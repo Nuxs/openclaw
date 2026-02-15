@@ -1,0 +1,54 @@
+# ============================================================================
+# 私有分支 CI — lint / test / build
+# ============================================================================
+# 与上游 ci.yml 平行，但只在私有分支上触发
+
+name: Private CI
+
+on:
+  push:
+    branches:
+      - private
+      - private/**
+  pull_request:
+    branches:
+      - private
+
+concurrency:
+  group: private-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint & format check
+        run: pnpm check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Build UI
+        run: pnpm ui:build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Apply brand (dry-run)
+        run: |
+          if [[ -f private/brand.json ]]; then
+            bash private/scripts/apply-brand.sh --dry-run
+          fi

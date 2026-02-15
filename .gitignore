@@ -88,3 +88,11 @@ USER.md
 !.agent/workflows/
 /local/
 package-lock.json
+
+# Private fork — 敏感配置不提交（模板文件保留）
+# private/env/*.env 中包含真实 token/key 时不要提交
+# 如果只是模板（无真实密钥），可以提交
+private/env/*.env.local
+private/assets/*.ico
+private/assets/*.svg
+private/assets/*.png

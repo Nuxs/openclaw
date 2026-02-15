@@ -1,0 +1,19 @@
+{
+  "name": "openclaw-plugin-example",
+  "version": "0.0.1",
+  "description": "私有插件开发模板 — 复制此目录作为新插件的起点",
+  "type": "module",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsdown src/handler.ts --format esm --platform node",
+    "dev": "tsdown src/handler.ts --format esm --platform node --watch"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "openclaw": "workspace:*",
+    "tsdown": "^0.12.0"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  }
+}

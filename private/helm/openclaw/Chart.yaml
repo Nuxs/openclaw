@@ -1,0 +1,14 @@
+apiVersion: v2
+name: openclaw
+description: OpenClaw AI Gateway — 私有化 Helm Chart
+type: application
+version: 0.1.0
+appVersion: "2026.2.13"
+keywords:
+  - ai
+  - gateway
+  - openclaw
+home: https://github.com/openclaw/openclaw
+maintainers:
+  - name: your-name
+    email: your-email@example.com

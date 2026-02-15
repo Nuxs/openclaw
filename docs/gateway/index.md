@@ -158,6 +158,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now openclaw-gateway[-<profile>].service
 ```
 
+If you maintain a private fork, the repo includes a hardened template at `private/systemd/openclaw-gateway.service` along with sample env files in `private/env/`.
+
   </Tab>
 </Tabs>
 

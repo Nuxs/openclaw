@@ -1,0 +1,40 @@
+# ============================================================================
+# 预发布环境 values override
+# ============================================================================
+# helm install openclaw ./private/helm/openclaw -f private/helm/openclaw/values-staging.yaml
+
+replicaCount: 1
+
+image:
+  tag: staging
+
+gateway:
+  bind: lan
+
+existingSecret: openclaw-secrets
+
+persistence:
+  size: 5Gi
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 2Gi
+    cpu: "2"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: staging-gateway.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: openclaw-staging-tls
+      hosts:
+        - staging-gateway.example.com

@@ -1,0 +1,28 @@
+# ============================================================================
+# 开发环境 values override
+# ============================================================================
+# helm install openclaw ./private/helm/openclaw -f private/helm/openclaw/values-dev.yaml
+
+replicaCount: 1
+
+image:
+  tag: dev
+  pullPolicy: Always
+
+gateway:
+  bind: loopback
+  token: dev-token-change-me
+
+persistence:
+  size: 1Gi
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: "1"
+
+ingress:
+  enabled: false

@@ -1,0 +1,24 @@
+# ============================================================================
+# 渠道保留列表 — filter-extensions.sh --keep-file 使用此文件
+# ============================================================================
+# 每行一个扩展名（extensions/ 下的子目录名）
+# '#' 开头为注释
+# 用 ./private/scripts/filter-extensions.sh --list 查看所有可用扩展
+
+# --- 核心渠道 ---
+telegram
+discord
+slack
+
+# --- 按需启用 ---
+# msteams
+# matrix
+# line
+# signal-cli
+# whatsapp-baileys
+# voice-call
+# zalo
+# zalouser
+# nostr
+# twitch
+# rc

@@ -21,7 +21,12 @@ COPY ui/package.json ./ui/package.json
 COPY patches ./patches
 COPY scripts ./scripts
 
-RUN pnpm install --frozen-lockfile
+ARG OPENCLAW_PNPM_FORCE="0"
+RUN if [ "$OPENCLAW_PNPM_FORCE" = "1" ]; then \
+      pnpm install --force; \
+    else \
+      pnpm install --frozen-lockfile; \
+    fi
 
 COPY . .
 RUN pnpm build

@@ -1,0 +1,43 @@
+{
+  "$schema": "./brand.schema.json",
+  "_comment": "私有化品牌配置 — apply-brand.sh 读取此文件替换所有品牌标识",
+
+  "name": "OpenClaw",
+  "nameLower": "openclaw",
+  "description": "Multi-channel AI gateway with extensible messaging integrations",
+
+  "ui": {
+    "title": "OpenClaw",
+    "favicon": "private/assets/favicon.ico",
+    "logo": "private/assets/logo.svg",
+    "primaryColor": "#6366f1"
+  },
+
+  "macos": {
+    "appName": "OpenClaw",
+    "bundleId": "ai.openclaw.gateway",
+    "teamId": ""
+  },
+
+  "ios": {
+    "appName": "OpenClaw",
+    "bundleId": "ai.openclaw.mobile"
+  },
+
+  "android": {
+    "appName": "OpenClaw",
+    "applicationId": "ai.openclaw.android"
+  },
+
+  "docker": {
+    "registry": "ghcr.io",
+    "imageName": "your-org/openclaw",
+    "platforms": ["linux/amd64", "linux/arm64"]
+  },
+
+  "deploy": {
+    "domain": "gateway.example.com",
+    "gatewayPort": 18789,
+    "bridgePort": 18790
+  }
+}

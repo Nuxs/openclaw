@@ -65,6 +65,24 @@ It writes config/workspace on the host:
 
 Running on a VPS? See [Hetzner (Docker VPS)](/install/hetzner).
 
+### Private fork overrides
+
+If you maintain a private fork, use the repo `private/` kit to layer in private images and environment files.
+
+Recommended (single entry point):
+
+```bash
+./private/scripts/deploy.sh docker dev
+```
+
+Manual compose override:
+
+```bash
+docker compose -f docker-compose.yml -f private/docker-compose.override.yml up -d openclaw-gateway
+```
+
+The override file expects env files under `private/env/` (for example `private/env/dev.env`). Avoid committing real secrets to the repo.
+
 ### Shell Helpers (optional)
 
 For easier day-to-day Docker management, install `ClawDock`:

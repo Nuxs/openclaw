@@ -1,0 +1,104 @@
+# ============================================================================
+# OpenClaw Helm Chart — 默认 values
+# ============================================================================
+# 环境 override: values-dev.yaml / values-staging.yaml / values-prod.yaml
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/your-org/openclaw
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Gateway 配置 -------------------------------------------------------------
+gateway:
+  # 监听地址: loopback / lan / 0.0.0.0
+  bind: lan
+  port: 18789
+  bridgePort: 18790
+  # 令牌 — 生产环境应从 Secret 注入
+  token: ""
+  # 密码认证（与 token 二选一）
+  password: ""
+
+# -- 环境变量（模型 API keys、渠道 tokens 等）----------------------------------
+# 建议通过 existingSecret 注入，不要明文写在 values 里
+env: {}
+  # OPENAI_API_KEY: ""
+  # ANTHROPIC_API_KEY: ""
+  # TELEGRAM_BOT_TOKEN: ""
+
+# 已有 Secret 名称（包含上述环境变量）
+existingSecret: ""
+
+# -- 持久化存储 ---------------------------------------------------------------
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 5Gi
+  # 挂载到容器内的路径
+  mountPath: /data
+
+# -- 服务 ---------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 18789
+  bridgePort: 18790
+
+# -- Ingress ------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: gateway.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: openclaw-tls
+    #   hosts:
+    #     - gateway.example.com
+
+# -- 资源限制 -----------------------------------------------------------------
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 2Gi
+    cpu: "2"
+
+# -- 健康检查 -----------------------------------------------------------------
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# -- 节点选择 & 容忍 -----------------------------------------------------------
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# -- ServiceAccount -----------------------------------------------------------
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""

@@ -1,0 +1,57 @@
+# ============================================================================
+# OpenClaw Gateway — Systemd 服务单元（裸机部署）
+# ============================================================================
+# 安装:
+#   sudo cp private/systemd/openclaw-gateway.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now openclaw-gateway
+#
+# 查看日志:
+#   journalctl -u openclaw-gateway -f
+#
+# 前提:
+#   - Node.js 22+ 已安装
+#   - openclaw 已通过 npm install -g 或源码构建安装
+#   - /etc/openclaw/.env 已配置
+
+[Unit]
+Description=OpenClaw AI Gateway
+Documentation=https://docs.openclaw.ai
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=openclaw
+Group=openclaw
+
+# 环境配置
+EnvironmentFile=-/etc/openclaw/.env
+Environment=NODE_ENV=production
+Environment=OPENCLAW_STATE_DIR=/var/lib/openclaw
+Environment=OPENCLAW_WORKSPACE_DIR=/var/lib/openclaw/workspace
+
+# 工作目录（源码安装时为仓库目录，npm 全局安装时为任意目录）
+WorkingDirectory=/opt/openclaw
+
+# 启动命令
+ExecStart=/usr/bin/node openclaw.mjs gateway --bind lan --port 18789
+
+# 优雅重启
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# 安全加固
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/openclaw
+PrivateTmp=yes
+
+# 资源限制
+LimitNOFILE=65535
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

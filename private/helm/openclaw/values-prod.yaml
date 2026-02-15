@@ -1,0 +1,42 @@
+# ============================================================================
+# 生产环境 values override
+# ============================================================================
+# helm install openclaw ./private/helm/openclaw -f private/helm/openclaw/values-prod.yaml
+
+replicaCount: 2
+
+image:
+  tag: latest
+
+gateway:
+  bind: lan
+
+existingSecret: openclaw-secrets
+
+persistence:
+  size: 10Gi
+
+resources:
+  requests:
+    memory: 1Gi
+    cpu: 500m
+  limits:
+    memory: 4Gi
+    cpu: "4"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: gateway.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: openclaw-prod-tls
+      hosts:
+        - gateway.example.com

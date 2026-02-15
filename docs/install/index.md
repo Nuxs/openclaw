@@ -136,6 +136,17 @@ The **installer script** is the recommended way to install OpenClaw. It handles 
   </Accordion>
 </AccordionGroup>
 
+## Private deployment kit
+
+If you maintain a private fork, the repo includes a deployment kit under `private/` with hardened defaults and multi-environment helpers.
+
+- **`private/scripts/deploy.sh`**: unified entry for Docker, Kubernetes, bare metal, and macOS
+- **`private/docker-compose.override.yml`**: Compose overrides for private images and env files
+- **`private/systemd/openclaw-gateway.service`**: production systemd template
+- **`private/helm/openclaw`**: Helm chart and environment values
+
+See [Docker](/install/docker) for container usage and [Gateway runbook](/gateway) for systemd operations.
+
 ## Other install methods
 
 <CardGroup cols={2}>
