@@ -94,12 +94,19 @@ async function promptWebToolsConfig(
 ): Promise<OpenClawConfig> {
   const existingSearch = nextConfig.tools?.web?.search;
   const existingFetch = nextConfig.tools?.web?.fetch;
-  const hasSearchKey = Boolean(existingSearch?.apiKey);
+  const existingProvider = existingSearch?.provider ?? "brave";
+  const existingPerplexity = existingSearch?.perplexity;
+  const existingGrok = existingSearch?.grok;
+  const existingSearxng = existingSearch?.searxng;
+  const hasBraveKey = Boolean(existingSearch?.apiKey);
+  const hasPerplexityKey = Boolean(existingPerplexity?.apiKey);
+  const hasGrokKey = Boolean(existingGrok?.apiKey);
+  const hasSearxngBaseUrl = Boolean(existingSearxng?.baseUrl);
 
   note(
     [
       "Web search lets your agent look things up online using the `web_search` tool.",
-      "It requires a Brave Search API key (you can store it in the config or set BRAVE_API_KEY in the Gateway environment).",
+      "Supported providers: Brave, Perplexity, Grok, SearxNG (self-hosted).",
       "Docs: https://docs.openclaw.ai/tools/web",
     ].join("\n"),
     "Web search",
@@ -107,8 +114,8 @@ async function promptWebToolsConfig(
 
   const enableSearch = guardCancel(
     await confirm({
-      message: "Enable web_search (Brave Search)?",
-      initialValue: existingSearch?.enabled ?? hasSearchKey,
+      message: "Enable web_search?",
+      initialValue: existingSearch?.enabled ?? (hasBraveKey || hasPerplexityKey || hasGrokKey),
     }),
     runtime,
   );
@@ -119,27 +126,146 @@ async function promptWebToolsConfig(
   };
 
   if (enableSearch) {
-    const keyInput = guardCancel(
-      await text({
-        message: hasSearchKey
-          ? "Brave Search API key (leave blank to keep current or use BRAVE_API_KEY)"
-          : "Brave Search API key (paste it here; leave blank to use BRAVE_API_KEY)",
-        placeholder: hasSearchKey ? "Leave blank to keep current" : "BSA...",
+    const provider = guardCancel(
+      await select({
+        message: "Web search provider",
+        options: [
+          { value: "brave", label: "Brave Search" },
+          { value: "perplexity", label: "Perplexity (Sonar/OpenRouter)" },
+          { value: "grok", label: "xAI Grok" },
+          { value: "searxng", label: "SearxNG (self-hosted)" },
+        ],
+        initialValue: existingProvider,
       }),
       runtime,
     );
-    const key = String(keyInput ?? "").trim();
-    if (key) {
-      nextSearch = { ...nextSearch, apiKey: key };
-    } else if (!hasSearchKey) {
-      note(
-        [
-          "No key stored yet, so web_search will stay unavailable.",
-          "Store a key here or set BRAVE_API_KEY in the Gateway environment.",
-          "Docs: https://docs.openclaw.ai/tools/web",
-        ].join("\n"),
-        "Web search",
+
+    nextSearch = { ...nextSearch, provider };
+
+    if (provider === "brave") {
+      const keyInput = guardCancel(
+        await text({
+          message: hasBraveKey
+            ? "Brave Search API key (leave blank to keep current or use BRAVE_API_KEY)"
+            : "Brave Search API key (paste it here; leave blank to use BRAVE_API_KEY)",
+          placeholder: hasBraveKey ? "Leave blank to keep current" : "BSA...",
+        }),
+        runtime,
       );
+      const key = String(keyInput ?? "").trim();
+      if (key) {
+        nextSearch = { ...nextSearch, apiKey: key };
+      } else if (!hasBraveKey) {
+        note(
+          [
+            "No key stored yet, so web_search will stay unavailable.",
+            "Store a key here or set BRAVE_API_KEY in the Gateway environment.",
+            "Docs: https://docs.openclaw.ai/tools/web",
+          ].join("\n"),
+          "Web search",
+        );
+      }
+    }
+
+    if (provider === "perplexity") {
+      const keyInput = guardCancel(
+        await text({
+          message: hasPerplexityKey
+            ? "Perplexity/OpenRouter API key (leave blank to keep current)"
+            : "Perplexity/OpenRouter API key (paste it here)",
+          placeholder: hasPerplexityKey ? "Leave blank to keep current" : "pplx- / sk-or-",
+        }),
+        runtime,
+      );
+      const key = String(keyInput ?? "").trim();
+      if (key) {
+        nextSearch = {
+          ...nextSearch,
+          perplexity: {
+            ...existingPerplexity,
+            apiKey: key,
+          },
+        };
+      } else if (!hasPerplexityKey) {
+        note(
+          [
+            "No Perplexity/OpenRouter key stored yet, so web_search will stay unavailable.",
+            "Store a key here or set PERPLEXITY_API_KEY/OPENROUTER_API_KEY in the Gateway environment.",
+            "Docs: https://docs.openclaw.ai/tools/web",
+          ].join("\n"),
+          "Web search",
+        );
+      }
+    }
+
+    if (provider === "grok") {
+      const keyInput = guardCancel(
+        await text({
+          message: hasGrokKey ? "xAI API key (leave blank to keep current)" : "xAI API key",
+          placeholder: hasGrokKey ? "Leave blank to keep current" : "xai-...",
+        }),
+        runtime,
+      );
+      const key = String(keyInput ?? "").trim();
+      if (key) {
+        nextSearch = {
+          ...nextSearch,
+          grok: {
+            ...existingGrok,
+            apiKey: key,
+          },
+        };
+      } else if (!hasGrokKey) {
+        note(
+          [
+            "No xAI API key stored yet, so web_search will stay unavailable.",
+            "Store a key here or set XAI_API_KEY in the Gateway environment.",
+            "Docs: https://docs.openclaw.ai/tools/web",
+          ].join("\n"),
+          "Web search",
+        );
+      }
+    }
+
+    if (provider === "searxng") {
+      const baseUrlInput = guardCancel(
+        await text({
+          message: "SearxNG base URL (e.g. https://search.example.com)",
+          placeholder: hasSearxngBaseUrl
+            ? "Leave blank to keep current"
+            : "https://search.example.com",
+          initialValue: hasSearxngBaseUrl ? existingSearxng?.baseUrl : undefined,
+        }),
+        runtime,
+      );
+      const baseUrl = String(baseUrlInput ?? "").trim();
+      const apiKeyInput = guardCancel(
+        await text({
+          message: "SearxNG API key (optional; leave blank if not required)",
+          placeholder: "Optional",
+        }),
+        runtime,
+      );
+      const apiKey = String(apiKeyInput ?? "").trim();
+      nextSearch = {
+        ...nextSearch,
+        searxng: {
+          ...existingSearxng,
+          baseUrl: baseUrl || existingSearxng?.baseUrl,
+          apiKey: apiKey || existingSearxng?.apiKey,
+        },
+      };
+
+      if (!baseUrl && !hasSearxngBaseUrl) {
+        note(
+          [
+            "No base URL stored yet, so web_search will stay unavailable.",
+            "Set tools.web.search.searxng.baseUrl to your SearxNG instance.",
+            "Docs: https://docs.openclaw.ai/tools/web",
+          ].join("\n"),
+          "Web search",
+        );
+      }
     }
   }
 
