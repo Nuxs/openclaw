@@ -1,0 +1,42 @@
+---
+description: 编码风格与命名规范（来源 AGENTS.md）
+alwaysApply: true
+globs: src/**/*,extensions/**/*
+---
+
+# 编码风格与命名规范
+
+## 语言与类型
+
+- TypeScript (ESM)，严格类型，避免 `any`
+- 格式化/Lint: Oxlint + Oxfmt；提交前 `pnpm check`
+
+## 文件组织
+
+- 添加简要注释解释复杂/非直觉逻辑
+- 保持文件简洁；提取 helper 而非复制为 "V2"。CLI 选项和依赖注入使用 `createDefaultDeps` 现有模式
+- 目标: 文件控制在 ~500-700 LOC 以内（指导性，非硬性），超出时拆分/重构
+
+## 命名
+
+- 产品/应用/文档标题: **OpenClaw**
+- CLI 命令/包名/二进制/路径/配置键: `openclaw`
+
+## UI 约束
+
+- CLI 进度条: 使用 `src/cli/progress.ts`（`osc-progress` + `@clack/prompts` spinner），不要手写
+- 状态输出: 使用 `src/terminal/table.ts` 的表格 + ANSI 安全换行
+- CLI 调色板: 使用 `src/terminal/palette.ts`，不要硬编码颜色
+
+## SwiftUI (iOS/macOS)
+
+- 状态管理优先用 Observation 框架（`@Observable`, `@Bindable`），不引入新的 `ObservableObject`
+- 触及相关代码时迁移旧的 `ObservableObject` 用法
+
+## Tool Schema 约束
+
+- 避免 `Type.Union`；不用 `anyOf`/`oneOf`/`allOf`
+- 字符串枚举用 `stringEnum`/`optionalStringEnum`（`Type.Unsafe`）
+- 可选字段用 `Type.Optional(...)` 而非 `... | null`
+- 顶层 schema 保持 `type: "object"` + `properties`
+- 避免 `format` 作为属性名（部分 validator 视为保留字）

@@ -1,0 +1,27 @@
+---
+description: 文档编写与国际化规则（来源 AGENTS.md）。在编辑 docs/ 目录文件时触发。
+alwaysApply: false
+globs: docs/**/*
+---
+
+# 文档编写规则
+
+## Mintlify 链接
+
+- 文档托管: Mintlify (docs.openclaw.ai)
+- `docs/**/*.md` 内部链接: 根相对路径，无 `.md`/`.mdx`（如 `[Config](/configuration)`）
+- 编辑文档时加载 mintlify skill
+- 章节交叉引用: 根相对路径 + 锚点（如 `[Hooks](/configuration#hooks)`）
+- 标题和锚点中避免 em dash 和撇号（会破坏 Mintlify 锚点链接）
+- When Peter asks for links, reply with full `https://docs.openclaw.ai/...` URLs (not root-relative).
+- When you touch docs, end the reply with the `https://docs.openclaw.ai/...` URLs you referenced.
+- README (GitHub): 使用绝对 URL `https://docs.openclaw.ai/...`
+- 内容必须通用化: 不含个人设备名/主机名/路径，使用占位符
+
+## 国际化 (zh-CN)
+
+- `docs/zh-CN/**` 为生成内容，除非用户明确要求否则不编辑
+- 流程: 更新英文文档 → 调整词汇表 (`docs/.i18n/glossary.zh-CN.json`) → 运行 `scripts/docs-i18n`
+- 翻译记忆: `docs/.i18n/zh-CN.tm.jsonl`（生成文件）
+- 详见 `docs/.i18n/README.md`
+- The pipeline can be slow/inefficient; if it’s dragging, ping @jospalmbier on Discord instead of hacking around it.

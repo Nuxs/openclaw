@@ -1,0 +1,17 @@
+---
+description: 测试规范（来源 AGENTS.md）。在编写或修改测试文件时触发。
+alwaysApply: false
+globs: "**/*.test.ts,test/**/*"
+---
+
+# 测试规范
+
+- 框架: Vitest + V8 覆盖率（70% lines/branches/functions/statements）
+- 命名: 源文件对应 `*.test.ts`；端到端测试 `*.e2e.test.ts`
+- 修改逻辑代码后推送前执行 `pnpm test`（或 `pnpm test:coverage`）
+- 测试 worker 数不超过 16
+- Live 测试: `CLAWDBOT_LIVE_TEST=1 pnpm test:live` 或 `LIVE=1 pnpm test:live`
+- Docker 测试: `pnpm test:docker:live-models`, `pnpm test:docker:live-gateway`, `pnpm test:docker:onboard`
+- 完整测试说明: `docs/testing.md`
+- Changelog: 仅用户可见变更；纯测试增减一般不需要 changelog 条目
+- 移动端测试: 优先使用已连接的真机（iOS + Android），再考虑模拟器

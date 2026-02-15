@@ -1,0 +1,41 @@
+---
+description: 提交、PR 与 Git 操作规范（来源 AGENTS.md）。在提交代码或处理 PR 时触发。
+alwaysApply: false
+---
+
+# 提交与 PR 规范
+
+## 提交
+
+- 使用 `scripts/committer "<msg>" <file...>` 创建提交；避免手动 `git add`/`git commit`
+- 简洁、行动导向的提交消息（如 `CLI: add verbose flag to send`）
+- 相关变更归组；避免捆绑无关重构
+
+## PR
+
+- PR 模板: `.github/pull_request_template.md`
+- Issue 模板: `.github/ISSUE_TEMPLATE/`
+- 完整维护者 PR 工作流见 `.agents/skills/PR_WORKFLOW.md`
+
+## 快捷命令
+
+- `sync`: 脏工作树 → 提交全部 → `git pull --rebase` → `git push`（冲突无法解决则停止）
+
+## Git 注意事项
+
+- 分支删除被策略阻止时: `git update-ref -d refs/heads/<branch>`
+
+## 多 Agent 安全
+
+- 不要创建/应用/丢弃 `git stash`（除非明确要求）
+- 不要切换分支（除非明确要求）
+- 不要操作 `git worktree`（除非明确要求）
+- `push` 时可 `git pull --rebase`，不丢弃其他 agent 的工作
+- `commit` 时只 scope 到自己的变更；`commit all` 则分组提交
+- 看到不认识的文件时继续工作，只提交自己的变更
+
+## Lint/格式化
+
+- 仅格式化变更: 自动解决，不询问
+- 已请求 commit/push: 自动 stage 格式化跟进
+- 语义变更: 才需要询问

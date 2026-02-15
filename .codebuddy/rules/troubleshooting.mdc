@@ -1,0 +1,8 @@
+---
+description: 故障排除要点（来源 AGENTS.md）
+alwaysApply: true
+---
+
+# Troubleshooting
+
+- Rebrand/migration issues or legacy config/service warnings: run `openclaw doctor` (see `docs/gateway/doctor.md`).

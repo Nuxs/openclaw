@@ -78,6 +78,10 @@ USER.md
 # local tooling
 .serena/
 
+# CodeBuddy IDE (rules 纳入版本控制，skills symlink 和 plans 忽略)
+.codebuddy/skills/
+.codebuddy/plans/
+
 # Agent credentials and memory (NEVER COMMIT)
 /memory/
 .agent/*.json

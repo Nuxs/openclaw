@@ -1,0 +1,17 @@
+---
+description: 安全与配置规范（来源 AGENTS.md）。始终生效的安全约束。
+alwaysApply: true
+---
+
+# 安全与配置规范
+
+- Web provider 凭证: `~/.openclaw/credentials/`；登出后重新 `openclaw login`
+- Pi 会话: `~/.openclaw/sessions/`（基目录不可配置）
+- 环境变量: 见 `~/.profile`
+- **绝不** 提交或发布真实电话号码、视频或线上配置值。文档/测试/示例中使用明显的假占位符
+- Release flow: always read `docs/reference/RELEASING.md` and `docs/platforms/mac/release.md` before any release work; do not ask routine questions once those docs answer them.
+- 发布护栏: 未经操作者明确同意不修改版本号；始终在 npm publish 前请求许可
+- 不要通过 SSH 重建 macOS app；必须直接在 Mac 上执行
+- 不向外部消息平台（WhatsApp/Telegram）发送流式/部分回复；仅发最终回复
+- 签名/公证密钥在仓库外管理
+- Notary 环境变量: `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_API_KEY_P8`

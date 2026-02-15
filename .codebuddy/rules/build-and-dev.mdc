@@ -1,0 +1,49 @@
+---
+description: 构建、开发与发布命令参考（来源 AGENTS.md）。在构建/开发/发布相关操作时触发。
+alwaysApply: false
+---
+
+# 构建、开发与发布
+
+## 运行环境
+
+- Node **22+**（保持 Node + Bun 双路径可用）
+
+## 常用命令
+
+| 操作 | 命令 |
+|------|------|
+| 安装依赖 | `pnpm install`（也支持 `bun install`） |
+| Pre-commit hooks | `prek install` |
+| 运行 CLI (dev) | `pnpm openclaw ...` 或 `pnpm dev` |
+| TS 执行 | 优先 `bun <file.ts>` / `bunx <tool>` |
+| 类型检查/构建 | `pnpm build` |
+| TS 检查 | `pnpm tsgo` |
+| Lint/格式 | `pnpm check` |
+| 格式检查 | `pnpm format` |
+| 格式修复 | `pnpm format:fix` |
+| 测试 | `pnpm test` |
+| 覆盖率 | `pnpm test:coverage` |
+| Mac 打包 | `scripts/package-mac-app.sh` |
+
+## 依赖缺失处理
+
+如 `node_modules` 缺失、`vitest not found` 等，先运行包管理器 install，再重跑原命令一次。重试仍失败则报告错误。
+
+## 发布通道
+
+| 通道 | 说明 |
+|------|------|
+| stable | 标签发布 `vYYYY.M.D`，npm dist-tag `latest` |
+| beta | `vYYYY.M.D-beta.N`，npm dist-tag `beta` |
+| dev | `main` 分支 HEAD |
+
+## 依赖管理
+
+- 不要更新 Carbon 依赖
+- `pnpm.patchedDependencies` 中的依赖必须使用精确版本（无 `^`/`~`）
+- 补丁/覆盖/vendor 变更需要明确审批
+
+## 运行产物
+
+- Node remains supported for running built output (`dist/*`) and production installs.
