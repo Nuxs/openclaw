@@ -36,6 +36,9 @@ const {
   resolveGrokModel,
   resolveGrokInlineCitations,
   extractGrokContent,
+  resolveSearxngBaseUrl,
+  resolveSearxngApiKey,
+  resolveSearchProvider,
 } = __testing;
 
 describe("web_search perplexity baseUrl defaults", () => {
@@ -241,5 +244,76 @@ describe("web_search grok response parsing", () => {
     const result = extractGrokContent({});
     expect(result.text).toBeUndefined();
     expect(result.annotationCitations).toEqual([]);
+  });
+});
+
+describe("web_search searxng config resolution", () => {
+  it("resolves baseUrl from config", () => {
+    expect(resolveSearxngBaseUrl({ baseUrl: "https://search.example.com" })).toBe(
+      "https://search.example.com",
+    );
+  });
+
+  it("returns undefined when no baseUrl is configured", () => {
+    expect(resolveSearxngBaseUrl({})).toBeUndefined();
+    expect(resolveSearxngBaseUrl(undefined)).toBeUndefined();
+  });
+
+  it("trims whitespace from baseUrl", () => {
+    expect(resolveSearxngBaseUrl({ baseUrl: "  https://search.example.com  " })).toBe(
+      "https://search.example.com",
+    );
+  });
+
+  it("returns undefined for empty/whitespace-only baseUrl", () => {
+    expect(resolveSearxngBaseUrl({ baseUrl: "   " })).toBeUndefined();
+    expect(resolveSearxngBaseUrl({ baseUrl: "" })).toBeUndefined();
+  });
+
+  it("resolves apiKey from config", () => {
+    expect(resolveSearxngApiKey({ apiKey: "my-token" })).toBe("my-token");
+  });
+
+  it("returns empty string when no apiKey is configured and no env", () => {
+    withEnv({ SEARXNG_API_KEY: undefined }, () => {
+      expect(resolveSearxngApiKey({})).toBeFalsy();
+      expect(resolveSearxngApiKey(undefined)).toBeFalsy();
+    });
+  });
+
+  it("falls back to SEARXNG_API_KEY env var", () => {
+    withEnv({ SEARXNG_API_KEY: "env-token" }, () => {
+      expect(resolveSearxngApiKey({})).toBe("env-token");
+    });
+  });
+
+  it("prefers config apiKey over env var", () => {
+    withEnv({ SEARXNG_API_KEY: "env-token" }, () => {
+      expect(resolveSearxngApiKey({ apiKey: "config-token" })).toBe("config-token");
+    });
+  });
+});
+
+describe("resolveSearchProvider", () => {
+  it("resolves searxng provider", () => {
+    expect(resolveSearchProvider({ provider: "searxng" } as any)).toBe("searxng");
+  });
+
+  it("resolves grok provider", () => {
+    expect(resolveSearchProvider({ provider: "grok" } as any)).toBe("grok");
+  });
+
+  it("resolves perplexity provider", () => {
+    expect(resolveSearchProvider({ provider: "perplexity" } as any)).toBe("perplexity");
+  });
+
+  it("resolves brave provider", () => {
+    expect(resolveSearchProvider({ provider: "brave" } as any)).toBe("brave");
+  });
+
+  it("defaults to brave for unknown providers", () => {
+    expect(resolveSearchProvider({ provider: "unknown" } as any)).toBe("brave");
+    expect(resolveSearchProvider(undefined)).toBe("brave");
+    expect(resolveSearchProvider({} as any)).toBe("brave");
   });
 });

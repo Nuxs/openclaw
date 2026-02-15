@@ -1,0 +1,20 @@
+services:
+  searxng:
+    image: ghcr.io/searxng/searxng
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    volumes:
+      - ./searxng/config:/etc/searxng
+      - ./searxng/data:/var/cache/searxng
+  searxng-proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro

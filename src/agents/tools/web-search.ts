@@ -407,7 +407,12 @@ function resolveSearxngBaseUrl(searxng?: SearxngConfig): string | undefined {
 }
 
 function resolveSearxngApiKey(searxng?: SearxngConfig): string | undefined {
-  return normalizeApiKey(searxng?.apiKey);
+  const fromConfig = normalizeApiKey(searxng?.apiKey);
+  if (fromConfig) {
+    return fromConfig;
+  }
+  const fromEnv = normalizeApiKey(process.env.SEARXNG_API_KEY);
+  return fromEnv || undefined;
 }
 
 function resolveSearchCount(value: unknown, fallback: number): number {
@@ -877,7 +882,7 @@ export function createWebSearchTool(options?: {
               : resolveSearchApiKey(search);
 
       if (provider !== "searxng" && !apiKey) {
-        return jsonResult(missingSearchKeyPayload(provider));
+        return jsonResult(missingSearchKeyPayload(provider as ApiKeyRequiredProvider));
       }
 
       if (provider === "searxng" && !searxngBaseUrl) {
@@ -950,4 +955,7 @@ export const __testing = {
   resolveGrokModel,
   resolveGrokInlineCitations,
   extractGrokContent,
+  resolveSearxngBaseUrl,
+  resolveSearxngApiKey,
+  resolveSearchProvider,
 } as const;

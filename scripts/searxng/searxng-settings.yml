@@ -1,0 +1,9 @@
+use_default_settings: true
+
+server:
+  base_url: "http://YOUR_HOST_OR_IP:8080"
+  secret_key: "CHANGE_ME_SECRET"
+  public_instance: false
+
+search:
+  safe_search: 0

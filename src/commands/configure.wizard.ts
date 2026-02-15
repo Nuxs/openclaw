@@ -115,7 +115,9 @@ async function promptWebToolsConfig(
   const enableSearch = guardCancel(
     await confirm({
       message: "Enable web_search?",
-      initialValue: existingSearch?.enabled ?? (hasBraveKey || hasPerplexityKey || hasGrokKey),
+      initialValue:
+        existingSearch?.enabled ??
+        (hasBraveKey || hasPerplexityKey || hasGrokKey || hasSearxngBaseUrl),
     }),
     runtime,
   );

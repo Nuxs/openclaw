@@ -1,9 +1,11 @@
 ---
-summary: "Web search + fetch tools (Brave Search API, Perplexity direct/OpenRouter)"
+summary: "Web search + fetch tools (Brave Search API, Perplexity direct/OpenRouter, xAI Grok, SearxNG self-hosted)"
 read_when:
   - You want to enable web_search or web_fetch
   - You need Brave Search API key setup
   - You want to use Perplexity Sonar for web search
+  - You want to use xAI Grok for web search
+  - You want to use SearxNG for web search
 title: "Web Tools"
 ---
 
@@ -11,7 +13,7 @@ title: "Web Tools"
 
 OpenClaw ships two lightweight web tools:
 
-- `web_search` — Search the web via Brave Search API (default) or Perplexity Sonar (direct or via OpenRouter).
+- `web_search` — Search the web via Brave Search API (default), Perplexity Sonar (direct or via OpenRouter), xAI Grok, or SearxNG (self-hosted).
 - `web_fetch` — HTTP fetch + readable extraction (HTML → markdown/text).
 
 These are **not** browser automation. For JS-heavy sites or logins, use the
@@ -22,6 +24,8 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 - `web_search` calls your configured provider and returns results.
   - **Brave** (default): returns structured results (title, URL, snippet).
   - **Perplexity**: returns AI-synthesized answers with citations from real-time web search.
+  - **Grok**: returns AI-synthesized answers with citations via xAI Responses API.
+  - **SearxNG**: returns structured results from your self-hosted instance.
 - Results are cached by query for 15 minutes (configurable).
 - `web_fetch` does a plain HTTP GET and extracts readable content
   (HTML → markdown/text). It does **not** execute JavaScript.
@@ -33,8 +37,10 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 | ------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
 | **Brave** (default) | Fast, structured results, free tier          | Traditional search results               | `BRAVE_API_KEY`                              |
 | **Perplexity**      | AI-synthesized answers, citations, real-time | Requires Perplexity or OpenRouter access | `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` |
+| **Grok**            | AI-synthesized answers, inline citations     | Requires xAI API access                  | `XAI_API_KEY`                                |
+| **SearxNG**         | Self-hosted, open-source                     | You host and maintain it                 | Optional (proxy token)                       |
 
-See [Brave Search setup](/brave-search) and [Perplexity Sonar](/perplexity) for provider-specific details.
+See [Brave Search setup](/brave-search), [Perplexity Sonar](/perplexity), [SearxNG](/searxng) for provider-specific details.
 
 Set the provider in config:
 
@@ -43,7 +49,7 @@ Set the provider in config:
   tools: {
     web: {
       search: {
-        provider: "brave", // or "perplexity"
+        provider: "brave", // or "perplexity", "grok", or "searxng"
       },
     },
   },
@@ -62,6 +68,24 @@ Example: switch to Perplexity Sonar (direct API):
           apiKey: "pplx-...",
           baseUrl: "https://api.perplexity.ai",
           model: "perplexity/sonar-pro",
+        },
+      },
+    },
+  },
+}
+```
+
+Example: use SearxNG (self-hosted):
+
+```json5
+{
+  tools: {
+    web: {
+      search: {
+        provider: "searxng",
+        searxng: {
+          baseUrl: "http://search.example.com:8080",
+          apiKey: "your-token", // optional if your proxy does not enforce it
         },
       },
     },
@@ -146,9 +170,11 @@ Search the web using your configured provider.
 ### Requirements
 
 - `tools.web.search.enabled` must not be `false` (default: enabled)
-- API key for your chosen provider:
+- API key or base URL for your chosen provider:
   - **Brave**: `BRAVE_API_KEY` or `tools.web.search.apiKey`
   - **Perplexity**: `OPENROUTER_API_KEY`, `PERPLEXITY_API_KEY`, or `tools.web.search.perplexity.apiKey`
+  - **Grok**: `XAI_API_KEY` or `tools.web.search.grok.apiKey`
+  - **SearxNG**: `tools.web.search.searxng.baseUrl` (and optional `tools.web.search.searxng.apiKey` or `SEARXNG_API_KEY`)
 
 ### Config
 
