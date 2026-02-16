@@ -96,6 +96,8 @@ search:
 EOF
 
 cat > /tmp/nginx.conf <<EOF
+map_hash_bucket_size 128;
+
 map \$arg_apikey \$searxng_auth_ok {
   default 0;
   "${SEARXNG_API_KEY}" 1;
