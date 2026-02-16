@@ -87,12 +87,16 @@ cat > /tmp/searxng-settings.yml <<EOF
 use_default_settings: true
 
 server:
+  limiter: false
   base_url: "${SEARXNG_BASE_URL}"
   secret_key: "${SECRET_KEY}"
   public_instance: false
 
 search:
   safe_search: 0
+  formats:
+    - html
+    - json
 EOF
 
 cat > /tmp/nginx.conf <<EOF
