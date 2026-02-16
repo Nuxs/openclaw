@@ -55,6 +55,14 @@ Set the provider and base URL in `tools.web.search`:
 }
 ```
 
+## Troubleshooting
+
+- `403` on `/search?format=json`: ensure `search.formats` in `settings.yml`
+  includes `json` (SearxNG rejects JSON output otherwise).
+- `public_instance: true` forces the limiter and link token features. If you
+  are using the nginx proxy + `apikey` gate, keep `public_instance: false` and
+  set `server.limiter: false` unless you also configure Valkey.
+
 ## Notes
 
 - SearxNG itself does not require an API key; the included proxy enforces a
