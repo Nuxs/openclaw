@@ -200,6 +200,7 @@ export const ToolsWebSearchSchema = z
       .object({
         baseUrl: z.string().optional(),
         apiKey: z.string().optional().register(sensitive),
+        siteWeights: z.record(z.string(), z.number().finite()).optional(),
       })
       .strict()
       .optional(),

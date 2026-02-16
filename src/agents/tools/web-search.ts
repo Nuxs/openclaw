@@ -105,6 +105,7 @@ type GrokConfig = {
 type SearxngConfig = {
   baseUrl?: string;
   apiKey?: string;
+  siteWeights?: Record<string, number>;
 };
 
 type GrokSearchResponse = {
@@ -246,7 +247,7 @@ function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDE
   if (raw === "brave") {
     return "brave";
   }
-  return "brave";
+  return "searxng";
 }
 
 function resolvePerplexityConfig(search?: WebSearchConfig): PerplexityConfig {
@@ -494,6 +495,132 @@ function resolveSiteName(url: string | undefined): string | undefined {
   }
 }
 
+type SearxngNormalizedResult = {
+  title: string;
+  url: string;
+  description: string;
+  published?: string;
+  siteName?: string;
+};
+
+const SEARXNG_TRACKING_PARAMS = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "gclid",
+  "fbclid",
+  "yclid",
+  "msclkid",
+  "ref",
+  "ref_src",
+]);
+
+function normalizeUrlForDedupe(rawUrl: string): string | undefined {
+  if (!rawUrl) {
+    return undefined;
+  }
+  try {
+    const url = new URL(rawUrl);
+    url.hash = "";
+    const toDelete = [...url.searchParams.keys()].filter((k) => SEARXNG_TRACKING_PARAMS.has(k));
+    for (const key of toDelete) {
+      url.searchParams.delete(key);
+    }
+    const hostname = url.hostname.replace(/^www\./i, "").toLowerCase();
+    let pathname = url.pathname.replace(/\/+$/, "");
+    if (!pathname) {
+      pathname = "/";
+    }
+    const search = url.searchParams.toString();
+    return `${hostname}${pathname}${search ? `?${search}` : ""}`;
+  } catch {
+    return undefined;
+  }
+}
+
+function serializeSiteWeights(weights?: Record<string, number>): string {
+  if (!weights) {
+    return "default";
+  }
+  const entries = Object.entries(weights).filter(([, value]) => Number.isFinite(value));
+  if (entries.length === 0) {
+    return "default";
+  }
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return entries.map(([key, value]) => `${key}:${value}`).join(",");
+}
+
+function resolveSearxngSiteWeight(
+  hostname: string | undefined,
+  siteWeights?: Record<string, number>,
+): number {
+  if (!hostname) {
+    return 1;
+  }
+  const normalizedHost = hostname.toLowerCase();
+  const trimmedHost = normalizedHost.replace(/^www\./i, "");
+  const parts = trimmedHost.split(".").filter(Boolean);
+  const baseDomain =
+    parts.length >= 2 ? `${parts[parts.length - 2]}.${parts[parts.length - 1]}` : "";
+  const directWeight = siteWeights?.[trimmedHost] ?? siteWeights?.[normalizedHost];
+  const baseWeight = baseDomain ? siteWeights?.[baseDomain] : undefined;
+  const resolved = directWeight ?? baseWeight;
+  if (typeof resolved === "number" && Number.isFinite(resolved)) {
+    return resolved;
+  }
+  if (trimmedHost.endsWith(".gov")) {
+    return 1.2;
+  }
+  if (trimmedHost.endsWith(".edu")) {
+    return 1.15;
+  }
+  if (trimmedHost.endsWith(".org")) {
+    return 1.05;
+  }
+  return 1;
+}
+
+/** Deduplicate SearxNG results and apply optional site weights, preserving original order. */
+function dedupeSearxngResults(params: {
+  results: SearxngNormalizedResult[];
+  count: number;
+  siteWeights?: Record<string, number>;
+}): SearxngNormalizedResult[] {
+  const seen = new Map<string, number>();
+  const deduped: (SearxngNormalizedResult & { index: number })[] = [];
+
+  for (let i = 0; i < params.results.length; i += 1) {
+    const entry = params.results[i];
+    const urlKey = normalizeUrlForDedupe(entry.url);
+    const titleKey = entry.title?.toLowerCase().trim();
+    const key = urlKey
+      ? `url:${urlKey}`
+      : titleKey
+        ? `title:${titleKey}|${entry.siteName ?? ""}`
+        : `index:${i}`;
+
+    if (!seen.has(key)) {
+      seen.set(key, deduped.length);
+      deduped.push({ ...entry, index: i });
+    }
+  }
+
+  // Stable sort by site weight (descending), preserving original order for equal weights.
+  const sorted = deduped.toSorted((a, b) => {
+    const wa = resolveSearxngSiteWeight(a.siteName, params.siteWeights);
+    const wb = resolveSearxngSiteWeight(b.siteName, params.siteWeights);
+    if (wb !== wa) {
+      return wb - wa;
+    }
+    return a.index - b.index;
+  });
+
+  return sorted.slice(0, params.count).map(({ index: _index, ...rest }) => rest);
+}
+
 async function runPerplexitySearch(params: {
   query: string;
   apiKey: string;
@@ -604,6 +731,7 @@ async function runSearxngSearch(params: {
   apiKey?: string;
   timeoutSeconds: number;
   searchLang?: string;
+  siteWeights?: Record<string, number>;
 }): Promise<{
   results: Array<{
     title: string;
@@ -639,19 +767,33 @@ async function runSearxngSearch(params: {
 
   const data = (await res.json()) as SearxngSearchResponse;
   const results = Array.isArray(data.results) ? data.results : [];
-  const mapped = results.slice(0, params.count).map((entry) => {
+  const normalized = results.map((entry) => {
     const title = entry.title ?? "";
     const url = entry.url ?? "";
     const description = entry.content ?? "";
     const rawSiteName = resolveSiteName(url);
     return {
-      title: title ? wrapWebContent(title, "web_search") : "",
+      title,
       url,
-      description: description ? wrapWebContent(description, "web_search") : "",
+      description,
       published: entry.publishedDate || entry.published || undefined,
       siteName: rawSiteName || undefined,
-    };
+    } satisfies SearxngNormalizedResult;
   });
+
+  const deduped = dedupeSearxngResults({
+    results: normalized,
+    count: params.count,
+    siteWeights: params.siteWeights,
+  });
+
+  const mapped = deduped.map((entry) => ({
+    title: entry.title ? wrapWebContent(entry.title, "web_search") : "",
+    url: entry.url,
+    description: entry.description ? wrapWebContent(entry.description, "web_search") : "",
+    published: entry.published,
+    siteName: entry.siteName,
+  }));
 
   return { results: mapped };
 }
@@ -673,6 +815,7 @@ async function runWebSearch(params: {
   grokInlineCitations?: boolean;
   searxngBaseUrl?: string;
   searxngApiKey?: string;
+  searxngSiteWeights?: Record<string, number>;
 }): Promise<Record<string, unknown>> {
   const cacheKey = normalizeCacheKey(
     params.provider === "brave"
@@ -680,7 +823,7 @@ async function runWebSearch(params: {
       : params.provider === "perplexity"
         ? `${params.provider}:${params.query}:${params.perplexityBaseUrl ?? DEFAULT_PERPLEXITY_BASE_URL}:${params.perplexityModel ?? DEFAULT_PERPLEXITY_MODEL}:${params.freshness || "default"}`
         : params.provider === "searxng"
-          ? `${params.provider}:${params.query}:${params.searxngBaseUrl ?? "default"}:${params.count}:${params.search_lang || "default"}`
+          ? `${params.provider}:${params.query}:${params.searxngBaseUrl ?? "default"}:${params.count}:${params.search_lang || "default"}:${serializeSiteWeights(params.searxngSiteWeights)}`
           : `${params.provider}:${params.query}:${params.grokModel ?? DEFAULT_GROK_MODEL}:${String(params.grokInlineCitations ?? false)}`,
   );
   const cached = readCache(SEARCH_CACHE, cacheKey);
@@ -754,6 +897,7 @@ async function runWebSearch(params: {
       apiKey: params.searxngApiKey,
       timeoutSeconds: params.timeoutSeconds,
       searchLang: params.search_lang,
+      siteWeights: params.searxngSiteWeights,
     });
 
     const payload = {
@@ -938,6 +1082,7 @@ export function createWebSearchTool(options?: {
         grokInlineCitations: resolveGrokInlineCitations(grokConfig),
         searxngBaseUrl,
         searxngApiKey: apiKey,
+        searxngSiteWeights: searxngConfig?.siteWeights,
       });
       return jsonResult(result);
     },

@@ -92,6 +92,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "tools.web.search.apiKey": "Brave Search API Key",
   "tools.web.search.searxng.baseUrl": "SearxNG Base URL",
   "tools.web.search.searxng.apiKey": "SearxNG API Key",
+  "tools.web.search.searxng.siteWeights": "SearxNG Site Weights",
   "tools.web.search.maxResults": "Web Search Max Results",
   "tools.web.search.timeoutSeconds": "Web Search Timeout (sec)",
   "tools.web.search.cacheTtlMinutes": "Web Search Cache TTL (min)",

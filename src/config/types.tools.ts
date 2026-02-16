@@ -370,6 +370,8 @@ export type ToolsConfig = {
         baseUrl?: string;
         /** Optional API key for SearxNG (sent as apikey query parameter). */
         apiKey?: string;
+        /** Optional per-site weighting for SearxNG reranking (hostname or base domain). */
+        siteWeights?: Record<string, number>;
       };
     };
     fetch?: {
