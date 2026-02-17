@@ -434,8 +434,8 @@ export async function runReplyAgent(params: {
       const output = usage.output ?? 0;
       const cacheRead = usage.cacheRead ?? 0;
       const cacheWrite = usage.cacheWrite ?? 0;
-      const promptTokensTotal = input + cacheRead + cacheWrite;
-      const totalTokens = usage.total ?? promptTokensTotal + output;
+      const promptTokens = input + cacheRead + cacheWrite;
+      const totalTokens = usage.total ?? promptTokens + output;
       const costConfig = resolveModelCostConfig({
         provider: providerUsed,
         model: modelUsed,
@@ -454,7 +454,7 @@ export async function runReplyAgent(params: {
           output,
           cacheRead,
           cacheWrite,
-          promptTokens: promptTokensTotal,
+          promptTokens,
           total: totalTokens,
         },
         context: {

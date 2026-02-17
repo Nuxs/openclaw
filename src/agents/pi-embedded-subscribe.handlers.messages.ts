@@ -310,18 +310,18 @@ export function handleMessageEnd(
         const splitResult = ctx.consumeReplyDirectives(text, { final: true });
         if (splitResult) {
           const {
-            text: blockCleanedText,
-            mediaUrls: blockMediaUrls,
+            text: cleanedText,
+            mediaUrls,
             audioAsVoice,
             replyToId,
             replyToTag,
             replyToCurrent,
           } = splitResult;
           // Emit if there's content OR audioAsVoice flag (to propagate the flag).
-          if (blockCleanedText || (blockMediaUrls && blockMediaUrls.length > 0) || audioAsVoice) {
+          if (cleanedText || (mediaUrls && mediaUrls.length > 0) || audioAsVoice) {
             void onBlockReply({
-              text: blockCleanedText,
-              mediaUrls: blockMediaUrls?.length ? blockMediaUrls : undefined,
+              text: cleanedText,
+              mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
               audioAsVoice,
               replyToId,
               replyToTag,
@@ -344,16 +344,16 @@ export function handleMessageEnd(
     const tailResult = ctx.consumeReplyDirectives("", { final: true });
     if (tailResult) {
       const {
-        text: tailCleanedText,
+        text: cleanedText,
         mediaUrls: tailMediaUrls,
         audioAsVoice,
         replyToId,
         replyToTag,
         replyToCurrent,
       } = tailResult;
-      if (tailCleanedText || (tailMediaUrls && tailMediaUrls.length > 0) || audioAsVoice) {
+      if (cleanedText || (tailMediaUrls && tailMediaUrls.length > 0) || audioAsVoice) {
         void onBlockReply({
-          text: tailCleanedText,
+          text: cleanedText,
           mediaUrls: tailMediaUrls?.length ? tailMediaUrls : undefined,
           audioAsVoice,
           replyToId,

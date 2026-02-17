@@ -433,16 +433,16 @@ export function resolveModelDirectiveSelection(params: {
     };
   };
 
-  const resolveFuzzy = (criteria: {
+  const resolveFuzzy = (params: {
     provider?: string;
     fragment: string;
   }): { selection?: ModelDirectiveSelection; error?: string } => {
-    const fragment = criteria.fragment.trim().toLowerCase();
+    const fragment = params.fragment.trim().toLowerCase();
     if (!fragment) {
       return {};
     }
 
-    const providerFilter = criteria.provider ? normalizeProviderId(criteria.provider) : undefined;
+    const providerFilter = params.provider ? normalizeProviderId(params.provider) : undefined;
 
     const candidates: Array<{ provider: string; model: string }> = [];
     for (const key of allowedModelKeys) {
@@ -459,7 +459,7 @@ export function resolveModelDirectiveSelection(params: {
     }
 
     // Also allow partial alias matches when the user didn't specify a provider.
-    if (!criteria.provider) {
+    if (!params.provider) {
       const aliasMatches: Array<{ provider: string; model: string }> = [];
       for (const [aliasKey, entry] of aliasIndex.byAlias.entries()) {
         if (!aliasKey.includes(fragment)) {

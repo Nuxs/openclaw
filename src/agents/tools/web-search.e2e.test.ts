@@ -296,34 +296,24 @@ describe("web_search searxng config resolution", () => {
 
 describe("resolveSearchProvider", () => {
   it("resolves searxng provider", () => {
-    expect(resolveSearchProvider({ provider: "searxng" } as unknown as { provider: string })).toBe(
-      "searxng",
-    );
+    expect(resolveSearchProvider({ provider: "searxng" } as any)).toBe("searxng");
   });
 
   it("resolves grok provider", () => {
-    expect(resolveSearchProvider({ provider: "grok" } as unknown as { provider: string })).toBe(
-      "grok",
-    );
+    expect(resolveSearchProvider({ provider: "grok" } as any)).toBe("grok");
   });
 
   it("resolves perplexity provider", () => {
-    expect(
-      resolveSearchProvider({ provider: "perplexity" } as unknown as { provider: string }),
-    ).toBe("perplexity");
+    expect(resolveSearchProvider({ provider: "perplexity" } as any)).toBe("perplexity");
   });
 
   it("resolves brave provider", () => {
-    expect(resolveSearchProvider({ provider: "brave" } as unknown as { provider: string })).toBe(
-      "brave",
-    );
+    expect(resolveSearchProvider({ provider: "brave" } as any)).toBe("brave");
   });
 
   it("defaults to brave for unknown providers", () => {
-    expect(resolveSearchProvider({ provider: "unknown" } as unknown as { provider: string })).toBe(
-      "brave",
-    );
+    expect(resolveSearchProvider({ provider: "unknown" } as any)).toBe("brave");
     expect(resolveSearchProvider(undefined)).toBe("brave");
-    expect(resolveSearchProvider({} as unknown as { provider?: string })).toBe("brave");
+    expect(resolveSearchProvider({} as any)).toBe("brave");
   });
 });
