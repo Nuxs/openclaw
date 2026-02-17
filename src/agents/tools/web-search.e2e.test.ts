@@ -273,24 +273,25 @@ describe("web_search searxng config resolution", () => {
 
 describe("resolveSearchProvider", () => {
   it("resolves searxng provider", () => {
-    expect(resolveSearchProvider({ provider: "searxng" } as any)).toBe("searxng");
+    expect(resolveSearchProvider({ provider: "searxng" })).toBe("searxng");
   });
 
   it("resolves grok provider", () => {
-    expect(resolveSearchProvider({ provider: "grok" } as any)).toBe("grok");
+    expect(resolveSearchProvider({ provider: "grok" })).toBe("grok");
   });
 
   it("resolves perplexity provider", () => {
-    expect(resolveSearchProvider({ provider: "perplexity" } as any)).toBe("perplexity");
+    expect(resolveSearchProvider({ provider: "perplexity" })).toBe("perplexity");
   });
 
   it("resolves brave provider", () => {
-    expect(resolveSearchProvider({ provider: "brave" } as any)).toBe("brave");
+    expect(resolveSearchProvider({ provider: "brave" })).toBe("brave");
   });
 
   it("defaults to brave for unknown providers", () => {
-    expect(resolveSearchProvider({ provider: "unknown" } as any)).toBe("brave");
+    // @ts-expect-error - testing runtime behavior with invalid provider
+    expect(resolveSearchProvider({ provider: "unknown" })).toBe("brave");
     expect(resolveSearchProvider(undefined)).toBe("brave");
-    expect(resolveSearchProvider({} as any)).toBe("brave");
+    expect(resolveSearchProvider({})).toBe("brave");
   });
 });

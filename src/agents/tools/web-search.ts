@@ -747,7 +747,8 @@ async function runSearxngRerank(params: {
 
   if (!res.ok) {
     const detail = await readResponseText(res);
-    throw new Error(`SearxNG rerank error (${res.status}): ${detail || res.statusText}`);
+    const errorMsg = typeof detail === "string" ? detail : res.statusText;
+    throw new Error(`SearxNG rerank error (${res.status}): ${errorMsg}`);
   }
 
   const data = (await res.json()) as { scores?: number[] };
@@ -908,7 +909,8 @@ async function runSearxngSearch(params: {
 
   if (!res.ok) {
     const detail = await readResponseText(res);
-    throw new Error(`SearxNG API error (${res.status}): ${detail || res.statusText}`);
+    const errorMsg = typeof detail === "string" ? detail : res.statusText;
+    throw new Error(`SearxNG API error (${res.status}): ${errorMsg}`);
   }
 
   const data = (await res.json()) as SearxngSearchResponse;
