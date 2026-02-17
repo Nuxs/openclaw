@@ -913,12 +913,12 @@ async function runSearxngSearch(params: {
   const results = Array.isArray(data.results) ? data.results : [];
   const normalized = results.map((entry) => {
     const title = entry.title ?? "";
-    const url = entry.url ?? "";
+    const resultUrl = entry.url ?? "";
     const description = entry.content ?? "";
-    const rawSiteName = resolveSiteName(url);
+    const rawSiteName = resolveSiteName(resultUrl);
     return {
       title,
-      url,
+      url: resultUrl,
       description,
       published: entry.publishedDate || entry.published || undefined,
       siteName: rawSiteName || undefined,
@@ -1155,11 +1155,11 @@ async function runWebSearch(params: {
   const mapped = results.map((entry) => {
     const description = entry.description ?? "";
     const title = entry.title ?? "";
-    const url = entry.url ?? "";
-    const rawSiteName = resolveSiteName(url);
+    const resultUrl = entry.url ?? "";
+    const rawSiteName = resolveSiteName(resultUrl);
     return {
       title: title ? wrapWebContent(title, "web_search") : "",
-      url, // Keep raw for tool chaining
+      url: resultUrl, // Keep raw for tool chaining
       description: description ? wrapWebContent(description, "web_search") : "",
       published: entry.age || undefined,
       siteName: rawSiteName || undefined,

@@ -278,8 +278,8 @@ describe("commands registry args", () => {
           name: "level",
           description: "level",
           type: "string",
-          choices: ({ provider, model, command, arg }) => {
-            seen = { provider, model, commandKey: command.key, argName: arg.name };
+          choices: ({ provider, model, command: commandSpec, arg }) => {
+            seen = { provider, model, commandKey: commandSpec.key, argName: arg.name };
             return ["low", "high"];
           },
         },

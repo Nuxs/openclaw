@@ -183,8 +183,8 @@ export async function resolveReplyDirectives(params: {
       cmd.textAliases.map((a) => a.replace(/^\//, "").toLowerCase()),
     ),
   );
-  for (const command of skillCommands) {
-    reservedCommands.add(command.name.toLowerCase());
+  for (const skillCommand of skillCommands) {
+    reservedCommands.add(skillCommand.name.toLowerCase());
   }
   const configuredAliases = Object.values(cfg.agents?.defaults?.models ?? {})
     .map((entry) => entry.alias?.trim())

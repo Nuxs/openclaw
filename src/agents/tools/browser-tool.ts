@@ -273,7 +273,7 @@ export function createBrowserTool(opts?: {
           });
 
       const proxyRequest = nodeTarget
-        ? async (opts: {
+        ? async (request: {
             method: string;
             path: string;
             query?: Record<string, string | number | boolean | undefined>;
@@ -283,12 +283,12 @@ export function createBrowserTool(opts?: {
           }) => {
             const proxy = await callBrowserProxy({
               nodeId: nodeTarget.nodeId,
-              method: opts.method,
-              path: opts.path,
-              query: opts.query,
-              body: opts.body,
-              timeoutMs: opts.timeoutMs,
-              profile: opts.profile,
+              method: request.method,
+              path: request.path,
+              query: request.query,
+              body: request.body,
+              timeoutMs: request.timeoutMs,
+              profile: request.profile,
             });
             const mapping = await persistProxyFiles(proxy.files);
             applyProxyPaths(proxy.result, mapping);
