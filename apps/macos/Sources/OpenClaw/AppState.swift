@@ -179,6 +179,19 @@ final class AppState {
         didSet { self.ifNotPreview { UserDefaults.standard.set(self.canvasEnabled, forKey: canvasEnabledKey) } }
     }
 
+    var nodeModeEnabled: Bool {
+        didSet {
+            self.ifNotPreview {
+                UserDefaults.standard.set(self.nodeModeEnabled, forKey: nodeModeEnabledKey)
+                if self.nodeModeEnabled {
+                    MacNodeModeCoordinator.shared.start()
+                } else {
+                    MacNodeModeCoordinator.shared.stop()
+                }
+            }
+        }
+    }
+
     var execApprovalMode: ExecApprovalQuickMode {
         didSet {
             self.ifNotPreview {
@@ -301,6 +314,9 @@ final class AppState {
         self.remoteProjectRoot = UserDefaults.standard.string(forKey: remoteProjectRootKey) ?? ""
         self.remoteCliPath = UserDefaults.standard.string(forKey: remoteCliPathKey) ?? ""
         self.canvasEnabled = UserDefaults.standard.object(forKey: canvasEnabledKey) as? Bool ?? true
+        // Support OPENCLAW_NODE_MODE=1 env var to force-enable (for developers)
+        let envNodeMode = ProcessInfo.processInfo.environment["OPENCLAW_NODE_MODE"] == "1"
+        self.nodeModeEnabled = envNodeMode || (UserDefaults.standard.object(forKey: nodeModeEnabledKey) as? Bool ?? false)
         let execDefaults = ExecApprovalsStore.resolveDefaults()
         self.execApprovalMode = ExecApprovalQuickMode.from(security: execDefaults.security, ask: execDefaults.ask)
         self.peekabooBridgeEnabled = UserDefaults.standard

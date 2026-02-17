@@ -35,6 +35,13 @@ final class MacNodeModeCoordinator {
         let defaults = UserDefaults.standard
 
         while !Task.isCancelled {
+            // Check if Node Mode is enabled
+            let nodeModeEnabled = defaults.object(forKey: nodeModeEnabledKey) as? Bool ?? false
+            if !nodeModeEnabled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                continue
+            }
+
             if await MainActor.run(body: { AppStateStore.shared.isPaused }) {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 continue

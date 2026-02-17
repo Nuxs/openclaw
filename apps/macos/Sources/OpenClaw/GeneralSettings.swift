@@ -71,6 +71,14 @@ struct GeneralSettings: View {
                         title: "Enable debug tools",
                         subtitle: "Show the Debug tab with development utilities.",
                         binding: self.$state.debugPaneEnabled)
+
+                    // Node Mode only visible when debug tools are enabled
+                    if self.state.debugPaneEnabled {
+                        SettingsToggleRow(
+                            title: "Enable Remote Control",
+                            subtitle: "Allow this Mac to be controlled remotely by other OpenClaw instances. Advanced developer feature.",
+                            binding: self.$state.nodeModeEnabled)
+                    }
                 }
 
                 Spacer(minLength: 12)
