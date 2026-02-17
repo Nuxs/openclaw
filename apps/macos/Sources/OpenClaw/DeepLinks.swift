@@ -67,7 +67,46 @@ final class DeepLinkHandler {
         switch route {
         case let .agent(link):
             await self.handleAgent(link: link, originalURL: url)
+        case let .gateway(link):
+            self.handleGatewayConnect(link: link)
         }
+    }
+
+    private func handleGatewayConnect(link: GatewayConnectDeepLink) {
+        let scheme = link.tls ? "wss" : "ws"
+        let url = "\(scheme)://\(link.host):\(link.port)"
+
+        let body = "Connect to remote gateway?\n\n\(url)"
+        guard self.confirm(title: "Connect to gateway?", message: body) else { return }
+
+        // Persist remote gateway config (direct transport).
+        OpenClawConfigFile.updateGatewayDict { gateway in
+            var remote = gateway["remote"] as? [String: Any] ?? [:]
+            remote["url"] = url
+            remote["transport"] = AppState.RemoteTransport.direct.rawValue
+            if let token = link.token?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty {
+                remote["token"] = token
+            } else {
+                remote.removeValue(forKey: "token")
+            }
+            if let password = link.password?.trimmingCharacters(in: .whitespacesAndNewlines), !password.isEmpty {
+                remote["password"] = password
+            } else {
+                remote.removeValue(forKey: "password")
+            }
+            gateway["remote"] = remote
+        }
+
+        // Switch to remote mode and refresh the connection.
+        AppStateStore.shared.connectionMode = .remote
+        AppStateStore.shared.remoteTransport = .direct
+        AppStateStore.shared.remoteUrl = url
+        Task {
+            await GatewayEndpointStore.shared.setMode(.remote)
+            _ = try? await GatewayConnection.shared.refresh()
+        }
+
+        deepLinkLogger.info("gateway deep link applied url=\(url, privacy: .public)")
     }
 
     private func handleAgent(link: AgentDeepLink, originalURL: URL) async {

@@ -190,6 +190,11 @@ enum PermissionManager {
         for cap in caps {
             switch cap {
             case .notifications:
+                // Guard against bundleProxyForCurrentProcess nil crash when running outside Xcode
+                guard Bundle.main.bundleIdentifier != nil else {
+                    results[cap] = false
+                    continue
+                }
                 let center = UNUserNotificationCenter.current()
                 let settings = await center.notificationSettings()
                 results[cap] = settings.authorizationStatus == .authorized
