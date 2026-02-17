@@ -137,11 +137,11 @@ export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
           if (signal?.aborted) {
             throw err;
           }
-          const errName =
+          const name =
             err && typeof err === "object" && "name" in err
               ? String((err as { name?: unknown }).name)
               : "";
-          if (errName === "AbortError") {
+          if (name === "AbortError") {
             throw err;
           }
           if (beforeHookWrapped) {

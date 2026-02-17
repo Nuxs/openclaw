@@ -331,7 +331,7 @@ export function registerBrowserManageCommands(
       const parent = parentOpts(cmd);
       const profile = parent?.browserProfile;
       await runBrowserCommand(async () => {
-        const openedTab = await callBrowserRequest<BrowserTab>(
+        const tab = await callBrowserRequest<BrowserTab>(
           parent,
           {
             method: "POST",
@@ -342,10 +342,10 @@ export function registerBrowserManageCommands(
           { timeoutMs: 15000 },
         );
         if (parent?.json) {
-          defaultRuntime.log(JSON.stringify(openedTab, null, 2));
+          defaultRuntime.log(JSON.stringify(tab, null, 2));
           return;
         }
-        defaultRuntime.log(`opened: ${openedTab.url}\nid: ${openedTab.targetId}`);
+        defaultRuntime.log(`opened: ${tab.url}\nid: ${tab.targetId}`);
       });
     });
 

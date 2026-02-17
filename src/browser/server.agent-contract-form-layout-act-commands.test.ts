@@ -147,9 +147,9 @@ vi.mock("./cdp.js", () => ({
   normalizeCdpWsUrl: vi.fn((wsUrl: string) => wsUrl),
   snapshotAria: cdpMocks.snapshotAria,
   getHeadersWithAuth: vi.fn(() => ({})),
-  appendCdpPath: vi.fn((cdpUrl: string, cdpPath: string) => {
+  appendCdpPath: vi.fn((cdpUrl: string, path: string) => {
     const base = cdpUrl.replace(/\/$/, "");
-    const suffix = cdpPath.startsWith("/") ? cdpPath : `/${cdpPath}`;
+    const suffix = path.startsWith("/") ? path : `/${path}`;
     return `${base}${suffix}`;
   }),
 }));

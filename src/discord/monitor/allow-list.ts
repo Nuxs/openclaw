@@ -74,7 +74,7 @@ export function normalizeDiscordAllowList(
       ids.add(maybeId);
       continue;
     }
-    const prefix = prefixes.find((prefixValue) => text.startsWith(prefixValue));
+    const prefix = prefixes.find((entry) => text.startsWith(entry));
     if (prefix) {
       const candidate = text.slice(prefix.length);
       if (candidate) {

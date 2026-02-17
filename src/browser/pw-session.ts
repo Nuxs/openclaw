@@ -169,17 +169,17 @@ export function restoreRoleRefsForTarget(opts: {
   if (!targetId) {
     return;
   }
-  const cachedEntry = roleRefsByTarget.get(roleRefsKey(opts.cdpUrl, targetId));
-  if (!cachedEntry) {
+  const cached = roleRefsByTarget.get(roleRefsKey(opts.cdpUrl, targetId));
+  if (!cached) {
     return;
   }
   const state = ensurePageState(opts.page);
   if (state.roleRefs) {
     return;
   }
-  state.roleRefs = cachedEntry.refs;
-  state.roleRefsFrameSelector = cachedEntry.frameSelector;
-  state.roleRefsMode = cachedEntry.mode;
+  state.roleRefs = cached.refs;
+  state.roleRefsFrameSelector = cached.frameSelector;
+  state.roleRefsMode = cached.mode;
 }
 
 export function ensurePageState(page: Page): PageState {

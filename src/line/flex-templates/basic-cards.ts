@@ -91,7 +91,7 @@ export function createInfoCard(title: string, body: string, footer?: string): Fl
  */
 export function createListCard(title: string, items: ListItem[]): FlexBubble {
   const itemContents: FlexComponent[] = items.slice(0, 8).map((item, index) => {
-    const itemContentParts: FlexComponent[] = [
+    const itemContents: FlexComponent[] = [
       {
         type: "text",
         text: item.title,
@@ -103,7 +103,7 @@ export function createListCard(title: string, items: ListItem[]): FlexBubble {
     ];
 
     if (item.subtitle) {
-      itemContentParts.push({
+      itemContents.push({
         type: "text",
         text: item.subtitle,
         size: "sm",
@@ -140,7 +140,7 @@ export function createListCard(title: string, items: ListItem[]): FlexBubble {
         {
           type: "box",
           layout: "vertical",
-          contents: itemContentParts,
+          contents: itemContents,
           flex: 1,
         } as FlexBox,
       ],

@@ -463,14 +463,14 @@ export function renderApp(state: AppViewState) {
                   if (index < 0) {
                     return;
                   }
-                  const toolsBasePath = ["agents", "list", index, "tools"];
+                  const basePath = ["agents", "list", index, "tools"];
                   if (profile) {
-                    updateConfigFormValue(state, [...toolsBasePath, "profile"], profile);
+                    updateConfigFormValue(state, [...basePath, "profile"], profile);
                   } else {
-                    removeConfigFormValue(state, [...toolsBasePath, "profile"]);
+                    removeConfigFormValue(state, [...basePath, "profile"]);
                   }
                   if (clearAllow) {
-                    removeConfigFormValue(state, [...toolsBasePath, "allow"]);
+                    removeConfigFormValue(state, [...basePath, "allow"]);
                   }
                 },
                 onToolsOverridesChange: (agentId, alsoAllow, deny) => {
@@ -491,16 +491,16 @@ export function renderApp(state: AppViewState) {
                   if (index < 0) {
                     return;
                   }
-                  const toolsBasePath = ["agents", "list", index, "tools"];
+                  const basePath = ["agents", "list", index, "tools"];
                   if (alsoAllow.length > 0) {
-                    updateConfigFormValue(state, [...toolsBasePath, "alsoAllow"], alsoAllow);
+                    updateConfigFormValue(state, [...basePath, "alsoAllow"], alsoAllow);
                   } else {
-                    removeConfigFormValue(state, [...toolsBasePath, "alsoAllow"]);
+                    removeConfigFormValue(state, [...basePath, "alsoAllow"]);
                   }
                   if (deny.length > 0) {
-                    updateConfigFormValue(state, [...toolsBasePath, "deny"], deny);
+                    updateConfigFormValue(state, [...basePath, "deny"], deny);
                   } else {
-                    removeConfigFormValue(state, [...toolsBasePath, "deny"]);
+                    removeConfigFormValue(state, [...basePath, "deny"]);
                   }
                 },
                 onConfigReload: () => loadConfig(state),
@@ -609,9 +609,9 @@ export function renderApp(state: AppViewState) {
                   if (index < 0) {
                     return;
                   }
-                  const modelBasePath = ["agents", "list", index, "model"];
+                  const basePath = ["agents", "list", index, "model"];
                   if (!modelId) {
-                    removeConfigFormValue(state, modelBasePath);
+                    removeConfigFormValue(state, basePath);
                     return;
                   }
                   const entry = list[index] as { model?: unknown };
@@ -622,9 +622,9 @@ export function renderApp(state: AppViewState) {
                       primary: modelId,
                       ...(Array.isArray(fallbacks) ? { fallbacks } : {}),
                     };
-                    updateConfigFormValue(state, modelBasePath, next);
+                    updateConfigFormValue(state, basePath, next);
                   } else {
-                    updateConfigFormValue(state, modelBasePath, modelId);
+                    updateConfigFormValue(state, basePath, modelId);
                   }
                 },
                 onModelFallbacksChange: (agentId, fallbacks) => {
@@ -645,7 +645,7 @@ export function renderApp(state: AppViewState) {
                   if (index < 0) {
                     return;
                   }
-                  const modelBasePath = ["agents", "list", index, "model"];
+                  const basePath = ["agents", "list", index, "model"];
                   const entry = list[index] as { model?: unknown };
                   const normalized = fallbacks.map((name) => name.trim()).filter(Boolean);
                   const existing = entry.model;
@@ -665,16 +665,16 @@ export function renderApp(state: AppViewState) {
                   const primary = resolvePrimary();
                   if (normalized.length === 0) {
                     if (primary) {
-                      updateConfigFormValue(state, modelBasePath, primary);
+                      updateConfigFormValue(state, basePath, primary);
                     } else {
-                      removeConfigFormValue(state, modelBasePath);
+                      removeConfigFormValue(state, basePath);
                     }
                     return;
                   }
                   const next = primary
                     ? { primary, fallbacks: normalized }
                     : { fallbacks: normalized };
-                  updateConfigFormValue(state, modelBasePath, next);
+                  updateConfigFormValue(state, basePath, next);
                 },
               })
             : nothing
@@ -747,11 +747,11 @@ export function renderApp(state: AppViewState) {
                   }
                 },
                 onBindAgent: (agentIndex, nodeId) => {
-                  const execBasePath = ["agents", "list", agentIndex, "tools", "exec", "node"];
+                  const basePath = ["agents", "list", agentIndex, "tools", "exec", "node"];
                   if (nodeId) {
-                    updateConfigFormValue(state, execBasePath, nodeId);
+                    updateConfigFormValue(state, basePath, nodeId);
                   } else {
-                    removeConfigFormValue(state, execBasePath);
+                    removeConfigFormValue(state, basePath);
                   }
                 },
                 onSaveBindings: () => saveConfig(state),

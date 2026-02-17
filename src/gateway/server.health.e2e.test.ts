@@ -186,11 +186,11 @@ describe("gateway server health/presence", () => {
   });
 
   test("shutdown event is broadcast on close", { timeout: 8000 }, async () => {
-    const { server: testServer, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient();
     await connectOk(ws);
 
     const shutdownP = onceMessage(ws, (o) => o.type === "event" && o.event === "shutdown", 5000);
-    await testServer.close();
+    await server.close();
     const evt = await shutdownP;
     expect(evt.payload?.reason).toBeDefined();
   });

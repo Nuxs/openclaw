@@ -870,7 +870,7 @@ async function deliverDiscordInteractionReply(params: {
 
   let hasReplied = false;
   const sendMessage = async (content: string, files?: { name: string; data: Buffer }[]) => {
-    const replyPayload =
+    const payload =
       files && files.length > 0
         ? {
             content,
@@ -885,11 +885,11 @@ async function deliverDiscordInteractionReply(params: {
         : { content };
     await safeDiscordInteractionCall("interaction send", async () => {
       if (!preferFollowUp && !hasReplied) {
-        await interaction.reply(replyPayload);
+        await interaction.reply(payload);
         hasReplied = true;
         return;
       }
-      await interaction.followUp(replyPayload);
+      await interaction.followUp(payload);
       hasReplied = true;
     });
   };

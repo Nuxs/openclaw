@@ -316,7 +316,7 @@ export const formatHealthChannelLines = (
             .map((account) => formatAccountProbeTiming(account))
             .filter((value): value is string => Boolean(value))
         : [];
-    const failedSummary = listSummaries.find((accountSummary) => isProbeFailure(accountSummary));
+    const failedSummary = listSummaries.find((summary) => isProbeFailure(summary));
     if (failedSummary) {
       const failureLine = formatProbeLine(failedSummary.probe, { botUsernames });
       if (failureLine) {

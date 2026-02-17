@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("node:child_process", () => {
-  const spawnImpl = vi.fn(() => {
+  const spawn = vi.fn(() => {
     const child = new EventEmitter() as EventEmitter & {
       stdout?: EventEmitter & { setEncoding?: (enc: string) => void };
       kill?: (signal?: string) => void;
@@ -30,7 +30,7 @@ vi.mock("node:child_process", () => {
     });
     return child;
   });
-  return { spawn: spawnImpl };
+  return { spawn };
 });
 
 const spawnMock = vi.mocked(spawn);

@@ -383,10 +383,10 @@ export async function runConfigureWizard(
       token: baseConfig.gateway?.auth?.token ?? process.env.OPENCLAW_GATEWAY_TOKEN,
       password: baseConfig.gateway?.auth?.password ?? process.env.OPENCLAW_GATEWAY_PASSWORD,
     });
-    const configuredRemoteUrl = baseConfig.gateway?.remote?.url?.trim() ?? "";
-    const remoteProbe = configuredRemoteUrl
+    const remoteUrl = baseConfig.gateway?.remote?.url?.trim() ?? "";
+    const remoteProbe = remoteUrl
       ? await probeGatewayReachable({
-          url: configuredRemoteUrl,
+          url: remoteUrl,
           token: baseConfig.gateway?.remote?.token,
         })
       : null;
@@ -405,11 +405,11 @@ export async function runConfigureWizard(
           {
             value: "remote",
             label: "Remote (info-only)",
-            hint: !configuredRemoteUrl
+            hint: !remoteUrl
               ? "No remote URL configured yet"
               : remoteProbe?.ok
-                ? `Gateway reachable (${configuredRemoteUrl})`
-                : `Configured but unreachable (${configuredRemoteUrl})`,
+                ? `Gateway reachable (${remoteUrl})`
+                : `Configured but unreachable (${remoteUrl})`,
           },
         ],
       }),
@@ -548,11 +548,9 @@ export async function runConfigureWizard(
           customBindHost: nextConfig.gateway?.customBindHost,
           basePath: undefined,
         });
-        const healthRemoteUrl = nextConfig.gateway?.remote?.url?.trim();
+        const remoteUrl = nextConfig.gateway?.remote?.url?.trim();
         const wsUrl =
-          nextConfig.gateway?.mode === "remote" && healthRemoteUrl
-            ? healthRemoteUrl
-            : localLinks.wsUrl;
+          nextConfig.gateway?.mode === "remote" && remoteUrl ? remoteUrl : localLinks.wsUrl;
         const token = nextConfig.gateway?.auth?.token ?? process.env.OPENCLAW_GATEWAY_TOKEN;
         const password =
           nextConfig.gateway?.auth?.password ?? process.env.OPENCLAW_GATEWAY_PASSWORD;
@@ -677,11 +675,9 @@ export async function runConfigureWizard(
             customBindHost: nextConfig.gateway?.customBindHost,
             basePath: undefined,
           });
-          const healthRemoteUrl = nextConfig.gateway?.remote?.url?.trim();
+          const remoteUrl = nextConfig.gateway?.remote?.url?.trim();
           const wsUrl =
-            nextConfig.gateway?.mode === "remote" && healthRemoteUrl
-              ? healthRemoteUrl
-              : localLinks.wsUrl;
+            nextConfig.gateway?.mode === "remote" && remoteUrl ? remoteUrl : localLinks.wsUrl;
           const token = nextConfig.gateway?.auth?.token ?? process.env.OPENCLAW_GATEWAY_TOKEN;
           const password =
             nextConfig.gateway?.auth?.password ?? process.env.OPENCLAW_GATEWAY_PASSWORD;
