@@ -159,7 +159,7 @@ export async function applyPatch(
 
     const target = await resolvePatchPath(hunk.path, options);
     const applied = await applyUpdateHunk(target.resolved, hunk.chunks, {
-      readFile: (path) => fileOps.readFile(path),
+      readFile: (filePath) => fileOps.readFile(filePath),
     });
 
     if (hunk.movePath) {

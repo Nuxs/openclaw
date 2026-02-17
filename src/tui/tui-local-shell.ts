@@ -78,8 +78,8 @@ export function createLocalShellRunner(deps: LocalShellDeps) {
     });
   };
 
-  const runLocalShellLine = async (line: string) => {
-    const cmd = line.slice(1);
+  const runLocalShellLine = async (inputLine: string) => {
+    const cmd = inputLine.slice(1);
     // NOTE: A lone '!' is handled by the submit handler as a normal message.
     // Keep this guard anyway in case this is called directly.
     if (cmd === "") {

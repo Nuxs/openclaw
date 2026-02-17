@@ -341,9 +341,9 @@ export async function buildLinePostbackContext(params: {
   }
   let rawBody = rawData;
   if (rawData.includes("line.action=")) {
-    const params = new URLSearchParams(rawData);
-    const action = params.get("line.action") ?? "";
-    const device = params.get("line.device");
+    const urlParams = new URLSearchParams(rawData);
+    const action = urlParams.get("line.action") ?? "";
+    const device = urlParams.get("line.device");
     rawBody = device ? `line action ${action} device ${device}` : `line action ${action}`;
   }
 

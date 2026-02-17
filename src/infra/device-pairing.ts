@@ -256,13 +256,13 @@ export async function approveDevicePairing(
     if (roleForToken) {
       const nextScopes = normalizeScopes(pending.scopes);
       const existingToken = tokens[roleForToken];
-      const now = Date.now();
+      const rotatedAt = Date.now();
       tokens[roleForToken] = {
         token: newToken(),
         role: roleForToken,
         scopes: nextScopes,
-        createdAtMs: existingToken?.createdAtMs ?? now,
-        rotatedAtMs: existingToken ? now : undefined,
+        createdAtMs: existingToken?.createdAtMs ?? rotatedAt,
+        rotatedAtMs: existingToken ? rotatedAt : undefined,
         revokedAtMs: undefined,
         lastUsedAtMs: existingToken?.lastUsedAtMs,
       };

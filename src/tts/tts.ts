@@ -545,10 +545,10 @@ export async function textToSpeech(params: {
 
   let lastError: string | undefined;
 
-  for (const provider of providers) {
+  for (const providerId of providers) {
     const providerStart = Date.now();
     try {
-      if (provider === "edge") {
+      if (providerId === "edge") {
         if (!config.edge.enabled) {
           lastError = "edge: disabled";
           continue;
@@ -610,20 +610,20 @@ export async function textToSpeech(params: {
           success: true,
           audioPath: edgeResult.audioPath,
           latencyMs: Date.now() - providerStart,
-          provider,
+          provider: providerId,
           outputFormat: edgeResult.outputFormat,
           voiceCompatible,
         };
       }
 
-      const apiKey = resolveTtsApiKey(config, provider);
+      const apiKey = resolveTtsApiKey(config, providerId);
       if (!apiKey) {
-        lastError = `No API key for ${provider}`;
+        lastError = `No API key for ${providerId}`;
         continue;
       }
 
       let audioBuffer: Buffer;
-      if (provider === "elevenlabs") {
+      if (providerId === "elevenlabs") {
         const voiceIdOverride = params.overrides?.elevenlabs?.voiceId;
         const modelIdOverride = params.overrides?.elevenlabs?.modelId;
         const voiceSettings = {
@@ -670,16 +670,16 @@ export async function textToSpeech(params: {
         success: true,
         audioPath,
         latencyMs,
-        provider,
-        outputFormat: provider === "openai" ? output.openai : output.elevenlabs,
+        provider: providerId,
+        outputFormat: providerId === "openai" ? output.openai : output.elevenlabs,
         voiceCompatible: output.voiceCompatible,
       };
     } catch (err) {
       const error = err as Error;
       if (error.name === "AbortError") {
-        lastError = `${provider}: request timed out`;
+        lastError = `${providerId}: request timed out`;
       } else {
-        lastError = `${provider}: ${error.message}`;
+        lastError = `${providerId}: ${error.message}`;
       }
     }
   }
@@ -710,21 +710,21 @@ export async function textToSpeechTelephony(params: {
 
   let lastError: string | undefined;
 
-  for (const provider of providers) {
+  for (const providerId of providers) {
     const providerStart = Date.now();
     try {
-      if (provider === "edge") {
+      if (providerId === "edge") {
         lastError = "edge: unsupported for telephony";
         continue;
       }
 
-      const apiKey = resolveTtsApiKey(config, provider);
+      const apiKey = resolveTtsApiKey(config, providerId);
       if (!apiKey) {
-        lastError = `No API key for ${provider}`;
+        lastError = `No API key for ${providerId}`;
         continue;
       }
 
-      if (provider === "elevenlabs") {
+      if (providerId === "elevenlabs") {
         const output = TELEPHONY_OUTPUT.elevenlabs;
         const audioBuffer = await elevenLabsTTS({
           text: params.text,
@@ -744,7 +744,7 @@ export async function textToSpeechTelephony(params: {
           success: true,
           audioBuffer,
           latencyMs: Date.now() - providerStart,
-          provider,
+          provider: providerId,
           outputFormat: output.format,
           sampleRate: output.sampleRate,
         };
@@ -764,16 +764,16 @@ export async function textToSpeechTelephony(params: {
         success: true,
         audioBuffer,
         latencyMs: Date.now() - providerStart,
-        provider,
+        provider: providerId,
         outputFormat: output.format,
         sampleRate: output.sampleRate,
       };
     } catch (err) {
       const error = err as Error;
       if (error.name === "AbortError") {
-        lastError = `${provider}: request timed out`;
+        lastError = `${providerId}: request timed out`;
       } else {
-        lastError = `${provider}: ${error.message}`;
+        lastError = `${providerId}: ${error.message}`;
       }
     }
   }

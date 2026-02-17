@@ -214,22 +214,22 @@ function createMergePatch(base: unknown, target: unknown): unknown {
   return patch;
 }
 
-function collectEnvRefPaths(value: unknown, path: string, output: Map<string, string>): void {
+function collectEnvRefPaths(value: unknown, pathKey: string, output: Map<string, string>): void {
   if (typeof value === "string") {
     if (containsEnvVarReference(value)) {
-      output.set(path, value);
+      output.set(pathKey, value);
     }
     return;
   }
   if (Array.isArray(value)) {
     value.forEach((item, index) => {
-      collectEnvRefPaths(item, `${path}[${index}]`, output);
+      collectEnvRefPaths(item, `${pathKey}[${index}]`, output);
     });
     return;
   }
   if (isPlainObject(value)) {
     for (const [key, child] of Object.entries(value)) {
-      const childPath = path ? `${path}.${key}` : key;
+      const childPath = pathKey ? `${pathKey}.${key}` : key;
       collectEnvRefPaths(child, childPath, output);
     }
   }
@@ -238,13 +238,13 @@ function collectEnvRefPaths(value: unknown, path: string, output: Map<string, st
 function collectChangedPaths(
   base: unknown,
   target: unknown,
-  path: string,
+  pathKey: string,
   output: Set<string>,
 ): void {
   if (Array.isArray(base) && Array.isArray(target)) {
     const max = Math.max(base.length, target.length);
     for (let index = 0; index < max; index += 1) {
-      const childPath = path ? `${path}[${index}]` : `[${index}]`;
+      const childPath = pathKey ? `${pathKey}[${index}]` : `[${index}]`;
       if (index >= base.length || index >= target.length) {
         output.add(childPath);
         continue;
@@ -256,7 +256,7 @@ function collectChangedPaths(
   if (isPlainObject(base) && isPlainObject(target)) {
     const keys = new Set([...Object.keys(base), ...Object.keys(target)]);
     for (const key of keys) {
-      const childPath = path ? `${path}.${key}` : key;
+      const childPath = pathKey ? `${pathKey}.${key}` : key;
       const hasBase = key in base;
       const hasTarget = key in target;
       if (!hasTarget || !hasBase) {
@@ -268,7 +268,7 @@ function collectChangedPaths(
     return;
   }
   if (!isDeepStrictEqual(base, target)) {
-    output.add(path);
+    output.add(pathKey);
   }
 }
 
@@ -284,11 +284,11 @@ function parentPath(value: string): string {
   return index >= 0 ? value.slice(0, index) : "";
 }
 
-function isPathChanged(path: string, changedPaths: Set<string>): boolean {
-  if (changedPaths.has(path)) {
+function isPathChanged(pathKey: string, changedPaths: Set<string>): boolean {
+  if (changedPaths.has(pathKey)) {
     return true;
   }
-  let current = parentPath(path);
+  let current = parentPath(pathKey);
   while (current) {
     if (changedPaths.has(current)) {
       return true;
@@ -300,13 +300,13 @@ function isPathChanged(path: string, changedPaths: Set<string>): boolean {
 
 function restoreEnvRefsFromMap(
   value: unknown,
-  path: string,
+  pathKey: string,
   envRefMap: Map<string, string>,
   changedPaths: Set<string>,
 ): unknown {
   if (typeof value === "string") {
-    if (!isPathChanged(path, changedPaths)) {
-      const original = envRefMap.get(path);
+    if (!isPathChanged(pathKey, changedPaths)) {
+      const original = envRefMap.get(pathKey);
       if (original !== undefined) {
         return original;
       }
@@ -316,7 +316,7 @@ function restoreEnvRefsFromMap(
   if (Array.isArray(value)) {
     let changed = false;
     const next = value.map((item, index) => {
-      const updated = restoreEnvRefsFromMap(item, `${path}[${index}]`, envRefMap, changedPaths);
+      const updated = restoreEnvRefsFromMap(item, `${pathKey}[${index}]`, envRefMap, changedPaths);
       if (updated !== item) {
         changed = true;
       }
@@ -328,7 +328,7 @@ function restoreEnvRefsFromMap(
     let changed = false;
     const next: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value)) {
-      const childPath = path ? `${path}.${key}` : key;
+      const childPath = pathKey ? `${pathKey}.${key}` : key;
       const updated = restoreEnvRefsFromMap(child, childPath, envRefMap, changedPaths);
       if (updated !== child) {
         changed = true;
@@ -526,7 +526,7 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
   const configPath =
     candidatePaths.find((candidate) => deps.fs.existsSync(candidate)) ?? requestedConfigPath;
 
-  function loadConfig(): OpenClawConfig {
+  function loadConfigInternal(): OpenClawConfig {
     try {
       maybeLoadDotEnvForConfig(deps.env);
       if (!deps.fs.existsSync(configPath)) {
@@ -801,12 +801,12 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
     }
   }
 
-  async function readConfigFileSnapshot(): Promise<ConfigFileSnapshot> {
+  async function readConfigFileSnapshotLocal(): Promise<ConfigFileSnapshot> {
     const result = await readConfigFileSnapshotInternal();
     return result.snapshot;
   }
 
-  async function readConfigFileSnapshotForWrite(): Promise<ReadConfigFileSnapshotForWriteResult> {
+  async function readConfigFileSnapshotForWriteInternal(): Promise<ReadConfigFileSnapshotForWriteResult> {
     const result = await readConfigFileSnapshotInternal();
     return {
       snapshot: result.snapshot,
@@ -817,7 +817,7 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
     };
   }
 
-  async function writeConfigFile(cfg: OpenClawConfig, options: ConfigWriteOptions = {}) {
+  async function writeConfigFileInternal(cfg: OpenClawConfig, options: ConfigWriteOptions = {}) {
     clearConfigCache();
     let persistCandidate: unknown = cfg;
     const { snapshot } = await readConfigFileSnapshotInternal();
@@ -1039,10 +1039,10 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
 
   return {
     configPath,
-    loadConfig,
-    readConfigFileSnapshot,
-    readConfigFileSnapshotForWrite,
-    writeConfigFile,
+    loadConfig: loadConfigInternal,
+    readConfigFileSnapshot: readConfigFileSnapshotLocal,
+    readConfigFileSnapshotForWrite: readConfigFileSnapshotForWriteInternal,
+    writeConfigFile: writeConfigFileInternal,
   };
 }
 

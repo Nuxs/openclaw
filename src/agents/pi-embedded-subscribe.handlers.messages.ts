@@ -345,16 +345,16 @@ export function handleMessageEnd(
     if (tailResult) {
       const {
         text: cleanedText,
-        mediaUrls,
+        mediaUrls: tailMediaUrls,
         audioAsVoice,
         replyToId,
         replyToTag,
         replyToCurrent,
       } = tailResult;
-      if (cleanedText || (mediaUrls && mediaUrls.length > 0) || audioAsVoice) {
+      if (cleanedText || (tailMediaUrls && tailMediaUrls.length > 0) || audioAsVoice) {
         void onBlockReply({
           text: cleanedText,
-          mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
+          mediaUrls: tailMediaUrls?.length ? tailMediaUrls : undefined,
           audioAsVoice,
           replyToId,
           replyToTag,

@@ -286,7 +286,8 @@ describe("discord tool result dispatch", () => {
   });
 
   it("uses channel id allowlists for non-thread channels with categories", async () => {
-    const { createDiscordMessageHandler } = await import("./monitor.js");
+    const { createDiscordMessageHandler: createDiscordMessageHandlerLazy } =
+      await import("./monitor.js");
     let capturedCtx: { SessionKey?: string } | undefined;
     dispatchMock.mockImplementationOnce(async ({ ctx, dispatcher }) => {
       capturedCtx = ctx;
@@ -316,7 +317,7 @@ describe("discord tool result dispatch", () => {
       routing: { allowFrom: [] },
     } as ReturnType<typeof import("../config/config.js").loadConfig>;
 
-    const handler = createDiscordMessageHandler({
+    const handler = createDiscordMessageHandlerLazy({
       cfg,
       discordConfig: cfg.channels.discord,
       accountId: "default",
@@ -377,7 +378,8 @@ describe("discord tool result dispatch", () => {
   });
 
   it("prefixes group bodies with sender label", async () => {
-    const { createDiscordMessageHandler } = await import("./monitor.js");
+    const { createDiscordMessageHandler: createDiscordMessageHandlerLazy } =
+      await import("./monitor.js");
     let capturedBody = "";
     dispatchMock.mockImplementationOnce(async ({ ctx, dispatcher }) => {
       capturedBody = ctx.Body ?? "";
@@ -407,7 +409,7 @@ describe("discord tool result dispatch", () => {
       routing: { allowFrom: [] },
     } as ReturnType<typeof import("../config/config.js").loadConfig>;
 
-    const handler = createDiscordMessageHandler({
+    const handler = createDiscordMessageHandlerLazy({
       cfg,
       discordConfig: cfg.channels.discord,
       accountId: "default",
@@ -468,7 +470,8 @@ describe("discord tool result dispatch", () => {
   });
 
   it("replies with pairing code and sender id when dmPolicy is pairing", async () => {
-    const { createDiscordMessageHandler } = await import("./monitor.js");
+    const { createDiscordMessageHandler: createDiscordMessageHandlerLazy } =
+      await import("./monitor.js");
     const cfg = {
       agents: {
         defaults: {
@@ -482,7 +485,7 @@ describe("discord tool result dispatch", () => {
       },
     } as ReturnType<typeof import("../config/config.js").loadConfig>;
 
-    const handler = createDiscordMessageHandler({
+    const handler = createDiscordMessageHandlerLazy({
       cfg,
       discordConfig: cfg.channels.discord,
       accountId: "default",

@@ -9,10 +9,10 @@ const {
   resetLastAgent,
   webSocketSpy,
 } = vi.hoisted(() => {
-  const proxyAgentSpy = vi.fn();
-  const webSocketSpy = vi.fn();
+  const proxyAgentSpyImpl = vi.fn();
+  const webSocketSpyImpl = vi.fn();
 
-  const GatewayIntents = {
+  const gatewayIntentsImpl = {
     Guilds: 1 << 0,
     GuildMessages: 1 << 1,
     MessageContent: 1 << 2,
@@ -23,31 +23,31 @@ const {
     GuildMembers: 1 << 7,
   } as const;
 
-  class GatewayPlugin {}
+  class GatewayPluginImpl {}
 
-  class HttpsProxyAgent {
-    static lastCreated: HttpsProxyAgent | undefined;
+  class HttpsProxyAgentImpl {
+    static lastCreated: HttpsProxyAgentImpl | undefined;
     proxyUrl: string;
     constructor(proxyUrl: string) {
       if (proxyUrl === "bad-proxy") {
         throw new Error("bad proxy");
       }
       this.proxyUrl = proxyUrl;
-      HttpsProxyAgent.lastCreated = this;
-      proxyAgentSpy(proxyUrl);
+      HttpsProxyAgentImpl.lastCreated = this;
+      proxyAgentSpyImpl(proxyUrl);
     }
   }
 
   return {
-    GatewayIntents,
-    GatewayPlugin,
-    HttpsProxyAgent,
-    getLastAgent: () => HttpsProxyAgent.lastCreated,
-    proxyAgentSpy,
+    GatewayIntents: gatewayIntentsImpl,
+    GatewayPlugin: GatewayPluginImpl,
+    HttpsProxyAgent: HttpsProxyAgentImpl,
+    getLastAgent: () => HttpsProxyAgentImpl.lastCreated,
+    proxyAgentSpy: proxyAgentSpyImpl,
     resetLastAgent: () => {
-      HttpsProxyAgent.lastCreated = undefined;
+      HttpsProxyAgentImpl.lastCreated = undefined;
     },
-    webSocketSpy,
+    webSocketSpy: webSocketSpyImpl,
   };
 });
 

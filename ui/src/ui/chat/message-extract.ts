@@ -86,8 +86,8 @@ export function extractTextCached(message: unknown): string | null {
 }
 
 export function extractThinking(message: unknown): string | null {
-  const m = message as Record<string, unknown>;
-  const content = m.content;
+  const messageRecord = message as Record<string, unknown>;
+  const content = messageRecord.content;
   const parts: string[] = [];
   if (Array.isArray(content)) {
     for (const p of content) {
@@ -112,7 +112,7 @@ export function extractThinking(message: unknown): string | null {
   const matches = [
     ...rawText.matchAll(/<\s*think(?:ing)?\s*>([\s\S]*?)<\s*\/\s*think(?:ing)?\s*>/gi),
   ];
-  const extracted = matches.map((m) => (m[1] ?? "").trim()).filter(Boolean);
+  const extracted = matches.map((match) => (match[1] ?? "").trim()).filter(Boolean);
   return extracted.length > 0 ? extracted.join("\n") : null;
 }
 

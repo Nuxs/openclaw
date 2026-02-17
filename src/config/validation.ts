@@ -220,16 +220,16 @@ function validateConfigObjectWithPluginsBase(
     const normalizedPlugins = normalizePluginsConfig(config.plugins);
 
     for (const diag of registry.diagnostics) {
-      let path = diag.pluginId ? `plugins.entries.${diag.pluginId}` : "plugins";
+      let issuePath = diag.pluginId ? `plugins.entries.${diag.pluginId}` : "plugins";
       if (!diag.pluginId && diag.message.includes("plugin path not found")) {
-        path = "plugins.load.paths";
+        issuePath = "plugins.load.paths";
       }
       const pluginLabel = diag.pluginId ? `plugin ${diag.pluginId}` : "plugin";
       const message = `${pluginLabel}: ${diag.message}`;
       if (diag.level === "error") {
-        issues.push({ path, message });
+        issues.push({ path: issuePath, message });
       } else {
-        warnings.push({ path, message });
+        warnings.push({ path: issuePath, message });
       }
     }
 
@@ -267,13 +267,13 @@ function validateConfigObjectWithPluginsBase(
     heartbeatChannelIds.add(channelId.toLowerCase());
   }
 
-  const validateHeartbeatTarget = (target: string | undefined, path: string) => {
+  const validateHeartbeatTarget = (target: string | undefined, pathLabel: string) => {
     if (typeof target !== "string") {
       return;
     }
     const trimmed = target.trim();
     if (!trimmed) {
-      issues.push({ path, message: "heartbeat target must not be empty" });
+      issues.push({ path: pathLabel, message: "heartbeat target must not be empty" });
       return;
     }
     const normalized = trimmed.toLowerCase();
@@ -297,7 +297,7 @@ function validateConfigObjectWithPluginsBase(
     if (heartbeatChannelIds.has(normalized)) {
       return;
     }
-    issues.push({ path, message: `unknown heartbeat target: ${target}` });
+    issues.push({ path: pathLabel, message: `unknown heartbeat target: ${target}` });
   };
 
   validateHeartbeatTarget(

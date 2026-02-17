@@ -177,12 +177,12 @@ function resolveFallbackCandidates(params: {
     if (params.fallbacksOverride !== undefined) {
       return params.fallbacksOverride;
     }
-    const model = params.cfg?.agents?.defaults?.model as
+    const modelConfig = params.cfg?.agents?.defaults?.model as
       | { fallbacks?: string[] }
       | string
       | undefined;
-    if (model && typeof model === "object") {
-      return model.fallbacks ?? [];
+    if (modelConfig && typeof modelConfig === "object") {
+      return modelConfig.fallbacks ?? [];
     }
     return [];
   })();
