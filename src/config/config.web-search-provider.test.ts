@@ -32,6 +32,13 @@ describe("web search provider config", () => {
             searxng: {
               baseUrl: "https://search.example.com",
               apiKey: "test-key",
+              rerank: {
+                mode: "auto",
+                endpoint: "http://127.0.0.1:8899/rerank",
+                timeoutSeconds: 1,
+                maxCandidates: 20,
+                maxLength: 256,
+              },
             },
           },
         },

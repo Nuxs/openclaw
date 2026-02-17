@@ -98,10 +98,12 @@ async function promptWebToolsConfig(
   const existingPerplexity = existingSearch?.perplexity;
   const existingGrok = existingSearch?.grok;
   const existingSearxng = existingSearch?.searxng;
+  const existingSearxngRerank = existingSearxng?.rerank;
   const hasBraveKey = Boolean(existingSearch?.apiKey);
   const hasPerplexityKey = Boolean(existingPerplexity?.apiKey);
   const hasGrokKey = Boolean(existingGrok?.apiKey);
   const hasSearxngBaseUrl = Boolean(existingSearxng?.baseUrl);
+  const hasSearxngRerankEndpoint = Boolean(existingSearxngRerank?.endpoint);
 
   note(
     [
@@ -249,12 +251,56 @@ async function promptWebToolsConfig(
         runtime,
       );
       const apiKey = String(apiKeyInput ?? "").trim();
+
+      const isRerankEnabled = existingSearxngRerank?.mode
+        ? existingSearxngRerank.mode !== "off"
+        : false;
+      const enableRerank = guardCancel(
+        await confirm({
+          message: "Enable local rerank for SearxNG results?",
+          initialValue: isRerankEnabled,
+        }),
+        runtime,
+      );
+
+      let nextRerank = existingSearxngRerank;
+      if (enableRerank) {
+        const endpointInput = guardCancel(
+          await text({
+            message: "SearxNG rerank endpoint (local service)",
+            placeholder: hasSearxngRerankEndpoint
+              ? "Leave blank to keep current"
+              : "http://127.0.0.1:8899/rerank",
+            initialValue: hasSearxngRerankEndpoint
+              ? existingSearxngRerank?.endpoint
+              : "http://127.0.0.1:8899/rerank",
+          }),
+          runtime,
+        );
+        const endpointValue = String(endpointInput ?? "").trim();
+        nextRerank = {
+          ...existingSearxngRerank,
+          mode: existingSearxngRerank?.mode ?? "auto",
+          endpoint:
+            endpointValue || existingSearxngRerank?.endpoint || "http://127.0.0.1:8899/rerank",
+          timeoutSeconds: existingSearxngRerank?.timeoutSeconds ?? 1,
+          maxCandidates: existingSearxngRerank?.maxCandidates ?? 20,
+          maxLength: existingSearxngRerank?.maxLength ?? 256,
+        };
+      } else if (isRerankEnabled) {
+        nextRerank = {
+          ...existingSearxngRerank,
+          mode: "off",
+        };
+      }
+
       nextSearch = {
         ...nextSearch,
         searxng: {
           ...existingSearxng,
           baseUrl: baseUrl || existingSearxng?.baseUrl,
           apiKey: apiKey || existingSearxng?.apiKey,
+          rerank: nextRerank,
         },
       };
 

@@ -32,6 +32,11 @@ const OPENROUTER_KEY_PREFIXES = ["sk-or-"];
 const XAI_API_ENDPOINT = "https://api.x.ai/v1/responses";
 const DEFAULT_GROK_MODEL = "grok-4-1-fast";
 
+const DEFAULT_SEARXNG_RERANK_MODE = "auto" as const;
+const DEFAULT_SEARXNG_RERANK_TIMEOUT_SECONDS = 1;
+const DEFAULT_SEARXNG_RERANK_MAX_CANDIDATES = 20;
+const DEFAULT_SEARXNG_RERANK_MAX_LENGTH = 256;
+
 const SEARCH_CACHE = new Map<string, CacheEntry<Record<string, unknown>>>();
 const BRAVE_FRESHNESS_SHORTCUTS = new Set(["pd", "pw", "pm", "py"]);
 const BRAVE_FRESHNESS_RANGE = /^(\d{4}-\d{2}-\d{2})to(\d{4}-\d{2}-\d{2})$/;
@@ -102,10 +107,21 @@ type GrokConfig = {
   inlineCitations?: boolean;
 };
 
+type SearxngRerankMode = "off" | "auto" | "on";
+
+type SearxngRerankConfig = {
+  mode?: SearxngRerankMode;
+  endpoint?: string;
+  timeoutSeconds?: number;
+  maxCandidates?: number;
+  maxLength?: number;
+};
+
 type SearxngConfig = {
   baseUrl?: string;
   apiKey?: string;
   siteWeights?: Record<string, number>;
+  rerank?: SearxngRerankConfig;
 };
 
 type GrokSearchResponse = {
@@ -399,6 +415,52 @@ function resolveSearxngConfig(search?: WebSearchConfig): SearxngConfig {
   return searxng as SearxngConfig;
 }
 
+function resolveSearxngRerankConfig(searxng?: SearxngConfig): SearxngRerankConfig | undefined {
+  if (!searxng || typeof searxng !== "object") {
+    return undefined;
+  }
+  const rerank = "rerank" in searxng ? searxng.rerank : undefined;
+  if (!rerank || typeof rerank !== "object") {
+    return undefined;
+  }
+  return rerank;
+}
+
+function resolveSearxngRerankMode(rerank?: SearxngRerankConfig): SearxngRerankMode {
+  const raw =
+    rerank && "mode" in rerank && typeof rerank.mode === "string" ? rerank.mode.trim() : "";
+  if (raw === "off" || raw === "auto" || raw === "on") {
+    return raw;
+  }
+  return DEFAULT_SEARXNG_RERANK_MODE;
+}
+
+function resolveSearxngRerankEndpoint(rerank?: SearxngRerankConfig): string | undefined {
+  const fromConfig =
+    rerank && "endpoint" in rerank && typeof rerank.endpoint === "string"
+      ? rerank.endpoint.trim()
+      : "";
+  return fromConfig || undefined;
+}
+
+function resolveSearxngRerankMaxCandidates(rerank?: SearxngRerankConfig): number {
+  const raw =
+    rerank && "maxCandidates" in rerank && typeof rerank.maxCandidates === "number"
+      ? rerank.maxCandidates
+      : DEFAULT_SEARXNG_RERANK_MAX_CANDIDATES;
+  const parsed = Number.isFinite(raw) ? Math.floor(raw) : DEFAULT_SEARXNG_RERANK_MAX_CANDIDATES;
+  return Math.max(1, parsed);
+}
+
+function resolveSearxngRerankMaxLength(rerank?: SearxngRerankConfig): number {
+  const raw =
+    rerank && "maxLength" in rerank && typeof rerank.maxLength === "number"
+      ? rerank.maxLength
+      : DEFAULT_SEARXNG_RERANK_MAX_LENGTH;
+  const parsed = Number.isFinite(raw) ? Math.floor(raw) : DEFAULT_SEARXNG_RERANK_MAX_LENGTH;
+  return Math.max(1, parsed);
+}
+
 function resolveSearxngBaseUrl(searxng?: SearxngConfig): string | undefined {
   const fromConfig =
     searxng && "baseUrl" in searxng && typeof searxng.baseUrl === "string"
@@ -553,6 +615,27 @@ function serializeSiteWeights(weights?: Record<string, number>): string {
   return entries.map(([key, value]) => `${key}:${value}`).join(",");
 }
 
+function serializeSearxngRerankConfig(rerank?: SearxngRerankConfig): string {
+  const mode = resolveSearxngRerankMode(rerank);
+  if (mode === "off") {
+    return "off";
+  }
+  const endpoint = resolveSearxngRerankEndpoint(rerank) ?? "unset";
+  const timeoutSeconds = resolveTimeoutSeconds(
+    rerank?.timeoutSeconds,
+    DEFAULT_SEARXNG_RERANK_TIMEOUT_SECONDS,
+  );
+  const maxCandidates = resolveSearxngRerankMaxCandidates(rerank);
+  const maxLength = resolveSearxngRerankMaxLength(rerank);
+  return [
+    `mode:${mode}`,
+    `endpoint:${endpoint}`,
+    `timeout:${timeoutSeconds}`,
+    `maxCandidates:${maxCandidates}`,
+    `maxLength:${maxLength}`,
+  ].join(",");
+}
+
 function resolveSearxngSiteWeight(
   hostname: string | undefined,
   siteWeights?: Record<string, number>,
@@ -619,6 +702,66 @@ function dedupeSearxngResults(params: {
   });
 
   return sorted.slice(0, params.count).map(({ index: _index, ...rest }) => rest);
+}
+
+function clampRerankText(value: string, maxLength?: number): string {
+  if (!value) {
+    return "";
+  }
+  if (!maxLength || maxLength <= 0) {
+    return value;
+  }
+  return value.length > maxLength ? value.slice(0, maxLength) : value;
+}
+
+async function runSearxngRerank(params: {
+  query: string;
+  candidates: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+  }>;
+  endpoint: string;
+  timeoutSeconds: number;
+  maxLength?: number;
+}): Promise<number[]> {
+  const endpoint = params.endpoint.trim().replace(/\/$/, "");
+  const payload = {
+    query: params.query,
+    candidates: params.candidates.map((entry) => ({
+      title: clampRerankText(entry.title, params.maxLength),
+      url: entry.url,
+      snippet: clampRerankText(entry.snippet, params.maxLength),
+    })),
+    maxLength: params.maxLength,
+  };
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal: withTimeout(undefined, params.timeoutSeconds * 1000),
+  });
+
+  if (!res.ok) {
+    const detail = await readResponseText(res);
+    throw new Error(`SearxNG rerank error (${res.status}): ${detail || res.statusText}`);
+  }
+
+  const data = (await res.json()) as { scores?: number[] };
+  if (!Array.isArray(data.scores)) {
+    throw new Error("SearxNG rerank response missing scores.");
+  }
+  if (data.scores.length !== params.candidates.length) {
+    throw new Error("SearxNG rerank response length mismatch.");
+  }
+  if (data.scores.some((score) => !Number.isFinite(score))) {
+    throw new Error("SearxNG rerank response contains invalid scores.");
+  }
+
+  return data.scores;
 }
 
 async function runPerplexitySearch(params: {
@@ -732,6 +875,7 @@ async function runSearxngSearch(params: {
   timeoutSeconds: number;
   searchLang?: string;
   siteWeights?: Record<string, number>;
+  rerank?: SearxngRerankConfig;
 }): Promise<{
   results: Array<{
     title: string;
@@ -781,13 +925,66 @@ async function runSearxngSearch(params: {
     } satisfies SearxngNormalizedResult;
   });
 
+  const rerankMode = resolveSearxngRerankMode(params.rerank);
+  const rerankEndpoint = resolveSearxngRerankEndpoint(params.rerank);
+  const rerankTimeoutSeconds = resolveTimeoutSeconds(
+    params.rerank?.timeoutSeconds,
+    DEFAULT_SEARXNG_RERANK_TIMEOUT_SECONDS,
+  );
+  const rerankMaxCandidates = resolveSearxngRerankMaxCandidates(params.rerank);
+  const rerankMaxLength = resolveSearxngRerankMaxLength(params.rerank);
+
+  const dedupeCount = Math.max(params.count, rerankMaxCandidates);
   const deduped = dedupeSearxngResults({
     results: normalized,
-    count: params.count,
+    count: dedupeCount,
     siteWeights: params.siteWeights,
   });
 
-  const mapped = deduped.map((entry) => ({
+  let ranked = deduped;
+  if (rerankMode !== "off") {
+    if (!rerankEndpoint) {
+      if (rerankMode === "on") {
+        throw new Error("SearxNG rerank endpoint is required when mode=on.");
+      }
+    } else {
+      const candidates = deduped.slice(0, rerankMaxCandidates).map((entry) => ({
+        title: entry.title,
+        url: entry.url,
+        snippet: entry.description,
+      }));
+      if (candidates.length > 0) {
+        try {
+          const scores = await runSearxngRerank({
+            query: params.query,
+            candidates,
+            endpoint: rerankEndpoint,
+            timeoutSeconds: rerankTimeoutSeconds,
+            maxLength: rerankMaxLength,
+          });
+          const scored = candidates.map((_, index) => ({
+            entry: deduped[index],
+            score: scores[index],
+            index,
+          }));
+          ranked = scored
+            .toSorted((a, b) => {
+              if (b.score !== a.score) {
+                return b.score - a.score;
+              }
+              return a.index - b.index;
+            })
+            .map((entry) => entry.entry);
+        } catch (error) {
+          if (rerankMode === "on") {
+            throw error;
+          }
+        }
+      }
+    }
+  }
+
+  const mapped = ranked.slice(0, params.count).map((entry) => ({
     title: entry.title ? wrapWebContent(entry.title, "web_search") : "",
     url: entry.url,
     description: entry.description ? wrapWebContent(entry.description, "web_search") : "",
@@ -816,6 +1013,7 @@ async function runWebSearch(params: {
   searxngBaseUrl?: string;
   searxngApiKey?: string;
   searxngSiteWeights?: Record<string, number>;
+  searxngRerank?: SearxngRerankConfig;
 }): Promise<Record<string, unknown>> {
   const cacheKey = normalizeCacheKey(
     params.provider === "brave"
@@ -823,7 +1021,7 @@ async function runWebSearch(params: {
       : params.provider === "perplexity"
         ? `${params.provider}:${params.query}:${params.perplexityBaseUrl ?? DEFAULT_PERPLEXITY_BASE_URL}:${params.perplexityModel ?? DEFAULT_PERPLEXITY_MODEL}:${params.freshness || "default"}`
         : params.provider === "searxng"
-          ? `${params.provider}:${params.query}:${params.searxngBaseUrl ?? "default"}:${params.count}:${params.search_lang || "default"}:${serializeSiteWeights(params.searxngSiteWeights)}`
+          ? `${params.provider}:${params.query}:${params.searxngBaseUrl ?? "default"}:${params.count}:${params.search_lang || "default"}:${serializeSiteWeights(params.searxngSiteWeights)}:${serializeSearxngRerankConfig(params.searxngRerank)}`
           : `${params.provider}:${params.query}:${params.grokModel ?? DEFAULT_GROK_MODEL}:${String(params.grokInlineCitations ?? false)}`,
   );
   const cached = readCache(SEARCH_CACHE, cacheKey);
@@ -898,6 +1096,7 @@ async function runWebSearch(params: {
       timeoutSeconds: params.timeoutSeconds,
       searchLang: params.search_lang,
       siteWeights: params.searxngSiteWeights,
+      rerank: params.searxngRerank,
     });
 
     const payload = {
@@ -997,6 +1196,7 @@ export function createWebSearchTool(options?: {
   const perplexityConfig = resolvePerplexityConfig(search);
   const grokConfig = resolveGrokConfig(search);
   const searxngConfig = resolveSearxngConfig(search);
+  const searxngRerankConfig = resolveSearxngRerankConfig(searxngConfig);
 
   const description =
     provider === "perplexity"
@@ -1083,6 +1283,7 @@ export function createWebSearchTool(options?: {
         searxngBaseUrl,
         searxngApiKey: apiKey,
         searxngSiteWeights: searxngConfig?.siteWeights,
+        searxngRerank: searxngRerankConfig,
       });
       return jsonResult(result);
     },

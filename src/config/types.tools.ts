@@ -372,6 +372,19 @@ export type ToolsConfig = {
         apiKey?: string;
         /** Optional per-site weighting for SearxNG reranking (hostname or base domain). */
         siteWeights?: Record<string, number>;
+        /** Optional local reranker service configuration. */
+        rerank?: {
+          /** Rerank mode: off, auto (use if available), or on (require). */
+          mode?: "off" | "auto" | "on";
+          /** HTTP endpoint for the reranker service (e.g. http://127.0.0.1:8899). */
+          endpoint?: string;
+          /** Timeout in seconds for reranker requests. */
+          timeoutSeconds?: number;
+          /** Max candidates sent to the reranker (smaller is faster on CPU). */
+          maxCandidates?: number;
+          /** Max input length per candidate (tokens or characters, service-defined). */
+          maxLength?: number;
+        };
       };
     };
     fetch?: {

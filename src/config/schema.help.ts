@@ -79,7 +79,7 @@ export const FIELD_HELP: Record<string, string> = {
     'Text suffix for cross-context markers (supports "{channel}").',
   "tools.message.broadcast.enabled": "Enable broadcast action (default: true).",
   "tools.web.search.enabled": "Enable the web_search tool (requires a provider API key).",
-  "tools.web.search.provider": 'Search provider ("brave" or "perplexity").',
+  "tools.web.search.provider": 'Search provider ("brave", "perplexity", "grok", or "searxng").',
   "tools.web.search.apiKey": "Brave Search API key (fallback: BRAVE_API_KEY env var).",
   "tools.web.search.maxResults": "Default number of results to return (1-10).",
   "tools.web.search.timeoutSeconds": "Timeout in seconds for web_search requests.",
@@ -90,6 +90,19 @@ export const FIELD_HELP: Record<string, string> = {
     "Perplexity base URL override (default: https://openrouter.ai/api/v1 or https://api.perplexity.ai).",
   "tools.web.search.perplexity.model":
     'Perplexity model override (default: "perplexity/sonar-pro").',
+  "tools.web.search.searxng.baseUrl": "SearxNG base URL (e.g. https://search.example.com).",
+  "tools.web.search.searxng.apiKey": "SearxNG API key (fallback: SEARXNG_API_KEY env var).",
+  "tools.web.search.searxng.siteWeights":
+    "Optional per-site weights to bias SearxNG result ordering (hostname or base domain).",
+  "tools.web.search.searxng.rerank.mode":
+    'Rerank mode for SearxNG results ("off", "auto", or "on").',
+  "tools.web.search.searxng.rerank.endpoint":
+    "HTTP endpoint for the local reranker service (e.g. http://127.0.0.1:8899).",
+  "tools.web.search.searxng.rerank.timeoutSeconds": "Timeout in seconds for reranker requests.",
+  "tools.web.search.searxng.rerank.maxCandidates":
+    "Max candidates sent to the reranker (lower is faster on CPU).",
+  "tools.web.search.searxng.rerank.maxLength":
+    "Max input length per candidate sent to the reranker (service-defined units).",
   "tools.web.fetch.enabled": "Enable the web_fetch tool (lightweight HTTP fetch).",
   "tools.web.fetch.maxChars": "Max characters returned by web_fetch (truncated).",
   "tools.web.fetch.maxCharsCap":

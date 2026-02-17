@@ -93,6 +93,36 @@ Example: use SearxNG (self-hosted):
 }
 ```
 
+## Optional SearxNG rerank (local service)
+
+If you run a local reranker, OpenClaw can re-score SearxNG results. When the service is
+unavailable, OpenClaw falls back to the normal ordering (dedupe + site weights).
+
+```json5
+{
+  tools: {
+    web: {
+      search: {
+        provider: "searxng",
+        searxng: {
+          baseUrl: "http://search.example.com:8080",
+          rerank: {
+            mode: "auto", // "auto" (default), "on" (require), or "off"
+            endpoint: "http://127.0.0.1:8899/rerank",
+            timeoutSeconds: 1,
+            maxCandidates: 20,
+            maxLength: 256,
+          },
+        },
+      },
+    },
+  },
+}
+```
+
+A reference implementation lives in the `bge-reranker` skill under `skills/` and runs on CPU
+by default (with optional GPU acceleration).
+
 ## Getting a Brave API key
 
 1. Create a Brave Search API account at [https://brave.com/search/api/](https://brave.com/search/api/)

@@ -40,6 +40,11 @@ Recommended: set up a Brave Search API key so the agent can use `web_search`
 which stores `tools.web.search.apiKey`. Docs: [Web tools](/tools/web).
 </Tip>
 
+<Tip>
+If you choose **SearxNG**, the wizard can also store a local rerank endpoint. Run the
+reranker service separately and keep `mode` set to `auto` for safe fallback.
+</Tip>
+
 ## QuickStart vs Advanced
 
 The wizard starts with **QuickStart** (defaults) vs **Advanced** (full control).

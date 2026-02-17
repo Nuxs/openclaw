@@ -201,6 +201,16 @@ export const ToolsWebSearchSchema = z
         baseUrl: z.string().optional(),
         apiKey: z.string().optional().register(sensitive),
         siteWeights: z.record(z.string(), z.number().finite()).optional(),
+        rerank: z
+          .object({
+            mode: z.union([z.literal("off"), z.literal("auto"), z.literal("on")]).optional(),
+            endpoint: z.string().optional(),
+            timeoutSeconds: z.number().int().positive().optional(),
+            maxCandidates: z.number().int().positive().optional(),
+            maxLength: z.number().int().positive().optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

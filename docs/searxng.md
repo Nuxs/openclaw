@@ -55,6 +55,48 @@ Set the provider and base URL in `tools.web.search`:
 }
 ```
 
+## Optional local reranker
+
+You can run a local reranker to improve result ordering. OpenClaw calls it via HTTP and
+falls back to the default ordering if it is unavailable.
+
+1. Install the `bge-reranker` skill dependencies:
+
+```bash
+cd <openclaw-repo>/skills/bge-reranker
+pip install -r scripts/requirements.txt
+```
+
+2. Start the service:
+
+```bash
+python scripts/serve.py
+```
+
+3. Enable rerank in config:
+
+```json5
+{
+  tools: {
+    web: {
+      search: {
+        provider: "searxng",
+        searxng: {
+          baseUrl: "http://<public-host-or-ip>:8080",
+          rerank: {
+            mode: "auto",
+            endpoint: "http://127.0.0.1:8899/rerank",
+            timeoutSeconds: 1,
+            maxCandidates: 20,
+            maxLength: 256,
+          },
+        },
+      },
+    },
+  },
+}
+```
+
 ## Troubleshooting
 
 - `403` on `/search?format=json`: ensure `search.formats` in `settings.yml`
