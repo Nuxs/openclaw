@@ -35,6 +35,10 @@ public final class OpenClawChatViewModel {
 
     @ObservationIgnored
     private nonisolated(unsafe) var eventTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private nonisolated(unsafe) var healthTask: Task<Void, Never>?
+
     private var pendingRuns = Set<String>() {
         didSet { self.pendingRunCount = self.pendingRuns.count }
     }
@@ -66,10 +70,27 @@ public final class OpenClawChatViewModel {
                 }
             }
         }
+
+        // Health polling used to depend on the gateway's `tick` push events.
+        // If the websocket can't connect yet (or push events are unavailable), we still want
+        // to periodically re-check health so the UI can recover without a manual refresh.
+        self.healthTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                await self.pollHealthIfNeeded(force: false)
+
+                let sleepSeconds: Double = await MainActor.run { [weak self] in
+                    // Poll less frequently when healthy to avoid needless traffic.
+                    self?.healthOK == true ? 30 : 5
+                }
+                try? await Task.sleep(nanoseconds: UInt64(sleepSeconds * 1_000_000_000))
+            }
+        }
     }
 
     deinit {
         self.eventTask?.cancel()
+        self.healthTask?.cancel()
         for (_, task) in self.pendingRunTimeoutTasks {
             task.cancel()
         }
@@ -288,9 +309,13 @@ public final class OpenClawChatViewModel {
         let trimmed = self.input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || !self.attachments.isEmpty else { return }
 
-        guard self.healthOK else {
-            self.errorText = "Gateway health not OK; cannot send"
-            return
+        if !self.healthOK {
+            // Avoid false negatives from stale health state.
+            await self.pollHealthIfNeeded(force: true)
+            guard self.healthOK else {
+                self.errorText = "Gateway health not OK; cannot send"
+                return
+            }
         }
 
         self.isSending = true
