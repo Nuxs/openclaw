@@ -108,6 +108,18 @@ export const pt_BR: TranslationMap = {
     thinkingToggle: "Alternar saída de pensamento/trabalho do assistente",
     focusToggle: "Alternar modo de foco (ocultar barra lateral + cabeçalho da página)",
     onboardingDisabled: "Desativado durante a integração",
+    progress: {
+      step: "Etapa {step}",
+      trail: "Anterior: {steps}",
+      gateway: "Enviando para o gateway",
+      model: "Pensando / chamando o modelo",
+      tool: "Executando ferramenta: {tool}",
+      toolFailed: "Falha na ferramenta: {tool}",
+      output: "Recebendo saída do modelo",
+      compaction: "Compactando contexto",
+      warning: "Aviso",
+      error: "Erro na execução",
+    },
   },
   languages: {
     en: "English",

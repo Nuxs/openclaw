@@ -34,6 +34,7 @@ export type ChatProps = {
   toolMessages: unknown[];
   stream: string | null;
   streamStartedAt: number | null;
+  progress?: import("../controllers/chat.ts").ChatProgressState | null;
   assistantAvatarUrl?: string | null;
   draft: string;
   queue: ChatQueueItem[];
@@ -236,7 +237,7 @@ export function renderChat(props: ChatProps) {
           }
 
           if (item.kind === "reading-indicator") {
-            return renderReadingIndicatorGroup(assistantIdentity);
+            return renderReadingIndicatorGroup(assistantIdentity, props.progress ?? null);
           }
 
           if (item.kind === "stream") {

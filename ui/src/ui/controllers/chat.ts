@@ -3,6 +3,23 @@ import type { GatewayBrowserClient } from "../gateway.ts";
 import type { ChatAttachment } from "../ui-types.ts";
 import { generateUUID } from "../uuid.ts";
 
+export type ChatProgressStep = {
+  index: number;
+  kind: "gateway" | "model" | "tool" | "output" | "compaction" | "warning" | "error";
+  status: "active" | "done" | "error";
+  ts: number;
+  toolName?: string;
+  note?: string;
+};
+
+export type ChatProgressState = {
+  runId: string;
+  sessionKey: string;
+  startedAt: number;
+  updatedAt: number;
+  steps: ChatProgressStep[];
+};
+
 export type ChatState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
@@ -16,6 +33,7 @@ export type ChatState = {
   chatRunId: string | null;
   chatStream: string | null;
   chatStreamStartedAt: number | null;
+  chatProgress: ChatProgressState | null;
   lastError: string | null;
 };
 
@@ -114,10 +132,18 @@ export async function sendChatMessage(
 
   state.chatSending = true;
   state.lastError = null;
+  state.chatProgress = null;
   const runId = generateUUID();
   state.chatRunId = runId;
   state.chatStream = "";
   state.chatStreamStartedAt = now;
+  state.chatProgress = {
+    runId,
+    sessionKey: state.sessionKey,
+    startedAt: now,
+    updatedAt: now,
+    steps: [{ index: 1, kind: "gateway", status: "active", ts: now }],
+  };
 
   // Convert attachments to API format
   const apiAttachments = hasAttachments
@@ -150,6 +176,7 @@ export async function sendChatMessage(
     state.chatRunId = null;
     state.chatStream = null;
     state.chatStreamStartedAt = null;
+    state.chatProgress = null;
     state.lastError = error;
     state.chatMessages = [
       ...state.chatMessages,
@@ -211,6 +238,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatProgress = null;
   } else if (payload.state === "aborted") {
     const normalizedMessage = normalizeAbortedAssistantMessage(payload.message);
     if (normalizedMessage) {
@@ -231,10 +259,12 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatProgress = null;
   } else if (payload.state === "error") {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatProgress = null;
     state.lastError = payload.errorMessage ?? "chat error";
   }
   return payload.state;

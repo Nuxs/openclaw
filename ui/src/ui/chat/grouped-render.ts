@@ -1,8 +1,11 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { t } from "../../i18n/index.ts";
 import type { AssistantIdentity } from "../assistant-identity.ts";
+import type { ChatProgressState, ChatProgressStep } from "../controllers/chat.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { detectTextDirection } from "../text-direction.ts";
+import { resolveToolDisplay } from "../tool-display.ts";
 import type { MessageGroup } from "../types/chat-types.ts";
 import { renderCopyAsMarkdownButton } from "./copy-as-markdown.ts";
 import {
@@ -55,15 +58,75 @@ function extractImages(message: unknown): ImageBlock[] {
   return images;
 }
 
-export function renderReadingIndicatorGroup(assistant?: AssistantIdentity) {
+function formatProgressLabel(step: ChatProgressStep): string {
+  switch (step.kind) {
+    case "gateway":
+      return t("chat.progress.gateway");
+    case "model":
+      return t("chat.progress.model");
+    case "tool": {
+      const display = resolveToolDisplay({ name: step.toolName ?? "tool" });
+      if (step.status === "error") {
+        return t("chat.progress.toolFailed", { tool: display.label });
+      }
+      return t("chat.progress.tool", { tool: display.label });
+    }
+    case "output":
+      return t("chat.progress.output");
+    case "compaction":
+      return t("chat.progress.compaction");
+    case "warning":
+      return t("chat.progress.warning");
+    case "error":
+      return t("chat.progress.error");
+  }
+}
+
+export function renderReadingIndicatorGroup(
+  assistant?: AssistantIdentity,
+  progress?: ChatProgressState | null,
+) {
+  const step = progress?.steps?.[progress.steps.length - 1] ?? null;
+  const stepLabel = step ? t("chat.progress.step", { step: String(step.index) }) : null;
+  const activity = step ? formatProgressLabel(step) : null;
+  const statusText = stepLabel && activity ? `${stepLabel} · ${activity}` : null;
+
+  const trail =
+    progress?.steps && progress.steps.length > 1
+      ? progress.steps
+          .slice(-4, -1)
+          .map(
+            (s) =>
+              `${t("chat.progress.step", { step: String(s.index) })} ${formatProgressLabel(s)}`,
+          )
+      : [];
+
   return html`
     <div class="chat-group assistant">
       ${renderAvatar("assistant", assistant)}
       <div class="chat-group-messages">
-        <div class="chat-bubble chat-reading-indicator" aria-hidden="true">
-          <span class="chat-reading-indicator__dots">
+        <div class="chat-bubble chat-reading-indicator" role="status" aria-live="polite">
+          <span class="chat-reading-indicator__dots" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
+          ${
+            statusText
+              ? html`
+                  <div class="chat-reading-indicator__status">
+                    <div class="chat-reading-indicator__status-line">${statusText}</div>
+                    ${
+                      trail.length
+                        ? html`
+                            <div class="chat-reading-indicator__trail muted">
+                              ${t("chat.progress.trail", { steps: trail.join(" → ") })}
+                            </div>
+                          `
+                        : nothing
+                    }
+                  </div>
+                `
+              : nothing
+          }
         </div>
       </div>
     </div>

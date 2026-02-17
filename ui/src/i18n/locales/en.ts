@@ -106,6 +106,18 @@ export const en: TranslationMap = {
     thinkingToggle: "Toggle assistant thinking/working output",
     focusToggle: "Toggle focus mode (hide sidebar + page header)",
     onboardingDisabled: "Disabled during onboarding",
+    progress: {
+      step: "Step {step}",
+      trail: "Previous: {steps}",
+      gateway: "Sending to gateway",
+      model: "Thinking / calling model",
+      tool: "Running tool: {tool}",
+      toolFailed: "Tool failed: {tool}",
+      output: "Receiving model output",
+      compaction: "Compacting context",
+      warning: "Warning",
+      error: "Run error",
+    },
   },
   languages: {
     en: "English",

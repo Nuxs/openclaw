@@ -28,6 +28,7 @@ export type ToolStreamEntry = {
 type ToolStreamHost = {
   sessionKey: string;
   chatRunId: string | null;
+  chatProgress?: import("./controllers/chat.ts").ChatProgressState | null;
   toolStreamById: Map<string, ToolStreamEntry>;
   toolStreamOrder: string[];
   chatToolMessages: Record<string, unknown>[];
@@ -204,14 +205,85 @@ export function handleCompactionEvent(host: CompactionHost, payload: AgentEventP
   }
 }
 
+function bumpProgressStep(
+  host: ToolStreamHost,
+  step: Omit<import("./controllers/chat.ts").ChatProgressStep, "index">,
+) {
+  const current = host.chatProgress;
+  const runId = host.chatRunId;
+  if (!runId || !current || current.runId !== runId) {
+    return;
+  }
+
+  const last = current.steps[current.steps.length - 1];
+  const now = Date.now();
+  // Avoid spamming identical steps (common with partial tool updates).
+  if (
+    last &&
+    last.kind === step.kind &&
+    last.toolName === step.toolName &&
+    last.note === step.note &&
+    last.status === step.status
+  ) {
+    host.chatProgress = { ...current, updatedAt: now };
+    return;
+  }
+
+  const normalizedSteps = current.steps.map((s) =>
+    s.status === "active" ? { ...s, status: "done" as const } : s,
+  );
+  const nextIndex = (normalizedSteps[normalizedSteps.length - 1]?.index ?? 0) + 1;
+  const trimmed = normalizedSteps.length >= 12 ? normalizedSteps.slice(-11) : normalizedSteps;
+  host.chatProgress = {
+    ...current,
+    updatedAt: now,
+    steps: [...trimmed, { ...step, index: nextIndex }],
+  };
+}
+
 export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPayload) {
   if (!payload) {
     return;
   }
 
+  // Progress updates: lifecycle/tool/assistant/seq gap
+  if (
+    host.chatProgress &&
+    host.chatRunId &&
+    payload.runId === host.chatRunId &&
+    (!payload.sessionKey || payload.sessionKey === host.sessionKey)
+  ) {
+    const data = payload.data ?? {};
+    if (payload.stream === "lifecycle") {
+      const phase = typeof data.phase === "string" ? data.phase : "";
+      if (phase === "start") {
+        bumpProgressStep(host, { kind: "model", status: "active", ts: payload.ts });
+      } else if (phase === "error") {
+        bumpProgressStep(host, { kind: "error", status: "error", ts: payload.ts });
+      } else if (phase === "end") {
+        bumpProgressStep(host, { kind: "output", status: "done", ts: payload.ts, note: "done" });
+      }
+    } else if (payload.stream === "assistant") {
+      bumpProgressStep(host, { kind: "output", status: "active", ts: payload.ts });
+    } else if (payload.stream === "error") {
+      const reason = typeof data.reason === "string" ? data.reason : "";
+      if (reason) {
+        bumpProgressStep(host, { kind: "warning", status: "error", ts: payload.ts, note: reason });
+      }
+    }
+  }
+
   // Handle compaction events
   if (payload.stream === "compaction") {
     handleCompactionEvent(host as CompactionHost, payload);
+    if (host.chatProgress && host.chatRunId && payload.runId === host.chatRunId) {
+      const phase = typeof payload.data?.phase === "string" ? payload.data.phase : "";
+      if (phase === "start") {
+        bumpProgressStep(host, { kind: "compaction", status: "active", ts: payload.ts });
+      } else if (phase === "end") {
+        bumpProgressStep(host, { kind: "model", status: "active", ts: payload.ts });
+      }
+    }
     return;
   }
 
@@ -240,6 +312,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   }
   const name = typeof data.name === "string" ? data.name : "tool";
   const phase = typeof data.phase === "string" ? data.phase : "";
+  const isError = phase === "result" && Boolean(data.isError);
   const args = phase === "start" ? data.args : undefined;
   const output =
     phase === "update"
@@ -247,6 +320,23 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       : phase === "result"
         ? formatToolOutput(data.result)
         : undefined;
+
+  if (
+    host.chatProgress &&
+    host.chatRunId &&
+    payload.runId === host.chatRunId &&
+    (!payload.sessionKey || payload.sessionKey === host.sessionKey)
+  ) {
+    if (phase === "start") {
+      bumpProgressStep(host, { kind: "tool", status: "active", ts: payload.ts, toolName: name });
+    } else if (phase === "result") {
+      if (isError) {
+        bumpProgressStep(host, { kind: "tool", status: "error", ts: payload.ts, toolName: name });
+      } else {
+        bumpProgressStep(host, { kind: "model", status: "active", ts: payload.ts });
+      }
+    }
+  }
 
   const now = Date.now();
   let entry = host.toolStreamById.get(toolCallId);

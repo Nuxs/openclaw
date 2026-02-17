@@ -105,6 +105,18 @@ export const zh_TW: TranslationMap = {
     thinkingToggle: "切換助手思考/工作輸出",
     focusToggle: "切換專注模式 (隱藏側邊欄 + 頁面頁眉)",
     onboardingDisabled: "引導期間禁用",
+    progress: {
+      step: "第 {step} 步",
+      trail: "已完成：{steps}",
+      gateway: "送出到網關",
+      model: "模型思考 / 請求模型",
+      tool: "呼叫工具：{tool}",
+      toolFailed: "工具失敗：{tool}",
+      output: "接收模型輸出",
+      compaction: "壓縮上下文",
+      warning: "警告",
+      error: "執行出錯",
+    },
   },
   languages: {
     en: "English",

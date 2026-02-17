@@ -794,6 +794,7 @@ export function renderApp(state: AppViewState) {
                   state.chatStream = null;
                   state.chatStreamStartedAt = null;
                   state.chatRunId = null;
+                  state.chatProgress = null;
                   state.chatQueue = [];
                   state.resetToolStream();
                   state.resetChatScroll();
@@ -816,6 +817,7 @@ export function renderApp(state: AppViewState) {
                 toolMessages: state.chatToolMessages,
                 stream: state.chatStream,
                 streamStartedAt: state.chatStreamStartedAt,
+                progress: state.chatProgress,
                 draft: state.chatMessage,
                 queue: state.chatQueue,
                 connected: state.connected,
