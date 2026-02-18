@@ -1,0 +1,131 @@
+{
+  "id": "web3-core",
+  "uiHints": {
+    "chain.network": {
+      "label": "Blockchain Network",
+      "help": "EVM chain to anchor audit records. Default: Base (L2).",
+      "placeholder": "base"
+    },
+    "chain.rpcUrl": {
+      "label": "RPC URL",
+      "sensitive": true,
+      "placeholder": "https://mainnet.base.org",
+      "help": "JSON-RPC endpoint for the selected chain"
+    },
+    "chain.privateKey": {
+      "label": "Signer Private Key",
+      "sensitive": true,
+      "help": "Private key used to sign anchor transactions (hex, with 0x prefix)"
+    },
+    "storage.provider": {
+      "label": "Decentralized Storage Provider",
+      "help": "Where to archive encrypted session data",
+      "placeholder": "ipfs"
+    },
+    "storage.gateway": {
+      "label": "IPFS/Arweave Gateway URL",
+      "placeholder": "https://w3s.link",
+      "help": "HTTP gateway for retrieving archived content"
+    },
+    "storage.pinataJwt": {
+      "label": "Pinata JWT (for IPFS pinning)",
+      "sensitive": true,
+      "help": "JWT token for Pinata IPFS pinning service"
+    },
+    "privacy.onChainData": {
+      "label": "On-chain Data Policy",
+      "help": "What to write on-chain: hash_only (default) | hash_and_meta | encrypted_content"
+    },
+    "privacy.archiveEncryption": {
+      "label": "Archive Encryption",
+      "help": "Encrypt content before uploading to decentralized storage (default: true)"
+    },
+    "identity.allowSiwe": {
+      "label": "Enable SIWE (Sign-In with Ethereum)",
+      "help": "Allow wallet-based authentication via EIP-4361"
+    },
+    "billing.enabled": {
+      "label": "Enable Billing",
+      "help": "Track usage and enforce quota limits"
+    },
+    "billing.quotaPerSession": {
+      "label": "Quota per Session (credits)",
+      "placeholder": "1000",
+      "help": "Maximum credits per session before requiring top-up"
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "chain": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "network": {
+            "type": "string",
+            "enum": ["base", "optimism", "arbitrum", "ethereum", "sepolia"],
+            "default": "base"
+          },
+          "rpcUrl": { "type": "string" },
+          "privateKey": { "type": "string" },
+          "contractAddress": { "type": "string" }
+        }
+      },
+      "storage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["ipfs", "arweave", "filecoin"],
+            "default": "ipfs"
+          },
+          "gateway": { "type": "string" },
+          "pinataJwt": { "type": "string" },
+          "arweaveKeyfile": { "type": "string" }
+        }
+      },
+      "privacy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "onChainData": {
+            "type": "string",
+            "enum": ["hash_only", "hash_and_meta", "encrypted_content"],
+            "default": "hash_only"
+          },
+          "archiveEncryption": {
+            "type": "boolean",
+            "default": true
+          },
+          "redactFields": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": ["apiKey", "token", "password", "secret"]
+          }
+        }
+      },
+      "identity": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "allowSiwe": { "type": "boolean", "default": true },
+          "requiredChainId": { "type": "number" }
+        }
+      },
+      "billing": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "quotaPerSession": { "type": "number", "default": 1000 },
+          "costPerLlmCall": { "type": "number", "default": 1 },
+          "costPerToolCall": { "type": "number", "default": 0.5 },
+          "paymentTokenAddress": { "type": "string" },
+          "paymentReceiverAddress": { "type": "string" }
+        }
+      }
+    }
+  }
+}

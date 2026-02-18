@@ -1,0 +1,19 @@
+{
+  "name": "@openclaw/web3-core",
+  "version": "2026.2.16",
+  "private": true,
+  "description": "OpenClaw Web3 plugin: decentralized storage, wallet identity, audit anchoring, billing & marketplace",
+  "type": "module",
+  "dependencies": {
+    "multiformats": "^13.3.2",
+    "viem": "^2.28.0"
+  },
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
