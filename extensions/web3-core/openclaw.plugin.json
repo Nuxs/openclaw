@@ -44,6 +44,24 @@
       "label": "Enable SIWE (Sign-In with Ethereum)",
       "help": "Allow wallet-based authentication via EIP-4361"
     },
+    "identity.domain": {
+      "label": "SIWE Domain",
+      "help": "Domain used for SIWE verification (default: openclaw.ai)",
+      "placeholder": "openclaw.ai"
+    },
+    "identity.uri": {
+      "label": "SIWE URI",
+      "help": "URI used in SIWE messages (default: https://openclaw.ai)",
+      "placeholder": "https://openclaw.ai"
+    },
+    "identity.statement": {
+      "label": "SIWE Statement",
+      "help": "User-facing statement shown in SIWE messages"
+    },
+    "identity.challengeTtlMs": {
+      "label": "SIWE Challenge TTL (ms)",
+      "help": "How long a SIWE challenge stays valid before expiring"
+    },
     "billing.enabled": {
       "label": "Enable Billing",
       "help": "Track usage and enforce quota limits"
@@ -111,7 +129,11 @@
         "additionalProperties": false,
         "properties": {
           "allowSiwe": { "type": "boolean", "default": true },
-          "requiredChainId": { "type": "number" }
+          "requiredChainId": { "type": "number" },
+          "domain": { "type": "string", "default": "openclaw.ai" },
+          "uri": { "type": "string", "default": "https://openclaw.ai" },
+          "statement": { "type": "string", "default": "Sign in to OpenClaw Web3" },
+          "challengeTtlMs": { "type": "number", "default": 300000 }
         }
       },
       "billing": {

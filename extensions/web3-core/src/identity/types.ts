@@ -9,6 +9,9 @@ export type WalletBinding = {
   verifiedAt: string;
   /** Optional ENS name resolved at bind time */
   ensName?: string;
+  siweDomain?: string;
+  siweUri?: string;
+  siweStatement?: string;
 };
 
 export type SiweChallenge = {
@@ -16,6 +19,16 @@ export type SiweChallenge = {
   message: string;
   /** Server-generated nonce */
   nonce: string;
+  /** Wallet address bound to the challenge */
+  address: string;
+  /** SIWE domain */
+  domain: string;
+  /** SIWE URI */
+  uri: string;
+  /** Optional statement */
+  statement?: string;
+  /** Issued at timestamp */
+  issuedAt: string;
   /** Expiry timestamp */
   expiresAt: string;
 };

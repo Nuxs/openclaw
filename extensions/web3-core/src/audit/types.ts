@@ -20,6 +20,8 @@ export type AuditEvent = {
   sessionIdHash: string;
   /** Sequence number within session (for ordering & idempotency) */
   seq: number;
+  /** Anchor idempotency key */
+  anchorId?: string;
   /** Canonical payload hash (SHA-256 of redacted + sorted JSON) */
   payloadHash: string;
   /** Optional: redacted payload for local storage/archive */

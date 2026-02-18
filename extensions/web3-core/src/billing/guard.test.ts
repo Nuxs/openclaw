@@ -53,10 +53,28 @@ describe("web3-core billing", () => {
     });
 
     const hook = createBillingLlmUsageHook(store, config);
-    hook({} as PluginHookLlmOutputEvent, { sessionId: "session-2" } as PluginHookAgentContext);
+    hook({} as PluginHookLlmOutputEvent, { sessionKey: "session-2" } as PluginHookAgentContext);
 
     const usage = store.getUsage(hashString("session-2"));
     expect(usage?.llmCalls).toBe(1);
     expect(usage?.creditsUsed).toBe(2);
+  });
+
+  it("prefers sessionKey when both ids are present", () => {
+    const store = createTestStore();
+    const config = resolveConfig({
+      billing: { enabled: true, quotaPerSession: 10, costPerToolCall: 1, costPerLlmCall: 1 },
+    });
+
+    const hook = createBillingLlmUsageHook(store, config);
+    hook(
+      {} as PluginHookLlmOutputEvent,
+      { sessionKey: "session-preferred", sessionId: "session-fallback" } as PluginHookAgentContext,
+    );
+
+    const preferred = store.getUsage(hashString("session-preferred"));
+    const fallback = store.getUsage(hashString("session-fallback"));
+    expect(preferred?.llmCalls).toBe(1);
+    expect(fallback).toBeUndefined();
   });
 });

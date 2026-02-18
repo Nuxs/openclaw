@@ -14,10 +14,13 @@ import type {
   GatewayRequestHandlerOptions,
   OpenClawPluginDefinition,
 } from "openclaw/plugin-sdk";
-import { hashString } from "./audit/canonicalize.js";
-import { createAuditHooks } from "./audit/hooks.js";
+import { createAuditHooks, flushPendingAnchors, flushPendingArchives } from "./audit/hooks.js";
 import { createCreditsCommand, createPayStatusCommand } from "./billing/commands.js";
-import { createBillingGuard, createBillingLlmUsageHook } from "./billing/guard.js";
+import {
+  createBillingGuard,
+  createBillingLlmUsageHook,
+  resolveSessionHash,
+} from "./billing/guard.js";
 import { resolveConfig } from "./config.js";
 import {
   createBindWalletCommand,
@@ -99,31 +102,18 @@ const plugin: OpenClawPluginDefinition = {
       id: "web3-anchor-service",
       async start(ctx) {
         ctx.logger.info("Web3 anchor service started");
-        // Retry pending anchors periodically
+        // Retry pending archives + anchors periodically
         const interval = setInterval(async () => {
-          const pending = store.getPendingTxs();
-          if (pending.length === 0) return;
-
-          if (!config.chain.privateKey) return;
+          try {
+            await flushPendingArchives(store, config);
+          } catch (err) {
+            ctx.logger.warn(`Archive flush error: ${err}`);
+          }
 
           try {
-            const { EvmChainAdapter } = await import("./chain/evm/adapter.js");
-            const chain = new EvmChainAdapter(config.chain);
-            for (const tx of pending) {
-              try {
-                const result = await chain.anchorHash({
-                  anchorId: tx.anchorId,
-                  payloadHash: tx.payloadHash,
-                });
-                ctx.logger.info(`Anchored ${tx.anchorId} → tx ${result.tx}`);
-              } catch (err) {
-                ctx.logger.warn(`Anchor retry failed for ${tx.anchorId}: ${err}`);
-              }
-            }
-            // Clear successful ones (simplified: clear all; real impl tracks per-item)
-            store.savePendingTxs([]);
+            await flushPendingAnchors(store, config);
           } catch (err) {
-            ctx.logger.warn(`Anchor service error: ${err}`);
+            ctx.logger.warn(`Anchor retry error: ${err}`);
           }
         }, 60_000); // every 60s
 
@@ -181,9 +171,7 @@ function createBillingSummaryHandler(
       senderId?: string;
       sessionIdHash?: string;
     };
-    const resolvedHash =
-      input.sessionIdHash ??
-      hashString(input.sessionKey ?? input.sessionId ?? input.senderId ?? "unknown");
+    const resolvedHash = input.sessionIdHash ?? resolveSessionHash(input);
     const usage = store.getUsage(resolvedHash);
     respond(true, {
       enabled: config.billing.enabled,
@@ -205,6 +193,8 @@ function createWeb3StatusSummaryHandler(
       .reverse()
       .find((event) => event.archivePointer?.cid || event.archivePointer?.uri);
     const lastAnchored = [...events].reverse().find((event) => event.chainRef?.tx);
+    const archiveReceipt = store.getArchiveReceipt();
+    const anchorReceipt = store.getLastAnchorReceipt();
     const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
     const recentCount = events.filter((event) => {
       const ts = Date.parse(event.timestamp);
@@ -216,9 +206,13 @@ function createWeb3StatusSummaryHandler(
       auditLastAt: lastEvent?.timestamp ?? null,
       archiveProvider: config.storage.provider ?? null,
       archiveLastCid:
-        lastArchived?.archivePointer?.cid ?? lastArchived?.archivePointer?.uri ?? null,
-      anchorNetwork: config.chain.network ?? null,
-      anchorLastTx: lastAnchored?.chainRef?.tx ?? null,
+        archiveReceipt?.cid ??
+        archiveReceipt?.uri ??
+        lastArchived?.archivePointer?.cid ??
+        lastArchived?.archivePointer?.uri ??
+        null,
+      anchorNetwork: anchorReceipt?.network ?? config.chain.network ?? null,
+      anchorLastTx: anchorReceipt?.tx ?? lastAnchored?.chainRef?.tx ?? null,
       pendingAnchors: pending.length,
       anchoringEnabled: Boolean(config.chain.privateKey),
     });

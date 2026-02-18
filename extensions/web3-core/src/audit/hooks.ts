@@ -16,7 +16,7 @@ import type {
 } from "openclaw/plugin-sdk";
 import { EvmChainAdapter } from "../chain/evm/adapter.js";
 import type { Web3PluginConfig } from "../config.js";
-import type { Web3StateStore } from "../state/store.js";
+import type { PendingArchive, PendingAnchor, Web3StateStore } from "../state/store.js";
 import { archiveContent } from "../storage/archive.js";
 import { IpfsStorageAdapter } from "../storage/ipfs-adapter.js";
 import { hashPayload, hashString, redactPayload } from "./canonicalize.js";
@@ -29,6 +29,10 @@ function nextSeq(sessionHash: string): number {
   const cur = seqCounters.get(sessionHash) ?? 0;
   seqCounters.set(sessionHash, cur + 1);
   return cur + 1;
+}
+
+function resolveSessionIdentity(input: { sessionKey?: string; sessionId?: string }) {
+  return input.sessionKey ?? input.sessionId;
 }
 
 function buildEvent(
@@ -48,6 +52,40 @@ function buildEvent(
     payloadHash: hashPayload(payload, redactFields),
     payload: redactedPayload,
   };
+}
+
+function resolveAnchorId(auditEvent: AuditEvent): string {
+  return (
+    auditEvent.anchorId ??
+    hashString(`${auditEvent.sessionIdHash}:${auditEvent.kind}:${auditEvent.seq}`)
+  );
+}
+
+function queuePendingArchive(store: Web3StateStore, auditEvent: AuditEvent, error?: unknown) {
+  const existing = store.getPendingArchives().find((entry) => entry.event.id === auditEvent.id);
+  const attempts = (existing?.attempts ?? 0) + (error ? 1 : 0);
+  const entry: PendingArchive = {
+    event: auditEvent,
+    createdAt: existing?.createdAt ?? auditEvent.timestamp,
+    attempts,
+    lastError: error ? String(error) : existing?.lastError,
+  };
+  store.upsertPendingArchive(entry);
+}
+
+function queuePendingAnchor(store: Web3StateStore, auditEvent: AuditEvent, error?: unknown) {
+  const anchorId = resolveAnchorId(auditEvent);
+  auditEvent.anchorId = anchorId;
+  const existing = store.getPendingTxs().find((entry) => entry.anchorId === anchorId);
+  const attempts = (existing?.attempts ?? 0) + (error ? 1 : 0);
+  const entry: PendingAnchor = {
+    anchorId,
+    payloadHash: auditEvent.payloadHash,
+    createdAt: existing?.createdAt ?? auditEvent.timestamp,
+    attempts,
+    lastError: error ? String(error) : existing?.lastError,
+  };
+  store.upsertPendingTx(entry);
 }
 
 async function maybeArchiveEvent(
@@ -73,6 +111,8 @@ async function maybeArchiveEvent(
   });
 
   auditEvent.archivePointer = { cid: result.cid, uri: result.uri };
+  store.saveArchiveReceipt({ cid: result.cid, uri: result.uri, updatedAt: auditEvent.timestamp });
+  store.removePendingArchive(auditEvent.id);
 }
 
 async function maybeAnchorEvent(
@@ -80,22 +120,25 @@ async function maybeAnchorEvent(
   store: Web3StateStore,
   config: Web3PluginConfig,
 ): Promise<void> {
-  const anchorId = hashString(`${auditEvent.sessionIdHash}:${auditEvent.kind}:${auditEvent.seq}`);
+  const anchorId = resolveAnchorId(auditEvent);
+  auditEvent.anchorId = anchorId;
 
   if (!config.chain.privateKey) {
-    const pending = store.getPendingTxs();
-    pending.push({
-      anchorId,
-      payloadHash: auditEvent.payloadHash,
-      createdAt: auditEvent.timestamp,
-    });
-    store.savePendingTxs(pending);
+    queuePendingAnchor(store, auditEvent);
     return;
   }
 
   const chain = new EvmChainAdapter(config.chain);
   const result = await chain.anchorHash({ anchorId, payloadHash: auditEvent.payloadHash });
   auditEvent.chainRef = { network: result.network, tx: result.tx, block: result.block };
+  store.saveAnchorReceipt({
+    anchorId,
+    tx: result.tx,
+    block: result.block,
+    network: result.network,
+    updatedAt: new Date().toISOString(),
+  });
+  store.removePendingTx(anchorId);
 }
 
 async function handleAuditEvent(
@@ -106,33 +149,106 @@ async function handleAuditEvent(
   config: Web3PluginConfig,
 ): Promise<void> {
   const auditEvent = buildEvent(kind, sessionId, payload, config.privacy.redactFields);
+  auditEvent.anchorId = resolveAnchorId(auditEvent);
 
   try {
     await maybeArchiveEvent(auditEvent, store, config);
-  } catch {
-    // Archive failures should not block the main flow; event is still logged locally.
+  } catch (err) {
+    queuePendingArchive(store, auditEvent, err);
   }
 
   try {
     await maybeAnchorEvent(auditEvent, store, config);
-  } catch {
-    const pending = store.getPendingTxs();
-    pending.push({
-      anchorId: hashString(`${auditEvent.sessionIdHash}:${auditEvent.kind}:${auditEvent.seq}`),
-      payloadHash: auditEvent.payloadHash,
-      createdAt: auditEvent.timestamp,
-    });
-    store.savePendingTxs(pending);
+  } catch (err) {
+    queuePendingAnchor(store, auditEvent, err);
   }
 
   store.appendAuditEvent(auditEvent);
+}
+
+export async function flushPendingArchives(store: Web3StateStore, config: Web3PluginConfig) {
+  if (config.storage.provider !== "ipfs") return;
+  if (!config.storage.pinataJwt) return;
+
+  const pending = store.getPendingArchives();
+  if (pending.length === 0) return;
+
+  const adapter = new IpfsStorageAdapter({
+    pinataJwt: config.storage.pinataJwt,
+    gateway: config.storage.gateway,
+  });
+  const remaining: PendingArchive[] = [];
+
+  for (const entry of pending) {
+    const auditEvent = entry.event;
+    try {
+      const bytes = new TextEncoder().encode(JSON.stringify(auditEvent));
+      const encryptionKey = config.privacy.archiveEncryption ? store.getArchiveKey() : undefined;
+      const result = await archiveContent(bytes, "application/json", adapter, {
+        encrypt: config.privacy.archiveEncryption,
+        encryptionKey,
+        name: `audit-${auditEvent.kind}-${auditEvent.seq}.json`,
+      });
+      auditEvent.archivePointer = { cid: result.cid, uri: result.uri };
+      store.saveArchiveReceipt({
+        cid: result.cid,
+        uri: result.uri,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      remaining.push({
+        ...entry,
+        attempts: (entry.attempts ?? 0) + 1,
+        lastError: String(err),
+      });
+    }
+  }
+
+  store.savePendingArchives(remaining);
+}
+
+export async function flushPendingAnchors(store: Web3StateStore, config: Web3PluginConfig) {
+  if (!config.chain.privateKey) return;
+
+  const pending = store.getPendingTxs();
+  if (pending.length === 0) return;
+
+  const chain = new EvmChainAdapter(config.chain);
+  const remaining: PendingAnchor[] = [];
+
+  for (const entry of pending) {
+    if (store.getAnchorReceipt(entry.anchorId)) {
+      continue;
+    }
+    try {
+      const result = await chain.anchorHash({
+        anchorId: entry.anchorId,
+        payloadHash: entry.payloadHash,
+      });
+      store.saveAnchorReceipt({
+        anchorId: entry.anchorId,
+        tx: result.tx,
+        block: result.block,
+        network: result.network,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      remaining.push({
+        ...entry,
+        attempts: (entry.attempts ?? 0) + 1,
+        lastError: String(err),
+      });
+    }
+  }
+
+  store.savePendingTxs(remaining);
 }
 
 export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig) {
   const onLlmInput = async (event: PluginHookLlmInputEvent, ctx: PluginHookAgentContext) => {
     await handleAuditEvent(
       "llm_input",
-      ctx.sessionId,
+      resolveSessionIdentity(ctx),
       {
         provider: event.provider,
         model: event.model,
@@ -147,7 +263,7 @@ export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig
   const onLlmOutput = async (event: PluginHookLlmOutputEvent, ctx: PluginHookAgentContext) => {
     await handleAuditEvent(
       "llm_output",
-      ctx.sessionId,
+      resolveSessionIdentity(ctx),
       {
         provider: event.provider,
         model: event.model,
@@ -165,7 +281,7 @@ export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig
   ) => {
     await handleAuditEvent(
       "tool_call",
-      ctx.sessionKey,
+      resolveSessionIdentity(ctx),
       {
         toolName: event.toolName,
         durationMs: event.durationMs,
@@ -179,7 +295,7 @@ export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig
   const onSessionEnd = async (event: PluginHookSessionEndEvent, ctx: PluginHookSessionContext) => {
     await handleAuditEvent(
       "session_end",
-      ctx.sessionId,
+      resolveSessionIdentity(ctx),
       {
         messageCount: event.messageCount,
         durationMs: event.durationMs,

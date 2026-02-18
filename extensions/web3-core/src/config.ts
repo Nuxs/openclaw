@@ -50,6 +50,10 @@ export type PrivacyConfig = {
 export type IdentityConfig = {
   allowSiwe: boolean;
   requiredChainId?: number;
+  domain?: string;
+  uri?: string;
+  statement?: string;
+  challengeTtlMs?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -98,6 +102,10 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
   },
   identity: {
     allowSiwe: true,
+    domain: "openclaw.ai",
+    uri: "https://openclaw.ai",
+    statement: "Sign in to OpenClaw Web3",
+    challengeTtlMs: 5 * 60_000,
   },
   billing: {
     enabled: false,

@@ -44,7 +44,10 @@ export function createBillingLlmUsageHook(store: Web3StateStore, config: Web3Plu
   return (event: PluginHookLlmOutputEvent, ctx: PluginHookAgentContext) => {
     if (!config.billing.enabled) return;
 
-    const sessionHash = resolveSessionHash({ sessionId: ctx.sessionId });
+    const sessionHash = resolveSessionHash({
+      sessionKey: ctx.sessionKey,
+      sessionId: ctx.sessionId,
+    });
     const usage = getOrCreateUsage(store, sessionHash, config);
 
     usage.creditsUsed += config.billing.costPerLlmCall;
@@ -54,7 +57,11 @@ export function createBillingLlmUsageHook(store: Web3StateStore, config: Web3Plu
   };
 }
 
-function resolveSessionHash(input: { sessionKey?: string; sessionId?: string; senderId?: string }) {
+export function resolveSessionHash(input: {
+  sessionKey?: string;
+  sessionId?: string;
+  senderId?: string;
+}) {
   return hashString(input.sessionKey ?? input.sessionId ?? input.senderId ?? "unknown");
 }
 

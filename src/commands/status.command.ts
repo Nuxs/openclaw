@@ -76,6 +76,8 @@ export async function statusCommand(
     summary,
     memory,
     memoryPlugin,
+    web3,
+    web3Error,
   } = scan;
 
   const securityAudit = await withProgress(
@@ -150,6 +152,8 @@ export async function statusCommand(
           updateChannelSource: channelInfo.source,
           memory,
           memoryPlugin,
+          web3,
+          web3Error,
           gateway: {
             mode: gatewayMode,
             url: gatewayConnection.url,
@@ -396,6 +400,51 @@ export async function statusCommand(
         { key: "Value", header: "Value", flex: true, minWidth: 32 },
       ],
       rows: overviewRows,
+    }).trimEnd(),
+  );
+
+  runtime.log("");
+  runtime.log(theme.heading("Web3"));
+  const web3Rows = (() => {
+    if (!gatewayReachable) {
+      return [{ Item: "Status", Value: warn("unavailable (gateway unreachable)") }];
+    }
+    if (web3Error) {
+      return [{ Item: "Status", Value: warn(shortenText(web3Error, 160)) }];
+    }
+    if (!web3) {
+      return [{ Item: "Status", Value: muted("unavailable (plugin disabled?)") }];
+    }
+    const lastAuditAt = web3.auditLastAt ? Date.parse(web3.auditLastAt) : NaN;
+    const lastAuditAge = Number.isNaN(lastAuditAt) ? null : Date.now() - lastAuditAt;
+    const lastAuditLabel = lastAuditAge == null ? "unknown" : formatTimeAgo(lastAuditAge);
+    const archiveLabel = web3.archiveLastCid ? shortenText(web3.archiveLastCid, 20) : "none";
+    const anchorLabel = web3.anchorLastTx ? shortenText(web3.anchorLastTx, 20) : "none";
+    return [
+      { Item: "Audits (24h)", Value: `${web3.auditEventsRecent}` },
+      { Item: "Last audit", Value: lastAuditLabel },
+      {
+        Item: "Archive",
+        Value: `${web3.archiveProvider ?? "unknown"} · ${archiveLabel}`,
+      },
+      {
+        Item: "Anchor",
+        Value: `${web3.anchorNetwork ?? "unknown"} · ${anchorLabel}`,
+      },
+      {
+        Item: "Anchoring",
+        Value: `${web3.anchoringEnabled ? ok("enabled") : muted("disabled")} · pending ${web3.pendingAnchors}`,
+      },
+    ];
+  })();
+  runtime.log(
+    renderTable({
+      width: tableWidth,
+      columns: [
+        { key: "Item", header: "Item", minWidth: 12 },
+        { key: "Value", header: "Value", flex: true, minWidth: 32 },
+      ],
+      rows: web3Rows,
     }).trimEnd(),
   );
 

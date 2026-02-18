@@ -43,7 +43,7 @@ export class EvmChainAdapter implements ChainAdapter {
     }
 
     // Dynamic import viem to keep the plugin lightweight when chain features are unused
-    const { createWalletClient, http, toHex } = await import("viem");
+    const { createWalletClient, createPublicClient, http, toHex } = await import("viem");
     const { privateKeyToAccount } = await import("viem/accounts");
 
     const account = privateKeyToAccount(this.privateKey as `0x${string}`);
@@ -62,9 +62,19 @@ export class EvmChainAdapter implements ChainAdapter {
       chain: { id: this.chainId } as any,
     });
 
+    let block: number | undefined;
+    try {
+      const publicClient = createPublicClient({ transport: http(this.rpcUrl) });
+      const receipt = await publicClient.getTransactionReceipt({ hash: tx as `0x${string}` });
+      block = Number(receipt.blockNumber);
+    } catch {
+      block = undefined;
+    }
+
     return {
       tx,
       network: this.networkId,
+      block,
     };
   }
 

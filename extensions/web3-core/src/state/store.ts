@@ -14,7 +14,36 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { join } from "node:path";
 import type { AuditEvent } from "../audit/types.js";
 import type { UsageRecord } from "../billing/types.js";
-import type { WalletBinding } from "../identity/types.js";
+import type { SiweChallenge, WalletBinding } from "../identity/types.js";
+
+export type PendingAnchor = {
+  anchorId: string;
+  payloadHash: string;
+  createdAt: string;
+  attempts?: number;
+  lastError?: string;
+};
+
+export type PendingArchive = {
+  event: AuditEvent;
+  createdAt: string;
+  attempts?: number;
+  lastError?: string;
+};
+
+export type AnchorReceipt = {
+  anchorId: string;
+  tx: string;
+  network: string;
+  block?: number;
+  updatedAt: string;
+};
+
+export type ArchiveReceipt = {
+  cid?: string;
+  uri?: string;
+  updatedAt: string;
+};
 
 export class Web3StateStore {
   private readonly dir: string;
@@ -49,6 +78,63 @@ export class Web3StateStore {
     this.saveBindings(this.getBindings().filter((b) => b.address !== address));
   }
 
+  // ---- SIWE challenges ----
+
+  private get siweChallengesPath() {
+    return join(this.dir, "siwe-challenges.json");
+  }
+
+  getSiweChallenge(nonce: string): SiweChallenge | undefined {
+    if (!existsSync(this.siweChallengesPath)) return undefined;
+    const map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
+      string,
+      SiweChallenge
+    >;
+    return map[nonce];
+  }
+
+  saveSiweChallenge(challenge: SiweChallenge): void {
+    let map: Record<string, SiweChallenge> = {};
+    if (existsSync(this.siweChallengesPath)) {
+      map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
+        string,
+        SiweChallenge
+      >;
+    }
+    map[challenge.nonce] = challenge;
+    writeFileSync(this.siweChallengesPath, JSON.stringify(map, null, 2));
+  }
+
+  deleteSiweChallenge(nonce: string): void {
+    if (!existsSync(this.siweChallengesPath)) return;
+    const map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
+      string,
+      SiweChallenge
+    >;
+    if (!(nonce in map)) return;
+    delete map[nonce];
+    writeFileSync(this.siweChallengesPath, JSON.stringify(map, null, 2));
+  }
+
+  pruneSiweChallenges(now = Date.now()): void {
+    if (!existsSync(this.siweChallengesPath)) return;
+    const map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
+      string,
+      SiweChallenge
+    >;
+    let dirty = false;
+    for (const [nonce, challenge] of Object.entries(map)) {
+      const expiresAt = Date.parse(challenge.expiresAt);
+      if (Number.isNaN(expiresAt) || expiresAt <= now) {
+        delete map[nonce];
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      writeFileSync(this.siweChallengesPath, JSON.stringify(map, null, 2));
+    }
+  }
+
   // ---- Audit log (append-only JSONL) ----
 
   private get auditLogPath() {
@@ -63,6 +149,21 @@ export class Web3StateStore {
     if (!existsSync(this.auditLogPath)) return [];
     const lines = readFileSync(this.auditLogPath, "utf-8").trim().split("\n");
     return lines.slice(-limit).map((l) => JSON.parse(l) as AuditEvent);
+  }
+
+  // ---- Archive receipts ----
+
+  private get archiveReceiptPath() {
+    return join(this.dir, "archive-receipt.json");
+  }
+
+  getArchiveReceipt(): ArchiveReceipt | null {
+    if (!existsSync(this.archiveReceiptPath)) return null;
+    return JSON.parse(readFileSync(this.archiveReceiptPath, "utf-8")) as ArchiveReceipt;
+  }
+
+  saveArchiveReceipt(receipt: ArchiveReceipt): void {
+    writeFileSync(this.archiveReceiptPath, JSON.stringify(receipt, null, 2));
   }
 
   // ---- Archive encryption key ----
@@ -102,18 +203,103 @@ export class Web3StateStore {
     writeFileSync(this.usagePath, JSON.stringify(map, null, 2));
   }
 
+  // ---- Pending archives (retry queue) ----
+
+  private get pendingArchivePath() {
+    return join(this.dir, "pending-archive.json");
+  }
+
+  getPendingArchives(): PendingArchive[] {
+    if (!existsSync(this.pendingArchivePath)) return [];
+    return JSON.parse(readFileSync(this.pendingArchivePath, "utf-8"));
+  }
+
+  savePendingArchives(items: PendingArchive[]): void {
+    writeFileSync(this.pendingArchivePath, JSON.stringify(items, null, 2));
+  }
+
+  upsertPendingArchive(item: PendingArchive): void {
+    const list = this.getPendingArchives();
+    const index = list.findIndex((entry) => entry.event.id === item.event.id);
+    if (index >= 0) {
+      list[index] = item;
+    } else {
+      list.push(item);
+    }
+    this.savePendingArchives(list);
+  }
+
+  removePendingArchive(eventId: string): void {
+    const list = this.getPendingArchives().filter((entry) => entry.event.id !== eventId);
+    this.savePendingArchives(list);
+  }
+
+  // ---- Anchor receipts ----
+
+  private get anchorReceiptsPath() {
+    return join(this.dir, "anchor-receipts.json");
+  }
+
+  getAnchorReceipt(anchorId: string): AnchorReceipt | undefined {
+    if (!existsSync(this.anchorReceiptsPath)) return undefined;
+    const map = JSON.parse(readFileSync(this.anchorReceiptsPath, "utf-8")) as Record<
+      string,
+      AnchorReceipt
+    >;
+    return map[anchorId];
+  }
+
+  getLastAnchorReceipt(): AnchorReceipt | null {
+    if (!existsSync(this.anchorReceiptsPath)) return null;
+    const map = JSON.parse(readFileSync(this.anchorReceiptsPath, "utf-8")) as Record<
+      string,
+      AnchorReceipt
+    >;
+    const entries = Object.values(map);
+    if (entries.length === 0) return null;
+    return entries.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+  }
+
+  saveAnchorReceipt(receipt: AnchorReceipt): void {
+    let map: Record<string, AnchorReceipt> = {};
+    if (existsSync(this.anchorReceiptsPath)) {
+      map = JSON.parse(readFileSync(this.anchorReceiptsPath, "utf-8")) as Record<
+        string,
+        AnchorReceipt
+      >;
+    }
+    map[receipt.anchorId] = receipt;
+    writeFileSync(this.anchorReceiptsPath, JSON.stringify(map, null, 2));
+  }
+
   // ---- Pending transactions (retry queue) ----
 
   private get pendingTxPath() {
     return join(this.dir, "pending-tx.json");
   }
 
-  getPendingTxs(): Array<{ anchorId: string; payloadHash: string; createdAt: string }> {
+  getPendingTxs(): PendingAnchor[] {
     if (!existsSync(this.pendingTxPath)) return [];
     return JSON.parse(readFileSync(this.pendingTxPath, "utf-8"));
   }
 
-  savePendingTxs(txs: Array<{ anchorId: string; payloadHash: string; createdAt: string }>): void {
+  savePendingTxs(txs: PendingAnchor[]): void {
     writeFileSync(this.pendingTxPath, JSON.stringify(txs, null, 2));
+  }
+
+  upsertPendingTx(tx: PendingAnchor): void {
+    const list = this.getPendingTxs();
+    const index = list.findIndex((entry) => entry.anchorId === tx.anchorId);
+    if (index >= 0) {
+      list[index] = tx;
+    } else {
+      list.push(tx);
+    }
+    this.savePendingTxs(list);
+  }
+
+  removePendingTx(anchorId: string): void {
+    const list = this.getPendingTxs().filter((entry) => entry.anchorId !== anchorId);
+    this.savePendingTxs(list);
   }
 }
