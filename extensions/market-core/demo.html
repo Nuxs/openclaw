@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -128,42 +128,42 @@
           <h2>1) 报价（Offer）</h2>
           <p>发布数据/服务资产的报价。</p>
           <button class="button" onclick="createOffer()">发布报价</button>
-          <div id="offerOutput" class="output" style="display:none;"></div>
+          <div id="offerOutput" class="output" style="display: none"></div>
         </div>
 
         <div class="card">
           <h2>2) 订单（Order）</h2>
           <p>买家下单并锁定付款。</p>
           <button class="button" onclick="createOrder()">创建订单</button>
-          <div id="orderOutput" class="output" style="display:none;"></div>
+          <div id="orderOutput" class="output" style="display: none"></div>
         </div>
 
         <div class="card">
           <h2>3) 授权（Consent）</h2>
           <p>买家授权用途与范围。</p>
           <button class="button" onclick="grantConsent()">授予授权</button>
-          <div id="consentOutput" class="output" style="display:none;"></div>
+          <div id="consentOutput" class="output" style="display: none"></div>
         </div>
 
         <div class="card">
           <h2>4) 交付（Delivery）</h2>
           <p>卖家交付数据或服务凭证。</p>
           <button class="button" onclick="issueDelivery()">完成交付</button>
-          <div id="deliveryOutput" class="output" style="display:none;"></div>
+          <div id="deliveryOutput" class="output" style="display: none"></div>
         </div>
 
         <div class="card">
           <h2>5) 结算（Settlement）</h2>
           <p>释放锁定资金，交易完成。</p>
           <button class="button" onclick="releaseSettlement()">释放结算</button>
-          <div id="settlementOutput" class="output" style="display:none;"></div>
+          <div id="settlementOutput" class="output" style="display: none"></div>
         </div>
 
         <div class="card">
           <h2>6) 审计（Audit）</h2>
           <p>关键事件进入审计日志。</p>
           <button class="button" onclick="appendAudit()">写入审计</button>
-          <div id="auditOutput" class="output" style="display:none;"></div>
+          <div id="auditOutput" class="output" style="display: none"></div>
         </div>
       </div>
 
@@ -197,7 +197,7 @@
           <div class="timeline-item">
             <div>${event.timestamp}</div>
             <div><strong>${event.kind}</strong> → ${event.refId}</div>
-          </div>`
+          </div>`,
           )
           .join("");
       }
@@ -264,7 +264,13 @@
       }
 
       function appendAudit() {
-        if (!state.offer || !state.order || !state.consent || !state.delivery || !state.settlement) {
+        if (
+          !state.offer ||
+          !state.order ||
+          !state.consent ||
+          !state.delivery ||
+          !state.settlement
+        ) {
           return alert("请先完成完整流程");
         }
         state.audit = [
@@ -276,7 +282,7 @@
         ];
         const output = document.getElementById("auditOutput");
         output.style.display = "block";
-        output.textContent = `✅ 审计事件写入 ${state.audit.length} 条`; 
+        output.textContent = `✅ 审计事件写入 ${state.audit.length} 条`;
         updateTimeline();
       }
 

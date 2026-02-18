@@ -1159,6 +1159,61 @@ export function createSettlementRefundHandler(
   };
 }
 
+export function createSettlementStatusHandler(
+  store: MarketStateStore,
+  config: MarketPluginConfig,
+): GatewayRequestHandler {
+  return (opts: GatewayRequestHandlerOptions) => {
+    const { params, respond } = opts;
+    try {
+      assertAccess(opts, config, "read");
+      const input = (params ?? {}) as Record<string, unknown>;
+      const actorId = requireActorId(opts, config, input);
+      const orderId = typeof input.orderId === "string" ? input.orderId : undefined;
+      const settlementId = typeof input.settlementId === "string" ? input.settlementId : undefined;
+
+      if (!orderId && !settlementId) {
+        throw new Error("orderId or settlementId is required");
+      }
+
+      let settlement = settlementId ? store.getSettlement(settlementId) : undefined;
+      if (!settlement && orderId) {
+        settlement = store.getSettlementByOrder(orderId);
+      }
+      if (!settlement) throw new Error("settlement not found");
+
+      const resolvedOrderId = orderId ?? settlement.orderId;
+      const order = store.getOrder(resolvedOrderId);
+      const offer = order ? store.getOffer(order.offerId) : undefined;
+
+      if (actorId && order) {
+        const buyerMatch = normalizeBuyerId(actorId) === normalizeBuyerId(order.buyerId ?? "");
+        const sellerMatch = offer ? actorId === offer.sellerId : false;
+        if (!buyerMatch && !sellerMatch) {
+          throw new Error("actorId does not match buyerId or sellerId");
+        }
+      }
+
+      respond(true, {
+        orderId: resolvedOrderId,
+        orderStatus: order?.status ?? null,
+        settlementId: settlement.settlementId,
+        status: settlement.status ?? null,
+        amount: settlement.amount ?? null,
+        tokenAddress: settlement.tokenAddress ?? null,
+        lockTxHash: settlement.lockTxHash ?? null,
+        releaseTxHash: settlement.releaseTxHash ?? null,
+        refundTxHash: settlement.refundTxHash ?? null,
+        lockedAt: settlement.lockedAt ?? null,
+        releasedAt: settlement.releasedAt ?? null,
+        refundedAt: settlement.refundedAt ?? null,
+      });
+    } catch (err) {
+      respond(false, { error: String(err) });
+    }
+  };
+}
+
 export function createMarketStatusSummaryHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,

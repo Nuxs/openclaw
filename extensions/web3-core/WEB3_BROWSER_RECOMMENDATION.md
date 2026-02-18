@@ -134,19 +134,19 @@ OpenClaw 现状更天然适配 **C + D**（我们做“策略/审计/归档/计�
 - **`web3-core` 审计链路**：hooks → `handleAuditEvent` → 可选 IPFS 归档 → 可选链上锚定 → `web3/audit-log.jsonl`（已实现）。
 - **`market-core` 结算链路**：`market.settlement.*` → `EscrowAdapter` → `recordAuditWithAnchor`（已实现）。
 - **明确缺口**：
-  - `web3-core` 的 `/pay_status` 仍为占位，**没有“链上支付闭环”。**
-  - **浏览器侧事件目前无法进入 Gateway**（已补上：`browser-extension` + `web3-core` 插件 HTTP ingest）。
+  - `web3-core` 的 `/pay_status` 已接入市场结算状态，**支付闭环已补齐。**
+  - **浏览器侧事件已进入 Gateway**（`browser-extension` + `web3-core` 插件 HTTP ingest）。
 
 ## 6) 实现计划（不留 TODO，交付可执行）
 
 ### 6.1 支付闭环（以 `market-core` 为准）
 
-- **输入**：`orderId`/`orderHash`（由 `market.order.create` 返回）。
+- **输入**：`orderId`/`settlementId`。
 - **处理**：
-  - 在 `market-core` 增加 `market.settlement.status` 方法，输出 `lockTx`/`releaseTx`/`refundTx` 与当前结算状态。
-  - 将 `/pay_status` 在 `web3-core` 调整为“指向市场结算状态的提示命令”，避免误导。
+  - `market-core` 提供 `market.settlement.status`，输出 `lockTx`/`releaseTx`/`refundTx` 与当前结算状态。
+  - `/pay_status` 从市场状态读取结算信息，统一以 `market-core` 为事实源。
 - **输出**：
-  - `market.settlement.status` 作为唯一结算状态源。
+  - `market.settlement.status` 为唯一结算状态源。
   - `web3.billing.status` 仅保留“配额/usage”维度。
 
 ### 6.2 浏览器扩展原型（已落仓，可直接加载）

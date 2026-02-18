@@ -32,6 +32,20 @@
       "sensitive": true,
       "help": "JWT token for Pinata IPFS pinning service"
     },
+    "storage.arweaveKeyfile": {
+      "label": "Arweave Keyfile",
+      "help": "Path to Arweave keyfile JSON used for signing uploads"
+    },
+    "storage.filecoinToken": {
+      "label": "Filecoin Upload Token",
+      "sensitive": true,
+      "help": "API token for Filecoin-compatible upload service (e.g., web3.storage)"
+    },
+    "storage.filecoinEndpoint": {
+      "label": "Filecoin Upload Endpoint",
+      "placeholder": "https://api.web3.storage/upload",
+      "help": "HTTP endpoint used for Filecoin uploads"
+    },
     "privacy.onChainData": {
       "label": "On-chain Data Policy",
       "help": "What to write on-chain: hash_only (default) | hash_and_meta | encrypted_content"
@@ -124,7 +138,12 @@
           },
           "gateway": { "type": "string" },
           "pinataJwt": { "type": "string" },
-          "arweaveKeyfile": { "type": "string" }
+          "arweaveKeyfile": { "type": "string" },
+          "filecoinToken": { "type": "string" },
+          "filecoinEndpoint": {
+            "type": "string",
+            "default": "https://api.web3.storage/upload"
+          }
         }
       },
       "privacy": {

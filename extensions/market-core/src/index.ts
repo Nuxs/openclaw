@@ -20,6 +20,7 @@ import {
   createSettlementLockHandler,
   createSettlementRefundHandler,
   createSettlementReleaseHandler,
+  createSettlementStatusHandler,
 } from "./market/handlers.js";
 import { MarketStateStore } from "./state/store.js";
 
@@ -52,6 +53,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod(
       "market.settlement.refund",
       createSettlementRefundHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.settlement.status",
+      createSettlementStatusHandler(store, config),
     );
 
     api.registerGatewayMethod("market.consent.grant", createConsentGrantHandler(store, config));

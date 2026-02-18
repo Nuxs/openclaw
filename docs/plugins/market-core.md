@@ -32,7 +32,7 @@
 
 - **Offer**: `market.offer.create` `market.offer.publish` `market.offer.update` `market.offer.close`
 - **Order**: `market.order.create` `market.order.cancel`
-- **Settlement**: `market.settlement.lock` `market.settlement.release` `market.settlement.refund`
+- **Settlement**: `market.settlement.lock` `market.settlement.release` `market.settlement.refund` `market.settlement.status`
 - **Consent**: `market.consent.grant` `market.consent.revoke`
 - **Delivery**: `market.delivery.issue` `market.delivery.complete` `market.delivery.revoke`
 - **Transparency**: `market.status.summary` `market.audit.query` `market.transparency.summary` `market.transparency.trace`

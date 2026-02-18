@@ -5,6 +5,7 @@
   "description": "OpenClaw Web3 plugin: decentralized storage, wallet identity, audit anchoring, billing & marketplace",
   "type": "module",
   "dependencies": {
+    "arweave": "1.15.7",
     "ethers": "6.16.0",
     "multiformats": "^13.3.2",
     "siwe": "3.0.0",

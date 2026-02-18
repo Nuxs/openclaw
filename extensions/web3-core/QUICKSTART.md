@@ -202,7 +202,9 @@ console.log("配额状态:", {
 {
   "storage": {
     "provider": "filecoin",
-    "gateway": "https://w3s.link"
+    "gateway": "https://w3s.link",
+    "filecoinToken": "REPLACE_WITH_TOKEN",
+    "filecoinEndpoint": "https://api.web3.storage/upload"
   }
 }
 ```

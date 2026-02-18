@@ -133,6 +133,9 @@ with defaults in `extensions/web3-core/src/config.ts`.
 - **`storage.provider`**: `ipfs | arweave | filecoin`
 - **`storage.gateway`**: HTTP gateway for archived content
 - **`storage.pinataJwt`**: Pinata JWT for IPFS uploads
+- **`storage.arweaveKeyfile`**: Arweave keyfile JSON path for uploads
+- **`storage.filecoinToken`**: Filecoin upload API token (e.g. web3.storage)
+- **`storage.filecoinEndpoint`**: Filecoin upload endpoint (default: `https://api.web3.storage/upload`)
 - **`privacy.onChainData`**: `hash_only | hash_and_meta | encrypted_content`
 - **`privacy.archiveEncryption`**: encrypt archive payloads
 - **`privacy.redactFields`**: fields redacted before hashing and storage
@@ -161,7 +164,7 @@ State lives under the Gateway state directory in `web3/`:
 - **`/unbind_wallet <0x...>`**: remove wallet binding
 - **`/whoami_web3`**: list bindings
 - **`/credits`**: session credits and usage
-- **`/pay_status`**: payment status placeholder
+- **`/pay_status`**: query settlement status from market state (orderId or settlementId)
 - **`/audit_status`**: recent audit events
 
 ### Hooks

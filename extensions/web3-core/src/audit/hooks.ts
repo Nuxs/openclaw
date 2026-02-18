@@ -17,8 +17,8 @@ import type {
 import { EvmChainAdapter } from "../chain/evm/adapter.js";
 import type { Web3PluginConfig } from "../config.js";
 import type { PendingArchive, PendingAnchor, Web3StateStore } from "../state/store.js";
+import { createStorageAdapter } from "../storage/adapter.js";
 import { archiveContent } from "../storage/archive.js";
-import { IpfsStorageAdapter } from "../storage/ipfs-adapter.js";
 import { hashPayload, hashString, redactPayload } from "./canonicalize.js";
 import type { AuditEvent, AuditEventKind } from "./types.js";
 
@@ -93,13 +93,8 @@ async function maybeArchiveEvent(
   store: Web3StateStore,
   config: Web3PluginConfig,
 ): Promise<void> {
-  if (config.storage.provider !== "ipfs") return;
-  if (!config.storage.pinataJwt) return;
-
-  const adapter = new IpfsStorageAdapter({
-    pinataJwt: config.storage.pinataJwt,
-    gateway: config.storage.gateway,
-  });
+  const adapter = createStorageAdapter(config);
+  if (!adapter) return;
 
   const bytes = new TextEncoder().encode(JSON.stringify(auditEvent));
   const encryptionKey = config.privacy.archiveEncryption ? store.getArchiveKey() : undefined;
@@ -167,16 +162,12 @@ async function handleAuditEvent(
 }
 
 export async function flushPendingArchives(store: Web3StateStore, config: Web3PluginConfig) {
-  if (config.storage.provider !== "ipfs") return;
-  if (!config.storage.pinataJwt) return;
+  const adapter = createStorageAdapter(config);
+  if (!adapter) return;
 
   const pending = store.getPendingArchives();
   if (pending.length === 0) return;
 
-  const adapter = new IpfsStorageAdapter({
-    pinataJwt: config.storage.pinataJwt,
-    gateway: config.storage.gateway,
-  });
   const remaining: PendingArchive[] = [];
 
   for (const entry of pending) {

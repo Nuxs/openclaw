@@ -70,7 +70,12 @@ const plugin: OpenClawPluginDefinition = {
     api.registerCommand({
       name: "pay_status",
       description: "Check payment and billing status",
-      handler: createPayStatusCommand(store),
+      handler: createPayStatusCommand(store, {
+        stateDir,
+        marketConfig: api.config.plugins?.entries?.["market-core"]?.config as
+          | Record<string, unknown>
+          | undefined,
+      }),
     });
     api.registerCommand({
       name: "audit_status",

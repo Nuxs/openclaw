@@ -13,6 +13,7 @@ import { mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AuditEvent } from "./src/audit/types.js";
+import type { UsageRecord } from "./src/billing/types.js";
 import { resolveConfig, type Web3PluginConfig } from "./src/config.js";
 import type { WalletBinding } from "./src/identity/types.js";
 import { Web3StateStore } from "./src/state/store.js";
@@ -72,9 +73,10 @@ const store = new Web3StateStore(DEMO_STATE_DIR);
 const demoWallet: WalletBinding = {
   address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
   chainId: 8453, // Base
-  boundAt: new Date().toISOString(),
-  verifiedViaSiwe: true,
-  signature: "0xdemo...signature",
+  verifiedAt: new Date().toISOString(),
+  siweDomain: config.identity.domain,
+  siweUri: "https://demo.openclaw.ai",
+  siweStatement: "Demo wallet binding",
 };
 
 store.addBinding(demoWallet);
@@ -88,13 +90,15 @@ console.log();
 console.log("3️⃣  审计追踪");
 console.log("━".repeat(60));
 
+const sessionHash = "demo-session-hash-123";
+
 const auditEvents: AuditEvent[] = [
   {
     id: "evt-1",
     kind: "llm_input",
     timestamp: new Date().toISOString(),
     seq: 1,
-    sessionKey: "demo-session",
+    sessionIdHash: sessionHash,
     payloadHash: "0xa1b2c3d4...",
     payload: { prompt: "用户输入示例" },
   },
@@ -103,7 +107,7 @@ const auditEvents: AuditEvent[] = [
     kind: "llm_output",
     timestamp: new Date().toISOString(),
     seq: 2,
-    sessionKey: "demo-session",
+    sessionIdHash: sessionHash,
     payloadHash: "0xe5f6g7h8...",
     payload: { response: "AI 响应示例", tokens: 150 },
   },
@@ -112,7 +116,7 @@ const auditEvents: AuditEvent[] = [
     kind: "tool_call",
     timestamp: new Date().toISOString(),
     seq: 3,
-    sessionKey: "demo-session",
+    sessionIdHash: sessionHash,
     payloadHash: "0xi9j0k1l2...",
     payload: { tool: "web_search", query: "OpenClaw Web3" },
   },
@@ -131,22 +135,23 @@ console.log();
 console.log("4️⃣  使用配额与计费");
 console.log("━".repeat(60));
 
-const sessionHash = "demo-session-hash-123";
-const usageRecord = {
+const creditsUsed = 5 * config.billing.costPerLlmCall + 3 * config.billing.costPerToolCall;
+const creditsQuota = config.billing.quotaPerSession;
+const usageRecord: UsageRecord = {
   sessionIdHash: sessionHash,
   llmCalls: 5,
   toolCalls: 3,
-  totalCost: 5 * config.billing.costPerLlmCall + 3 * config.billing.costPerToolCall,
-  quota: config.billing.quotaPerSession,
-  lastUpdated: new Date().toISOString(),
+  creditsUsed,
+  creditsQuota,
+  lastActivity: new Date().toISOString(),
 };
 
 store.saveUsage(usageRecord);
 console.log(`✅ 记录使用量: LLM 调用 ${usageRecord.llmCalls} 次`);
 console.log(`✅ 工具调用: ${usageRecord.toolCalls} 次`);
-console.log(`✅ 总成本: ${usageRecord.totalCost} credits`);
-console.log(`✅ 配额: ${usageRecord.quota} credits`);
-console.log(`✅ 剩余: ${usageRecord.quota - usageRecord.totalCost} credits`);
+console.log(`✅ 总成本: ${usageRecord.creditsUsed} credits`);
+console.log(`✅ 配额: ${usageRecord.creditsQuota} credits`);
+console.log(`✅ 剩余: ${usageRecord.creditsQuota - usageRecord.creditsUsed} credits`);
 console.log();
 
 // 5️⃣ 归档加密密钥

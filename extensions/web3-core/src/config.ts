@@ -29,6 +29,8 @@ export type StorageConfig = {
   gateway?: string;
   pinataJwt?: string;
   arweaveKeyfile?: string;
+  filecoinToken?: string;
+  filecoinEndpoint?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -107,6 +109,7 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
   storage: {
     provider: "ipfs",
     gateway: "https://w3s.link",
+    filecoinEndpoint: "https://api.web3.storage/upload",
   },
   privacy: {
     onChainData: "hash_only",
