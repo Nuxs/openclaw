@@ -240,6 +240,11 @@
   - changed-files:
       - any-glob-to-any-file:
           - "extensions/device-pair/**"
+"extensions: web3-core":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/web3-core/**"
+          - "docs/plugins/web3-core.md"
 "extensions: minimax-portal-auth":
   - changed-files:
       - any-glob-to-any-file:

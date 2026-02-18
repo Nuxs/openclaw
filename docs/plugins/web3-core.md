@@ -1,0 +1,174 @@
+---
+summary: "Web3 Core plugin for audit anchoring, wallet identity, decentralized archive, and billing controls"
+read_when:
+  - You need Web3 audit anchoring and decentralized archive support
+  - You are configuring or debugging the web3-core plugin
+  - You want usage billing and quota enforcement tied to sessions
+title: "Web3 Core Plugin"
+---
+
+# Web3 Core (plugin)
+
+The Web3 Core plugin provides audit anchoring, decentralized storage, wallet identity, and
+usage billing for OpenClaw. It runs inside the Gateway process and exposes commands,
+hooks, and gateway methods for UI and integrations.
+
+Quick mental model:
+
+- Install plugin
+- Restart Gateway
+- Configure under `plugins.entries.web3-core.config`
+- Use commands or gateway methods
+
+## Where it runs
+
+The Web3 Core plugin runs inside the Gateway process. If you use a remote Gateway,
+install and configure the plugin on the machine running the Gateway, then restart it.
+
+## Install
+
+### Option A: local folder (repo dev)
+
+```bash
+openclaw plugins install ./extensions/web3-core
+cd ./extensions/web3-core && pnpm install
+```
+
+Restart the Gateway afterwards.
+
+## Config
+
+Set config under `plugins.entries.web3-core.config`.
+
+```json5
+{
+  plugins: {
+    entries: {
+      "web3-core": {
+        enabled: true,
+        config: {
+          chain: {
+            network: "base", // base | optimism | arbitrum | ethereum | sepolia
+            rpcUrl: "https://mainnet.base.org",
+            privateKey: "0xYOUR_SIGNER_PRIVATE_KEY",
+          },
+          storage: {
+            provider: "ipfs", // ipfs | arweave | filecoin
+            gateway: "https://w3s.link",
+            pinataJwt: "PINATA_JWT",
+          },
+          privacy: {
+            onChainData: "hash_only", // hash_only | hash_and_meta | encrypted_content
+            archiveEncryption: true,
+            redactFields: ["apiKey", "token", "password", "secret", "privateKey"],
+          },
+          identity: {
+            allowSiwe: true,
+            requiredChainId: 8453,
+          },
+          billing: {
+            enabled: true,
+            quotaPerSession: 1000,
+            costPerLlmCall: 1,
+            costPerToolCall: 0.5,
+            paymentTokenAddress: "0xPAYMENT_TOKEN",
+            paymentReceiverAddress: "0xRECEIVER_ADDRESS",
+          },
+        },
+      },
+    },
+  },
+}
+```
+
+Notes:
+
+- Anchoring requires `chain.privateKey`. Without it, anchors are queued as pending.
+- For IPFS uploads, set `storage.pinataJwt`.
+- Defaults are defined in the plugin config and manifest.
+
+## Commands
+
+- **`/bind_wallet`**: Bind a wallet address to the identity.
+- **`/unbind_wallet`**: Remove a bound wallet address.
+- **`/whoami_web3`**: Show bound wallets and identity summary.
+- **`/credits`**: Show usage credits and quota.
+- **`/pay_status`**: Show payment status (placeholder).
+- **`/audit_status`**: Show recent audit anchoring events.
+
+## Hooks
+
+Audit trail hooks:
+
+- `llm_input`
+- `llm_output`
+- `after_tool_call`
+- `session_end`
+
+Billing hooks:
+
+- `before_tool_call`
+- `llm_output`
+
+## Gateway RPC
+
+- `web3.siwe.challenge` (params: `address`)
+- `web3.siwe.verify` (params: `message`, `signature`)
+- `web3.audit.query` (params: `limit?`)
+- `web3.billing.status` (params: `sessionIdHash`)
+- `web3.billing.summary` (params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`)
+- `web3.status.summary` (no params)
+
+## Example debug flow
+
+1. Enable the plugin and restart the Gateway.
+2. Trigger activity by sending a message that calls tools or the LLM.
+3. Query audit status and billing summaries.
+
+Example (RPC payloads are illustrative):
+
+```json5
+{
+  method: "web3.audit.query",
+  params: { limit: 10 },
+}
+```
+
+```json5
+{
+  method: "web3.billing.summary",
+  params: { sessionKey: "session-abc" },
+}
+```
+
+```json5
+{
+  method: "web3.status.summary",
+  params: {},
+}
+```
+
+Expected signals:
+
+- **Audit**: `events` list grows as LLM/tool/session hooks fire.
+- **Billing**: `usage` reflects LLM/tool cost increments.
+- **Anchoring**: `pendingAnchors` decreases after the background service retries.
+
+## UI integration notes
+
+The UI reads Web3 summary data via gateway methods and presents it on overview
+and usage screens.
+
+- **Usage detail**: `web3.billing.summary` surfaces credits, call counts, and last activity.
+- **Overview**: `web3.status.summary` shows audit/archive/anchoring health at a glance.
+
+Suggested UI refresh cadence:
+
+- Refresh on view load.
+- Provide a manual refresh button.
+- Avoid polling faster than once every 30 seconds.
+
+## Related docs
+
+- [Plugins](/tools/plugin)
+- [Plugin manifest](/plugins/manifest)
