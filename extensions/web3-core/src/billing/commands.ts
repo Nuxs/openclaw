@@ -9,9 +9,8 @@ import type { Web3StateStore } from "../state/store.js";
 export function createCreditsCommand(store: Web3StateStore): PluginCommandHandler {
   return async (ctx) => {
     const sessionHash = resolveSessionHash({
-      sessionKey: ctx.sessionKey,
-      sessionId: ctx.sessionId,
       senderId: ctx.senderId,
+      from: ctx.from,
     });
     const usage = store.getUsage(sessionHash);
     if (!usage) {
@@ -29,8 +28,8 @@ export function createCreditsCommand(store: Web3StateStore): PluginCommandHandle
   };
 }
 
-function resolveSessionHash(input: { sessionKey?: string; sessionId?: string; senderId?: string }) {
-  return hashString(input.sessionKey ?? input.sessionId ?? input.senderId ?? "unknown");
+function resolveSessionHash(input: { senderId?: string; from?: string }) {
+  return hashString(input.senderId ?? input.from ?? "unknown");
 }
 
 export function createPayStatusCommand(_store: Web3StateStore): PluginCommandHandler {

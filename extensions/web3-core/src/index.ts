@@ -9,7 +9,11 @@
  * - Service:   background anchor retry & archive flush
  */
 
-import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+  OpenClawPluginDefinition,
+} from "openclaw/plugin-sdk";
 import { hashString } from "./audit/canonicalize.js";
 import { createAuditHooks } from "./audit/hooks.js";
 import { createCreditsCommand, createPayStatusCommand } from "./billing/commands.js";
@@ -139,37 +143,38 @@ const plugin: OpenClawPluginDefinition = {
 
 // ---- Gateway handler helpers ----
 
-function createAuditQueryHandler(store: Web3StateStore) {
-  return async ({ params }: { params?: unknown }) => {
+function createAuditQueryHandler(store: Web3StateStore): GatewayRequestHandler {
+  return ({ params, respond }: GatewayRequestHandlerOptions) => {
     const { limit } = (params ?? {}) as { limit?: number };
     const events = store.readAuditEvents(limit ?? 50);
-    return { result: { events, count: events.length } };
+    respond(true, { events, count: events.length });
   };
 }
 
 function createBillingStatusHandler(
   store: Web3StateStore,
   config: import("./config.js").Web3PluginConfig,
-) {
-  return async ({ params }: { params?: unknown }) => {
+): GatewayRequestHandler {
+  return ({ params, respond }: GatewayRequestHandlerOptions) => {
     const { sessionIdHash } = (params ?? {}) as { sessionIdHash?: string };
-    if (!sessionIdHash) return { error: "sessionIdHash is required" };
+    if (!sessionIdHash) {
+      respond(false, { error: "sessionIdHash is required" });
+      return;
+    }
     const usage = store.getUsage(sessionIdHash);
-    return {
-      result: {
-        enabled: config.billing.enabled,
-        sessionIdHash,
-        usage: usage ?? null,
-      },
-    };
+    respond(true, {
+      enabled: config.billing.enabled,
+      sessionIdHash,
+      usage: usage ?? null,
+    });
   };
 }
 
 function createBillingSummaryHandler(
   store: Web3StateStore,
   config: import("./config.js").Web3PluginConfig,
-) {
-  return async ({ params }: { params?: unknown }) => {
+): GatewayRequestHandler {
+  return ({ params, respond }: GatewayRequestHandlerOptions) => {
     const input = (params ?? {}) as {
       sessionKey?: string;
       sessionId?: string;
@@ -180,21 +185,19 @@ function createBillingSummaryHandler(
       input.sessionIdHash ??
       hashString(input.sessionKey ?? input.sessionId ?? input.senderId ?? "unknown");
     const usage = store.getUsage(resolvedHash);
-    return {
-      result: {
-        enabled: config.billing.enabled,
-        sessionIdHash: resolvedHash,
-        usage: usage ?? null,
-      },
-    };
+    respond(true, {
+      enabled: config.billing.enabled,
+      sessionIdHash: resolvedHash,
+      usage: usage ?? null,
+    });
   };
 }
 
 function createWeb3StatusSummaryHandler(
   store: Web3StateStore,
   config: import("./config.js").Web3PluginConfig,
-) {
-  return async () => {
+): GatewayRequestHandler {
+  return ({ respond }: GatewayRequestHandlerOptions) => {
     const events = store.readAuditEvents(50);
     const pending = store.getPendingTxs();
     const lastEvent = events.at(-1);
@@ -208,19 +211,17 @@ function createWeb3StatusSummaryHandler(
       return !Number.isNaN(ts) && ts >= cutoffMs;
     }).length;
 
-    return {
-      result: {
-        auditEventsRecent: recentCount,
-        auditLastAt: lastEvent?.timestamp ?? null,
-        archiveProvider: config.storage.provider ?? null,
-        archiveLastCid:
-          lastArchived?.archivePointer?.cid ?? lastArchived?.archivePointer?.uri ?? null,
-        anchorNetwork: config.chain.network ?? null,
-        anchorLastTx: lastAnchored?.chainRef?.tx ?? null,
-        pendingAnchors: pending.length,
-        anchoringEnabled: Boolean(config.chain.privateKey),
-      },
-    };
+    respond(true, {
+      auditEventsRecent: recentCount,
+      auditLastAt: lastEvent?.timestamp ?? null,
+      archiveProvider: config.storage.provider ?? null,
+      archiveLastCid:
+        lastArchived?.archivePointer?.cid ?? lastArchived?.archivePointer?.uri ?? null,
+      anchorNetwork: config.chain.network ?? null,
+      anchorLastTx: lastAnchored?.chainRef?.tx ?? null,
+      pendingAnchors: pending.length,
+      anchoringEnabled: Boolean(config.chain.privateKey),
+    });
   };
 }
 

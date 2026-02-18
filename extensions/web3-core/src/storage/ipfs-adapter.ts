@@ -20,7 +20,11 @@ export class IpfsStorageAdapter implements DecentralizedStorageAdapter {
       throw new Error("storage.pinataJwt is required to upload to IPFS via Pinata");
     }
 
-    const blob = new Blob([input.bytes], { type: input.contentType });
+    const buffer =
+      input.bytes.buffer instanceof ArrayBuffer
+        ? input.bytes.buffer
+        : Uint8Array.from(input.bytes).buffer;
+    const blob = new Blob([buffer as ArrayBuffer], { type: input.contentType });
     const formData = new FormData();
     formData.append("file", blob, input.name ?? "archive.bin");
 

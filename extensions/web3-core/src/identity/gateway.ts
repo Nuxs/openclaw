@@ -3,7 +3,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import type { SiweChallenge } from "./types.js";
@@ -40,11 +40,17 @@ export function createSiweChallengeHandler(
   _store: Web3StateStore,
   config: Web3PluginConfig,
 ): GatewayRequestHandler {
-  return async ({ params }) => {
-    if (!config.identity.allowSiwe) return { error: "SIWE is disabled" };
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    if (!config.identity.allowSiwe) {
+      respond(false, { error: "SIWE is disabled" });
+      return;
+    }
 
     const address = (params as Record<string, unknown>)?.address as string | undefined;
-    if (!address) return { error: "address is required" };
+    if (!address) {
+      respond(false, { error: "address is required" });
+      return;
+    }
 
     const nonce = randomUUID().replace(/-/g, "").slice(0, 16);
     const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
@@ -68,7 +74,7 @@ export function createSiweChallengeHandler(
     const challenge: SiweChallenge = { message, nonce, expiresAt };
     pendingChallenges.set(nonce, challenge);
 
-    return { result: challenge };
+    respond(true, challenge);
   };
 }
 
@@ -76,44 +82,73 @@ export function createSiweVerifyHandler(
   store: Web3StateStore,
   config: Web3PluginConfig,
 ): GatewayRequestHandler {
-  return async ({ params }) => {
-    if (!config.identity.allowSiwe) return { error: "SIWE is disabled" };
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    if (!config.identity.allowSiwe) {
+      respond(false, { error: "SIWE is disabled" });
+      return;
+    }
 
     const { message, signature } = (params ?? {}) as { message?: string; signature?: string };
-    if (!message || !signature) return { error: "message and signature are required" };
+    if (!message || !signature) {
+      respond(false, { error: "message and signature are required" });
+      return;
+    }
 
     const parsed = parseSiweMessage(message);
-    if ("error" in parsed) return { error: parsed.error };
+    if ("error" in parsed) {
+      respond(false, { error: parsed.error });
+      return;
+    }
 
     const challenge = pendingChallenges.get(parsed.nonce);
-    if (!challenge) return { error: "challenge not found or expired" };
+    if (!challenge) {
+      respond(false, { error: "challenge not found or expired" });
+      return;
+    }
 
     const now = new Date();
     if (new Date(challenge.expiresAt) < now) {
       pendingChallenges.delete(parsed.nonce);
-      return { error: "challenge expired" };
+      respond(false, { error: "challenge expired" });
+      return;
     }
 
     if (parsed.expirationTime) {
       const parsedExpiration = new Date(parsed.expirationTime);
       if (Number.isNaN(parsedExpiration.getTime())) {
-        return { error: "invalid SIWE message (bad expiration)" };
+        respond(false, { error: "invalid SIWE message (bad expiration)" });
+        return;
       }
-      if (parsedExpiration < now) return { error: "challenge expired" };
+      if (parsedExpiration < now) {
+        respond(false, { error: "challenge expired" });
+        return;
+      }
     }
 
     if (config.identity.requiredChainId !== undefined) {
-      if (!parsed.chainId) return { error: "invalid SIWE message (missing chain id)" };
+      if (!parsed.chainId) {
+        respond(false, { error: "invalid SIWE message (missing chain id)" });
+        return;
+      }
       if (parsed.chainId !== config.identity.requiredChainId) {
-        return { error: "SIWE chainId mismatch" };
+        respond(false, { error: "SIWE chainId mismatch" });
+        return;
       }
     }
 
+    if (!signature.startsWith("0x")) {
+      respond(false, { error: "invalid signature format" });
+      return;
+    }
+
     const { getAddress, recoverMessageAddress } = await import("viem");
-    const recoveredAddress = getAddress(await recoverMessageAddress({ message, signature }));
+    const recoveredAddress = getAddress(
+      await recoverMessageAddress({ message, signature: signature as `0x${string}` }),
+    );
     const messageAddress = getAddress(parsed.address);
     if (recoveredAddress !== messageAddress) {
-      return { error: "signature verification failed" };
+      respond(false, { error: "signature verification failed" });
+      return;
     }
 
     pendingChallenges.delete(parsed.nonce);
@@ -124,6 +159,6 @@ export function createSiweVerifyHandler(
       verifiedAt: new Date().toISOString(),
     });
 
-    return { result: { ok: true, address: messageAddress, chainId: parsed.chainId } };
+    respond(true, { ok: true, address: messageAddress, chainId: parsed.chainId ?? null });
   };
 }
