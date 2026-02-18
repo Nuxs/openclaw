@@ -245,6 +245,10 @@
       - any-glob-to-any-file:
           - "extensions/web3-core/**"
           - "docs/plugins/web3-core.md"
+"extensions: market-core":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/market-core/**"
 "extensions: minimax-portal-auth":
   - changed-files:
       - any-glob-to-any-file:

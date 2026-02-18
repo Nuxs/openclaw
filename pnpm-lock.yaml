@@ -369,6 +369,16 @@ importers:
         specifier: workspace:*
         version: link:../..
 
+  extensions/market-core:
+    dependencies:
+      viem:
+        specifier: ^2.28.0
+        version: 2.46.2(typescript@5.9.3)(zod@4.3.6)
+    devDependencies:
+      openclaw:
+        specifier: workspace:*
+        version: link:../..
+
   extensions/matrix:
     dependencies:
       '@matrix-org/matrix-sdk-crypto-nodejs':

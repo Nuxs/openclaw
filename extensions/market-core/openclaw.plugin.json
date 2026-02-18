@@ -1,0 +1,233 @@
+{
+  "id": "market-core",
+  "uiHints": {
+    "chain.network": {
+      "label": "Blockchain Network",
+      "help": "EVM chain to anchor market hashes and settle payments",
+      "placeholder": "base"
+    },
+    "chain.rpcUrl": {
+      "label": "RPC URL",
+      "sensitive": true,
+      "placeholder": "https://mainnet.base.org",
+      "help": "JSON-RPC endpoint for the selected chain"
+    },
+    "chain.privateKey": {
+      "label": "Operator Private Key",
+      "sensitive": true,
+      "help": "Private key used for anchoring and escrow calls (hex, 0x prefix)"
+    },
+    "chain.escrowContractAddress": {
+      "label": "Escrow Contract Address",
+      "help": "On-chain escrow contract address"
+    },
+    "settlement.mode": {
+      "label": "Settlement Mode",
+      "help": "contract (default) | anchor_only (dev)"
+    },
+    "settlement.tokenAddress": {
+      "label": "Payment Token Address",
+      "help": "ERC-20 token used for settlement"
+    },
+    "settlement.treasuryAddress": {
+      "label": "Treasury Address",
+      "help": "Fallback receiver for settlement"
+    },
+    "revocation.mode": {
+      "label": "Revocation Mode",
+      "help": "none (default) | webhook"
+    },
+    "revocation.endpoint": {
+      "label": "Revocation Webhook",
+      "help": "Webhook endpoint to invalidate delivery access",
+      "sensitive": true
+    },
+    "revocation.apiKey": {
+      "label": "Revocation API Key",
+      "help": "Optional API key header for revocation webhook",
+      "sensitive": true
+    },
+    "revocation.signingSecret": {
+      "label": "Revocation Signing Secret",
+      "help": "HMAC secret used to sign revocation webhook payloads",
+      "sensitive": true
+    },
+    "revocation.timeoutMs": {
+      "label": "Revocation Timeout (ms)",
+      "help": "Timeout for webhook execution"
+    },
+    "revocation.maxAttempts": {
+      "label": "Revocation Max Attempts",
+      "help": "Maximum retry attempts for revocation webhook"
+    },
+    "revocation.retryDelayMs": {
+      "label": "Revocation Retry Delay (ms)",
+      "help": "Delay between revocation retries"
+    },
+    "store.mode": {
+      "label": "Storage Mode",
+      "help": "file | sqlite (recommended)"
+    },
+    "store.dbPath": {
+      "label": "SQLite DB Path",
+      "help": "Path for sqlite storage (defaults to state dir)"
+    },
+    "store.migrateFromFile": {
+      "label": "Migrate From File Store",
+      "help": "Import JSON store into sqlite when empty"
+    },
+    "access.mode": {
+      "label": "Access Mode",
+      "help": "open | scoped | allowlist"
+    },
+    "access.allowClientIds": {
+      "label": "Allowed Client IDs",
+      "help": "Allowlist of gateway client IDs"
+    },
+    "access.allowRoles": {
+      "label": "Allowed Roles",
+      "help": "Allowlist of gateway roles"
+    },
+    "access.allowScopes": {
+      "label": "Allowed Scopes",
+      "help": "Allowlist of required scopes"
+    },
+    "access.readScopes": {
+      "label": "Read Scopes",
+      "help": "Scopes that permit read-only operations"
+    },
+    "access.writeScopes": {
+      "label": "Write Scopes",
+      "help": "Scopes that permit write operations"
+    },
+    "access.requireActor": {
+      "label": "Require Actor ID",
+      "help": "Require actor identity on write operations"
+    },
+    "access.actorSource": {
+      "label": "Actor Source",
+      "help": "param | client | either"
+    },
+    "access.requireActorMatch": {
+      "label": "Require Actor Match",
+      "help": "Enforce actorId to match buyer/seller/payer"
+    },
+    "credentials.mode": {
+      "label": "Credentials Storage",
+      "help": "inline | external"
+    },
+    "credentials.storePath": {
+      "label": "Credentials Store Path",
+      "help": "Path for encrypted delivery credentials"
+    },
+    "credentials.encryptionKey": {
+      "label": "Credentials Encryption Key",
+      "help": "Key used to encrypt delivery credentials",
+      "sensitive": true
+    },
+    "credentials.lockTimeoutMs": {
+      "label": "Credentials Lock Timeout (ms)",
+      "help": "Timeout for credentials file locking"
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "chain": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "network": {
+            "type": "string",
+            "enum": ["base", "optimism", "arbitrum", "ethereum", "sepolia"],
+            "default": "base"
+          },
+          "rpcUrl": { "type": "string" },
+          "privateKey": { "type": "string" },
+          "escrowContractAddress": { "type": "string" }
+        }
+      },
+      "settlement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["contract", "anchor_only"],
+            "default": "contract"
+          },
+          "tokenAddress": { "type": "string" },
+          "treasuryAddress": { "type": "string" }
+        }
+      },
+      "revocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["none", "webhook"],
+            "default": "none"
+          },
+          "endpoint": { "type": "string" },
+          "apiKey": { "type": "string" },
+          "signingSecret": { "type": "string" },
+          "timeoutMs": { "type": "number" },
+          "maxAttempts": { "type": "number" },
+          "retryDelayMs": { "type": "number" }
+        }
+      },
+      "store": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["file", "sqlite"],
+            "default": "sqlite"
+          },
+          "dbPath": { "type": "string" },
+          "migrateFromFile": { "type": "boolean" }
+        }
+      },
+      "access": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["open", "scoped", "allowlist"],
+            "default": "open"
+          },
+          "allowClientIds": { "type": "array", "items": { "type": "string" } },
+          "allowRoles": { "type": "array", "items": { "type": "string" } },
+          "allowScopes": { "type": "array", "items": { "type": "string" } },
+          "readScopes": { "type": "array", "items": { "type": "string" } },
+          "writeScopes": { "type": "array", "items": { "type": "string" } },
+          "requireActor": { "type": "boolean" },
+          "actorSource": {
+            "type": "string",
+            "enum": ["param", "client", "either"],
+            "default": "param"
+          },
+          "requireActorMatch": { "type": "boolean" }
+        }
+      },
+      "credentials": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["inline", "external"],
+            "default": "inline"
+          },
+          "storePath": { "type": "string" },
+          "encryptionKey": { "type": "string" },
+          "lockTimeoutMs": { "type": "number" }
+        }
+      }
+    }
+  }
+}
