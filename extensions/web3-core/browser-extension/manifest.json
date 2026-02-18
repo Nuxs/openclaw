@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "OpenClaw Web3 Audit Bridge",
+  "version": "0.1.0",
+  "description": "Capture window.ethereum.request metadata and forward to the OpenClaw Gateway.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://127.0.0.1:18789/*", "http://localhost:18789/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ],
+  "options_page": "options.html"
+}

@@ -14,6 +14,7 @@ import type {
   GatewayRequestHandlerOptions,
   OpenClawPluginDefinition,
 } from "openclaw/plugin-sdk";
+import { registerPluginHttpRoute } from "openclaw/plugin-sdk";
 import { createAuditHooks, flushPendingAnchors, flushPendingArchives } from "./audit/hooks.js";
 import { createCreditsCommand, createPayStatusCommand } from "./billing/commands.js";
 import {
@@ -28,6 +29,7 @@ import {
   createWhoamiCommand,
 } from "./identity/commands.js";
 import { createSiweChallengeHandler, createSiweVerifyHandler } from "./identity/gateway.js";
+import { createBrowserIngestHandler } from "./ingest/browser-handler.js";
 import { Web3StateStore } from "./state/store.js";
 
 const plugin: OpenClawPluginDefinition = {
@@ -96,6 +98,17 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("web3.billing.status", createBillingStatusHandler(store, config));
     api.registerGatewayMethod("web3.billing.summary", createBillingSummaryHandler(store, config));
     api.registerGatewayMethod("web3.status.summary", createWeb3StatusSummaryHandler(store, config));
+
+    // ---- Browser ingest HTTP route ----
+    if (config.browserIngest.enabled) {
+      registerPluginHttpRoute({
+        path: config.browserIngest.ingestPath,
+        pluginId: plugin.id,
+        source: "web3-browser-ingest",
+        handler: createBrowserIngestHandler(store, config),
+      });
+      api.logger.info(`Web3 browser ingest enabled at ${config.browserIngest.ingestPath}`);
+    }
 
     // ---- Background service: anchor retry & archive flush ----
     api.registerService({

@@ -307,3 +307,19 @@ export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig
 
   return { onLlmInput, onLlmOutput, onAfterToolCall, onSessionEnd };
 }
+
+export async function recordExternalAuditEvent(params: {
+  kind: AuditEventKind;
+  sessionId?: string;
+  payload: unknown;
+  store: Web3StateStore;
+  config: Web3PluginConfig;
+}): Promise<void> {
+  await handleAuditEvent(
+    params.kind,
+    params.sessionId,
+    params.payload,
+    params.store,
+    params.config,
+  );
+}

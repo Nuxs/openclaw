@@ -8,7 +8,8 @@ export type AuditEventKind =
   | "llm_output"
   | "tool_call"
   | "tool_result"
-  | "session_end";
+  | "session_end"
+  | "dapp_request";
 
 export type AuditEvent = {
   /** Unique event id */

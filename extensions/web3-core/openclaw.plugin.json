@@ -70,6 +70,29 @@
       "label": "Quota per Session (credits)",
       "placeholder": "1000",
       "help": "Maximum credits per session before requiring top-up"
+    },
+    "browserIngest.enabled": {
+      "label": "Enable Browser Ingest",
+      "help": "Allow browser extension events to be posted into the Gateway"
+    },
+    "browserIngest.ingestPath": {
+      "label": "Browser Ingest Path",
+      "placeholder": "/plugins/web3-core/ingest",
+      "help": "HTTP path for extension -> Gateway ingest"
+    },
+    "browserIngest.token": {
+      "label": "Browser Ingest Token",
+      "sensitive": true,
+      "help": "Shared secret required by the browser extension"
+    },
+    "browserIngest.allowLoopback": {
+      "label": "Allow Loopback Without Token",
+      "help": "Permit localhost requests when no token is configured"
+    },
+    "browserIngest.maxBodyBytes": {
+      "label": "Max Ingest Payload (bytes)",
+      "placeholder": "65536",
+      "help": "Maximum payload size accepted from the browser extension"
     }
   },
   "configSchema": {
@@ -146,6 +169,17 @@
           "costPerToolCall": { "type": "number", "default": 0.5 },
           "paymentTokenAddress": { "type": "string" },
           "paymentReceiverAddress": { "type": "string" }
+        }
+      },
+      "browserIngest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "ingestPath": { "type": "string", "default": "/plugins/web3-core/ingest" },
+          "token": { "type": "string" },
+          "allowLoopback": { "type": "boolean", "default": true },
+          "maxBodyBytes": { "type": "number", "default": 65536 }
         }
       }
     }

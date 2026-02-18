@@ -70,6 +70,18 @@ export type BillingConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Browser ingest (extension -> Gateway)
+// ---------------------------------------------------------------------------
+
+export type BrowserIngestConfig = {
+  enabled: boolean;
+  ingestPath: string;
+  token?: string;
+  allowLoopback: boolean;
+  maxBodyBytes: number;
+};
+
+// ---------------------------------------------------------------------------
 // Top-level plugin config
 // ---------------------------------------------------------------------------
 
@@ -79,6 +91,7 @@ export type Web3PluginConfig = {
   privacy: PrivacyConfig;
   identity: IdentityConfig;
   billing: BillingConfig;
+  browserIngest: BrowserIngestConfig;
 };
 
 // ---------------------------------------------------------------------------
@@ -113,6 +126,12 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
     costPerLlmCall: 1,
     costPerToolCall: 0.5,
   },
+  browserIngest: {
+    enabled: false,
+    ingestPath: "/plugins/web3-core/ingest",
+    allowLoopback: true,
+    maxBodyBytes: 64 * 1024,
+  },
 };
 
 /** Merge user-supplied partial config with defaults. */
@@ -128,5 +147,6 @@ export function resolveConfig(raw?: Record<string, unknown>): Web3PluginConfig {
     privacy: merge(DEFAULT_CONFIG.privacy, raw.privacy),
     identity: merge(DEFAULT_CONFIG.identity, raw.identity),
     billing: merge(DEFAULT_CONFIG.billing, raw.billing),
+    browserIngest: merge(DEFAULT_CONFIG.browserIngest, raw.browserIngest),
   };
 }
