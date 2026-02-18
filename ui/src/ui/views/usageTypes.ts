@@ -1,3 +1,4 @@
+import type { Web3BillingSummary } from "../types.ts";
 import type {
   CostUsageDailyEntry,
   SessionsUsageEntry,
@@ -26,6 +27,9 @@ export type TimeSeriesPoint = SessionUsageTimePoint;
 export type UsageProps = {
   loading: boolean;
   error: string | null;
+  billingSummary: Web3BillingSummary | null;
+  billingError: string | null;
+  onBillingRefresh: () => void;
   startDate: string;
   endDate: string;
   sessions: UsageSessionEntry[];

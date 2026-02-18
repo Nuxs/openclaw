@@ -4,6 +4,7 @@ import { formatRelativeTimestamp, formatDurationHuman } from "../format.ts";
 import type { GatewayHelloOk } from "../gateway.ts";
 import { formatNextRun } from "../presenter.ts";
 import type { UiSettings } from "../storage.ts";
+import type { Web3StatusSummary } from "../types.ts";
 
 export type OverviewProps = {
   connected: boolean;
@@ -16,6 +17,8 @@ export type OverviewProps = {
   cronEnabled: boolean | null;
   cronNext: number | null;
   lastChannelsRefresh: number | null;
+  web3Status: Web3StatusSummary | null;
+  web3Error: string | null;
   onSettingsChange: (next: UiSettings) => void;
   onPasswordChange: (next: string) => void;
   onSessionKeyChange: (next: string) => void;
@@ -37,6 +40,24 @@ export function renderOverview(props: OverviewProps) {
     : t("common.na");
   const authMode = snapshot?.authMode;
   const isTrustedProxy = authMode === "trusted-proxy";
+
+  const web3Status = props.web3Status;
+  const web3LastAtMs = web3Status?.auditLastAt ? Date.parse(web3Status.auditLastAt) : null;
+  const web3LastAtLabel =
+    web3LastAtMs && !Number.isNaN(web3LastAtMs)
+      ? formatRelativeTimestamp(web3LastAtMs)
+      : t("common.na");
+  const archiveCid = web3Status?.archiveLastCid
+    ? `${web3Status.archiveLastCid.slice(0, 10)}…`
+    : t("common.na");
+  const anchorTx = web3Status?.anchorLastTx
+    ? `${web3Status.anchorLastTx.slice(0, 10)}…`
+    : t("common.na");
+  const anchorEnabledLabel = web3Status
+    ? web3Status.anchoringEnabled
+      ? t("common.enabled")
+      : t("common.disabled")
+    : t("common.na");
 
   const authHint = (() => {
     if (props.connected || !props.lastError) {
@@ -271,6 +292,68 @@ export function renderOverview(props: OverviewProps) {
         </div>
         <div class="muted">${t("overview.stats.cronNext", { time: formatNextRun(props.cronNext) })}</div>
       </div>
+    </section>
+
+    <section class="card" style="margin-top: 18px;">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <div class="card-title">Web3 status</div>
+          <div class="card-sub">Audit, archive, and anchoring summary.</div>
+        </div>
+        <button class="btn btn--sm" @click=${() => props.onRefresh()}>${t("common.refresh")}</button>
+      </div>
+      ${
+        props.web3Error
+          ? html`<div class="callout danger" style="margin-top: 12px;">${props.web3Error}</div>`
+          : ""
+      }
+      ${
+        !props.web3Status
+          ? html`
+              <div class="callout info" style="margin-top: 12px">Web3 status is not available yet.</div>
+            `
+          : ""
+      }
+      ${
+        props.web3Status
+          ? html`
+              <div class="stat-grid" style="margin-top: 14px;">
+                <div class="stat">
+                  <div class="stat-label">Recent audits (24h)</div>
+                  <div class="stat-value">${props.web3Status.auditEventsRecent}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Last audit</div>
+                  <div class="stat-value">${web3LastAtLabel}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Archive provider</div>
+                  <div class="stat-value">${props.web3Status.archiveProvider ?? t("common.na")}</div>
+                  <div class="muted">${archiveCid}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Anchor network</div>
+                  <div class="stat-value">${props.web3Status.anchorNetwork ?? t("common.na")}</div>
+                  <div class="muted">${anchorTx}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Anchoring</div>
+                  <div class="stat-value">${anchorEnabledLabel}</div>
+                  <div class="muted">Pending: ${props.web3Status.pendingAnchors}</div>
+                </div>
+              </div>
+            `
+          : ""
+      }
+      ${
+        props.web3Status && props.web3Status.pendingAnchors > 0
+          ? html`
+              <div class="callout warning" style="margin-top: 12px">
+                Pending anchors detected. Provide a signer key or wait for retries.
+              </div>
+            `
+          : ""
+      }
     </section>
 
     <section class="card" style="margin-top: 18px;">

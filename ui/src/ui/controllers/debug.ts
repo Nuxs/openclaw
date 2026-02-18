@@ -9,6 +9,8 @@ export type DebugState = {
   debugHealth: HealthSnapshot | null;
   debugModels: unknown[];
   debugHeartbeat: unknown;
+  debugWeb3Audit: unknown;
+  debugWeb3AuditError: string | null;
   debugCallMethod: string;
   debugCallParams: string;
   debugCallResult: string | null;
@@ -35,6 +37,15 @@ export async function loadDebug(state: DebugState) {
     const modelPayload = models as { models?: unknown[] } | undefined;
     state.debugModels = Array.isArray(modelPayload?.models) ? modelPayload?.models : [];
     state.debugHeartbeat = heartbeat;
+
+    try {
+      const audit = await state.client.request("web3.audit.query", { limit: 10 });
+      state.debugWeb3Audit = audit;
+      state.debugWeb3AuditError = null;
+    } catch (err) {
+      state.debugWeb3Audit = null;
+      state.debugWeb3AuditError = String(err);
+    }
   } catch (err) {
     state.debugCallError = String(err);
   } finally {

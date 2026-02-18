@@ -238,9 +238,14 @@ export class OpenClawApp extends LitElement {
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
 
+  @state() overviewWeb3Status: import("./types.js").Web3StatusSummary | null = null;
+  @state() overviewWeb3Error: string | null = null;
+
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;
   @state() usageCostSummary: import("./types.js").CostUsageSummary | null = null;
+  @state() usageBillingSummary: import("./types.js").Web3BillingSummary | null = null;
+  @state() usageBillingError: string | null = null;
   @state() usageError: string | null = null;
   @state() usageStartDate = (() => {
     const d = new Date();
@@ -321,6 +326,8 @@ export class OpenClawApp extends LitElement {
   @state() debugHealth: HealthSnapshot | null = null;
   @state() debugModels: unknown[] = [];
   @state() debugHeartbeat: unknown = null;
+  @state() debugWeb3Audit: unknown = null;
+  @state() debugWeb3AuditError: string | null = null;
   @state() debugCallMethod = "";
   @state() debugCallParams = "{}";
   @state() debugCallResult: string | null = null;

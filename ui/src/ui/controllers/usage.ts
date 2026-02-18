@@ -1,13 +1,21 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
-import type { SessionsUsageResult, CostUsageSummary, SessionUsageTimeSeries } from "../types.ts";
+import type {
+  SessionsUsageResult,
+  CostUsageSummary,
+  SessionUsageTimeSeries,
+  Web3BillingSummary,
+} from "../types.ts";
 import type { SessionLogEntry } from "../views/usage.ts";
 
 export type UsageState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
+  sessionKey: string;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
+  usageBillingSummary: Web3BillingSummary | null;
+  usageBillingError: string | null;
   usageError: string | null;
   usageStartDate: string;
   usageEndDate: string;
@@ -41,7 +49,7 @@ export async function loadUsage(
     const endDate = overrides?.endDate ?? state.usageEndDate;
 
     // Load both endpoints in parallel
-    const [sessionsRes, costRes] = await Promise.all([
+    const [sessionsRes, costRes, billingRes] = await Promise.allSettled([
       state.client.request("sessions.usage", {
         startDate,
         endDate,
@@ -49,19 +57,46 @@ export async function loadUsage(
         includeContextWeight: true,
       }),
       state.client.request("usage.cost", { startDate, endDate }),
+      state.client.request("web3.billing.summary", { sessionKey: state.sessionKey }),
     ]);
 
-    if (sessionsRes) {
-      state.usageResult = sessionsRes as SessionsUsageResult;
+    if (sessionsRes.status === "fulfilled") {
+      state.usageResult = sessionsRes.value as SessionsUsageResult;
+    } else {
+      state.usageError = String(sessionsRes.reason ?? "Failed to load usage sessions");
     }
-    if (costRes) {
-      state.usageCostSummary = costRes as CostUsageSummary;
+
+    if (costRes.status === "fulfilled") {
+      state.usageCostSummary = costRes.value as CostUsageSummary;
+    } else {
+      state.usageError = String(costRes.reason ?? "Failed to load usage costs");
+    }
+
+    if (billingRes.status === "fulfilled") {
+      state.usageBillingSummary = normalizeBillingSummary(billingRes.value);
+      state.usageBillingError = null;
+    } else {
+      state.usageBillingSummary = null;
+      state.usageBillingError = String(billingRes.reason ?? "Failed to load billing summary");
     }
   } catch (err) {
     state.usageError = String(err);
+    state.usageBillingSummary = null;
+    state.usageBillingError = String(err);
   } finally {
     state.usageLoading = false;
   }
+}
+
+function normalizeBillingSummary(input: unknown): Web3BillingSummary | null {
+  if (!input) {
+    return null;
+  }
+  const payload = (input as { result?: unknown }).result ?? input;
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  return payload as Web3BillingSummary;
 }
 
 export async function loadSessionTimeSeries(state: UsageState, sessionKey: string) {

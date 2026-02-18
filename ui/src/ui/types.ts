@@ -552,6 +552,31 @@ export type SkillStatusReport = {
 
 export type StatusSummary = Record<string, unknown>;
 
+export type Web3BillingUsage = {
+  creditsUsed: number;
+  creditsQuota: number;
+  llmCalls: number;
+  toolCalls: number;
+  lastActivity: string;
+};
+
+export type Web3BillingSummary = {
+  enabled: boolean;
+  sessionIdHash: string;
+  usage: Web3BillingUsage | null;
+};
+
+export type Web3StatusSummary = {
+  auditEventsRecent: number;
+  auditLastAt: string | null;
+  archiveProvider: string | null;
+  archiveLastCid: string | null;
+  anchorNetwork: string | null;
+  anchorLastTx: string | null;
+  pendingAnchors: number;
+  anchoringEnabled: boolean;
+};
+
 export type HealthSnapshot = Record<string, unknown>;
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";

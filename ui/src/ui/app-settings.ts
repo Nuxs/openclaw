@@ -21,6 +21,7 @@ import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
+import { loadWeb3Status } from "./controllers/web3-status.ts";
 import {
   inferBasePathFromPathname,
   normalizeBasePath,
@@ -409,6 +410,7 @@ export async function loadOverview(host: SettingsHost) {
     loadSessions(host as unknown as OpenClawApp),
     loadCronStatus(host as unknown as OpenClawApp),
     loadDebug(host as unknown as OpenClawApp),
+    loadWeb3Status(host as unknown as OpenClawApp),
   ]);
 }
 

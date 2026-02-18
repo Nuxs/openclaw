@@ -21,6 +21,9 @@ export function renderUsageTab(state: AppViewState) {
   return renderUsage({
     loading: state.usageLoading,
     error: state.usageError,
+    billingSummary: state.usageBillingSummary,
+    billingError: state.usageBillingError,
+    onBillingRefresh: () => loadUsage(state),
     startDate: state.usageStartDate,
     endDate: state.usageEndDate,
     sessions: state.usageResult?.sessions ?? [],

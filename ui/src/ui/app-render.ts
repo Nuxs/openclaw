@@ -212,6 +212,8 @@ export function renderApp(state: AppViewState) {
                 cronEnabled: state.cronStatus?.enabled ?? null,
                 cronNext,
                 lastChannelsRefresh: state.channelsLastSuccess,
+                web3Status: state.overviewWeb3Status,
+                web3Error: state.overviewWeb3Error,
                 onSettingsChange: (next) => state.applySettings(next),
                 onPasswordChange: (next) => (state.password = next),
                 onSessionKeyChange: (next) => {
@@ -912,6 +914,8 @@ export function renderApp(state: AppViewState) {
                 health: state.debugHealth,
                 models: state.debugModels,
                 heartbeat: state.debugHeartbeat,
+                web3Audit: state.debugWeb3Audit,
+                web3AuditError: state.debugWeb3AuditError,
                 eventLog: state.eventLog,
                 callMethod: state.debugCallMethod,
                 callParams: state.debugCallParams,

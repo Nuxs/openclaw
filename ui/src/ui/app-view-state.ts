@@ -151,9 +151,13 @@ export type AppViewState = {
   sessionsFilterLimit: string;
   sessionsIncludeGlobal: boolean;
   sessionsIncludeUnknown: boolean;
+  overviewWeb3Status: import("./types.ts").Web3StatusSummary | null;
+  overviewWeb3Error: string | null;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
+  usageBillingSummary: import("./types.ts").Web3BillingSummary | null;
+  usageBillingError: string | null;
   usageError: string | null;
   usageStartDate: string;
   usageEndDate: string;
@@ -206,6 +210,8 @@ export type AppViewState = {
   debugHealth: HealthSnapshot | null;
   debugModels: unknown[];
   debugHeartbeat: unknown;
+  debugWeb3Audit: unknown;
+  debugWeb3AuditError: string | null;
   debugCallMethod: string;
   debugCallParams: string;
   debugCallResult: string | null;

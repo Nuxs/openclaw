@@ -8,6 +8,8 @@ export type DebugProps = {
   health: Record<string, unknown> | null;
   models: unknown[];
   heartbeat: unknown;
+  web3Audit: unknown;
+  web3AuditError: string | null;
   eventLog: EventLogEntry[];
   callMethod: string;
   callParams: string;
@@ -106,6 +108,23 @@ export function renderDebug(props: DebugProps) {
             : nothing
         }
       </div>
+    </section>
+
+    <section class="card" style="margin-top: 18px;">
+      <div class="card-title">Web3 audit</div>
+      <div class="card-sub">Latest web3-core audit events.</div>
+      ${
+        props.web3AuditError
+          ? html`<div class="callout warn" style="margin-top: 12px;">
+              ${props.web3AuditError}
+            </div>`
+          : nothing
+      }
+      <pre class="code-block" style="margin-top: 12px;">${JSON.stringify(
+        props.web3Audit ?? {},
+        null,
+        2,
+      )}</pre>
     </section>
 
     <section class="card" style="margin-top: 18px;">
