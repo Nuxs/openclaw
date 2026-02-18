@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type { Hex } from "viem";
 import type { MarketPluginConfig } from "../config.js";
 import type { MarketStateStore } from "../state/store.js";
 import { EvmAnchorAdapter, type AnchorResult } from "./chain.js";
@@ -596,6 +597,10 @@ export function createConsentGrantHandler(
       const actorId = requireActorId(opts, config, input);
       const orderId = requireString(input.orderId, "orderId");
       const signature = requireString(input.signature, "signature");
+      if (!signature.startsWith("0x")) {
+        throw new Error("consent signature must be hex (0x-prefixed)");
+      }
+      const signatureHex = signature as Hex;
       const scope = (input.consentScope ?? {}) as Consent["scope"];
       if (!scope.purpose || typeof scope.purpose !== "string") {
         throw new Error("consentScope.purpose is required");
@@ -636,7 +641,7 @@ export function createConsentGrantHandler(
       const { verifyMessage } = await import("viem");
       const signatureOk = await verifyMessage({
         message: consentMessage,
-        signature,
+        signature: signatureHex,
         address: buyerAddress,
       });
       if (!signatureOk) throw new Error("consent signature invalid");
