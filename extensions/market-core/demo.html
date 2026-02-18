@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Core Plugin - Demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(135deg, #111827, #1f2937);
+        color: #f9fafb;
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .header h1 {
+        font-size: 2.6rem;
+        margin-bottom: 8px;
+      }
+
+      .header p {
+        color: #d1d5db;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        background: #111827;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      .card h2 {
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+      }
+
+      .card p {
+        color: #9ca3af;
+        font-size: 0.9rem;
+      }
+
+      .button {
+        margin-top: 12px;
+        width: 100%;
+        padding: 10px 14px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #2563eb, #60a5fa);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .output {
+        background: #0b1220;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        padding: 12px;
+        margin-top: 12px;
+        font-family: "Courier New", monospace;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+      }
+
+      .timeline {
+        margin-top: 20px;
+        padding: 16px;
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .timeline-item {
+        border-left: 3px solid #60a5fa;
+        padding-left: 10px;
+        margin-bottom: 10px;
+      }
+
+      .timeline-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .footer {
+        margin-top: 32px;
+        text-align: center;
+        color: #9ca3af;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🧭 Market Core Plugin Demo</h1>
+        <p>演示报价 → 订单 → 授权 → 交付 → 结算 → 审计</p>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>1) 报价（Offer）</h2>
+          <p>发布数据/服务资产的报价。</p>
+          <button class="button" onclick="createOffer()">发布报价</button>
+          <div id="offerOutput" class="output" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>2) 订单（Order）</h2>
+          <p>买家下单并锁定付款。</p>
+          <button class="button" onclick="createOrder()">创建订单</button>
+          <div id="orderOutput" class="output" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>3) 授权（Consent）</h2>
+          <p>买家授权用途与范围。</p>
+          <button class="button" onclick="grantConsent()">授予授权</button>
+          <div id="consentOutput" class="output" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>4) 交付（Delivery）</h2>
+          <p>卖家交付数据或服务凭证。</p>
+          <button class="button" onclick="issueDelivery()">完成交付</button>
+          <div id="deliveryOutput" class="output" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>5) 结算（Settlement）</h2>
+          <p>释放锁定资金，交易完成。</p>
+          <button class="button" onclick="releaseSettlement()">释放结算</button>
+          <div id="settlementOutput" class="output" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>6) 审计（Audit）</h2>
+          <p>关键事件进入审计日志。</p>
+          <button class="button" onclick="appendAudit()">写入审计</button>
+          <div id="auditOutput" class="output" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="timeline" id="timeline"></div>
+
+      <div class="footer">Market Core Plugin v2026.2.16 · Demo only</div>
+    </div>
+
+    <script>
+      const state = {
+        offer: null,
+        order: null,
+        consent: null,
+        delivery: null,
+        settlement: null,
+        audit: [],
+      };
+
+      const now = () => new Date().toISOString();
+      const shortId = (prefix) => `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+
+      function updateTimeline() {
+        const timeline = document.getElementById("timeline");
+        if (state.audit.length === 0) {
+          timeline.innerHTML = "审计时间线为空，先执行流程步骤。";
+          return;
+        }
+        timeline.innerHTML = state.audit
+          .map(
+            (event) => `
+          <div class="timeline-item">
+            <div>${event.timestamp}</div>
+            <div><strong>${event.kind}</strong> → ${event.refId}</div>
+          </div>`
+          )
+          .join("");
+      }
+
+      function createOffer() {
+        state.offer = {
+          offerId: shortId("offer"),
+          assetType: "data",
+          price: 100,
+          currency: "USDC",
+          status: "offer_published",
+        };
+        const output = document.getElementById("offerOutput");
+        output.style.display = "block";
+        output.textContent = `✅ 报价已发布\nID: ${state.offer.offerId}\n价格: ${state.offer.price} ${state.offer.currency}`;
+      }
+
+      function createOrder() {
+        if (!state.offer) return alert("请先发布报价");
+        state.order = {
+          orderId: shortId("order"),
+          offerId: state.offer.offerId,
+          status: "payment_locked",
+        };
+        const output = document.getElementById("orderOutput");
+        output.style.display = "block";
+        output.textContent = `✅ 订单创建\nID: ${state.order.orderId}\n状态: ${state.order.status}`;
+      }
+
+      function grantConsent() {
+        if (!state.order) return alert("请先创建订单");
+        state.consent = {
+          consentId: shortId("consent"),
+          orderId: state.order.orderId,
+          status: "consent_granted",
+        };
+        const output = document.getElementById("consentOutput");
+        output.style.display = "block";
+        output.textContent = `✅ 授权完成\nID: ${state.consent.consentId}`;
+      }
+
+      function issueDelivery() {
+        if (!state.consent) return alert("请先授予授权");
+        state.delivery = {
+          deliveryId: shortId("delivery"),
+          orderId: state.order.orderId,
+          status: "delivery_completed",
+        };
+        const output = document.getElementById("deliveryOutput");
+        output.style.display = "block";
+        output.textContent = `✅ 交付完成\nID: ${state.delivery.deliveryId}`;
+      }
+
+      function releaseSettlement() {
+        if (!state.delivery) return alert("请先完成交付");
+        state.settlement = {
+          settlementId: shortId("settlement"),
+          orderId: state.order.orderId,
+          status: "settlement_released",
+        };
+        const output = document.getElementById("settlementOutput");
+        output.style.display = "block";
+        output.textContent = `✅ 结算完成\nID: ${state.settlement.settlementId}`;
+      }
+
+      function appendAudit() {
+        if (!state.offer || !state.order || !state.consent || !state.delivery || !state.settlement) {
+          return alert("请先完成完整流程");
+        }
+        state.audit = [
+          { kind: "offer_published", refId: state.offer.offerId, timestamp: now() },
+          { kind: "payment_locked", refId: state.order.orderId, timestamp: now() },
+          { kind: "consent_granted", refId: state.consent.consentId, timestamp: now() },
+          { kind: "delivery_completed", refId: state.delivery.deliveryId, timestamp: now() },
+          { kind: "settlement_released", refId: state.settlement.settlementId, timestamp: now() },
+        ];
+        const output = document.getElementById("auditOutput");
+        output.style.display = "block";
+        output.textContent = `✅ 审计事件写入 ${state.audit.length} 条`; 
+        updateTimeline();
+      }
+
+      updateTimeline();
+    </script>
+  </body>
+</html>
