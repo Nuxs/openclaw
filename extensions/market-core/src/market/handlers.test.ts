@@ -7,8 +7,12 @@ import { MarketStateStore } from "../state/store.js";
 import {
   createConsentGrantHandler,
   createDeliveryIssueHandler,
+  createLedgerAppendHandler,
+  createLeaseIssueHandler,
+  createLeaseRevokeHandler,
   createOfferCreateHandler,
   createOfferPublishHandler,
+  createResourcePublishHandler,
   createSettlementLockHandler,
   createSettlementStatusHandler,
 } from "./handlers.js";
@@ -79,6 +83,26 @@ function createOrder(input: Partial<Order>): Order {
     updatedAt: now,
     ...input,
   };
+}
+
+async function withStoreModes(
+  tempDir: string,
+  run: (input: {
+    mode: "file" | "sqlite";
+    store: MarketStateStore;
+    config: ReturnType<typeof resolveConfig>;
+  }) => Promise<void>,
+) {
+  for (const mode of ["file", "sqlite"] as const) {
+    const modeDir = path.join(tempDir, mode);
+    await fs.mkdir(modeDir, { recursive: true });
+    const config = resolveConfig({
+      store: { mode },
+      access: { mode: "open", requireActor: true, requireActorMatch: true },
+    });
+    const store = new MarketStateStore(modeDir, config);
+    await run({ mode, store, config });
+  }
 }
 
 describe("market-core handlers", () => {
@@ -349,5 +373,130 @@ describe("market-core handlers", () => {
     expect(result()?.ok).toBe(false);
     const updated = store.getOrder(order.orderId);
     expect(updated?.status).toBe("order_created");
+  });
+
+  it("handles resource publish → lease → ledger → revoke for file/sqlite", async () => {
+    await withStoreModes(tempDir, async ({ store, config }) => {
+      const resourcePublishHandler = createResourcePublishHandler(store, config);
+      const leaseIssueHandler = createLeaseIssueHandler(store, config);
+      const leaseRevokeHandler = createLeaseRevokeHandler(store, config);
+      const ledgerAppendHandler = createLedgerAppendHandler(store, config);
+
+      const providerActorId = "0x00000000000000000000000000000000000000a1";
+      const consumerActorId = "0x00000000000000000000000000000000000000b1";
+
+      const publish = createResponder();
+      await resourcePublishHandler({
+        params: {
+          actorId: providerActorId,
+          resource: {
+            kind: "model",
+            label: "Example Model",
+            description: "test",
+            tags: ["demo"],
+            price: { unit: "token", amount: "10", currency: "USD" },
+            offer: {
+              assetId: "asset-1",
+              assetType: "api",
+              currency: "USD",
+              usageScope: { purpose: "research" },
+              deliveryType: "api",
+            },
+          },
+        },
+        respond: publish.respond,
+      } as any);
+
+      expect(publish.result()?.ok).toBe(true);
+      const resourceId = publish.result()?.payload.resourceId as string;
+
+      const leaseIssue = createResponder();
+      await leaseIssueHandler({
+        params: {
+          actorId: consumerActorId,
+          resourceId,
+          consumerActorId,
+          ttlMs: 60_000,
+          maxCost: "1000",
+        },
+        respond: leaseIssue.respond,
+      } as any);
+
+      expect(leaseIssue.result()?.ok).toBe(true);
+      const leaseId = leaseIssue.result()?.payload.leaseId as string;
+
+      const badLedger = createResponder();
+      await ledgerAppendHandler({
+        params: {
+          actorId: consumerActorId,
+          entry: {
+            leaseId,
+            resourceId,
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "100",
+            cost: "100",
+            currency: "USD",
+          },
+        },
+        respond: badLedger.respond,
+      } as any);
+
+      expect(badLedger.result()?.ok).toBe(false);
+      expect(String(badLedger.result()?.payload.error)).toContain("E_FORBIDDEN");
+
+      const goodLedger = createResponder();
+      await ledgerAppendHandler({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId,
+            resourceId,
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "100",
+            cost: "100",
+            currency: "USD",
+          },
+        },
+        respond: goodLedger.respond,
+      } as any);
+
+      expect(goodLedger.result()?.ok).toBe(true);
+
+      const revoke = createResponder();
+      await leaseRevokeHandler({
+        params: { actorId: providerActorId, leaseId, reason: "test" },
+        respond: revoke.respond,
+      } as any);
+
+      expect(revoke.result()?.ok).toBe(true);
+
+      const revokedLedger = createResponder();
+      await ledgerAppendHandler({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId,
+            resourceId,
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "1",
+            cost: "1",
+            currency: "USD",
+          },
+        },
+        respond: revokedLedger.respond,
+      } as any);
+
+      expect(revokedLedger.result()?.ok).toBe(false);
+      expect(String(revokedLedger.result()?.payload.error)).toContain("E_REVOKED");
+    });
   });
 });

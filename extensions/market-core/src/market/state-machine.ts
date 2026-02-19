@@ -1,3 +1,4 @@
+import type { MarketLeaseStatus, MarketResourceStatus } from "./resources.js";
 import type { DeliveryStatus, OfferStatus, OrderStatus, SettlementStatus } from "./types.js";
 
 export function assertOfferTransition(from: OfferStatus, to: OfferStatus) {
@@ -48,4 +49,21 @@ export function assertSettlementTransition(from: SettlementStatus, to: Settlemen
   if (!allowed[from].includes(to)) {
     throw new Error(`Invalid settlement transition: ${from} -> ${to}`);
   }
+}
+
+const conflict = (message: string) => new Error(`E_CONFLICT: ${message}`);
+
+export function assertResourceTransition(from: MarketResourceStatus, to: MarketResourceStatus) {
+  if (from === to) return;
+  if (from === "resource_draft" && to === "resource_published") return;
+  if (from === "resource_published" && to === "resource_unpublished") return;
+  throw conflict(`invalid resource transition: ${from} -> ${to}`);
+}
+
+export function assertLeaseTransition(from: MarketLeaseStatus, to: MarketLeaseStatus) {
+  if (from === to) return;
+  if (from === "lease_active" && (to === "lease_revoked" || to === "lease_expired")) {
+    return;
+  }
+  throw conflict(`invalid lease transition: ${from} -> ${to}`);
 }

@@ -17,6 +17,8 @@ import type {
   PluginHookBeforeModelResolveResult,
   PluginHookBeforePromptBuildEvent,
   PluginHookBeforePromptBuildResult,
+  PluginHookResolveStreamFnEvent,
+  PluginHookResolveStreamFnResult,
   PluginHookBeforeCompactionEvent,
   PluginHookLlmInputEvent,
   PluginHookLlmOutputEvent,
@@ -53,6 +55,8 @@ export type {
   PluginHookBeforeModelResolveResult,
   PluginHookBeforePromptBuildEvent,
   PluginHookBeforePromptBuildResult,
+  PluginHookResolveStreamFnEvent,
+  PluginHookResolveStreamFnResult,
   PluginHookLlmInputEvent,
   PluginHookLlmOutputEvent,
   PluginHookAgentEndEvent,
@@ -130,6 +134,13 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
       acc?.prependContext && next.prependContext
         ? `${acc.prependContext}\n\n${next.prependContext}`
         : (next.prependContext ?? acc?.prependContext),
+  });
+
+  const mergeResolveStreamFn = (
+    acc: PluginHookResolveStreamFnResult | undefined,
+    next: PluginHookResolveStreamFnResult,
+  ): PluginHookResolveStreamFnResult => ({
+    streamFn: acc?.streamFn ?? next.streamFn,
   });
 
   /**
@@ -261,6 +272,22 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
         ...mergeBeforePromptBuild(acc, next),
         ...mergeBeforeModelResolve(acc, next),
       }),
+    );
+  }
+
+  /**
+   * Run resolve_stream_fn hook.
+   * Allows plugins to supply a custom StreamFn for this run.
+   */
+  async function runResolveStreamFn(
+    event: PluginHookResolveStreamFnEvent,
+    ctx: PluginHookAgentContext,
+  ): Promise<PluginHookResolveStreamFnResult | undefined> {
+    return runModifyingHook<"resolve_stream_fn", PluginHookResolveStreamFnResult>(
+      "resolve_stream_fn",
+      event,
+      ctx,
+      mergeResolveStreamFn,
     );
   }
 
@@ -619,6 +646,7 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
     runBeforeModelResolve,
     runBeforePromptBuild,
     runBeforeAgentStart,
+    runResolveStreamFn,
     runLlmInput,
     runLlmOutput,
     runAgentEnd,

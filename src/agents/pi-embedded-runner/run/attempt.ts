@@ -542,6 +542,13 @@ export async function runEmbeddedAttempt(
 
       // Get hook runner early so it's available when creating tools
       const hookRunner = getGlobalHookRunner();
+      const hookAgentId =
+        typeof params.agentId === "string" && params.agentId.trim()
+          ? normalizeAgentId(params.agentId)
+          : resolveSessionAgentIds({
+              sessionKey: params.sessionKey,
+              config: params.config,
+            }).sessionAgentId;
 
       const { builtInTools, customTools } = splitSdkTools({
         tools,
@@ -609,20 +616,48 @@ export async function runEmbeddedAttempt(
         workspaceDir: params.workspaceDir,
       });
 
-      // Ollama native API: bypass SDK's streamSimple and use direct /api/chat calls
-      // for reliable streaming + tool calling support (#11828).
-      if (params.model.api === "ollama") {
-        // Use the resolved model baseUrl first so custom provider aliases work.
-        const providerConfig = params.config?.models?.providers?.[params.model.provider];
-        const modelBaseUrl =
-          typeof params.model.baseUrl === "string" ? params.model.baseUrl.trim() : "";
-        const providerBaseUrl =
-          typeof providerConfig?.baseUrl === "string" ? providerConfig.baseUrl.trim() : "";
-        const ollamaBaseUrl = modelBaseUrl || providerBaseUrl || OLLAMA_NATIVE_BASE_URL;
-        activeSession.agent.streamFn = createOllamaStreamFn(ollamaBaseUrl);
+      const streamHookResult = hookRunner?.hasHooks("resolve_stream_fn")
+        ? await hookRunner
+            .runResolveStreamFn(
+              {
+                provider: params.provider,
+                modelId: params.modelId,
+                modelApi: params.model.api,
+                baseUrl:
+                  typeof params.model.baseUrl === "string" ? params.model.baseUrl : undefined,
+              },
+              {
+                agentId: hookAgentId,
+                sessionKey: params.sessionKey,
+                sessionId: params.sessionId,
+                workspaceDir: params.workspaceDir,
+                messageProvider: params.messageProvider ?? undefined,
+              },
+            )
+            .catch((hookErr: unknown) => {
+              log.warn(`resolve_stream_fn hook failed: ${String(hookErr)}`);
+              return undefined;
+            })
+        : undefined;
+
+      if (streamHookResult?.streamFn) {
+        activeSession.agent.streamFn = streamHookResult.streamFn;
       } else {
-        // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
-        activeSession.agent.streamFn = streamSimple;
+        // Ollama native API: bypass SDK's streamSimple and use direct /api/chat calls
+        // for reliable streaming + tool calling support (#11828).
+        if (params.model.api === "ollama") {
+          // Use the resolved model baseUrl first so custom provider aliases work.
+          const providerConfig = params.config?.models?.providers?.[params.model.provider];
+          const modelBaseUrl =
+            typeof params.model.baseUrl === "string" ? params.model.baseUrl.trim() : "";
+          const providerBaseUrl =
+            typeof providerConfig?.baseUrl === "string" ? providerConfig.baseUrl.trim() : "";
+          const ollamaBaseUrl = modelBaseUrl || providerBaseUrl || OLLAMA_NATIVE_BASE_URL;
+          activeSession.agent.streamFn = createOllamaStreamFn(ollamaBaseUrl);
+        } else {
+          // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
+          activeSession.agent.streamFn = streamSimple;
+        }
       }
 
       applyExtraParamsToAgent(
@@ -848,15 +883,6 @@ export async function runEmbeddedAttempt(
           });
         }
       }
-
-      // Hook runner was already obtained earlier before tool creation
-      const hookAgentId =
-        typeof params.agentId === "string" && params.agentId.trim()
-          ? normalizeAgentId(params.agentId)
-          : resolveSessionAgentIds({
-              sessionKey: params.sessionKey,
-              config: params.config,
-            }).sessionAgentId;
 
       let promptError: unknown = null;
       let promptErrorSource: "prompt" | "compaction" | null = null;

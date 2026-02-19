@@ -280,6 +280,23 @@ describe("POST /tools/invoke", () => {
     expect(implicitBody.ok).toBe(true);
   });
 
+  it("routes non-tools requests to plugin HTTP handlers", async () => {
+    const pluginHandler = vi.fn(async (req: IncomingMessage, res: ServerResponse) => {
+      if (req.url !== "/web3/resources/health") {
+        return false;
+      }
+      res.statusCode = 200;
+      res.end("ok");
+      return true;
+    });
+    pluginHttpHandlers = [async (req, res) => pluginHandler(req, res)];
+
+    const res = await fetch(`http://127.0.0.1:${sharedPort}/web3/resources/health`);
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("ok");
+  });
+
   it("routes tools invoke before plugin HTTP handlers", async () => {
     const pluginHandler = vi.fn(async (_req: IncomingMessage, res: ServerResponse) => {
       res.statusCode = 418;

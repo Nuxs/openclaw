@@ -3,6 +3,15 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { MarketPluginConfig } from "../config.js";
 import type {
+  MarketLedgerEntry,
+  MarketLedgerFilter,
+  MarketLedgerSummary,
+  MarketLease,
+  MarketLeaseFilter,
+  MarketResource,
+  MarketResourceFilter,
+} from "../market/resources.js";
+import type {
   AuditEvent,
   Consent,
   Delivery,
@@ -16,6 +25,9 @@ type MarketStore = {
   listOffers: () => Offer[];
   getOffer: (offerId: string) => Offer | undefined;
   saveOffer: (offer: Offer) => void;
+  listResources: (filter?: MarketResourceFilter) => MarketResource[];
+  getResource: (resourceId: string) => MarketResource | undefined;
+  saveResource: (resource: MarketResource) => void;
   listOrders: () => Order[];
   getOrder: (orderId: string) => Order | undefined;
   saveOrder: (order: Order) => void;
@@ -29,6 +41,12 @@ type MarketStore = {
   getSettlement: (settlementId: string) => Settlement | undefined;
   getSettlementByOrder: (orderId: string) => Settlement | undefined;
   saveSettlement: (settlement: Settlement) => void;
+  listLeases: (filter?: MarketLeaseFilter) => MarketLease[];
+  getLease: (leaseId: string) => MarketLease | undefined;
+  saveLease: (lease: MarketLease) => void;
+  appendLedger: (entry: MarketLedgerEntry) => void;
+  listLedger: (filter?: MarketLedgerFilter) => MarketLedgerEntry[];
+  summarizeLedger: (filter?: MarketLedgerFilter) => MarketLedgerSummary;
   listRevocations: () => RevocationJob[];
   getRevocation: (jobId: string) => RevocationJob | undefined;
   saveRevocation: (job: RevocationJob) => void;
@@ -73,6 +91,40 @@ class MarketFileStore implements MarketStore {
     const map = this.readMap<Offer>(this.offersPath);
     map[offer.offerId] = offer;
     this.writeMap(this.offersPath, map);
+  }
+
+  private get resourcesPath() {
+    return "resources.json";
+  }
+
+  listResources(filter?: MarketResourceFilter): MarketResource[] {
+    let resources = Object.values(this.readMap<MarketResource>(this.resourcesPath));
+    if (filter?.kind) {
+      resources = resources.filter((entry) => entry.kind === filter.kind);
+    }
+    if (filter?.providerActorId) {
+      resources = resources.filter((entry) => entry.providerActorId === filter.providerActorId);
+    }
+    if (filter?.status) {
+      resources = resources.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.tag) {
+      resources = resources.filter((entry) => entry.tags?.includes(filter.tag ?? "") ?? false);
+    }
+    if (filter?.limit !== undefined) {
+      resources = resources.slice(0, Math.max(0, filter.limit));
+    }
+    return resources;
+  }
+
+  getResource(resourceId: string): MarketResource | undefined {
+    return this.readMap<MarketResource>(this.resourcesPath)[resourceId];
+  }
+
+  saveResource(resource: MarketResource): void {
+    const map = this.readMap<MarketResource>(this.resourcesPath);
+    map[resource.resourceId] = resource;
+    this.writeMap(this.resourcesPath, map);
   }
 
   private get ordersPath() {
@@ -151,6 +203,113 @@ class MarketFileStore implements MarketStore {
     this.writeMap(this.settlementsPath, map);
   }
 
+  private get leasesPath() {
+    return "leases.json";
+  }
+
+  listLeases(filter?: MarketLeaseFilter): MarketLease[] {
+    let leases = Object.values(this.readMap<MarketLease>(this.leasesPath));
+    if (filter?.resourceId) {
+      leases = leases.filter((entry) => entry.resourceId === filter.resourceId);
+    }
+    if (filter?.providerActorId) {
+      leases = leases.filter((entry) => entry.providerActorId === filter.providerActorId);
+    }
+    if (filter?.consumerActorId) {
+      leases = leases.filter((entry) => entry.consumerActorId === filter.consumerActorId);
+    }
+    if (filter?.status) {
+      leases = leases.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.limit !== undefined) {
+      leases = leases.slice(0, Math.max(0, filter.limit));
+    }
+    return leases;
+  }
+
+  getLease(leaseId: string): MarketLease | undefined {
+    return this.readMap<MarketLease>(this.leasesPath)[leaseId];
+  }
+
+  saveLease(lease: MarketLease): void {
+    const map = this.readMap<MarketLease>(this.leasesPath);
+    map[lease.leaseId] = lease;
+    this.writeMap(this.leasesPath, map);
+  }
+
+  private get ledgerPath() {
+    return join(this.dir, "ledger.jsonl");
+  }
+
+  appendLedger(entry: MarketLedgerEntry): void {
+    appendFileSync(this.ledgerPath, JSON.stringify(entry) + "\n");
+  }
+
+  listLedger(filter?: MarketLedgerFilter): MarketLedgerEntry[] {
+    if (!existsSync(this.ledgerPath)) return [];
+    const raw = readFileSync(this.ledgerPath, "utf-8").trim();
+    if (!raw) return [];
+    const lines = raw.split("\n");
+    let entries = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line) as MarketLedgerEntry;
+        } catch {
+          return null;
+        }
+      })
+      .filter((entry): entry is MarketLedgerEntry => Boolean(entry));
+    if (filter?.leaseId) {
+      entries = entries.filter((entry) => entry.leaseId === filter.leaseId);
+    }
+    if (filter?.resourceId) {
+      entries = entries.filter((entry) => entry.resourceId === filter.resourceId);
+    }
+    if (filter?.providerActorId) {
+      entries = entries.filter((entry) => entry.providerActorId === filter.providerActorId);
+    }
+    if (filter?.consumerActorId) {
+      entries = entries.filter((entry) => entry.consumerActorId === filter.consumerActorId);
+    }
+    if (filter?.since) {
+      const since = Date.parse(filter.since);
+      if (!Number.isNaN(since)) {
+        entries = entries.filter((entry) => Date.parse(entry.timestamp) >= since);
+      }
+    }
+    if (filter?.until) {
+      const until = Date.parse(filter.until);
+      if (!Number.isNaN(until)) {
+        entries = entries.filter((entry) => Date.parse(entry.timestamp) <= until);
+      }
+    }
+    entries.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+    if (filter?.limit !== undefined) {
+      entries = entries.slice(-Math.max(0, filter.limit));
+    }
+    return entries;
+  }
+
+  summarizeLedger(filter?: MarketLedgerFilter): MarketLedgerSummary {
+    const entries = this.listLedger(filter);
+    const byUnit: Record<string, { quantity: string; cost: string }> = {};
+    let totalCost = 0n;
+    let currency = "";
+    for (const entry of entries) {
+      if (!currency) {
+        currency = entry.currency;
+      }
+      const unitBucket = byUnit[entry.unit] ?? { quantity: "0", cost: "0" };
+      const nextQuantity = BigInt(unitBucket.quantity) + BigInt(entry.quantity);
+      const nextCost = BigInt(unitBucket.cost) + BigInt(entry.cost);
+      unitBucket.quantity = nextQuantity.toString();
+      unitBucket.cost = nextCost.toString();
+      byUnit[entry.unit] = unitBucket;
+      totalCost += BigInt(entry.cost);
+    }
+    return { byUnit, totalCost: totalCost.toString(), currency };
+  }
+
   private get revocationsPath() {
     return "revocations.json";
   }
@@ -194,10 +353,13 @@ class MarketFileStore implements MarketStore {
   hasAnyData(): boolean {
     return (
       this.listOffers().length > 0 ||
+      this.listResources().length > 0 ||
       this.listOrders().length > 0 ||
       this.listConsents().length > 0 ||
       this.listDeliveries().length > 0 ||
       this.listSettlements().length > 0 ||
+      this.listLeases().length > 0 ||
+      this.listLedger({ limit: 1 }).length > 0 ||
       this.listRevocations().length > 0 ||
       this.readAuditEvents(1_000_000).length > 0
     );
@@ -223,12 +385,16 @@ class MarketSqliteStore implements MarketStore {
   private ensureSchema() {
     this.db.exec(
       "CREATE TABLE IF NOT EXISTS offers (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS consents (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS deliveries (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS settlements (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS leases (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS revocations (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS ledger (id TEXT PRIMARY KEY, timestamp TEXT NOT NULL, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS audit (id TEXT PRIMARY KEY, timestamp TEXT NOT NULL, data TEXT NOT NULL);" +
+        "CREATE INDEX IF NOT EXISTS ledger_ts ON ledger(timestamp);" +
         "CREATE INDEX IF NOT EXISTS audit_ts ON audit(timestamp);",
     );
   }
@@ -243,11 +409,14 @@ class MarketSqliteStore implements MarketStore {
   private isEmpty(): boolean {
     return (
       this.countRows("offers") === 0 &&
+      this.countRows("resources") === 0 &&
       this.countRows("orders") === 0 &&
       this.countRows("consents") === 0 &&
       this.countRows("deliveries") === 0 &&
       this.countRows("settlements") === 0 &&
+      this.countRows("leases") === 0 &&
       this.countRows("revocations") === 0 &&
+      this.countRows("ledger") === 0 &&
       this.countRows("audit") === 0
     );
   }
@@ -258,10 +427,13 @@ class MarketSqliteStore implements MarketStore {
     }
 
     for (const offer of fileStore.listOffers()) this.saveOffer(offer);
+    for (const resource of fileStore.listResources()) this.saveResource(resource);
     for (const order of fileStore.listOrders()) this.saveOrder(order);
     for (const consent of fileStore.listConsents()) this.saveConsent(consent);
     for (const delivery of fileStore.listDeliveries()) this.saveDelivery(delivery);
     for (const settlement of fileStore.listSettlements()) this.saveSettlement(settlement);
+    for (const lease of fileStore.listLeases()) this.saveLease(lease);
+    for (const entry of fileStore.listLedger({ limit: 1_000_000 })) this.appendLedger(entry);
     for (const revocation of fileStore.listRevocations()) this.saveRevocation(revocation);
     for (const event of fileStore.readAuditEvents(1_000_000)) this.appendAuditEvent(event);
   }
@@ -294,6 +466,34 @@ class MarketSqliteStore implements MarketStore {
 
   saveOffer(offer: Offer): void {
     this.saveTo("offers", offer.offerId, offer);
+  }
+
+  listResources(filter?: MarketResourceFilter): MarketResource[] {
+    let resources = this.listFrom<MarketResource>("resources");
+    if (filter?.kind) {
+      resources = resources.filter((entry) => entry.kind === filter.kind);
+    }
+    if (filter?.providerActorId) {
+      resources = resources.filter((entry) => entry.providerActorId === filter.providerActorId);
+    }
+    if (filter?.status) {
+      resources = resources.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.tag) {
+      resources = resources.filter((entry) => entry.tags?.includes(filter.tag ?? "") ?? false);
+    }
+    if (filter?.limit !== undefined) {
+      resources = resources.slice(0, Math.max(0, filter.limit));
+    }
+    return resources;
+  }
+
+  getResource(resourceId: string): MarketResource | undefined {
+    return this.getFrom<MarketResource>("resources", resourceId);
+  }
+
+  saveResource(resource: MarketResource): void {
+    this.saveTo("resources", resource.resourceId, resource);
   }
 
   listOrders(): Order[] {
@@ -346,6 +546,93 @@ class MarketSqliteStore implements MarketStore {
 
   saveSettlement(settlement: Settlement): void {
     this.saveTo("settlements", settlement.settlementId, settlement);
+  }
+
+  listLeases(filter?: MarketLeaseFilter): MarketLease[] {
+    let leases = this.listFrom<MarketLease>("leases");
+    if (filter?.resourceId) {
+      leases = leases.filter((entry) => entry.resourceId === filter.resourceId);
+    }
+    if (filter?.providerActorId) {
+      leases = leases.filter((entry) => entry.providerActorId === filter.providerActorId);
+    }
+    if (filter?.consumerActorId) {
+      leases = leases.filter((entry) => entry.consumerActorId === filter.consumerActorId);
+    }
+    if (filter?.status) {
+      leases = leases.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.limit !== undefined) {
+      leases = leases.slice(0, Math.max(0, filter.limit));
+    }
+    return leases;
+  }
+
+  getLease(leaseId: string): MarketLease | undefined {
+    return this.getFrom<MarketLease>("leases", leaseId);
+  }
+
+  saveLease(lease: MarketLease): void {
+    this.saveTo("leases", lease.leaseId, lease);
+  }
+
+  appendLedger(entry: MarketLedgerEntry): void {
+    this.db
+      .prepare("INSERT OR REPLACE INTO ledger (id, timestamp, data) VALUES (?, ?, ?)")
+      .run(entry.ledgerId, entry.timestamp, JSON.stringify(entry));
+  }
+
+  listLedger(filter?: MarketLedgerFilter): MarketLedgerEntry[] {
+    let entries = this.listFrom<MarketLedgerEntry>("ledger");
+    if (filter?.leaseId) {
+      entries = entries.filter((entry) => entry.leaseId === filter.leaseId);
+    }
+    if (filter?.resourceId) {
+      entries = entries.filter((entry) => entry.resourceId === filter.resourceId);
+    }
+    if (filter?.providerActorId) {
+      entries = entries.filter((entry) => entry.providerActorId === filter.providerActorId);
+    }
+    if (filter?.consumerActorId) {
+      entries = entries.filter((entry) => entry.consumerActorId === filter.consumerActorId);
+    }
+    if (filter?.since) {
+      const since = Date.parse(filter.since);
+      if (!Number.isNaN(since)) {
+        entries = entries.filter((entry) => Date.parse(entry.timestamp) >= since);
+      }
+    }
+    if (filter?.until) {
+      const until = Date.parse(filter.until);
+      if (!Number.isNaN(until)) {
+        entries = entries.filter((entry) => Date.parse(entry.timestamp) <= until);
+      }
+    }
+    entries.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+    if (filter?.limit !== undefined) {
+      entries = entries.slice(-Math.max(0, filter.limit));
+    }
+    return entries;
+  }
+
+  summarizeLedger(filter?: MarketLedgerFilter): MarketLedgerSummary {
+    const entries = this.listLedger(filter);
+    const byUnit: Record<string, { quantity: string; cost: string }> = {};
+    let totalCost = 0n;
+    let currency = "";
+    for (const entry of entries) {
+      if (!currency) {
+        currency = entry.currency;
+      }
+      const unitBucket = byUnit[entry.unit] ?? { quantity: "0", cost: "0" };
+      const nextQuantity = BigInt(unitBucket.quantity) + BigInt(entry.quantity);
+      const nextCost = BigInt(unitBucket.cost) + BigInt(entry.cost);
+      unitBucket.quantity = nextQuantity.toString();
+      unitBucket.cost = nextCost.toString();
+      byUnit[entry.unit] = unitBucket;
+      totalCost += BigInt(entry.cost);
+    }
+    return { byUnit, totalCost: totalCost.toString(), currency };
   }
 
   listRevocations(): RevocationJob[] {
@@ -402,6 +689,18 @@ export class MarketStateStore {
     this.store.saveOffer(offer);
   }
 
+  listResources(filter?: MarketResourceFilter): MarketResource[] {
+    return this.store.listResources(filter);
+  }
+
+  getResource(resourceId: string): MarketResource | undefined {
+    return this.store.getResource(resourceId);
+  }
+
+  saveResource(resource: MarketResource): void {
+    this.store.saveResource(resource);
+  }
+
   listOrders(): Order[] {
     return this.store.listOrders();
   }
@@ -452,6 +751,30 @@ export class MarketStateStore {
 
   saveSettlement(settlement: Settlement): void {
     this.store.saveSettlement(settlement);
+  }
+
+  listLeases(filter?: MarketLeaseFilter): MarketLease[] {
+    return this.store.listLeases(filter);
+  }
+
+  getLease(leaseId: string): MarketLease | undefined {
+    return this.store.getLease(leaseId);
+  }
+
+  saveLease(lease: MarketLease): void {
+    this.store.saveLease(lease);
+  }
+
+  appendLedger(entry: MarketLedgerEntry): void {
+    this.store.appendLedger(entry);
+  }
+
+  listLedger(filter?: MarketLedgerFilter): MarketLedgerEntry[] {
+    return this.store.listLedger(filter);
+  }
+
+  summarizeLedger(filter?: MarketLedgerFilter): MarketLedgerSummary {
+    return this.store.summarizeLedger(filter);
   }
 
   listRevocations(): RevocationJob[] {

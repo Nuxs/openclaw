@@ -6,7 +6,16 @@ import {
   createDeliveryCompleteHandler,
   createDeliveryIssueHandler,
   createDeliveryRevokeHandler,
+  createLedgerAppendHandler,
+  createLedgerListHandler,
+  createLedgerSummaryHandler,
+  createLeaseExpireSweepHandler,
+  createLeaseGetHandler,
+  createLeaseIssueHandler,
+  createLeaseListHandler,
+  createLeaseRevokeHandler,
   createMarketAuditQueryHandler,
+  createMarketRepairRetryHandler,
   createMarketRevocationRetryHandler,
   createMarketStatusSummaryHandler,
   createMarketTransparencySummaryHandler,
@@ -17,6 +26,10 @@ import {
   createOfferUpdateHandler,
   createOrderCancelHandler,
   createOrderCreateHandler,
+  createResourceGetHandler,
+  createResourceListHandler,
+  createResourcePublishHandler,
+  createResourceUnpublishHandler,
   createSettlementLockHandler,
   createSettlementRefundHandler,
   createSettlementReleaseHandler,
@@ -41,6 +54,17 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("market.offer.publish", createOfferPublishHandler(store, config));
     api.registerGatewayMethod("market.offer.update", createOfferUpdateHandler(store, config));
     api.registerGatewayMethod("market.offer.close", createOfferCloseHandler(store, config));
+
+    api.registerGatewayMethod(
+      "market.resource.publish",
+      createResourcePublishHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.resource.unpublish",
+      createResourceUnpublishHandler(store, config),
+    );
+    api.registerGatewayMethod("market.resource.get", createResourceGetHandler(store, config));
+    api.registerGatewayMethod("market.resource.list", createResourceListHandler(store, config));
 
     api.registerGatewayMethod("market.order.create", createOrderCreateHandler(store, config));
     api.registerGatewayMethod("market.order.cancel", createOrderCancelHandler(store, config));
@@ -69,6 +93,19 @@ const plugin: OpenClawPluginDefinition = {
       createDeliveryCompleteHandler(store, config),
     );
 
+    api.registerGatewayMethod("market.lease.issue", createLeaseIssueHandler(store, config));
+    api.registerGatewayMethod("market.lease.revoke", createLeaseRevokeHandler(store, config));
+    api.registerGatewayMethod("market.lease.get", createLeaseGetHandler(store, config));
+    api.registerGatewayMethod("market.lease.list", createLeaseListHandler(store, config));
+    api.registerGatewayMethod(
+      "market.lease.expireSweep",
+      createLeaseExpireSweepHandler(store, config),
+    );
+
+    api.registerGatewayMethod("market.ledger.append", createLedgerAppendHandler(store, config));
+    api.registerGatewayMethod("market.ledger.list", createLedgerListHandler(store, config));
+    api.registerGatewayMethod("market.ledger.summary", createLedgerSummaryHandler(store, config));
+
     api.registerGatewayMethod(
       "market.status.summary",
       createMarketStatusSummaryHandler(store, config),
@@ -82,6 +119,7 @@ const plugin: OpenClawPluginDefinition = {
       "market.transparency.trace",
       createMarketTransparencyTraceHandler(store, config),
     );
+    api.registerGatewayMethod("market.repair.retry", createMarketRepairRetryHandler(store, config));
     api.registerGatewayMethod(
       "market.revocation.retry",
       createMarketRevocationRetryHandler(store, config),

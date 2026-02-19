@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage, StreamFn } from "@mariozechner/pi-agent-core";
 import type { Command } from "commander";
 import type { AuthProfileCredential, OAuthCredential } from "../agents/auth-profiles/types.js";
 import type { AnyAgentTool } from "../agents/tools/common.js";
@@ -299,6 +299,7 @@ export type PluginHookName =
   | "before_model_resolve"
   | "before_prompt_build"
   | "before_agent_start"
+  | "resolve_stream_fn"
   | "llm_input"
   | "llm_output"
   | "agent_end"
@@ -360,6 +361,18 @@ export type PluginHookBeforeAgentStartEvent = {
 
 export type PluginHookBeforeAgentStartResult = PluginHookBeforePromptBuildResult &
   PluginHookBeforeModelResolveResult;
+
+// resolve_stream_fn hook
+export type PluginHookResolveStreamFnEvent = {
+  provider: string;
+  modelId: string;
+  modelApi?: string;
+  baseUrl?: string;
+};
+
+export type PluginHookResolveStreamFnResult = {
+  streamFn?: StreamFn;
+};
 
 // llm_input hook
 export type PluginHookLlmInputEvent = {
@@ -579,6 +592,10 @@ export type PluginHookHandlerMap = {
     event: PluginHookBeforeAgentStartEvent,
     ctx: PluginHookAgentContext,
   ) => Promise<PluginHookBeforeAgentStartResult | void> | PluginHookBeforeAgentStartResult | void;
+  resolve_stream_fn: (
+    event: PluginHookResolveStreamFnEvent,
+    ctx: PluginHookAgentContext,
+  ) => Promise<PluginHookResolveStreamFnResult | void> | PluginHookResolveStreamFnResult | void;
   llm_input: (event: PluginHookLlmInputEvent, ctx: PluginHookAgentContext) => Promise<void> | void;
   llm_output: (
     event: PluginHookLlmOutputEvent,
