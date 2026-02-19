@@ -281,3 +281,91 @@ sequenceDiagram
 
 该方案是正确方向，但需要 **以 `web3-core` 与 `market-core` 为基座**，优先复用成熟开源组件补齐底层能力，再完成联动与消费入口的落地，最后才扩展到完整的 Client/Node 市场网络。
 该文档已整理为 **AI 代理可执行的分阶段设计方案**。
+
+---
+
+### **十二、web3-support-plan（主脑切换闭环实现计划）**
+
+### **目标与边界（面向主脑切换链路）**
+
+- **目标**：提供可审核、可执行的闭环计划，打通“主脑切换 → Web3 去中心化模型作为主脑 → 结算与状态可追踪”的链路。
+- **边界**：补齐 **状态对齐、结算入口绑定、去中心化模型主脑接入**；不新造协议层，优先复用 `web3-core`/`market-core` 既有入口。
+- **原则**：可降级、可回滚；去中心化主脑不可用时回退到中心化模型，不阻断对话链路。
+
+### **数据流与状态对齐（闭环视角）**
+
+- **入口态**：主脑切换完成后，以 `session` 维度记录“当前主脑来源 = web3/decentralized”与 `provider/model`。
+- **运行态**：`before_tool_call` 做结算/credits 预检与可用性探测；`session_end` 汇总 usage 触发结算绑定。
+- **展示态**：`/pay_status` 与 `web3.status.summary` 汇总并对齐 `market-core` 的结算权威状态，同时展示“当前主脑来源”。
+
+### **Phase 1：状态对齐与 /pay_status 一致性（优先级 P0）**
+
+- **目标**：主脑切换后，CLI/UI 上 Web3 状态与结算状态可审计、可追踪、可复核。
+- **执行项**：
+  - **状态汇总**：`web3.status.summary` 扩展字段，统一输出审计/锚定/归档/结算/主脑来源/可用性提示。
+  - **结算对齐**：`/pay_status` 与 `market-core` 的 settlement 状态、余额/credits、锁定信息一致。
+  - **异常提示**：统一输出“结算不可用/未绑定/余额不足/状态未知”的降级文案，避免阻断主脑切换。
+- **涉及模块/文件**：
+  - `extensions/web3-core/src/billing/commands.ts`
+  - `extensions/web3-core/src/index.ts`
+  - `extensions/market-core/src/market/handlers.ts`（如需补齐汇总字段）
+  - `extensions/web3-core/src/state/store.ts`（如需新增汇总缓存）
+- **测试建议**：
+  - **单元**：`commands.test.ts` 覆盖 `/pay_status` 与 `status summary` 字段对齐。
+  - **集成**：模拟 `market-core` store（file/sqlite）一致性读取路径，避免重复扫描。
+
+### **Phase 2：结算入口绑定（before_tool_call / session_end）**
+
+- **目标**：主脑切换到 Web3 去中心化模型时，结算绑定与调用链路一致，失败可降级提示。
+- **执行项**：
+  - **入口绑定**：在 `before_tool_call` 检查结算/credits 与主脑可用性，失败降级提示并触发回退策略。
+  - **会话结算**：在 `session_end` 汇总 usage，触发最小化结算绑定流程，控制写入频率。
+  - **降级策略**：结算不可用或模型不可达 → 标记状态 + UI 提示 + 回退到中心化主脑。
+- **涉及模块/文件**：
+  - `extensions/web3-core/src/billing/guard.ts`
+  - `extensions/web3-core/src/audit/hooks.ts`
+  - `extensions/web3-core/src/state/store.ts`
+- **测试建议**：
+  - **单元**：`guard.test.ts` 覆盖可用/不可用/未知状态下的降级与回退行为。
+  - **单元**：`hooks.test.ts` 覆盖 `session_end` 触发与最小写入策略。
+
+### **Phase 3：去中心化主脑接入（必须）**
+
+- **目标**：让 Web3 去中心化模型成为可选主脑，并纳入主脑切换链路。
+- **执行项**：
+  - **主脑候选注册**：将 Web3 去中心化模型注册为可选主脑来源，带 `provider/model/availability`。
+  - **调用路径接入**：在主脑切换后走真实推理路径（web3 节点/网关/适配器），失败可回退。
+  - **allowlist 校验**：仅允许可信节点/模型进入主脑池，未在 allowlist 直接降级。
+- **涉及模块/文件**：
+  - `extensions/web3-core/src/config.ts`
+  - `extensions/web3-core/src/state/store.ts`
+  - `extensions/web3-core/src/index.ts`
+- **测试建议**：
+  - **单元**：配置解析与 allowlist 校验覆盖。
+  - **集成**：主脑切换到 Web3 模型的路径验证 + 回退路径验证。
+
+### **输出与展示格式（CLI/UI 一致性）**
+
+- **必须对齐字段**：`pay_status`、`web3.status.summary`、`market.status.summary`、`brain.source`（主脑来源）。
+- **展示原则**：简洁一致、可审计、可降级，不输出敏感信息（私钥、配置细节）。
+
+### **文件/模块清单（计划内）**
+
+- `extensions/web3-core/src/config.ts`
+- `extensions/web3-core/src/state/store.ts`
+- `extensions/web3-core/src/billing/guard.ts`
+- `extensions/web3-core/src/audit/hooks.ts`
+- `extensions/web3-core/src/billing/commands.ts`
+- `extensions/web3-core/src/index.ts`
+- `extensions/market-core/src/market/handlers.ts`
+- `extensions/web3-core/src/billing/commands.test.ts`
+- `extensions/web3-core/src/billing/guard.test.ts`
+- `extensions/web3-core/src/audit/hooks.test.ts`
+- `extensions/market-core/src/market/handlers.test.ts`
+
+### **评审调整要点（相对原计划的优化）**
+
+- **对齐主脑切换链路**：确保主脑可切到 Web3 去中心化模型，并可回退。
+- **状态优先级明确**：`market-core` 为结算权威，`web3-core` 做汇总与入口绑定。
+- **最小侵入**：结算绑定挂在 hooks 内，失败不阻断主链路。
+- **真实推理路径**：去中心化模型进入主脑池，按 allowlist 约束并提供回退。
