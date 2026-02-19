@@ -153,3 +153,36 @@
 - **Gate-LEDGER-01**：consumer 不能写权威 ledger
 - **Gate-COMPAT-01**：`/pay_status` 输出不变
 - **Gate-STORE-01**：file/sqlite 行为一致
+
+---
+
+## 6. 上线阻断项 Gate（评审补充，必须全部通过）
+
+> 以下 Gate 对应评审发现的4个上线阻断项，每项均为上线硬性门槛。
+
+### Gate-SETTLE-01：结算闭环可执行
+
+- **验证**：`queuePendingSettlement` 写入的条目包含 `orderId`、`payer`、`amount` 三字段（均非空）
+- **验证**：`flushPendingSettlements` 对 ready 条目调用 `market.settlement.lock` 并成功移除
+- **验证**：有对应单元测试通过
+
+### Gate-LEDGER-02：模型调用有 Provider 权威记账
+
+- **验证**：`/web3/resources/model/chat` 流式响应完成后调用 `market.ledger.append`
+- **验证**：ledger entry 的 `kind="model"`、`unit="token"`、`quantity` 取自上游 usage 或回退为 1
+- **验证**：记账失败不影响已返回的响应
+- **验证**：有对应单元测试通过
+
+### Gate-ATOMIC-01：多对象写入原子性
+
+- **验证（SQLite）**：`market.resource.publish`、`market.lease.issue`、`market.settlement.lock/release/refund` 的多步写入包裹在 `BEGIN`/`COMMIT`/`ROLLBACK` 事务中
+- **验证（File）**：上述操作在 `withFileLock` 锁内执行
+- **验证**：SQLite 中途抛错后数据完全回滚（有测试）
+- **验证**：File 模式中途抛错后文件未被部分覆写（有测试）
+
+### Gate-TEST-01：关键路径测试覆盖
+
+- **验证**：`web3.status.summary` handler 有测试，覆盖 brain/billing/settlement 字段
+- **验证**：`flushPendingSettlements` 有测试，覆盖 ready/not-ready/重试/成功清除
+- **验证**：model chat ledger 记账有测试
+- **验证**：原子性回滚有测试（sqlite + file 双模式）
