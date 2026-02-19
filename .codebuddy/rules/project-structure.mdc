@@ -8,6 +8,7 @@ alwaysApply: true
 - 源码: `src/`（CLI 在 `src/cli`，命令在 `src/commands`，Web provider 在 `src/provider-web.ts`，基础设施在 `src/infra`，媒体管线在 `src/media`）
 - 测试: 与源文件同目录的 `*.test.ts`
 - 文档: `docs/`（图片、队列、Pi 配置）。构建产物在 `dist/`
+- Web3 market 设计规范: `skills/web3-market/references/`（涉及该域问题优先加载 `web3-market` skill）
 - 插件/扩展: `extensions/*`（workspace packages）。插件专属依赖放在扩展的 `package.json`，不要加到根 `package.json`（除非核心也用）
 - 插件安装: 插件目录内 `npm install --omit=dev`；运行时依赖必须在 `dependencies`。`dependencies` 中避免 `workspace:*`（npm install 会报错）；`openclaw` 放到 `devDependencies` 或 `peerDependencies`
 - 安装脚本: `https://openclaw.ai/*` 对应的仓库 `../openclaw.ai`（`public/install.sh`, `public/install-cli.sh`, `public/install.ps1`）

@@ -13,6 +13,7 @@ mkdir -p "$CB_SKILLS" "$CB_RULES"
 
 created=0
 skipped=0
+skipped_existing=0
 warned=0
 
 for skill_dir in "$SKILLS_SRC"/*/; do
@@ -32,8 +33,7 @@ for skill_dir in "$SKILLS_SRC"/*/; do
       warned=$((warned + 1))
     fi
   elif [ -e "$target" ]; then
-    echo "⚠  $skill_name: 已存在且不是 symlink，跳过（请手动处理）"
-    warned=$((warned + 1))
+    skipped_existing=$((skipped_existing + 1))
   else
     ln -s "$rel_path" "$target"
     created=$((created + 1))
@@ -42,5 +42,8 @@ done
 
 echo ""
 echo "✅ 同步完成: 新建 $created 个链接, 跳过 $skipped 个, 警告 $warned 个"
+if [ "$skipped_existing" -gt 0 ]; then
+  echo "ℹ️  另外: $skipped_existing 个条目已存在且不是 symlink，未改动"
+fi
 echo "   Skills 目录: $CB_SKILLS"
 echo "   Rules 目录:  $CB_RULES"
