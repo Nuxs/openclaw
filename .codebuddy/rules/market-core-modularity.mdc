@@ -1,0 +1,47 @@
+---
+description: market-core 模块拆分与文件大小约束（面向多次迭代防止单文件膨胀）
+alwaysApply: true
+globs: extensions/market-core/src/**/*.ts
+---
+
+# market-core：防止单文件膨胀（700 行软上限）
+
+## 目标
+
+- **默认目标**：单文件控制在 ~500-700 LOC（指导性但要主动遵守）。
+- **硬性行为**：当你需要新增/修改功能时，**不要继续把新逻辑堆进已经很大的文件**（尤其是 `market/handlers.ts` 这类入口文件）。
+
+## 执行规则（写代码前先做）
+
+- **先看行数**：在开始修改任何 `extensions/market-core/src/**` 文件前，先确认目标文件大致行数。
+  - 如果你已读到该文件明显 >700 行：后续新增逻辑必须优先拆分。
+  - 如果接近阈值（例如 >650 行）：默认选择拆分，而不是继续追加。
+
+## 结构策略（推荐标准形态）
+
+- **保持薄入口**：入口文件只做“路由/导出/装配”，不承载具体业务实现。
+  - 示例：`market/handlers.ts` 仅负责 re-export。
+- **按领域拆分**：把实现拆到同目录子模块，按业务域或资源类型分组，例如：
+  - `market/handlers/offers.ts`
+  - `market/handlers/orders.ts`
+  - `market/handlers/settlements.ts`
+  - `market/handlers/consents.ts`
+  - `market/handlers/deliveries.ts`
+  - `market/handlers/market.ts`（聚合/查询类）
+  - `market/handlers/revocations.ts`
+  - `market/handlers/shared.ts`（跨模块共享的纯函数/小工具）
+
+## 多次迭代时 AI 的默认决策
+
+当你接到“再加一个 handler/再加一个 endpoint/再加一个状态机分支/再加一个查询字段”这类需求：
+
+- **如果目标文件已经偏大**：
+  - 新增实现放到新模块文件；
+  - 入口文件只加/改导出；
+  - 避免引入 `*V2*` 或复制粘贴整段逻辑，优先抽 helper。
+
+## 合并前自检（面向长期可维护）
+
+- 新增的实现文件应当独立可读（尽量 <400-600 行）。
+- 共享逻辑应下沉到 `shared` 或更靠近数据结构/校验/状态机的模块，而不是在 handler 内重复。
+- **禁止策略**：不要为了图快把新 handler 直接追加到一个已经很大的 `handlers.ts` 中。
