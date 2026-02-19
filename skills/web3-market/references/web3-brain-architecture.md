@@ -68,6 +68,7 @@
 | 场景                       | 处理                                                                |
 | -------------------------- | ------------------------------------------------------------------- |
 | 去中心化节点不可达         | `resolve_stream_fn` 返回 null → 走默认 `streamSimple`（回退中心化） |
+| 未获得有效租约或无人接单   | `before_model_resolve` 不覆写 → 走默认中心化主脑                    |
 | 结算/credits 不足          | `before_tool_call` 降级提示，不阻断对话                             |
 | allowlist 未命中           | `before_model_resolve` 不覆写 → 走默认中心化主脑                    |
 | `session_end` 结算写入失败 | fire-and-forget 限制；需异步重试队列兜底                            |
@@ -288,10 +289,13 @@ brain: {
   - 新增 `resolve_stream_fn` hook 类型 + 执行器 + 调用点
   - 涉及：`src/plugins/types.ts`, `src/plugins/hooks.ts`, `src/agents/pi-embedded-runner/run/attempt.ts`
 - **插件侧**：
-  - 注册 `before_model_resolve` hook（动态切换 provider/model）
-  - 注册 `resolve_stream_fn` hook（提供自定义 StreamFn）
-  - 新增 `brain` 配置节 + allowlist 校验
-  - 涉及：`extensions/web3-core/src/index.ts`, `config.ts`, 新增 `brain/stream.ts`, `brain/resolve.ts`
+- 注册 `before_model_resolve` hook（动态切换 provider/model）
+- 注册 `resolve_stream_fn` hook（提供自定义 StreamFn）
+- **无租约不切换**：`before_model_resolve` 在资源共享开启时要求有有效租约，否则不覆写
+- **失败回退兜底**：`resolve_stream_fn` 仅在租约有效时返回 StreamFn，确保共享不可用时仍走默认链路
+- 新增 `brain` 配置节 + allowlist 校验
+- 涉及：`extensions/web3-core/src/index.ts`, `config.ts`, 新增 `brain/stream.ts`, `brain/resolve.ts`
+
 - **测试建议**：
   - **单元**：`brain/resolve.test.ts` 覆盖 allowlist 命中/未命中/节点不可用的回退
   - **集成**：mock 本地 HTTP server 模拟去中心化节点（OpenAI API 兼容 + 自定义协议），验证 StreamFn 全链路

@@ -1,8 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { resolveConfig } from "../config.js";
+import { clearConsumerLeaseAccess, saveConsumerLeaseAccess } from "../resources/leases.js";
 import { resolveBrainModelOverride } from "./resolve.js";
 
 describe("web3-core brain resolve", () => {
+  afterEach(() => {
+    clearConsumerLeaseAccess("model-1");
+  });
+
   it("returns overrides when brain is enabled and allowlist matches", () => {
     const config = resolveConfig({
       brain: {
@@ -48,5 +53,52 @@ describe("web3-core brain resolve", () => {
 
     const result = resolveBrainModelOverride(config);
     expect(result).toBeUndefined();
+  });
+
+  it("returns undefined when resources are enabled but no active lease", () => {
+    const config = resolveConfig({
+      brain: {
+        enabled: true,
+        providerId: "web3-decentralized",
+        defaultModel: "model-1",
+        allowlist: ["model-1"],
+        endpoint: "https://brain.example.com",
+      },
+      resources: {
+        enabled: true,
+        consumer: { enabled: true },
+      },
+    });
+
+    const result = resolveBrainModelOverride(config);
+    expect(result).toBeUndefined();
+  });
+
+  it("returns overrides when a lease is available for the default model", () => {
+    saveConsumerLeaseAccess({
+      leaseId: "lease-1",
+      resourceId: "model-1",
+      accessToken: "token-1",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      providerEndpoint: "https://provider.example.com",
+    });
+
+    const config = resolveConfig({
+      brain: {
+        enabled: true,
+        providerId: "web3-decentralized",
+        defaultModel: "model-1",
+        allowlist: ["model-1"],
+        endpoint: "",
+      },
+      resources: {
+        enabled: true,
+        consumer: { enabled: true },
+      },
+    });
+
+    const result = resolveBrainModelOverride(config);
+    expect(result?.providerOverride).toBe("web3-decentralized");
+    expect(result?.modelOverride).toBe("model-1");
   });
 });

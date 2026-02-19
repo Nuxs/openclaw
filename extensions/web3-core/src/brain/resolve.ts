@@ -1,5 +1,6 @@
 import type { PluginHookBeforeModelResolveResult } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
+import { getConsumerLeaseAccess } from "../resources/leases.js";
 
 function isAllowlisted(allowlist: string[], modelId: string): boolean {
   if (allowlist.length === 0) {
@@ -21,9 +22,15 @@ export function resolveBrainModelOverride(
   if (!isAllowlisted(brain.allowlist, brain.defaultModel)) {
     return undefined;
   }
+  const canUseLease = config.resources.enabled && config.resources.consumer.enabled;
+  const lease = canUseLease ? getConsumerLeaseAccess(brain.defaultModel) : null;
+  if (canUseLease && !lease) {
+    return undefined;
+  }
   if (brain.protocol === "openai-compat") {
     const endpoint = brain.endpoint?.trim();
-    if (!endpoint) {
+    const leaseEndpoint = lease?.providerEndpoint?.trim();
+    if (!endpoint && !leaseEndpoint) {
       return undefined;
     }
   }

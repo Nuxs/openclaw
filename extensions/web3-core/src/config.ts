@@ -101,6 +101,84 @@ export type BrowserIngestConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Resources sharing (B-2)
+// ---------------------------------------------------------------------------
+
+export type ResourceProviderBind = "loopback" | "lan";
+
+export type ResourcePriceUnit = "token" | "call" | "query" | "gb_day" | "put" | "get";
+
+export type ResourcePrice = {
+  unit: ResourcePriceUnit;
+  amount: number;
+  currency: string;
+};
+
+export type ResourceModelOffer = {
+  id: string;
+  label: string;
+  backend: "ollama" | "lmstudio" | "openai-compat" | "custom";
+  backendConfig: Record<string, unknown>;
+  price: ResourcePrice;
+  policy: {
+    maxConcurrent: number;
+    maxTokens?: number;
+    allowTools: boolean;
+  };
+};
+
+export type ResourceSearchOffer = {
+  id: string;
+  label: string;
+  backend: "searxng" | "custom";
+  backendConfig: Record<string, unknown>;
+  price: ResourcePrice;
+};
+
+export type ResourceStorageOffer = {
+  id: string;
+  label: string;
+  backend: "filesystem" | "s3" | "ipfs" | "custom";
+  backendConfig: Record<string, unknown>;
+  price: ResourcePrice;
+  policy: {
+    maxBytes: number;
+    allowMime?: string[];
+  };
+};
+
+export type ResourceProviderConfig = {
+  listen: {
+    enabled: boolean;
+    bind: ResourceProviderBind;
+    port: number;
+    publicBaseUrl?: string;
+  };
+  auth: {
+    mode: "siwe" | "token";
+    tokenTtlMs: number;
+    allowedConsumers?: string[];
+  };
+  offers: {
+    models: ResourceModelOffer[];
+    search: ResourceSearchOffer[];
+    storage: ResourceStorageOffer[];
+  };
+};
+
+export type ResourceConsumerConfig = {
+  enabled: boolean;
+  preferLocalFirst: boolean;
+};
+
+export type ResourceSharingConfig = {
+  enabled: boolean;
+  advertiseToMarket: boolean;
+  provider: ResourceProviderConfig;
+  consumer: ResourceConsumerConfig;
+};
+
+// ---------------------------------------------------------------------------
 // Top-level plugin config
 // ---------------------------------------------------------------------------
 
@@ -111,6 +189,7 @@ export type Web3PluginConfig = {
   identity: IdentityConfig;
   billing: BillingConfig;
   brain: BrainConfig;
+  resources: ResourceSharingConfig;
   browserIngest: BrowserIngestConfig;
 };
 
@@ -156,6 +235,31 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
     fallback: "centralized",
     timeoutMs: 30_000,
   },
+  resources: {
+    enabled: false,
+    advertiseToMarket: false,
+    provider: {
+      listen: {
+        enabled: false,
+        bind: "loopback",
+        port: 0,
+      },
+      auth: {
+        mode: "siwe",
+        tokenTtlMs: 10 * 60_000,
+        allowedConsumers: [],
+      },
+      offers: {
+        models: [],
+        search: [],
+        storage: [],
+      },
+    },
+    consumer: {
+      enabled: true,
+      preferLocalFirst: true,
+    },
+  },
   browserIngest: {
     enabled: false,
     ingestPath: "/plugins/web3-core/ingest",
@@ -178,6 +282,7 @@ export function resolveConfig(raw?: Record<string, unknown>): Web3PluginConfig {
     identity: merge(DEFAULT_CONFIG.identity, raw.identity),
     billing: merge(DEFAULT_CONFIG.billing, raw.billing),
     brain: merge(DEFAULT_CONFIG.brain, raw.brain),
+    resources: merge(DEFAULT_CONFIG.resources, raw.resources),
     browserIngest: merge(DEFAULT_CONFIG.browserIngest, raw.browserIngest),
   };
 }

@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveConfig } from "../config.js";
+import { clearConsumerLeaseAccess, saveConsumerLeaseAccess } from "../resources/leases.js";
 import { createWeb3StreamFn } from "./stream.js";
 
 describe("web3-core brain stream", () => {
+  afterEach(() => {
+    clearConsumerLeaseAccess("m");
+  });
+
   describe("createWeb3StreamFn", () => {
     it("returns undefined when brain is disabled", () => {
       const config = resolveConfig({
@@ -24,7 +29,7 @@ describe("web3-core brain stream", () => {
       expect(createWeb3StreamFn(config)).toBeUndefined();
     });
 
-    it("returns undefined when endpoint is empty", () => {
+    it("returns undefined when endpoint is empty and no lease is available", () => {
       const config = resolveConfig({
         brain: {
           enabled: true,
@@ -48,6 +53,31 @@ describe("web3-core brain stream", () => {
         },
       });
       expect(createWeb3StreamFn(config)).toBeUndefined();
+    });
+
+    it("returns a StreamFn when resources consumer is enabled with a lease", () => {
+      saveConsumerLeaseAccess({
+        leaseId: "lease-1",
+        resourceId: "m",
+        accessToken: "token-1",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        providerEndpoint: "https://provider.example.com",
+      });
+
+      const config = resolveConfig({
+        brain: {
+          enabled: true,
+          protocol: "openai-compat",
+          endpoint: "",
+          providerId: "test",
+          defaultModel: "m",
+        },
+        resources: {
+          enabled: true,
+          consumer: { enabled: true },
+        },
+      });
+      expect(createWeb3StreamFn(config)).toBeTypeOf("function");
     });
 
     it("returns a StreamFn when brain is enabled with valid openai-compat config", () => {

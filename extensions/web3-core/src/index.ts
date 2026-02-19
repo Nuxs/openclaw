@@ -33,6 +33,28 @@ import {
 } from "./identity/commands.js";
 import { createSiweChallengeHandler, createSiweVerifyHandler } from "./identity/gateway.js";
 import { createBrowserIngestHandler } from "./ingest/browser-handler.js";
+import {
+  createResourceModelChatHandler,
+  createResourceSearchQueryHandler,
+  createResourceStorageGetHandler,
+  createResourceStorageListHandler,
+  createResourceStoragePutHandler,
+} from "./resources/http.js";
+import { getConsumerLeaseAccess } from "./resources/leases.js";
+import {
+  createResourceLeaseHandler,
+  createResourceListHandler,
+  createResourcePublishHandler,
+  createResourceRevokeLeaseHandler,
+  createResourceStatusHandler,
+  createResourceUnpublishHandler,
+} from "./resources/registry.js";
+import {
+  createWeb3SearchTool,
+  createWeb3StorageGetTool,
+  createWeb3StorageListTool,
+  createWeb3StoragePutTool,
+} from "./resources/tools.js";
 import { Web3StateStore } from "./state/store.js";
 
 const plugin: OpenClawPluginDefinition = {
@@ -95,6 +117,10 @@ const plugin: OpenClawPluginDefinition = {
       (event) => {
         if (!brainStreamFn) return;
         if (event.provider !== config.brain.providerId) return;
+        if (config.resources.enabled && config.resources.consumer.enabled) {
+          const lease = getConsumerLeaseAccess(event.modelId);
+          if (!lease) return;
+        }
         return { streamFn: brainStreamFn };
       },
       { priority: 10 },
@@ -121,6 +147,33 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("web3.billing.summary", createBillingSummaryHandler(store, config));
     api.registerGatewayMethod("web3.status.summary", createWeb3StatusSummaryHandler(store, config));
 
+    api.registerGatewayMethod("web3.resources.publish", createResourcePublishHandler(config));
+    api.registerGatewayMethod("web3.resources.unpublish", createResourceUnpublishHandler(config));
+    api.registerGatewayMethod("web3.resources.list", createResourceListHandler(config));
+    api.registerGatewayMethod("web3.resources.lease", createResourceLeaseHandler(config));
+    api.registerGatewayMethod(
+      "web3.resources.revokeLease",
+      createResourceRevokeLeaseHandler(config),
+    );
+    api.registerGatewayMethod("web3.resources.status", createResourceStatusHandler(config));
+
+    const web3SearchTool = createWeb3SearchTool(config);
+    if (web3SearchTool) {
+      api.registerTool(web3SearchTool);
+    }
+    const web3StoragePutTool = createWeb3StoragePutTool(config);
+    if (web3StoragePutTool) {
+      api.registerTool(web3StoragePutTool);
+    }
+    const web3StorageGetTool = createWeb3StorageGetTool(config);
+    if (web3StorageGetTool) {
+      api.registerTool(web3StorageGetTool);
+    }
+    const web3StorageListTool = createWeb3StorageListTool(config);
+    if (web3StorageListTool) {
+      api.registerTool(web3StorageListTool);
+    }
+
     // ---- Browser ingest HTTP route ----
     if (config.browserIngest.enabled) {
       registerPluginHttpRoute({
@@ -130,6 +183,52 @@ const plugin: OpenClawPluginDefinition = {
         handler: createBrowserIngestHandler(store, config),
       });
       api.logger.info(`Web3 browser ingest enabled at ${config.browserIngest.ingestPath}`);
+    }
+
+    // ---- Resource provider HTTP routes ----
+    if (config.resources.enabled && config.resources.provider.listen.enabled) {
+      const modelHandler = createResourceModelChatHandler(config);
+      const searchHandler = createResourceSearchQueryHandler(config);
+      const storagePutHandler = createResourceStoragePutHandler(config);
+      const storageGetHandler = createResourceStorageGetHandler(config);
+      const storageListHandler = createResourceStorageListHandler(config);
+      registerPluginHttpRoute({
+        path: "/web3/resources/model/chat",
+        pluginId: plugin.id,
+        source: "web3-resources-model",
+        handler: modelHandler,
+      });
+      registerPluginHttpRoute({
+        path: "/v1/chat/completions",
+        pluginId: plugin.id,
+        source: "web3-resources-model",
+        handler: modelHandler,
+      });
+      registerPluginHttpRoute({
+        path: "/web3/resources/search/query",
+        pluginId: plugin.id,
+        source: "web3-resources-search",
+        handler: searchHandler,
+      });
+      registerPluginHttpRoute({
+        path: "/web3/resources/storage/put",
+        pluginId: plugin.id,
+        source: "web3-resources-storage",
+        handler: storagePutHandler,
+      });
+      registerPluginHttpRoute({
+        path: "/web3/resources/storage/get",
+        pluginId: plugin.id,
+        source: "web3-resources-storage",
+        handler: storageGetHandler,
+      });
+      registerPluginHttpRoute({
+        path: "/web3/resources/storage/list",
+        pluginId: plugin.id,
+        source: "web3-resources-storage",
+        handler: storageListHandler,
+      });
+      api.logger.info("Web3 resource provider routes enabled");
     }
 
     // ---- Background service: anchor retry & archive flush ----
