@@ -35,6 +35,19 @@ type Web3StatusSummary = {
   anchorLastTx: string | null;
   pendingAnchors: number;
   anchoringEnabled: boolean;
+  brain?: {
+    source: "web3/decentralized" | "centralized" | null;
+    provider: string | null;
+    model: string | null;
+    availability: "ok" | "degraded" | "unavailable" | null;
+  };
+  billing?: {
+    status: "active" | "exhausted" | "unbound";
+    credits: number;
+  };
+  settlement?: {
+    pending: number;
+  };
 };
 
 function normalizeWeb3Summary(input: unknown): Web3StatusSummary | null {

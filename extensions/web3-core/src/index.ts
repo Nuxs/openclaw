@@ -22,6 +22,9 @@ import {
   createBillingLlmUsageHook,
   resolveSessionHash,
 } from "./billing/guard.js";
+import { flushPendingSettlements } from "./billing/settlement.js";
+import { resolveBrainModelOverride } from "./brain/resolve.js";
+import { createWeb3StreamFn } from "./brain/stream.js";
 import { resolveConfig } from "./config.js";
 import {
   createBindWalletCommand,
@@ -65,13 +68,14 @@ const plugin: OpenClawPluginDefinition = {
     api.registerCommand({
       name: "credits",
       description: "Check your usage credits and quota",
-      handler: createCreditsCommand(store),
+      handler: createCreditsCommand(store, config),
     });
     api.registerCommand({
       name: "pay_status",
       description: "Check payment and billing status",
       handler: createPayStatusCommand(store, {
         stateDir,
+        config,
         marketConfig: api.config.plugins?.entries?.["market-core"]?.config as
           | Record<string, unknown>
           | undefined,
@@ -82,6 +86,19 @@ const plugin: OpenClawPluginDefinition = {
       description: "Show recent audit anchoring events",
       handler: createAuditStatusCommand(store),
     });
+
+    // ---- Hooks: Brain selection ----
+    const brainStreamFn = createWeb3StreamFn(config);
+    api.on("before_model_resolve", () => resolveBrainModelOverride(config), { priority: 10 });
+    api.on(
+      "resolve_stream_fn",
+      (event) => {
+        if (!brainStreamFn) return;
+        if (event.provider !== config.brain.providerId) return;
+        return { streamFn: brainStreamFn };
+      },
+      { priority: 10 },
+    );
 
     // ---- Hooks: Audit trail ----
     const auditHooks = createAuditHooks(store, config);
@@ -132,6 +149,12 @@ const plugin: OpenClawPluginDefinition = {
             await flushPendingAnchors(store, config);
           } catch (err) {
             ctx.logger.warn(`Anchor retry error: ${err}`);
+          }
+
+          try {
+            await flushPendingSettlements(store, config);
+          } catch (err) {
+            ctx.logger.warn(`Settlement retry error: ${err}`);
           }
         }, 60_000); // every 60s
 
@@ -199,6 +222,44 @@ function createBillingSummaryHandler(
   };
 }
 
+function resolveBrainAvailability(config: import("./config.js").Web3PluginConfig) {
+  const brain = config.brain;
+  if (!brain.enabled) return null;
+  if (!brain.providerId || !brain.defaultModel) return "degraded";
+  if (brain.allowlist.length > 0 && !brain.allowlist.includes(brain.defaultModel))
+    return "degraded";
+  if (brain.protocol !== "openai-compat") return "degraded";
+  if (!brain.endpoint?.trim()) return "unavailable";
+  return "ok";
+}
+
+function resolveBillingSummary(
+  store: Web3StateStore,
+  config: import("./config.js").Web3PluginConfig,
+) {
+  if (!config.billing.enabled) {
+    return { status: "unbound", credits: 0 } as const;
+  }
+  const records = store.listUsageRecords();
+  const latest = records.reduce(
+    (acc, entry) => {
+      if (!acc) return entry;
+      const accTs = Date.parse(acc.lastActivity);
+      const entryTs = Date.parse(entry.lastActivity);
+      if (Number.isNaN(entryTs)) return acc;
+      if (Number.isNaN(accTs)) return entry;
+      return entryTs >= accTs ? entry : acc;
+    },
+    undefined as undefined | (typeof records)[number],
+  );
+
+  const remaining = latest
+    ? Math.max(0, latest.creditsQuota - latest.creditsUsed)
+    : Math.max(0, config.billing.quotaPerSession);
+  const status = remaining <= 0 ? "exhausted" : "active";
+  return { status, credits: remaining } as const;
+}
+
 function createWeb3StatusSummaryHandler(
   store: Web3StateStore,
   config: import("./config.js").Web3PluginConfig,
@@ -219,6 +280,11 @@ function createWeb3StatusSummaryHandler(
       return !Number.isNaN(ts) && ts >= cutoffMs;
     }).length;
 
+    const brainEnabled = config.brain.enabled;
+    const brainSource = brainEnabled ? "web3/decentralized" : "centralized";
+    const brainAvailability = resolveBrainAvailability(config);
+    const billingSummary = resolveBillingSummary(store, config);
+
     respond(true, {
       auditEventsRecent: recentCount,
       auditLastAt: lastEvent?.timestamp ?? null,
@@ -233,6 +299,19 @@ function createWeb3StatusSummaryHandler(
       anchorLastTx: anchorReceipt?.tx ?? lastAnchored?.chainRef?.tx ?? null,
       pendingAnchors: pending.length,
       anchoringEnabled: Boolean(config.chain.privateKey),
+      brain: {
+        source: brainSource,
+        provider: brainEnabled ? config.brain.providerId : null,
+        model: brainEnabled ? config.brain.defaultModel : null,
+        availability: brainAvailability,
+      },
+      billing: {
+        status: billingSummary.status,
+        credits: billingSummary.credits,
+      },
+      settlement: {
+        pending: store.getPendingSettlements().length,
+      },
     });
   };
 }

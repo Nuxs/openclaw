@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { resolveConfig } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
 import { createPayStatusCommand } from "./commands.js";
 
@@ -52,6 +53,7 @@ describe("/pay_status command", () => {
 
     const handler = createPayStatusCommand(new Web3StateStore(tempDir), {
       stateDir: tempDir,
+      config: resolveConfig({}),
       marketConfig: { store: { mode: "file" } },
     });
 
@@ -65,11 +67,14 @@ describe("/pay_status command", () => {
 
     expect(result.text).toContain("settlement_locked");
     expect(result.text).toContain("order-1");
+    expect(result.text).toContain("Brain source:");
+    expect(result.text).toContain("Pending settlements:");
   });
 
   it("prints usage when no args are provided", async () => {
     const handler = createPayStatusCommand(new Web3StateStore(tempDir), {
       stateDir: tempDir,
+      config: resolveConfig({}),
       marketConfig: { store: { mode: "file" } },
     });
 

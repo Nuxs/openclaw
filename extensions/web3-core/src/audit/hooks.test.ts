@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveConfig } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
+import { hashString } from "./canonicalize.js";
 import { createAuditHooks } from "./hooks.js";
 
 vi.mock("../storage/adapter.js", () => ({
@@ -50,5 +51,23 @@ describe("audit hooks", () => {
 
     expect(store.getPendingArchives()).toHaveLength(1);
     expect(store.getPendingTxs()).toHaveLength(1);
+  });
+
+  it("queues pending settlements when billing is enabled", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "openclaw-web3-audit-"));
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({
+      billing: { enabled: true, quotaPerSession: 10, costPerToolCall: 1, costPerLlmCall: 1 },
+    });
+
+    const hooks = createAuditHooks(store, config);
+    await hooks.onSessionEnd(
+      { messageCount: 2, durationMs: 100 } as any,
+      { sessionKey: "session-2" } as any,
+    );
+
+    const pending = store.getPendingSettlements();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.sessionIdHash).toBe(hashString("session-2"));
   });
 });

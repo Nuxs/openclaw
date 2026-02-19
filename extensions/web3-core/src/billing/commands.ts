@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { PluginCommandHandler } from "openclaw/plugin-sdk";
 import { hashString } from "../audit/canonicalize.js";
+import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 
 type MarketStoreMode = "sqlite" | "file";
@@ -37,10 +38,14 @@ type OrderSnapshot = {
 
 type PayStatusDeps = {
   stateDir: string;
+  config: Web3PluginConfig;
   marketConfig?: Record<string, unknown>;
 };
 
-export function createCreditsCommand(store: Web3StateStore): PluginCommandHandler {
+export function createCreditsCommand(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+): PluginCommandHandler {
   return async (ctx) => {
     const sessionHash = resolveSessionHash({
       senderId: ctx.senderId,
@@ -57,6 +62,7 @@ export function createCreditsCommand(store: Web3StateStore): PluginCommandHandle
         `LLM calls: ${usage.llmCalls}`,
         `Tool calls: ${usage.toolCalls}`,
         `Last activity: ${usage.lastActivity}`,
+        `Brain source: ${resolveBrainSource(config)}`,
       ].join("\n"),
     };
   };
@@ -162,15 +168,23 @@ function readMarketSettlementStatus(
   return readFromSqliteStore(storeConfig, stateDir, ids);
 }
 
+function resolveBrainSource(config: Web3PluginConfig): string {
+  return config.brain.enabled ? "web3/decentralized" : "centralized";
+}
+
 function formatPayStatus(snapshot: {
   settlement: SettlementSnapshot;
   order?: OrderSnapshot;
+  brainSource: string;
+  pendingCount: number;
 }): string {
-  const { settlement, order } = snapshot;
+  const { settlement, order, brainSource, pendingCount } = snapshot;
   const lines = [
     `Settlement status: ${settlement.status ?? "unknown"}`,
     `Order: ${settlement.orderId}${order?.status ? ` (${order.status})` : ""}`,
     `Settlement: ${settlement.settlementId}`,
+    `Brain source: ${brainSource}`,
+    `Pending settlements: ${pendingCount}`,
   ];
   if (settlement.amount) lines.push(`Amount: ${settlement.amount}`);
   if (settlement.lockTxHash) lines.push(`Lock tx: ${settlement.lockTxHash}`);
@@ -180,7 +194,7 @@ function formatPayStatus(snapshot: {
 }
 
 export function createPayStatusCommand(
-  _store: Web3StateStore,
+  store: Web3StateStore,
   deps: PayStatusDeps,
 ): PluginCommandHandler {
   return async (ctx) => {
@@ -209,6 +223,13 @@ export function createPayStatusCommand(
       return { text: `No settlement found for ${ref}.` };
     }
 
-    return { text: formatPayStatus({ settlement, order }) };
+    return {
+      text: formatPayStatus({
+        settlement,
+        order,
+        brainSource: resolveBrainSource(deps.config),
+        pendingCount: store.getPendingSettlements().length,
+      }),
+    };
   };
 }

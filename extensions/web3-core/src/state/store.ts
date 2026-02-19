@@ -3,10 +3,11 @@
  * All plugin state is stored under `stateDir` (typically ~/.openclaw).
  *
  * Files:
- *   web3/bindings.json   — wallet bindings
- *   web3/audit-log.jsonl — local audit event log (append-only)
- *   web3/usage.json      — billing / quota state
- *   web3/pending-tx.json — pending chain transactions (retry queue)
+ *   web3/bindings.json           — wallet bindings
+ *   web3/audit-log.jsonl         — local audit event log (append-only)
+ *   web3/usage.json              — billing / quota state
+ *   web3/pending-settlements.json — settlement retry queue
+ *   web3/pending-tx.json         — pending chain transactions (retry queue)
  */
 
 import { randomBytes } from "node:crypto";
@@ -27,6 +28,17 @@ export type PendingAnchor = {
 export type PendingArchive = {
   event: AuditEvent;
   createdAt: string;
+  attempts?: number;
+  lastError?: string;
+};
+
+export type PendingSettlement = {
+  sessionIdHash: string;
+  createdAt: string;
+  orderId?: string;
+  payer?: string;
+  amount?: string;
+  actorId?: string;
   attempts?: number;
   lastError?: string;
 };
@@ -201,6 +213,45 @@ export class Web3StateStore {
     }
     map[record.sessionIdHash] = record;
     writeFileSync(this.usagePath, JSON.stringify(map, null, 2));
+  }
+
+  listUsageRecords(): UsageRecord[] {
+    if (!existsSync(this.usagePath)) return [];
+    const map = JSON.parse(readFileSync(this.usagePath, "utf-8")) as Record<string, UsageRecord>;
+    return Object.values(map);
+  }
+
+  // ---- Pending settlements (retry queue) ----
+
+  private get pendingSettlementsPath() {
+    return join(this.dir, "pending-settlements.json");
+  }
+
+  getPendingSettlements(): PendingSettlement[] {
+    if (!existsSync(this.pendingSettlementsPath)) return [];
+    return JSON.parse(readFileSync(this.pendingSettlementsPath, "utf-8"));
+  }
+
+  savePendingSettlements(items: PendingSettlement[]): void {
+    writeFileSync(this.pendingSettlementsPath, JSON.stringify(items, null, 2));
+  }
+
+  upsertPendingSettlement(item: PendingSettlement): void {
+    const list = this.getPendingSettlements();
+    const index = list.findIndex((entry) => entry.sessionIdHash === item.sessionIdHash);
+    if (index >= 0) {
+      list[index] = item;
+    } else {
+      list.push(item);
+    }
+    this.savePendingSettlements(list);
+  }
+
+  removePendingSettlement(sessionIdHash: string): void {
+    const list = this.getPendingSettlements().filter(
+      (entry) => entry.sessionIdHash !== sessionIdHash,
+    );
+    this.savePendingSettlements(list);
   }
 
   // ---- Pending archives (retry queue) ----

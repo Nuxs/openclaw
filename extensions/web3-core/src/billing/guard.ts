@@ -25,6 +25,13 @@ export function createBillingGuard(store: Web3StateStore, config: Web3PluginConf
     const sessionHash = resolveSessionHash({ sessionKey: ctx.sessionKey });
     const usage = getOrCreateUsage(store, sessionHash, config);
 
+    if (config.brain.enabled && usage.creditsQuota <= 0) {
+      return {
+        block: true,
+        blockReason: "Billing quota is not configured for Web3 brain sessions.",
+      };
+    }
+
     if (usage.creditsUsed >= usage.creditsQuota) {
       return {
         block: true,

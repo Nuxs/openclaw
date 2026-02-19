@@ -77,4 +77,23 @@ describe("web3-core billing", () => {
     expect(preferred?.llmCalls).toBe(1);
     expect(fallback).toBeUndefined();
   });
+
+  it("blocks tool calls when brain is enabled but quota is zero", () => {
+    const store = createTestStore();
+    const config = resolveConfig({
+      billing: { enabled: true, quotaPerSession: 0, costPerToolCall: 1, costPerLlmCall: 1 },
+      brain: { enabled: true },
+    });
+
+    const guard = createBillingGuard(store, config);
+    const result = guard(
+      {} as PluginHookBeforeToolCallEvent,
+      {
+        sessionKey: "session-brain",
+      } as PluginHookToolContext,
+    );
+
+    expect(result?.block).toBe(true);
+    expect(result?.blockReason).toContain("Billing quota is not configured");
+  });
 });

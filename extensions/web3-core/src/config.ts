@@ -72,6 +72,23 @@ export type BillingConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Web3 decentralized brain
+// ---------------------------------------------------------------------------
+
+export type BrainProtocol = "openai-compat" | "custom-ws" | "p2p";
+
+export type BrainConfig = {
+  enabled: boolean;
+  providerId: string;
+  defaultModel: string;
+  allowlist: string[];
+  endpoint?: string;
+  protocol: BrainProtocol;
+  fallback: "centralized";
+  timeoutMs: number;
+};
+
+// ---------------------------------------------------------------------------
 // Browser ingest (extension -> Gateway)
 // ---------------------------------------------------------------------------
 
@@ -93,6 +110,7 @@ export type Web3PluginConfig = {
   privacy: PrivacyConfig;
   identity: IdentityConfig;
   billing: BillingConfig;
+  brain: BrainConfig;
   browserIngest: BrowserIngestConfig;
 };
 
@@ -129,6 +147,15 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
     costPerLlmCall: 1,
     costPerToolCall: 0.5,
   },
+  brain: {
+    enabled: false,
+    providerId: "web3-decentralized",
+    defaultModel: "",
+    allowlist: [],
+    protocol: "openai-compat",
+    fallback: "centralized",
+    timeoutMs: 30_000,
+  },
   browserIngest: {
     enabled: false,
     ingestPath: "/plugins/web3-core/ingest",
@@ -150,6 +177,7 @@ export function resolveConfig(raw?: Record<string, unknown>): Web3PluginConfig {
     privacy: merge(DEFAULT_CONFIG.privacy, raw.privacy),
     identity: merge(DEFAULT_CONFIG.identity, raw.identity),
     billing: merge(DEFAULT_CONFIG.billing, raw.billing),
+    brain: merge(DEFAULT_CONFIG.brain, raw.brain),
     browserIngest: merge(DEFAULT_CONFIG.browserIngest, raw.browserIngest),
   };
 }

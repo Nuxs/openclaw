@@ -35,6 +35,26 @@ function resolveSessionIdentity(input: { sessionKey?: string; sessionId?: string
   return input.sessionKey ?? input.sessionId;
 }
 
+function queuePendingSettlement(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+  sessionId: string | undefined,
+) {
+  if (!config.billing.enabled) {
+    return;
+  }
+  const sessionIdHash = hashString(sessionId ?? "unknown");
+  const existing = store
+    .getPendingSettlements()
+    .find((entry) => entry.sessionIdHash === sessionIdHash);
+  store.upsertPendingSettlement({
+    sessionIdHash,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    attempts: existing?.attempts,
+    lastError: existing?.lastError,
+  });
+}
+
 function buildEvent(
   kind: AuditEventKind,
   sessionId: string | undefined,
@@ -284,9 +304,10 @@ export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig
   };
 
   const onSessionEnd = async (event: PluginHookSessionEndEvent, ctx: PluginHookSessionContext) => {
+    const sessionIdentity = resolveSessionIdentity(ctx);
     await handleAuditEvent(
       "session_end",
-      resolveSessionIdentity(ctx),
+      sessionIdentity,
       {
         messageCount: event.messageCount,
         durationMs: event.durationMs,
@@ -294,6 +315,7 @@ export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig
       store,
       config,
     );
+    queuePendingSettlement(store, config, sessionIdentity);
   };
 
   return { onLlmInput, onLlmOutput, onAfterToolCall, onSessionEnd };
