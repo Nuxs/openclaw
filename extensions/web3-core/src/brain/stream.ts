@@ -20,16 +20,9 @@ function resolveTimeoutSignal(timeoutMs: number, existing?: AbortSignal): AbortS
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     return undefined;
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  controller.signal.addEventListener(
-    "abort",
-    () => {
-      clearTimeout(timer);
-    },
-    { once: true },
-  );
-  return controller.signal;
+  // Use built-in AbortSignal.timeout to avoid timer leaks —
+  // the runtime cleans up the internal timer when the signal is GC'd.
+  return AbortSignal.timeout(timeoutMs);
 }
 
 export function createWeb3StreamFn(config: Web3PluginConfig): StreamFn | undefined {
