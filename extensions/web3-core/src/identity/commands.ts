@@ -3,20 +3,28 @@
  */
 
 import type { PluginCommandHandler } from "openclaw/plugin-sdk";
+import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 
-export function createBindWalletCommand(store: Web3StateStore): PluginCommandHandler {
+export function createBindWalletCommand(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+): PluginCommandHandler {
   return async (ctx) => {
     const address = ctx.args?.trim();
     if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
       return { text: "Usage: /bind_wallet 0xYourAddress\nProvide a valid EVM address." };
     }
-    store.addBinding({
-      address,
-      chainId: 8453, // Base mainnet
-      verifiedAt: new Date().toISOString(),
-    });
-    return { text: `Wallet bound: ${address}\nUse SIWE to verify ownership (coming soon).` };
+
+    if (!config.identity.allowSiwe) {
+      return {
+        text: "SIWE is disabled. Enable identity.allowSiwe and bind via web3.siwe.challenge + web3.siwe.verify.",
+      };
+    }
+
+    return {
+      text: "Direct binding is disabled for security. Use web3.siwe.challenge + web3.siwe.verify to bind ownership.",
+    };
   };
 }
 

@@ -98,8 +98,7 @@
   },
   "settlement": {
     "mode": "contract",
-    "tokenAddress": "0xTOKEN_ADDRESS",
-    "treasuryAddress": "0xTREASURY_ADDRESS"
+    "tokenAddress": "0xTOKEN_ADDRESS"
   },
   "revocation": {
     "mode": "webhook",

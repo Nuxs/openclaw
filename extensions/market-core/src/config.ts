@@ -16,7 +16,6 @@ export type SettlementMode = "contract" | "anchor_only";
 export type SettlementConfig = {
   mode: SettlementMode;
   tokenAddress?: string;
-  treasuryAddress?: string;
 };
 
 export type RevocationMode = "none" | "webhook";

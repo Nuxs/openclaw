@@ -160,7 +160,7 @@ State lives under the Gateway state directory in `web3/`:
 
 ### Commands
 
-- **`/bind_wallet <0x...>`**: add wallet binding
+- **`/bind_wallet <0x...>`**: validate address input and guide SIWE verification
 - **`/unbind_wallet <0x...>`**: remove wallet binding
 - **`/whoami_web3`**: list bindings
 - **`/credits`**: session credits and usage
@@ -297,7 +297,7 @@ Suggested client behavior:
 
 - **No signer key**: anchoring is queued into `pending-tx.json`.
 - **IPFS uploads**: require `storage.pinataJwt`.
-- **SIWE nonce store**: in memory and resets on Gateway restart.
+- **SIWE nonce store**: persisted on disk under the Gateway state directory (siwe-challenges.json).
 
 ## Related docs
 

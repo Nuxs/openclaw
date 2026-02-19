@@ -8,6 +8,12 @@ describe("canonicalize", () => {
     expect(a).toBe(b);
   });
 
+  it("should sort nested objects deterministically", () => {
+    const hash1 = hashPayload({ meta: { b: 2, a: 1 }, name: "test" });
+    const hash2 = hashPayload({ name: "test", meta: { a: 1, b: 2 } });
+    expect(hash1).toBe(hash2);
+  });
+
   it("should redact sensitive fields", () => {
     const withSecret = hashPayload({ name: "test", apiKey: "sk-123" });
     const withRedacted = hashPayload({ name: "test", apiKey: "[REDACTED]" });

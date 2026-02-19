@@ -134,7 +134,7 @@ Hook: llm_output
 ```
 web3/
 ├── bindings.json           # 钱包绑定列表
-├── siwe-challenges.json    # SIWE 挑战缓存 (nonce → challenge)
+├── siwe-challenges.json    # SIWE 挑战缓存 (持久化到 state 目录)
 ├── audit-log.jsonl         # 审计事件日志 (追加模式)
 ├── usage.json              # 配额记录 (sessionIdHash → UsageRecord)
 ├── pending-archive.json    # 待归档队列 (重试)
@@ -150,14 +150,14 @@ web3/
 
 ### 命令 (Commands)
 
-| 命令             | 描述              | 用法                      |
-| ---------------- | ----------------- | ------------------------- |
-| `/bind_wallet`   | 绑定 EVM 钱包地址 | `/bind_wallet 0x123...`   |
-| `/unbind_wallet` | 解绑钱包地址      | `/unbind_wallet 0x123...` |
-| `/whoami_web3`   | 查看已绑定钱包    | `/whoami_web3`            |
-| `/credits`       | 查看配额余额      | `/credits`                |
-| `/pay_status`    | 查看支付状态      | `/pay_status`             |
-| `/audit_status`  | 查看最近审计事件  | `/audit_status`           |
+| 命令             | 描述                     | 用法                      |
+| ---------------- | ------------------------ | ------------------------- |
+| `/bind_wallet`   | 校验地址并引导 SIWE 绑定 | `/bind_wallet 0x123...`   |
+| `/unbind_wallet` | 解绑钱包地址             | `/unbind_wallet 0x123...` |
+| `/whoami_web3`   | 查看已绑定钱包           | `/whoami_web3`            |
+| `/credits`       | 查看配额余额             | `/credits`                |
+| `/pay_status`    | 查看支付状态             | `/pay_status`             |
+| `/audit_status`  | 查看最近审计事件         | `/audit_status`           |
 
 ### Hooks (生命周期钩子)
 

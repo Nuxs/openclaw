@@ -9,6 +9,7 @@ import {
   createDeliveryIssueHandler,
   createOfferCreateHandler,
   createOfferPublishHandler,
+  createSettlementLockHandler,
   createSettlementStatusHandler,
 } from "./handlers.js";
 import type { Offer, Order } from "./types.js";
@@ -38,9 +39,9 @@ function createClient(scopes = ["operator.write"]) {
     connect: {
       client: {
         id: "test-client",
-        role: "operator",
-        scopes,
       },
+      role: "operator",
+      scopes,
     },
   };
 }
@@ -314,5 +315,39 @@ describe("market-core handlers", () => {
     expect(result()?.payload.settlementId).toBe("settlement-1");
     expect(result()?.payload.status).toBe("settlement_locked");
     expect(result()?.payload.lockTxHash).toBe("0xlock");
+  });
+
+  it("does not mutate order when settlement already exists", async () => {
+    const config = resolveConfig({
+      store: { mode: "file" },
+      access: { mode: "open" },
+      settlement: { mode: "anchor_only" },
+    });
+    const store = new MarketStateStore(tempDir, config);
+
+    const offer = createOffer({ status: "offer_published" });
+    const order = createOrder({ status: "order_created", offerId: offer.offerId });
+    store.saveOffer(offer);
+    store.saveOrder(order);
+    store.saveSettlement({
+      settlementId: "settlement-1",
+      orderId: order.orderId,
+      status: "settlement_locked",
+      amount: "10",
+      lockTxHash: "0xlock",
+    });
+
+    const handler = createSettlementLockHandler(store, config);
+    const { respond, result } = createResponder();
+
+    await handler({
+      params: { orderId: order.orderId, amount: "10", payer: order.buyerId },
+      respond,
+      client: createClient(),
+    } as any);
+
+    expect(result()?.ok).toBe(false);
+    const updated = store.getOrder(order.orderId);
+    expect(updated?.status).toBe("order_created");
   });
 });

@@ -44,7 +44,7 @@ console.log("━".repeat(60));
 
 const config = resolveConfig({
   chain: { network: "base" },
-  settlement: { mode: "contract", tokenAddress: "0xToken", treasuryAddress: "0xTreasury" },
+  settlement: { mode: "contract", tokenAddress: "0xToken" },
   store: { mode: "sqlite" },
   access: { mode: "open" },
   credentials: { mode: "inline" },

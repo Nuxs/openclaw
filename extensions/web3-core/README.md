@@ -33,7 +33,7 @@ cat ARCHITECTURE.md
 
 ### 命令
 
-- `/bind_wallet` - 绑定 EVM 钱包
+- `/bind_wallet` - 校验地址并引导 SIWE 绑定
 - `/unbind_wallet` - 解绑钱包
 - `/whoami_web3` - 查看身份
 - `/credits` - 查看配额

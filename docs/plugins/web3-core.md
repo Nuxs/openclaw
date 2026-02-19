@@ -89,11 +89,11 @@ Notes:
 
 ## Commands
 
-- **`/bind_wallet`**: Bind a wallet address to the identity.
+- **`/bind_wallet`**: Validate address input and direct users to SIWE verification.
 - **`/unbind_wallet`**: Remove a bound wallet address.
 - **`/whoami_web3`**: Show bound wallets and identity summary.
 - **`/credits`**: Show usage credits and quota.
-- **`/pay_status`**: Show payment status (placeholder).
+- **`/pay_status`**: Query settlement status from market state (orderId or settlementId).
 - **`/audit_status`**: Show recent audit anchoring events.
 
 ## Hooks
@@ -150,9 +150,10 @@ Example (RPC payloads are illustrative):
 
 Expected signals:
 
-- **Audit**: `events` list grows as LLM/tool/session hooks fire.
+- **Audit**: `auditEventsRecent` increases and `auditLastAt` advances as hooks fire.
 - **Billing**: `usage` reflects LLM/tool cost increments.
 - **Anchoring**: `pendingAnchors` decreases after the background service retries.
+- **Archive**: `archiveLastCid` updates after successful archival.
 
 ## UI integration notes
 

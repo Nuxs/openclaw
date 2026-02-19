@@ -76,7 +76,7 @@ if (result.ok) {
 ### 命令行使用
 
 ```bash
-# 绑定钱包
+# 绑定钱包（命令仅引导 SIWE 验证）
 /bind_wallet 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
 
 # 查看身份
@@ -260,7 +260,7 @@ console.log("配额状态:", {
   "privacy": {
     "onChainData": "hash_only",
     "archiveEncryption": true,
-    "redactFields": ["apiKey", "token", "password", "secret"]
+    "redactFields": ["apiKey", "token", "password", "secret", "privateKey"]
   }
 }
 ```

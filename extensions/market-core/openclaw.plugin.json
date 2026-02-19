@@ -29,10 +29,6 @@
       "label": "Payment Token Address",
       "help": "ERC-20 token used for settlement"
     },
-    "settlement.treasuryAddress": {
-      "label": "Treasury Address",
-      "help": "Fallback receiver for settlement"
-    },
     "revocation.mode": {
       "label": "Revocation Mode",
       "help": "none (default) | webhook"
@@ -157,8 +153,7 @@
             "enum": ["contract", "anchor_only"],
             "default": "contract"
           },
-          "tokenAddress": { "type": "string" },
-          "treasuryAddress": { "type": "string" }
+          "tokenAddress": { "type": "string" }
         }
       },
       "revocation": {

@@ -546,6 +546,11 @@ export function createSettlementLockHandler(
       }
       assertOrderTransition(order.status, "payment_locked");
 
+      const existingSettlement = store.getSettlementByOrder(orderId);
+      if (existingSettlement && existingSettlement.status !== "settlement_refunded") {
+        throw new Error("settlement already exists for order");
+      }
+
       let txHash: string | undefined;
       if (config.settlement.mode === "contract") {
         const escrow = new EscrowAdapter(config.chain, config.settlement);
@@ -556,11 +561,6 @@ export function createSettlementLockHandler(
       order.updatedAt = nowIso();
       order.paymentTxHash = txHash;
       store.saveOrder(order);
-
-      const existingSettlement = store.getSettlementByOrder(orderId);
-      if (existingSettlement && existingSettlement.status !== "settlement_refunded") {
-        throw new Error("settlement already exists for order");
-      }
 
       const settlementId = existingSettlement?.settlementId ?? randomUUID();
       const settlement: Settlement = {

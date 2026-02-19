@@ -162,7 +162,7 @@
           "redactFields": {
             "type": "array",
             "items": { "type": "string" },
-            "default": ["apiKey", "token", "password", "secret"]
+            "default": ["apiKey", "token", "password", "secret", "privateKey"]
           }
         }
       },

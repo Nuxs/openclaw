@@ -23,9 +23,21 @@ function redact(obj: unknown, redactFields: Set<string>): unknown {
   return obj;
 }
 
-/** Produce a deterministic JSON string (sorted keys). */
+/** Produce a deterministic JSON string (sorted keys, deep). */
 function canonicalJson(obj: unknown): string {
-  return JSON.stringify(obj, Object.keys(obj as Record<string, unknown>).sort());
+  const normalize = (value: unknown): unknown => {
+    if (value === null || value === undefined) return value;
+    if (Array.isArray(value)) return value.map((item) => normalize(item));
+    if (typeof value === "object") {
+      const entries = Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, val]) => [key, normalize(val)] as const);
+      return Object.fromEntries(entries);
+    }
+    return value;
+  };
+
+  return JSON.stringify(normalize(obj));
 }
 
 /** Return a redacted payload for safe local/archival use. */

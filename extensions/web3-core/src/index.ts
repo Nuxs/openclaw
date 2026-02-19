@@ -49,7 +49,7 @@ const plugin: OpenClawPluginDefinition = {
       name: "bind_wallet",
       description: "Bind an EVM wallet address to your identity",
       acceptsArgs: true,
-      handler: createBindWalletCommand(store),
+      handler: createBindWalletCommand(store, config),
     });
     api.registerCommand({
       name: "unbind_wallet",
