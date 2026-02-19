@@ -29,6 +29,8 @@ type SearchOffer = Web3PluginConfig["resources"]["provider"]["offers"]["search"]
 
 type StorageOffer = Web3PluginConfig["resources"]["provider"]["offers"]["storage"][number];
 
+type ModelOffer = Web3PluginConfig["resources"]["provider"]["offers"]["models"][number];
+
 type SearchQuery = {
   q: string;
   limit?: number;
@@ -169,6 +171,14 @@ function parseSearchRequest(payload: unknown): SearchQuery {
   return { q, limit, site };
 }
 
+function resolveLedgerCost(quantity: string, priceAmount: number): string {
+  const qty = Number.parseFloat(quantity);
+  if (!Number.isFinite(qty) || !Number.isFinite(priceAmount)) {
+    return "0";
+  }
+  return String(Math.max(0, qty) * priceAmount);
+}
+
 async function appendSearchLedger(params: {
   config: Web3PluginConfig;
   lease: { leaseId: string; resourceId: string; providerActorId: string; consumerActorId: string };
@@ -177,9 +187,7 @@ async function appendSearchLedger(params: {
   try {
     const callGateway = await loadCallGateway();
     const quantity = "1";
-    const cost = Number.isFinite(params.offer.price.amount)
-      ? String(params.offer.price.amount)
-      : "0";
+    const cost = resolveLedgerCost(quantity, params.offer.price.amount);
     await callGateway({
       method: "market.ledger.append",
       params: {
@@ -332,9 +340,7 @@ async function appendStorageLedger(params: {
     const unit =
       params.offer.price.unit === "put" || params.offer.price.unit === "get" ? "call" : "byte";
     const quantity = unit === "call" ? "1" : String(Math.max(0, params.bytes));
-    const cost = Number.isFinite(params.offer.price.amount)
-      ? String(params.offer.price.amount)
-      : "0";
+    const cost = resolveLedgerCost(quantity, params.offer.price.amount);
     await callGateway({
       method: "market.ledger.append",
       params: {
@@ -355,6 +361,40 @@ async function appendStorageLedger(params: {
     });
   } catch {
     // ignore ledger failures
+  }
+}
+
+async function appendModelLedger(params: {
+  config: Web3PluginConfig;
+  lease: { leaseId: string; resourceId: string; providerActorId: string; consumerActorId: string };
+  offer: ModelOffer;
+  usageTokens?: number;
+}): Promise<void> {
+  try {
+    const callGateway = await loadCallGateway();
+    const quantity =
+      params.usageTokens && params.usageTokens > 0 ? String(params.usageTokens) : "1";
+    const cost = resolveLedgerCost(quantity, params.offer.price.amount);
+    await callGateway({
+      method: "market.ledger.append",
+      params: {
+        actorId: params.lease.providerActorId,
+        entry: {
+          leaseId: params.lease.leaseId,
+          resourceId: params.lease.resourceId,
+          kind: "model",
+          providerActorId: params.lease.providerActorId,
+          consumerActorId: params.lease.consumerActorId,
+          unit: "token",
+          quantity,
+          cost,
+          currency: params.offer.price.currency,
+        },
+      },
+      timeoutMs: params.config.brain.timeoutMs,
+    });
+  } catch {
+    // ignore ledger failures — fire-and-forget
   }
 }
 
@@ -433,10 +473,24 @@ export function createResourceModelChatHandler(config: Web3PluginConfig) {
 
     if (!upstream.body) {
       res.end();
+      // Fire-and-forget ledger append even for empty body
+      appendModelLedger({ config, lease: leaseResult.lease, offer }).catch(() => {});
       return;
     }
 
     await pipeline(Readable.fromWeb(upstream.body as any), res);
+
+    // Extract usage tokens from upstream response headers if available
+    const usageHeader = upstream.headers.get("x-usage-tokens");
+    const usageTokens = usageHeader ? Number.parseInt(usageHeader, 10) : undefined;
+
+    // Fire-and-forget: write Provider authority ledger after streaming completes
+    appendModelLedger({
+      config,
+      lease: leaseResult.lease,
+      offer,
+      usageTokens: Number.isFinite(usageTokens) ? usageTokens : undefined,
+    }).catch(() => {});
   };
 }
 

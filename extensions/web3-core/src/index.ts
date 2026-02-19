@@ -321,7 +321,8 @@ function createBillingSummaryHandler(
   };
 }
 
-function resolveBrainAvailability(config: import("./config.js").Web3PluginConfig) {
+/** @internal exported for testing */
+export function resolveBrainAvailability(config: import("./config.js").Web3PluginConfig) {
   const brain = config.brain;
   if (!brain.enabled) return null;
   if (!brain.providerId || !brain.defaultModel) return "degraded";
@@ -332,7 +333,8 @@ function resolveBrainAvailability(config: import("./config.js").Web3PluginConfig
   return "ok";
 }
 
-function resolveBillingSummary(
+/** @internal exported for testing */
+export function resolveBillingSummary(
   store: Web3StateStore,
   config: import("./config.js").Web3PluginConfig,
 ) {
@@ -359,7 +361,8 @@ function resolveBillingSummary(
   return { status, credits: remaining } as const;
 }
 
-function createWeb3StatusSummaryHandler(
+/** @internal exported for testing */
+export function createWeb3StatusSummaryHandler(
   store: Web3StateStore,
   config: import("./config.js").Web3PluginConfig,
 ): GatewayRequestHandler {

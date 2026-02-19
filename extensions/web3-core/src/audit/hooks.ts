@@ -39,17 +39,40 @@ function queuePendingSettlement(
   store: Web3StateStore,
   config: Web3PluginConfig,
   sessionId: string | undefined,
+  settlementContext?: {
+    orderId?: string;
+    payer?: string;
+    amount?: string;
+    actorId?: string;
+  },
 ) {
   if (!config.billing.enabled) {
     return;
   }
   const sessionIdHash = hashString(sessionId ?? "unknown");
+
+  // Resolve settlement fields from explicit context or usage records
+  const usage = store.getUsage(sessionIdHash);
+  const orderId = settlementContext?.orderId;
+  const payer = settlementContext?.payer ?? settlementContext?.actorId;
+
+  if (!orderId || !payer) {
+    return;
+  }
+
+  const amount = settlementContext?.amount ?? (usage ? String(usage.creditsUsed) : "0");
+  const actorId = settlementContext?.actorId ?? payer;
+
   const existing = store
     .getPendingSettlements()
     .find((entry) => entry.sessionIdHash === sessionIdHash);
   store.upsertPendingSettlement({
     sessionIdHash,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
+    orderId: orderId ?? existing?.orderId,
+    payer: payer ?? existing?.payer,
+    amount: amount ?? existing?.amount,
+    actorId: actorId ?? existing?.actorId,
     attempts: existing?.attempts,
     lastError: existing?.lastError,
   });
@@ -315,7 +338,12 @@ export function createAuditHooks(store: Web3StateStore, config: Web3PluginConfig
       store,
       config,
     );
-    queuePendingSettlement(store, config, sessionIdentity);
+    // Pass settlement context from event metadata (orderId/payer/amount
+    // are populated by billing guard or resource lease during the session)
+    const settlementCtx = (event as Record<string, unknown>).settlement as
+      | { orderId?: string; payer?: string; amount?: string; actorId?: string }
+      | undefined;
+    queuePendingSettlement(store, config, sessionIdentity, settlementCtx);
   };
 
   return { onLlmInput, onLlmOutput, onAfterToolCall, onSessionEnd };

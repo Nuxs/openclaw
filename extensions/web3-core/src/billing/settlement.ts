@@ -25,7 +25,8 @@ async function loadCallGateway(): Promise<CallGatewayFn> {
   return mod.callGateway as CallGatewayFn;
 }
 
-function isSettlementReady(entry: PendingSettlement): boolean {
+/** @internal exported for testing */
+export function isSettlementReady(entry: PendingSettlement): boolean {
   return Boolean(entry.orderId && entry.payer && entry.amount);
 }
 

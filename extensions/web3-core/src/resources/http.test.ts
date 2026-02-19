@@ -1,5 +1,5 @@
 import { PassThrough } from "node:stream";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { resolveConfig } from "../config.js";
 import {
   createResourceModelChatHandler,
@@ -15,13 +15,21 @@ vi.mock("./leases.js", () => ({
   validateLeaseAccess: (...args: unknown[]) => validateLeaseAccessMock(...args),
 }));
 
+const callGatewayMock = vi.fn().mockResolvedValue({ ok: true, result: {} });
+
 vi.mock("../../../src/gateway/call.js", () => ({
-  callGateway: vi.fn().mockResolvedValue({ ok: true, result: {} }),
+  callGateway: (...args: unknown[]) => callGatewayMock(...args),
+}));
+
+// Also mock the .ts variant used by loadCallGateway dynamic import
+vi.mock("../../../../src/gateway/call.ts", () => ({
+  callGateway: (...args: unknown[]) => callGatewayMock(...args),
 }));
 
 describe("web3 resource storage handlers", () => {
   beforeEach(() => {
     validateLeaseAccessMock.mockReset();
+    callGatewayMock.mockReset().mockResolvedValue({ ok: true, result: {} });
   });
 
   it("rejects storage put with path traversal", async () => {
@@ -409,3 +417,201 @@ function createResponse() {
   };
   return res as any;
 }
+
+describe("model chat ledger (appendModelLedger)", () => {
+  const modelOffer = {
+    id: "res_model_1",
+    label: "GPT-4",
+    backend: "openai-compat" as const,
+    backendConfig: {
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "test-key",
+    },
+    price: { unit: "token" as const, amount: 1, currency: "USDC" },
+  };
+
+  function makeModelConfig() {
+    return resolveConfig({
+      resources: {
+        enabled: true,
+        advertiseToMarket: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: {
+            models: [modelOffer],
+            search: [],
+            storage: [],
+          },
+        },
+        consumer: { enabled: false, preferLocalFirst: true },
+      },
+    });
+  }
+
+  const mockLease = {
+    leaseId: "lease-model-1",
+    resourceId: "res_model_1",
+    providerActorId: "0xprovider",
+    consumerActorId: "0xconsumer",
+    status: "lease_active",
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  };
+
+  function createWritableResponse() {
+    const pass = new PassThrough();
+    const chunks: Buffer[] = [];
+    pass.on("data", (chunk: Buffer) => chunks.push(chunk));
+    const res = pass as any;
+    res.statusCode = 200;
+    res.headers = new Map();
+    res.setHeader = (key: string, value: string) => res.headers.set(key, value);
+    res.getBody = () => Buffer.concat(chunks).toString();
+    return res;
+  }
+
+  beforeEach(() => {
+    validateLeaseAccessMock.mockReset();
+    callGatewayMock.mockReset().mockResolvedValue({ ok: true, result: {} });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("calls market.ledger.append with usage tokens from response header", async () => {
+    const config = makeModelConfig();
+    validateLeaseAccessMock.mockResolvedValue({ ok: true, lease: mockLease });
+
+    // Mock fetch: return response with x-usage-tokens header and a readable body
+    const body = JSON.stringify({ choices: [] });
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(body));
+        controller.close();
+      },
+    });
+    const mockFetchResponse = new Response(stream, {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "x-usage-tokens": "150",
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-model-1",
+        "content-type": "application/json",
+      },
+    });
+    const res = createWritableResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ messages: [{ role: "user", content: "hello" }] }));
+    await promise;
+
+    // Wait for fire-and-forget ledger append
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(res.statusCode).toBe(200);
+    expect(callGatewayMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "market.ledger.append",
+        params: expect.objectContaining({
+          actorId: "0xprovider",
+          entry: expect.objectContaining({
+            kind: "model",
+            unit: "token",
+            quantity: "150",
+            cost: "150",
+            leaseId: "lease-model-1",
+            resourceId: "res_model_1",
+            providerActorId: "0xprovider",
+            consumerActorId: "0xconsumer",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("uses fallback quantity '1' when x-usage-tokens header missing", async () => {
+    const config = makeModelConfig();
+    validateLeaseAccessMock.mockResolvedValue({ ok: true, lease: mockLease });
+
+    // Return response with no x-usage-tokens and null body → hits early return path
+    const mockFetchResponse = {
+      status: 200,
+      body: null,
+      headers: new Headers({ "content-type": "application/json" }),
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-model-1",
+        "content-type": "application/json",
+      },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ messages: [] }));
+    await promise;
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(callGatewayMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "market.ledger.append",
+        params: expect.objectContaining({
+          entry: expect.objectContaining({
+            kind: "model",
+            quantity: "1",
+            cost: "1",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("does not throw when ledger append fails (fire-and-forget)", async () => {
+    const config = makeModelConfig();
+    validateLeaseAccessMock.mockResolvedValue({ ok: true, lease: mockLease });
+    callGatewayMock.mockRejectedValue(new Error("ledger unavailable"));
+
+    const mockFetchResponse = {
+      status: 200,
+      body: null,
+      headers: new Headers({ "content-type": "application/json" }),
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-model-1",
+        "content-type": "application/json",
+      },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ messages: [] }));
+    await promise;
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Handler should still have returned 200 despite ledger failure
+    expect(res.statusCode).toBe(200);
+  });
+});

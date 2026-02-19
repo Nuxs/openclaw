@@ -62,12 +62,35 @@ describe("audit hooks", () => {
 
     const hooks = createAuditHooks(store, config);
     await hooks.onSessionEnd(
-      { messageCount: 2, durationMs: 100 } as any,
+      {
+        messageCount: 2,
+        durationMs: 100,
+        settlement: { orderId: "order-2", payer: "0xpayer", amount: "5" },
+      } as any,
       { sessionKey: "session-2" } as any,
     );
 
     const pending = store.getPendingSettlements();
     expect(pending).toHaveLength(1);
     expect(pending[0]?.sessionIdHash).toBe(hashString("session-2"));
+    expect(pending[0]?.orderId).toBe("order-2");
+    expect(pending[0]?.payer).toBe("0xpayer");
+    expect(pending[0]?.amount).toBe("5");
+  });
+
+  it("skips pending settlement when required fields are missing", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "openclaw-web3-audit-"));
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({
+      billing: { enabled: true, quotaPerSession: 10, costPerToolCall: 1, costPerLlmCall: 1 },
+    });
+
+    const hooks = createAuditHooks(store, config);
+    await hooks.onSessionEnd(
+      { messageCount: 1, durationMs: 10, settlement: { amount: "2" } } as any,
+      { sessionKey: "session-3" } as any,
+    );
+
+    expect(store.getPendingSettlements()).toHaveLength(0);
   });
 });

@@ -558,6 +558,12 @@ export type PluginHookSessionEndEvent = {
   sessionId: string;
   messageCount: number;
   durationMs?: number;
+  settlement?: {
+    orderId?: string;
+    payer?: string;
+    amount?: string;
+    actorId?: string;
+  };
 };
 
 // Gateway context
