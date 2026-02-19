@@ -9,7 +9,7 @@ type CallGatewayFn = (opts: {
 
 async function loadCallGateway(): Promise<CallGatewayFn> {
   try {
-    const mod = await import("../../../src/gateway/call.js");
+    const mod = await import("../../../../src/gateway/call.ts");
     if (typeof mod.callGateway === "function") {
       return mod.callGateway as CallGatewayFn;
     }
@@ -17,7 +17,8 @@ async function loadCallGateway(): Promise<CallGatewayFn> {
     // ignore
   }
 
-  const mod = await import("../../../dist/gateway/call.js");
+  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
+  const mod = await import("../../../../dist/gateway/call.js");
   if (typeof mod.callGateway !== "function") {
     throw new Error("callGateway is not available");
   }

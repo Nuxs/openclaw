@@ -72,6 +72,8 @@ export type {
   PluginCommandResult,
   PluginHookAfterToolCallEvent,
   PluginHookAgentContext,
+  PluginHookBeforeModelResolveEvent,
+  PluginHookBeforeModelResolveResult,
   PluginHookBeforeToolCallEvent,
   PluginHookBeforeToolCallResult,
   PluginHookLlmInputEvent,
