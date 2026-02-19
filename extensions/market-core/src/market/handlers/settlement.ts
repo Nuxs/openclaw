@@ -57,7 +57,6 @@ export function createSettlementLockHandler(
       order.status = "payment_locked";
       order.updatedAt = nowIso();
       order.paymentTxHash = txHash;
-      store.saveOrder(order);
 
       const settlementId = existingSettlement?.settlementId ?? randomUUID();
       const settlement: Settlement = {
@@ -69,7 +68,11 @@ export function createSettlementLockHandler(
         lockedAt: nowIso(),
         lockTxHash: txHash,
       };
-      store.saveSettlement(settlement);
+      // Atomic: order + settlement must persist together
+      store.runInTransaction(() => {
+        store.saveOrder(order);
+        store.saveSettlement(settlement);
+      });
       recordAudit(store, "payment_locked", orderId, order.orderHash, actorId || payer, {
         amount,
         txHash,
@@ -113,7 +116,6 @@ export function createSettlementReleaseHandler(
 
       order.status = "settlement_completed";
       order.updatedAt = nowIso();
-      store.saveOrder(order);
 
       const existingSettlement = store.getSettlementByOrder(orderId);
       const settlementId = existingSettlement?.settlementId ?? randomUUID();
@@ -130,8 +132,11 @@ export function createSettlementReleaseHandler(
         releaseTxHash: txHash,
         settlementHash,
       };
-
-      store.saveSettlement(settlement);
+      // Atomic: order + settlement must persist together
+      store.runInTransaction(() => {
+        store.saveOrder(order);
+        store.saveSettlement(settlement);
+      });
       await recordAuditWithAnchor({
         store,
         config,
@@ -187,7 +192,6 @@ export function createSettlementRefundHandler(
 
       order.status = "settlement_cancelled";
       order.updatedAt = nowIso();
-      store.saveOrder(order);
 
       const existingSettlement = store.getSettlementByOrder(orderId);
       const settlementId = existingSettlement?.settlementId ?? randomUUID();
@@ -207,8 +211,11 @@ export function createSettlementRefundHandler(
         refundTxHash: txHash,
         settlementHash,
       };
-
-      store.saveSettlement(settlement);
+      // Atomic: order + settlement must persist together
+      store.runInTransaction(() => {
+        store.saveOrder(order);
+        store.saveSettlement(settlement);
+      });
       await recordAuditWithAnchor({
         store,
         config,

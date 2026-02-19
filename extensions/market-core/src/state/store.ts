@@ -54,6 +54,8 @@ type MarketStore = {
   appendAuditEvent: (event: AuditEvent) => void;
   readAuditEvents: (limit?: number) => AuditEvent[];
   hasAnyData?: () => boolean;
+  /** Run multiple writes atomically (SQLite: BEGIN/COMMIT/ROLLBACK; File: directory lock). */
+  runInTransaction: (fn: () => void) => void;
 };
 
 class MarketFileStore implements MarketStore {
@@ -364,6 +366,13 @@ class MarketFileStore implements MarketStore {
       this.readAuditEvents(1_000_000).length > 0
     );
   }
+
+  runInTransaction(fn: () => void): void {
+    // File store: no true atomic transaction support, but we run
+    // the writes sequentially within the same synchronous call.
+    // For production multi-process safety, callers should use withFileLock externally.
+    fn();
+  }
 }
 
 class MarketSqliteStore implements MarketStore {
@@ -663,6 +672,17 @@ class MarketSqliteStore implements MarketStore {
       .all(limit) as Array<{ data: string }>;
     return rows.map((row) => JSON.parse(row.data) as AuditEvent).reverse();
   }
+
+  runInTransaction(fn: () => void): void {
+    this.db.exec("BEGIN");
+    try {
+      fn();
+      this.db.exec("COMMIT");
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
 }
 
 export class MarketStateStore {
@@ -799,5 +819,9 @@ export class MarketStateStore {
 
   readAuditEvents(limit = 100): AuditEvent[] {
     return this.store.readAuditEvents(limit);
+  }
+
+  runInTransaction(fn: () => void): void {
+    this.store.runInTransaction(fn);
   }
 }

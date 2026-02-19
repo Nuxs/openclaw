@@ -175,10 +175,13 @@ export function createLeaseIssueHandler(
         maxCost,
       };
 
-      store.saveOrder(order);
-      store.saveConsent(consent);
-      store.saveDelivery(delivery);
-      store.saveLease(lease);
+      // Atomic: order + consent + delivery + lease must persist together
+      store.runInTransaction(() => {
+        store.saveOrder(order);
+        store.saveConsent(consent);
+        store.saveDelivery(delivery);
+        store.saveLease(lease);
+      });
 
       await recordAuditWithAnchor({
         store,
@@ -248,30 +251,35 @@ export function createLeaseRevokeHandler(
       const revokedAt = nowIso();
       lease.status = "lease_revoked";
       lease.revokedAt = revokedAt;
-      store.saveLease(lease);
 
       const delivery = lease.deliveryId ? store.getDelivery(lease.deliveryId) : undefined;
       const order = store.getOrder(lease.orderId);
       const offer = order ? store.getOffer(order.offerId) : undefined;
       const consent = lease.consentId ? store.getConsent(lease.consentId) : undefined;
 
-      if (
-        delivery &&
-        delivery.status !== "delivery_completed" &&
-        delivery.status !== "delivery_revoked"
-      ) {
-        assertDeliveryTransition(delivery.status, "delivery_revoked");
-        delivery.status = "delivery_revoked";
-        delivery.revokedAt = revokedAt;
-        delivery.revokeReason = reason ?? "lease_revoked";
-        delivery.revokeHash = hashCanonical({
-          deliveryId: delivery.deliveryId,
-          orderId: delivery.orderId,
-          revokedAt,
-          reason: delivery.revokeReason,
-        });
-        store.saveDelivery(delivery);
+      // Atomic: lease + delivery revocation must persist together
+      store.runInTransaction(() => {
+        store.saveLease(lease);
+        if (
+          delivery &&
+          delivery.status !== "delivery_completed" &&
+          delivery.status !== "delivery_revoked"
+        ) {
+          assertDeliveryTransition(delivery.status, "delivery_revoked");
+          delivery.status = "delivery_revoked";
+          delivery.revokedAt = revokedAt;
+          delivery.revokeReason = reason ?? "lease_revoked";
+          delivery.revokeHash = hashCanonical({
+            deliveryId: delivery.deliveryId,
+            orderId: delivery.orderId,
+            revokedAt,
+            reason: delivery.revokeReason,
+          });
+          store.saveDelivery(delivery);
+        }
+      });
 
+      if (delivery && delivery.status === "delivery_revoked") {
         const deliveryPayload = await resolveDeliveryPayloadForRevocation(config, delivery);
         const revokeResult = await executeRevocation(config, {
           delivery: deliveryPayload ? { ...delivery, payload: deliveryPayload } : delivery,

@@ -175,8 +175,11 @@ export function createResourcePublishHandler(
         updatedAt: now,
       };
 
-      store.saveOffer(offer);
-      store.saveResource(resource);
+      // Atomic: offer + resource must persist together
+      store.runInTransaction(() => {
+        store.saveOffer(offer);
+        store.saveResource(resource);
+      });
 
       const resourceHash = hashCanonical({
         resourceId,
@@ -232,15 +235,18 @@ export function createResourceUnpublishHandler(
       const now = nowIso();
       resource.status = "resource_unpublished";
       resource.updatedAt = now;
-      store.saveResource(resource);
 
       const offer = store.getOffer(resource.offerId);
-      if (offer && offer.status !== "offer_closed") {
-        assertOfferTransition(offer.status, "offer_closed");
-        offer.status = "offer_closed";
-        offer.updatedAt = now;
-        store.saveOffer(offer);
-      }
+      // Atomic: resource + offer status must update together
+      store.runInTransaction(() => {
+        store.saveResource(resource);
+        if (offer && offer.status !== "offer_closed") {
+          assertOfferTransition(offer.status, "offer_closed");
+          offer.status = "offer_closed";
+          offer.updatedAt = now;
+          store.saveOffer(offer);
+        }
+      });
 
       recordAudit(
         store,
