@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
+import type { SessionEntry } from "../../config/sessions.js";
 import { createModelSelectionState } from "./model-selection.js";
 
 vi.mock("../../agents/model-catalog.js", () => ({
@@ -12,7 +13,7 @@ vi.mock("../../agents/model-catalog.js", () => ({
   ]),
 }));
 
-const makeEntry = (overrides: Record<string, unknown> = {}) => ({
+const makeEntry = (overrides: Partial<SessionEntry> = {}): SessionEntry => ({
   sessionId: "session-id",
   updatedAt: Date.now(),
   ...overrides,
@@ -262,5 +263,71 @@ describe("createModelSelectionState respects session model override", () => {
 
     expect(state.provider).toBe(defaultProvider);
     expect(state.model).toBe("deepseek-v3-4bit-mlx");
+  });
+});
+
+describe("createModelSelectionState respects channel overrides", () => {
+  const defaultProvider = "openai";
+  const defaultModel = "gpt-4o-mini";
+  const sessionKey = "agent:main:slack:channel:c1";
+  const contextKey = "slack|channel:C1||";
+
+  async function resolveState(params: {
+    cfg: OpenClawConfig;
+    sessionEntry: ReturnType<typeof makeEntry>;
+    sessionStore: Record<string, ReturnType<typeof makeEntry>>;
+  }) {
+    return createModelSelectionState({
+      cfg: params.cfg,
+      agentCfg: params.cfg.agents?.defaults,
+      sessionEntry: params.sessionEntry,
+      sessionStore: params.sessionStore,
+      sessionKey,
+      defaultProvider,
+      defaultModel,
+      provider: defaultProvider,
+      model: defaultModel,
+      hasModelDirective: false,
+    });
+  }
+
+  it("uses channel override when present", async () => {
+    const sessionEntry = makeEntry({
+      deliveryContext: { channel: "slack", to: "channel:C1" },
+      modelOverridesByContext: {
+        [contextKey]: { provider: "openai", model: "gpt-4o" },
+      },
+    });
+    const sessionStore = { [sessionKey]: sessionEntry };
+
+    const state = await resolveState({ cfg: {} as OpenClawConfig, sessionEntry, sessionStore });
+
+    expect(state.provider).toBe("openai");
+    expect(state.model).toBe("gpt-4o");
+  });
+
+  it("clears channel override when disallowed", async () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          models: {
+            "openai/gpt-4o-mini": {},
+          },
+        },
+      },
+    } as OpenClawConfig;
+    const sessionEntry = makeEntry({
+      deliveryContext: { channel: "slack", to: "channel:C1" },
+      modelOverridesByContext: {
+        [contextKey]: { provider: "openai", model: "gpt-4o" },
+      },
+    });
+    const sessionStore = { [sessionKey]: sessionEntry };
+
+    const state = await resolveState({ cfg, sessionEntry, sessionStore });
+
+    expect(state.provider).toBe(defaultProvider);
+    expect(state.model).toBe(defaultModel);
+    expect(sessionEntry.modelOverridesByContext?.[contextKey]).toBeUndefined();
   });
 });

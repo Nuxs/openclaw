@@ -6,6 +6,137 @@ export type ModelOverrideSelection = {
   isDefault?: boolean;
 };
 
+export type ModelOverrideContextEntry = {
+  provider?: string;
+  model: string;
+  authProfileOverride?: string;
+  authProfileOverrideSource?: "auto" | "user";
+};
+
+export function resolveModelOverrideForContext(params: {
+  entry?: SessionEntry;
+  contextKey?: string;
+}): ModelOverrideContextEntry | null {
+  const contextKey = params.contextKey?.trim();
+  if (!contextKey) {
+    return null;
+  }
+  const override = params.entry?.modelOverridesByContext?.[contextKey];
+  const model = override?.model?.trim();
+  if (!model) {
+    return null;
+  }
+  const provider = override?.provider?.trim() || undefined;
+  const authProfileOverride = override?.authProfileOverride?.trim() || undefined;
+  return {
+    provider,
+    model,
+    authProfileOverride,
+    authProfileOverrideSource: override?.authProfileOverrideSource,
+  };
+}
+
+export function applyModelOverrideToSessionEntryForContext(params: {
+  entry: SessionEntry;
+  contextKey: string;
+  selection: ModelOverrideSelection;
+  profileOverride?: string;
+  profileOverrideSource?: "auto" | "user";
+}): { updated: boolean } {
+  const contextKey = params.contextKey.trim();
+  if (!contextKey) {
+    return { updated: false };
+  }
+  const profileOverrideSource = params.profileOverrideSource ?? "user";
+  const overrides = params.entry.modelOverridesByContext ?? {};
+  let updated = false;
+
+  if (params.selection.isDefault) {
+    if (overrides[contextKey]) {
+      delete overrides[contextKey];
+      updated = true;
+    }
+  } else {
+    const next: ModelOverrideContextEntry = {
+      provider: params.selection.provider,
+      model: params.selection.model,
+    };
+    if (params.profileOverride) {
+      next.authProfileOverride = params.profileOverride;
+      next.authProfileOverrideSource = profileOverrideSource;
+    }
+    const prev = overrides[contextKey];
+    if (
+      !prev ||
+      prev.provider !== next.provider ||
+      prev.model !== next.model ||
+      prev.authProfileOverride !== next.authProfileOverride ||
+      prev.authProfileOverrideSource !== next.authProfileOverrideSource
+    ) {
+      overrides[contextKey] = next;
+      updated = true;
+    }
+  }
+
+  if (updated) {
+    if (Object.keys(overrides).length === 0) {
+      delete params.entry.modelOverridesByContext;
+    } else {
+      params.entry.modelOverridesByContext = overrides;
+    }
+    params.entry.updatedAt = Date.now();
+  }
+
+  return { updated };
+}
+
+export function clearModelOverrideForContext(params: { entry: SessionEntry; contextKey: string }): {
+  updated: boolean;
+} {
+  const contextKey = params.contextKey.trim();
+  if (!contextKey) {
+    return { updated: false };
+  }
+  const overrides = params.entry.modelOverridesByContext;
+  if (!overrides || !overrides[contextKey]) {
+    return { updated: false };
+  }
+  delete overrides[contextKey];
+  if (Object.keys(overrides).length === 0) {
+    delete params.entry.modelOverridesByContext;
+  }
+  params.entry.updatedAt = Date.now();
+  return { updated: true };
+}
+
+export function clearModelProfileOverrideForContext(params: {
+  entry: SessionEntry;
+  contextKey: string;
+}): { updated: boolean } {
+  const contextKey = params.contextKey.trim();
+  if (!contextKey) {
+    return { updated: false };
+  }
+  const overrides = params.entry.modelOverridesByContext;
+  const override = overrides?.[contextKey];
+  if (!override) {
+    return { updated: false };
+  }
+  let updated = false;
+  if (override.authProfileOverride) {
+    delete override.authProfileOverride;
+    updated = true;
+  }
+  if (override.authProfileOverrideSource) {
+    delete override.authProfileOverrideSource;
+    updated = true;
+  }
+  if (updated) {
+    params.entry.updatedAt = Date.now();
+  }
+  return { updated };
+}
+
 export function applyModelOverrideToSessionEntry(params: {
   entry: SessionEntry;
   selection: ModelOverrideSelection;

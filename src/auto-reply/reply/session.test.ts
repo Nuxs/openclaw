@@ -1054,6 +1054,47 @@ describe("initSessionState preserves behavior overrides across /new and /reset",
     expect(result.sessionEntry.reasoningLevel).toBe("low");
   });
 
+  it("/new preserves modelOverridesByContext for channel defaults", async () => {
+    const storePath = await createStorePath("openclaw-reset-model-context-");
+    const sessionKey = "agent:main:slack:channel:c1";
+    const existingSessionId = "existing-session-model-context";
+    const contextKey = "slack|channel:C1||";
+    await seedSessionStoreWithOverrides({
+      storePath,
+      sessionKey,
+      sessionId: existingSessionId,
+      overrides: {
+        modelOverridesByContext: {
+          [contextKey]: { provider: "openai", model: "gpt-4o" },
+        },
+      },
+    });
+
+    const cfg = {
+      session: { store: storePath, idleMinutes: 999 },
+    } as OpenClawConfig;
+
+    const result = await initSessionState({
+      ctx: {
+        Body: "/new",
+        RawBody: "/new",
+        CommandBody: "/new",
+        From: "user1",
+        To: "channel:C1",
+        ChatType: "channel",
+        SessionKey: sessionKey,
+        Provider: "slack",
+        Surface: "slack",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.resetTriggered).toBe(true);
+    expect(result.sessionEntry.modelOverridesByContext?.[contextKey]?.model).toBe("gpt-4o");
+  });
+
   it("/new in a new session does not preserve overrides", async () => {
     const storePath = await createStorePath("openclaw-new-no-preserve-");
     const sessionKey = "agent:main:telegram:dm:user3";

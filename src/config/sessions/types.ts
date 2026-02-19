@@ -55,6 +55,16 @@ export type SessionEntry = {
   authProfileOverride?: string;
   authProfileOverrideSource?: "auto" | "user";
   authProfileOverrideCompactionCount?: number;
+  /** Per-channel model override, keyed by deliveryContextKey(). */
+  modelOverridesByContext?: Record<
+    string,
+    {
+      provider?: string;
+      model: string;
+      authProfileOverride?: string;
+      authProfileOverrideSource?: "auto" | "user";
+    }
+  >;
   groupActivation?: "mention" | "always";
   groupActivationNeedsSystemIntro?: boolean;
   sendPolicy?: "allow" | "deny";

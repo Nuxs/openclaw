@@ -16,7 +16,11 @@ import type { OpenClawConfig } from "../../config/config.js";
 import { type SessionEntry, updateSessionStore } from "../../config/sessions.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { applyVerboseOverride } from "../../sessions/level-overrides.js";
-import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
+import {
+  applyModelOverrideToSessionEntry,
+  applyModelOverrideToSessionEntryForContext,
+} from "../../sessions/model-overrides.js";
+import { deliveryContextFromSession, deliveryContextKey } from "../../utils/delivery-context.js";
 import { resolveProfileOverride } from "./directive-handling.auth.js";
 import type { InlineDirectives } from "./directive-handling.parse.js";
 import { enqueueModeSwitchEvents } from "./directive-handling.shared.js";
@@ -146,6 +150,7 @@ export async function persistInlineDirectives(params: {
       if (resolved) {
         const key = modelKey(resolved.ref.provider, resolved.ref.model);
         if (allowedModelKeys.size === 0 || allowedModelKeys.has(key)) {
+          const contextKey = deliveryContextKey(deliveryContextFromSession(sessionEntry));
           let profileOverride: string | undefined;
           if (directives.rawModelProfile) {
             const profileResolved = resolveProfileOverride({
@@ -161,15 +166,26 @@ export async function persistInlineDirectives(params: {
           }
           const isDefault =
             resolved.ref.provider === defaultProvider && resolved.ref.model === defaultModel;
-          const { updated: modelUpdated } = applyModelOverrideToSessionEntry({
-            entry: sessionEntry,
-            selection: {
-              provider: resolved.ref.provider,
-              model: resolved.ref.model,
-              isDefault,
-            },
-            profileOverride,
-          });
+          const { updated: modelUpdated } = contextKey
+            ? applyModelOverrideToSessionEntryForContext({
+                entry: sessionEntry,
+                contextKey,
+                selection: {
+                  provider: resolved.ref.provider,
+                  model: resolved.ref.model,
+                  isDefault,
+                },
+                profileOverride,
+              })
+            : applyModelOverrideToSessionEntry({
+                entry: sessionEntry,
+                selection: {
+                  provider: resolved.ref.provider,
+                  model: resolved.ref.model,
+                  isDefault,
+                },
+                profileOverride,
+              });
           provider = resolved.ref.provider;
           model = resolved.ref.model;
           const nextLabel = `${provider}/${model}`;

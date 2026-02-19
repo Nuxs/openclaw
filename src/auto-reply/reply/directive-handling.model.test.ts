@@ -152,6 +152,25 @@ describe("handleDirectiveOnly model persist behavior (fixes #1435)", () => {
     expect(result?.text).not.toContain("failed");
   });
 
+  it("persists /model to channel override when delivery context is known", async () => {
+    const directives = parseInlineDirectives("/model openai/gpt-4o");
+    const contextKey = "slack|channel:C1||";
+    const sessionEntry = createSessionEntry({
+      deliveryContext: { channel: "slack", to: "channel:C1" },
+    });
+    await handleDirectiveOnly(
+      createHandleParams({
+        directives,
+        sessionEntry,
+      }),
+    );
+
+    expect(sessionEntry.modelOverridesByContext?.[contextKey]?.provider).toBe("openai");
+    expect(sessionEntry.modelOverridesByContext?.[contextKey]?.model).toBe("gpt-4o");
+    expect(sessionEntry.providerOverride).toBeUndefined();
+    expect(sessionEntry.modelOverride).toBeUndefined();
+  });
+
   it("shows no model message when no /model directive", async () => {
     const directives = parseInlineDirectives("hello world");
     const sessionEntry = createSessionEntry();

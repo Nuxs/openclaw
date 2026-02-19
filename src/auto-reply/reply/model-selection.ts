@@ -12,8 +12,14 @@ import {
 } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { type SessionEntry, updateSessionStore } from "../../config/sessions.js";
-import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
+import {
+  applyModelOverrideToSessionEntry,
+  clearModelOverrideForContext,
+  clearModelProfileOverrideForContext,
+  resolveModelOverrideForContext,
+} from "../../sessions/model-overrides.js";
 import { resolveThreadParentSessionKey } from "../../sessions/session-key-utils.js";
+import { deliveryContextFromSession, deliveryContextKey } from "../../utils/delivery-context.js";
 import type { ThinkLevel } from "./directives.js";
 
 export type ModelDirectiveSelection = {
@@ -96,19 +102,28 @@ function boundedLevenshteinDistance(a: string, b: string, maxDistance: number): 
 export type StoredModelOverride = {
   provider?: string;
   model: string;
-  source: "session" | "parent";
+  authProfileOverride?: string;
+  authProfileOverrideSource?: "auto" | "user";
+  source: "context" | "session" | "parent";
 };
 
-function resolveModelOverrideFromEntry(entry?: SessionEntry): {
-  provider?: string;
-  model: string;
-} | null {
+/** Resolve session-level (global) model override from an entry's top-level fields.
+ *  Context-scoped overrides are handled separately by `resolveModelOverrideForContext`. */
+function resolveSessionLevelOverride(
+  entry?: SessionEntry,
+): Omit<StoredModelOverride, "source"> | null {
   const model = entry?.modelOverride?.trim();
   if (!model) {
     return null;
   }
   const provider = entry?.providerOverride?.trim() || undefined;
-  return { provider, model };
+  const authProfileOverride = entry?.authProfileOverride?.trim() || undefined;
+  return {
+    provider,
+    model,
+    authProfileOverride,
+    authProfileOverrideSource: entry?.authProfileOverrideSource,
+  };
 }
 
 function resolveParentSessionKeyCandidate(params: {
@@ -131,8 +146,16 @@ export function resolveStoredModelOverride(params: {
   sessionStore?: Record<string, SessionEntry>;
   sessionKey?: string;
   parentSessionKey?: string;
+  contextKey?: string;
 }): StoredModelOverride | null {
-  const direct = resolveModelOverrideFromEntry(params.sessionEntry);
+  const contextOverride = resolveModelOverrideForContext({
+    entry: params.sessionEntry,
+    contextKey: params.contextKey,
+  });
+  if (contextOverride) {
+    return { ...contextOverride, source: "context" };
+  }
+  const direct = resolveSessionLevelOverride(params.sessionEntry);
   if (direct) {
     return { ...direct, source: "session" };
   }
@@ -144,7 +167,14 @@ export function resolveStoredModelOverride(params: {
     return null;
   }
   const parentEntry = params.sessionStore[parentKey];
-  const parentOverride = resolveModelOverrideFromEntry(parentEntry);
+  const parentContextOverride = resolveModelOverrideForContext({
+    entry: parentEntry,
+    contextKey: params.contextKey,
+  });
+  if (parentContextOverride) {
+    return { ...parentContextOverride, source: "parent" };
+  }
+  const parentOverride = resolveSessionLevelOverride(parentEntry);
   if (!parentOverride) {
     return null;
   }
@@ -290,12 +320,14 @@ export async function createModelSelectionState(params: {
   let provider = params.provider;
   let model = params.model;
 
+  const contextKey = deliveryContextKey(deliveryContextFromSession(sessionEntry));
   const hasAllowlist = agentCfg?.models && Object.keys(agentCfg.models).length > 0;
   const initialStoredOverride = resolveStoredModelOverride({
     sessionEntry,
     sessionStore,
     sessionKey,
     parentSessionKey,
+    contextKey,
   });
   const hasStoredOverride = Boolean(initialStoredOverride);
   const needsModelCatalog = params.hasModelDirective || hasAllowlist || hasStoredOverride;
@@ -317,22 +349,65 @@ export async function createModelSelectionState(params: {
     allowedModelKeys = allowed.allowedKeys;
   }
 
-  if (sessionEntry && sessionStore && sessionKey && hasStoredOverride) {
-    const overrideProvider = sessionEntry.providerOverride?.trim() || defaultProvider;
-    const overrideModel = sessionEntry.modelOverride?.trim();
+  if (sessionEntry && sessionStore && sessionKey && hasStoredOverride && initialStoredOverride) {
+    const overrideProvider = initialStoredOverride.provider ?? defaultProvider;
+    const overrideModel = initialStoredOverride.model;
     if (overrideModel) {
       const key = modelKey(overrideProvider, overrideModel);
       if (allowedModelKeys.size > 0 && !allowedModelKeys.has(key)) {
-        const { updated } = applyModelOverrideToSessionEntry({
-          entry: sessionEntry,
-          selection: { provider: defaultProvider, model: defaultModel, isDefault: true },
-        });
-        if (updated) {
-          sessionStore[sessionKey] = sessionEntry;
-          if (storePath) {
-            await updateSessionStore(storePath, (store) => {
-              store[sessionKey] = sessionEntry;
-            });
+        let updated = false;
+        if (initialStoredOverride.source === "context") {
+          if (contextKey) {
+            updated = clearModelOverrideForContext({ entry: sessionEntry, contextKey }).updated;
+          }
+          if (updated) {
+            sessionStore[sessionKey] = sessionEntry;
+            if (storePath) {
+              await updateSessionStore(storePath, (store) => {
+                store[sessionKey] = sessionEntry;
+              });
+            }
+          }
+        } else if (initialStoredOverride.source === "session") {
+          const result = applyModelOverrideToSessionEntry({
+            entry: sessionEntry,
+            selection: { provider: defaultProvider, model: defaultModel, isDefault: true },
+          });
+          updated = result.updated;
+          if (updated) {
+            sessionStore[sessionKey] = sessionEntry;
+            if (storePath) {
+              await updateSessionStore(storePath, (store) => {
+                store[sessionKey] = sessionEntry;
+              });
+            }
+          }
+        } else if (initialStoredOverride.source === "parent") {
+          const parentKey = resolveParentSessionKeyCandidate({
+            sessionKey,
+            parentSessionKey,
+          });
+          const parentEntry = parentKey ? sessionStore[parentKey] : undefined;
+          if (parentEntry && parentKey) {
+            if (contextKey) {
+              updated = clearModelOverrideForContext({
+                entry: parentEntry,
+                contextKey,
+              }).updated;
+            } else {
+              updated = applyModelOverrideToSessionEntry({
+                entry: parentEntry,
+                selection: { provider: defaultProvider, model: defaultModel, isDefault: true },
+              }).updated;
+            }
+            if (updated) {
+              sessionStore[parentKey] = parentEntry;
+              if (storePath) {
+                await updateSessionStore(storePath, (store) => {
+                  store[parentKey] = parentEntry;
+                });
+              }
+            }
           }
         }
         resetModelOverride = updated;
@@ -345,6 +420,7 @@ export async function createModelSelectionState(params: {
     sessionStore,
     sessionKey,
     parentSessionKey,
+    contextKey,
   });
   // Skip stored session model override only when an explicit heartbeat.model
   // was resolved. Heartbeat runs without heartbeat.model should still inherit
@@ -359,20 +435,66 @@ export async function createModelSelectionState(params: {
     }
   }
 
-  if (sessionEntry && sessionStore && sessionKey && sessionEntry.authProfileOverride) {
+  const authProfileOverride =
+    storedOverride?.authProfileOverride ?? sessionEntry?.authProfileOverride;
+  if (sessionEntry && sessionStore && sessionKey && authProfileOverride) {
     const { ensureAuthProfileStore } = await import("../../agents/auth-profiles.js");
     const store = ensureAuthProfileStore(undefined, {
       allowKeychainPrompt: false,
     });
-    const profile = store.profiles[sessionEntry.authProfileOverride];
+    const profile = store.profiles[authProfileOverride];
     const providerKey = normalizeProviderId(provider);
     if (!profile || normalizeProviderId(profile.provider) !== providerKey) {
-      await clearSessionAuthProfileOverride({
-        sessionEntry,
-        sessionStore,
-        sessionKey,
-        storePath,
-      });
+      if (storedOverride?.source === "context" && contextKey) {
+        const { updated } = clearModelProfileOverrideForContext({
+          entry: sessionEntry,
+          contextKey,
+        });
+        if (updated) {
+          sessionStore[sessionKey] = sessionEntry;
+          if (storePath) {
+            await updateSessionStore(storePath, (store) => {
+              store[sessionKey] = sessionEntry;
+            });
+          }
+        }
+      } else if (storedOverride?.source === "parent") {
+        const parentKey = resolveParentSessionKeyCandidate({
+          sessionKey,
+          parentSessionKey,
+        });
+        const parentEntry = parentKey ? sessionStore[parentKey] : undefined;
+        if (parentEntry && parentKey) {
+          if (contextKey) {
+            const { updated } = clearModelProfileOverrideForContext({
+              entry: parentEntry,
+              contextKey,
+            });
+            if (updated) {
+              sessionStore[parentKey] = parentEntry;
+              if (storePath) {
+                await updateSessionStore(storePath, (store) => {
+                  store[parentKey] = parentEntry;
+                });
+              }
+            }
+          } else {
+            await clearSessionAuthProfileOverride({
+              sessionEntry: parentEntry,
+              sessionStore,
+              sessionKey: parentKey,
+              storePath,
+            });
+          }
+        }
+      } else {
+        await clearSessionAuthProfileOverride({
+          sessionEntry,
+          sessionStore,
+          sessionKey,
+          storePath,
+        });
+      }
     }
   }
 
