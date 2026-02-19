@@ -111,6 +111,12 @@ export type SessionEntry = {
   lastThreadId?: string | number;
   skillsSnapshot?: SessionSkillSnapshot;
   systemPromptReport?: SessionSystemPromptReport;
+  settlement?: {
+    orderId?: string;
+    payer?: string;
+    amount?: string;
+    actorId?: string;
+  };
 };
 
 export function mergeSessionEntry(

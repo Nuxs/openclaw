@@ -122,7 +122,7 @@
 
 - `web3.resources.publish`：调用 `market.resource.publish` + 建立 Provider 本地 offer/route 映射（不暴露 endpoint）
 - `web3.resources.list`：聚合 market list + 本地可见性过滤
-- `web3.resources.lease`：调用 `market.lease.issue`，把 accessToken 交给 Consumer 内存态或安全存储（不进 session transcript）
+- `web3.resources.lease`：调用 `market.lease.issue`，把 accessToken 交给 Consumer 内存态或安全存储（不进 session transcript）；若提供 `sessionKey`，则把 `orderId/payer` 写入 session metadata 供结算使用
 - `web3.resources.revokeLease`：调用 `market.lease.revoke`
 
 ---
@@ -145,6 +145,20 @@
 - **协议**：
   - `openai-compat`：OpenAI Chat Completions 或 Responses（二选一）
   - `custom`：必须在 `resources.provider.offers.models[].backend` 中声明
+
+#### 4.2.1 Provider 权威记账（model chat）
+
+> model/chat 路由**必须**在流式响应完成后写入 Provider 权威账本，与 search/storage 路由保持一致。
+
+- **触发**：pipeline 完成后（流已全部发送），调用 `market.ledger.append`，fire-and-forget（`.catch(noop)`）。
+- **ledger entry 字段**：
+  - `kind`: `"model"`
+  - `unit`: `"token"`
+  - `quantity`: 优先取上游响应 header `x-usage-tokens` 或响应体 `usage.total_tokens`；无法获取时回退为 `1`
+  - `cost`: `quantity * offer.price.perUnit`
+  - `leaseId` / `resourceId` / `providerActorId` / `consumerActorId`：从鉴权阶段的 lease 上下文获取
+- **失败处理**：记账失败不影响已发送的流式响应，仅记录 warn 日志。
+- **对齐要求**：`appendModelLedger` 与已有的 `appendSearchLedger` / `appendStorageLedger` 遵循相同的 `callGateway` 调用模式。
 
 ### 4.3 `POST /web3/resources/search/query`
 

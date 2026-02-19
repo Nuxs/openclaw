@@ -1,4 +1,9 @@
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+  OpenClawConfig,
+} from "openclaw/plugin-sdk";
+import type { SessionEntry } from "../../../../src/config/sessions/types.ts";
 import type { Web3PluginConfig } from "../config.js";
 import { clearConsumerLeaseById, saveConsumerLeaseAccess } from "./leases.js";
 
@@ -46,6 +51,130 @@ function normalizeGatewayResult(payload: unknown): {
     return { ok: true, result };
   }
   return { ok: true, result: payload };
+}
+
+type SessionSettlement = {
+  orderId: string;
+  payer: string;
+  amount?: string;
+  actorId?: string;
+};
+
+type SessionStoreHelpers = {
+  resolveSessionStoreKey: (params: { cfg: OpenClawConfig; sessionKey: string }) => string;
+  resolveStorePath: (store?: string, opts?: { agentId?: string }) => string;
+  updateSessionStoreEntry: (params: {
+    storePath: string;
+    sessionKey: string;
+    update: (entry: SessionEntry) => Promise<Partial<SessionEntry> | null>;
+  }) => Promise<SessionEntry | null>;
+  resolveSessionAgentId: (params: { sessionKey?: string; config?: OpenClawConfig }) => string;
+};
+
+async function loadCoreConfig(): Promise<OpenClawConfig> {
+  try {
+    const mod = await import("../../../../src/config/config.ts");
+    if (typeof mod.loadConfig === "function") {
+      return await mod.loadConfig();
+    }
+  } catch {
+    // ignore
+  }
+
+  const distUrl = new URL("../../../../dist/config/config.js", import.meta.url);
+  const mod = await import(distUrl.href);
+  if (typeof mod.loadConfig !== "function") {
+    throw new Error("loadConfig is not available");
+  }
+  return await mod.loadConfig();
+}
+
+async function loadSessionStoreHelpers(): Promise<SessionStoreHelpers> {
+  try {
+    const [sessionUtils, sessionPaths, sessionStore, agentScope] = await Promise.all([
+      import("../../../../src/gateway/session-utils.ts"),
+      import("../../../../src/config/sessions/paths.ts"),
+      import("../../../../src/config/sessions/store.ts"),
+      import("../../../../src/agents/agent-scope.ts"),
+    ]);
+    if (
+      typeof sessionUtils.resolveSessionStoreKey !== "function" ||
+      typeof sessionPaths.resolveStorePath !== "function" ||
+      typeof sessionStore.updateSessionStoreEntry !== "function" ||
+      typeof agentScope.resolveSessionAgentId !== "function"
+    ) {
+      throw new Error("session store helpers are unavailable");
+    }
+    return {
+      resolveSessionStoreKey: sessionUtils.resolveSessionStoreKey,
+      resolveStorePath: sessionPaths.resolveStorePath,
+      updateSessionStoreEntry: sessionStore.updateSessionStoreEntry,
+      resolveSessionAgentId: agentScope.resolveSessionAgentId,
+    };
+  } catch {
+    const distUrls = {
+      sessionUtils: new URL("../../../../dist/gateway/session-utils.js", import.meta.url).href,
+      sessionPaths: new URL("../../../../dist/config/sessions/paths.js", import.meta.url).href,
+      sessionStore: new URL("../../../../dist/config/sessions/store.js", import.meta.url).href,
+      agentScope: new URL("../../../../dist/agents/agent-scope.js", import.meta.url).href,
+    };
+    const [sessionUtils, sessionPaths, sessionStore, agentScope] = await Promise.all([
+      import(distUrls.sessionUtils),
+      import(distUrls.sessionPaths),
+      import(distUrls.sessionStore),
+      import(distUrls.agentScope),
+    ]);
+    if (
+      typeof sessionUtils.resolveSessionStoreKey !== "function" ||
+      typeof sessionPaths.resolveStorePath !== "function" ||
+      typeof sessionStore.updateSessionStoreEntry !== "function" ||
+      typeof agentScope.resolveSessionAgentId !== "function"
+    ) {
+      throw new Error("session store helpers are unavailable");
+    }
+    return {
+      resolveSessionStoreKey: sessionUtils.resolveSessionStoreKey,
+      resolveStorePath: sessionPaths.resolveStorePath,
+      updateSessionStoreEntry: sessionStore.updateSessionStoreEntry,
+      resolveSessionAgentId: agentScope.resolveSessionAgentId,
+    };
+  }
+}
+
+async function recordLeaseSettlement(params: {
+  sessionKey?: string;
+  settlement: SessionSettlement;
+}): Promise<void> {
+  const sessionKey = params.sessionKey?.trim();
+  if (!sessionKey) {
+    return;
+  }
+  const orderId = params.settlement.orderId.trim();
+  const payer = params.settlement.payer.trim();
+  if (!orderId || !payer) {
+    return;
+  }
+  try {
+    const cfg = await loadCoreConfig();
+    const helpers = await loadSessionStoreHelpers();
+    const canonicalKey = helpers.resolveSessionStoreKey({ cfg, sessionKey });
+    const agentId = helpers.resolveSessionAgentId({ sessionKey: canonicalKey, config: cfg });
+    const storePath = helpers.resolveStorePath(cfg.session?.store, { agentId });
+    await helpers.updateSessionStoreEntry({
+      storePath,
+      sessionKey: canonicalKey,
+      update: async (entry) => ({
+        settlement: {
+          orderId,
+          payer,
+          amount: params.settlement.amount ?? entry.settlement?.amount,
+          actorId: params.settlement.actorId ?? payer,
+        },
+      }),
+    });
+  } catch {
+    // ignore settlement metadata failures
+  }
 }
 
 function requireResourcesEnabled(config: Web3PluginConfig) {
@@ -152,9 +281,25 @@ export function createResourceLeaseHandler(config: Web3PluginConfig): GatewayReq
         });
       }
 
+      const orderId = typeof result.orderId === "string" ? result.orderId : undefined;
+      const sessionKey = typeof input.sessionKey === "string" ? input.sessionKey.trim() : "";
+      const consumerActorId =
+        typeof input.consumerActorId === "string" ? input.consumerActorId.trim() : "";
+      const actorId = typeof input.actorId === "string" ? input.actorId.trim() : consumerActorId;
+      if (sessionKey && orderId && consumerActorId) {
+        void recordLeaseSettlement({
+          sessionKey,
+          settlement: {
+            orderId,
+            payer: consumerActorId,
+            actorId,
+          },
+        });
+      }
+
       respond(true, {
         leaseId: leaseId ?? null,
-        orderId: typeof result.orderId === "string" ? result.orderId : null,
+        orderId: orderId ?? null,
         consentId: typeof result.consentId === "string" ? result.consentId : null,
         deliveryId: typeof result.deliveryId === "string" ? result.deliveryId : null,
         expiresAt: expiresAt ?? null,

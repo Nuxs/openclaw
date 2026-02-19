@@ -1,5 +1,13 @@
+import fs from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { resolveConfig } from "../config.js";
+
+const loadConfigMock = vi.fn();
+vi.mock("../../../../src/config/config.ts", () => ({
+  loadConfig: (...args: unknown[]) => loadConfigMock(...args),
+}));
 
 const callGatewayMock = vi.fn();
 vi.mock("../../../../src/gateway/call.ts", () => ({
@@ -19,6 +27,7 @@ function createResponder() {
 describe("web3-core resource registry handlers", () => {
   beforeEach(() => {
     callGatewayMock.mockReset();
+    loadConfigMock.mockReset();
   });
 
   it("rejects publish when resources disabled", async () => {
@@ -148,6 +157,60 @@ describe("web3-core resource registry handlers", () => {
 
     // Cleanup
     clearConsumerLeaseAccess("res-lease-test");
+  });
+
+  it("records settlement metadata when sessionKey is provided", async () => {
+    const tempDir = fs.mkdtempSync(path.join(tmpdir(), "openclaw-web3-session-"));
+    const storePath = path.join(tempDir, "sessions.json");
+    const sessionKey = "agent:main:web3";
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify(
+        {
+          [sessionKey]: { sessionId: "sess-1", updatedAt: Date.now() },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+    loadConfigMock.mockResolvedValue({ session: { store: storePath } });
+
+    callGatewayMock.mockResolvedValue({
+      ok: true,
+      result: {
+        leaseId: "lease-new",
+        accessToken: "tok_new",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        orderId: "ord-2",
+        consentId: "con-2",
+        deliveryId: "del-2",
+      },
+    });
+
+    const config = resolveConfig({
+      resources: { enabled: true, consumer: { enabled: true } },
+    });
+    const { createResourceLeaseHandler } = await import("./registry.js");
+    const { loadSessionStore } = await import("../../../../src/config/sessions/store.ts");
+    const handler = createResourceLeaseHandler(config);
+    const { respond, result } = createResponder();
+
+    await handler({
+      params: {
+        resourceId: "res-lease-test",
+        consumerActorId: "0xcons",
+        actorId: "0xcons",
+        ttlMs: 60000,
+        sessionKey,
+      },
+      respond,
+    } as any);
+
+    expect(result()?.ok).toBe(true);
+    const store = loadSessionStore(storePath, { skipCache: true });
+    expect(store[sessionKey]?.settlement?.orderId).toBe("ord-2");
+    expect(store[sessionKey]?.settlement?.payer).toBe("0xcons");
   });
 
   it("rejects revokeLease when resources disabled", async () => {

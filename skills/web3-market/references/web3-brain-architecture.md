@@ -223,6 +223,29 @@ brain: {
 - `session_end` 写入失败 → 追加到 `pendingSettlements`
 - 复用现有 `web3-anchor-service` 的 60 秒重试机制，增加结算重试逻辑
 
+##### **4.5.1 `PendingSettlement` 字段来源与填充规范（必须）**
+
+> 重试逻辑 `flushPendingSettlements` 中的 `isSettlementReady` 要求 `orderId`、`payer`、`amount` 三字段均非空才会触发 `market.settlement.lock`。因此 `queuePendingSettlement` **必须**在入队时填充这三个字段，否则条目将永远处于 not-ready 状态被无限跳过，结算闭环失效。
+
+**字段来源映射**：
+
+| 字段            | 来源                                                                                             | 说明                                          |
+| --------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| `sessionIdHash` | `sha256(sessionId)`                                                                              | 去标识化，关联审计                            |
+| `createdAt`     | `new Date().toISOString()`                                                                       | 入队时间戳                                    |
+| `orderId`       | `web3.resources.lease` 成功后写入 session metadata → `session_end` 读取                          | 以租约签发作为结算权威来源                    |
+| `payer`         | `web3.resources.lease` 的 `consumerActorId`                                                      | 即 Consumer 的 actorId                        |
+| `amount`        | `event.usage.totalCost`（由 `llm_output` hook 累计的会话总费用，格式为字符串化的 BigNumber-ish） | 取自会话 usage 汇总；若无法获取则回退为 `"0"` |
+| `actorId`       | 同 `payer`                                                                                       | 冗余字段，便于查询                            |
+| `attempts`      | 初始 `0`                                                                                         | 重试计数器                                    |
+| `lastError`     | 初始 `undefined`                                                                                 | 最近一次重试失败原因                          |
+
+**实现要点**：
+
+- `onSessionEnd`（`audit/hooks.ts`）回调签名需接收 session 上下文（含 orderId/actorId/usage），而非仅 sessionId。
+- 若 `orderId` 在当前 session 上下文中不可得（例如非 Web3 主脑会话），**不入队**——仅 Web3 去中心化模型会话需要结算兜底。
+- `amount` 字段取 `event.usage.totalCost`；如果 usage 缺失或为零，仍入队但 `amount = "0"`，以便后续对账发现异常。
+
 #### **4.6 涉及 `web3-core` 文件清单**
 
 | 文件                                                 | 改动                                                       |
@@ -498,8 +521,9 @@ billing: {
   - **输入**：`filter`（类型=模型/搜索/存储、标签、提供者、价格区间）
   - **输出**：资源列表（不含敏感 endpoint）
 - **`web3.resources.lease`（Consumer 侧）**
-  - **输入**：`resourceId`、`ttlMs`、`maxCost`（可选）
-  - **输出**：`leaseId`、`accessToken`（短期）、`expiresAt`
+  - **输入**：`resourceId`、`consumerActorId`、`ttlMs`、`maxCost`（可选）、`sessionKey`（可选，建议传入以绑定结算上下文）
+  - **输出**：`leaseId`、`orderId`、`accessToken`（短期）、`expiresAt`
+  - **行为**：成功租约后，`web3-core` 会将 `orderId/payer` 写入对应会话的 session metadata，供 `session_end` 结算使用
 - **`web3.resources.revokeLease`（Provider/Consumer 侧）**
   - **输入**：`leaseId`
   - **输出**：成功/失败
@@ -616,6 +640,31 @@ resources: {
 
 - `market-core` 增加资源目录/租约/账本结构（不必上链，先本地权威）
 - `web3-core` 增加 `pendingSettlements` 的资源调用场景（不仅 LLM output）
+
+##### **12.8.1 模型调用 Provider 权威记账规范（必须）**
+
+> search 与 storage 路由已在请求完成后调用 `appendSearchLedger` / `appendStorageLedger` 写入 Provider 权威账本，但 **model/chat 路由缺失此记账调用**，导致模型调用——作为 B-2 最核心的共享资源——无法审计与结算。
+
+**`appendModelLedger` 规范**：
+
+- **调用时机**：`/web3/resources/model/chat` 的 pipeline 完成后（流式响应已全部发送），fire-and-forget（`.catch(noop)`），不阻塞响应。
+- **调用目标**：`market.ledger.append`（与 search/storage 完全一致的 gateway method）。
+- **记账字段**：
+
+| 字段              | 值                                                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `leaseId`         | 从鉴权阶段已解析的 lease                                                                                          |
+| `resourceId`      | lease 关联的 resourceId                                                                                           |
+| `providerActorId` | 当前 Provider 的 actorId                                                                                          |
+| `consumerActorId` | lease 的 consumerActorId                                                                                          |
+| `kind`            | `"model"`                                                                                                         |
+| `unit`            | `"token"`（对齐 `price.unit`）                                                                                    |
+| `quantity`        | 优先从上游响应 header `x-usage-tokens` 或响应体 `usage.total_tokens` 提取；无法获取时回退为 `1`（按调用次数计量） |
+| `cost`            | `quantity * offer.price.perUnit`（字符串化 BigNumber-ish）                                                        |
+| `requestId`       | 请求的 `X-OpenClaw-Request-Id`（可选，用于对账）                                                                  |
+
+- **实现位置**：`extensions/web3-core/src/resources/http.ts`，紧跟 `createResourceModelChatHandler` 的 pipeline 完成回调。
+- **与 search/storage 对齐**：三种资源类型的 ledger append 遵循相同的 `callGateway("market.ledger.append", params)` 模式，仅 `kind`/`unit`/`quantity` 不同。
 
 #### **12.9 阶段计划（B-2 与 B-1 并行，但有依赖顺序）**
 
