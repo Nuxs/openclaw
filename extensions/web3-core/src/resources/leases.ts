@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Web3PluginConfig } from "../config.js";
 
 type GatewayCallResult = {
@@ -74,7 +74,15 @@ function hashAccessToken(token: string): string {
 
 function isTokenValid(expectedHash: string | undefined, token: string): boolean {
   if (!expectedHash) return false;
-  return expectedHash === hashAccessToken(token);
+  const providedHash = hashAccessToken(token);
+  const expectedBuffer = Buffer.from(expectedHash, "utf8");
+  const providedBuffer = Buffer.from(providedHash, "utf8");
+  if (expectedBuffer.length !== providedBuffer.length) {
+    // Compare against self to keep constant time regardless of length mismatch.
+    timingSafeEqual(expectedBuffer, expectedBuffer);
+    return false;
+  }
+  return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
 export async function validateLeaseAccess(params: {

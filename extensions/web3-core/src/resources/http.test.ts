@@ -1,7 +1,13 @@
 import { PassThrough } from "node:stream";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { resolveConfig } from "../config.js";
-import { createResourceStorageListHandler, createResourceStoragePutHandler } from "./http.js";
+import {
+  createResourceModelChatHandler,
+  createResourceSearchQueryHandler,
+  createResourceStorageGetHandler,
+  createResourceStorageListHandler,
+  createResourceStoragePutHandler,
+} from "./http.js";
 
 const validateLeaseAccessMock = vi.fn();
 
@@ -132,6 +138,239 @@ describe("web3 resource storage handlers", () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.body).toContain("invalid path");
+  });
+
+  // --- Auth failure: missing authorization ---
+  it("rejects storage put with missing auth", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceStoragePutHandler(config);
+    const req = createRequest({ method: "POST", headers: {} });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end("{}");
+    await promise;
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toContain("authorization");
+  });
+
+  // --- Auth failure: lease validation fails ---
+  it("rejects storage put when lease validation fails", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    validateLeaseAccessMock.mockResolvedValue({
+      ok: false,
+      error: "invalid lease token",
+    });
+
+    const handler = createResourceStoragePutHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_bad",
+        "x-openclaw-lease": "lease-bad",
+      },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ path: "test.txt", bytesBase64: "aGVsbG8=" }));
+    await promise;
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toContain("invalid lease token");
+  });
+
+  // --- Method not allowed ---
+  it("rejects storage put with GET method", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceStoragePutHandler(config);
+    const req = createRequest({ method: "GET", headers: {} });
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(405);
+  });
+
+  it("rejects storage get with POST method", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceStorageGetHandler(config);
+    const req = createRequest({ method: "POST", headers: {} });
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(405);
+  });
+
+  it("rejects model chat with GET method", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({ method: "GET", headers: {} });
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(405);
+  });
+
+  it("rejects search query with GET method", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceSearchQueryHandler(config);
+    const req = createRequest({ method: "GET", headers: {} });
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(405);
+  });
+
+  // --- Resources provider disabled ---
+  it("returns 404 when resources provider disabled for model chat", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: false,
+        provider: {
+          listen: { enabled: false },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: { authorization: "Bearer tok_test", "x-openclaw-lease": "lease-1" },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end("{}");
+    await promise;
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  // --- Auth missing for model and search ---
+  it("rejects model chat with missing auth", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({ method: "POST", headers: {} });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end("{}");
+    await promise;
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toContain("authorization");
+  });
+
+  it("rejects search query with missing lease header", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: { models: [], search: [], storage: [] },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    const handler = createResourceSearchQueryHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: { authorization: "Bearer tok_test" },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ q: "test" }));
+    await promise;
+
+    expect(res.statusCode).toBe(401);
   });
 });
 
