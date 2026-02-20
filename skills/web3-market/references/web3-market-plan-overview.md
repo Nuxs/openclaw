@@ -2,11 +2,11 @@
 
 ### **文档目的**
 
-对你提出的 **Web3 Market + Node 网络**方案进行评审，并基于现有 `web3-core` 与 `market-core` 的真实能力，给出 **可落地、可扩展、可演进** 的设计方案与实现边界，最终形成 AI 代理可直接执行的实现方向。
+在保持 OpenClaw 核心轻量的前提下，规划一个 **可合入主干** 的去中心化市场扩展：对外仅暴露 **`web3.*` 单入口体验层**，并通过 **能力自描述** 让管家无歧义调用；内部由 `market-core` 作为权威执行层完成结算、账本、租约与仲裁。该规划必须覆盖 **完整去中心化任务市场协议与仲裁体系**，并形成 **索引服务、监控告警、管理台** 的平台级闭环。
 
 ### **文档定位与导航**
 
-- 本文是方案总纲与阶段设计，具体执行与权威入口见下述文档。
+- 本文是方案总纲与阶段设计，**新版规划以“新版权威规划”小节为准**。
 - 主文档：`web3-brain-architecture.md`
 - 执行清单附录：`web3-market-resource-implementation-checklist.md`
 - 评审文档（仅评审，不作为规范）：`web3-market-assessment-2026-02-19.md`
@@ -22,7 +22,119 @@
   - `web3-market-resource-implementation-checklist.md`
 - 快速进入：先读 `web3-brain-architecture.md`，再读资源共享 API 与安全文档。
 
-### **现状快照（与代码一致）**
+### **新版权威规划（以本节为准）**
+
+#### **目标与边界**
+
+- **单入口体验层**：对外仅暴露 `web3.*`，所有用户与管家只学习一套语义。
+- **能力自描述**：`web3.capabilities.*` 返回机器可理解的能力与约束，确保管家“懂一切”。
+- **权威执行层**：`market-core` 仍是结算、账本、租约、仲裁权威，但不直接对外暴露。
+- **平台闭环**：必须完成任务市场协议、仲裁体系、索引服务、监控告警与管理台。
+- **与 OpenClaw 方向一致**：Core 保持轻量，所有“市场/协议/仲裁/索引/管理台”均在扩展或独立服务中实现。
+
+#### **单入口体验层（`web3.*`）能力分组**
+
+- **能力自描述**：`web3.capabilities.list`，`web3.capabilities.describe`
+- **市场与任务协议**：`web3.market.*`（发布、发现、下单、竞标、授标、交付、验收）
+- **争议与仲裁**：`web3.dispute.*`（发起、提交证据、仲裁、申诉）
+- **索引与发现**：`web3.index.*`（查询、健康、信誉）
+- **监控与告警**：`web3.monitor.*`（指标、规则、历史）
+- **管理台聚合**：`web3.admin.*`（概览、资源、租约、账本、争议）
+
+#### **能力自描述（机器可理解）**
+
+能力描述必须包含：
+
+- **功能**：方法名、意图、用途示例
+- **输入参数**：类型、必填/可选、范围、格式
+- **权限与风控**：所需 scope、allowlist、速率限制、预算上限
+- **代价与结算**：计费单位、预估成本、是否需要预付锁定
+- **前置条件**：必须存在的租约、钱包绑定或配置
+- **返回含义**：字段语义、错误码与降级策略
+
+推荐结构：
+
+- `CapabilityDescriptor { name, summary, paramsSchema, permissions, risk, pricing, prerequisites, returns, examples }`
+
+#### **权威执行层与数据一致性**
+
+- `web3.*` 只做编排、审计与体验层语义；所有资金与账本变更由 `market-core` 执行。
+- `market-core` 对外只暴露给 `web3-core`，不直接暴露给普通用户与管家。
+
+#### **阶段规划与验收标准**
+
+- **Phase 0：语义收敛与能力自描述**
+  - **产出**：冻结 `web3.*` 入口语义；补齐 `web3.capabilities.*` 结构与内容；明确与 `market-core` 的映射表。
+  - **验收**：管家可通过 `web3.capabilities.list/describe` 获取所有能力与约束，不依赖外部文档。
+
+- **Phase 1：任务市场协议 MVP（完整闭环）**
+  - **产出**：TaskOrder/Bid/Result/Receipt 数据结构与状态机；`web3.market.*` 方法集；签名与可审计哈希。
+  - **验收**：任务发布 → 竞标 → 授标 → 交付 → 验收 → 结算全链路可跑通。
+  - **细化规范**：见 `web3-market-plan-phase1-execution.md` 的“任务市场协议规范（MVP）/测试矩阵”。
+
+- **Phase 2：仲裁体系 MVP（链下为主）**
+  - **产出**：`web3.dispute.*` 入口；证据结构化与审计锚定；仲裁 SLA 与人工流程。
+  - **验收**：争议可发起、证据可提交、裁决可落账，且不泄露敏感信息。
+  - **细化规范**：见 `web3-market-plan-phase1-execution.md` 的“仲裁体系规范（MVP）”。
+
+- **Phase 3：索引服务闭环（中心化到去中心化）**
+  - **产出**：index-service MVP（Provider 上报、Consumer 查询、健康心跳）；DHT 兼容接口。
+  - **验收**：资源/任务可发现，索引健康可观测，支持多节点聚合。
+
+- **Phase 4：监控告警与管理台闭环**
+  - **产出**：指标、告警规则、历史记录；管理台（概览/资源/租约/账本/争议）。
+  - **验收**：非开发者可完成发布、交易、仲裁与结算查询。
+
+---
+
+### **任务协议与仲裁概要表（不重复细节）**
+
+| 对象        | 关键字段（摘要）                                                             | 状态                                                                | 权威落盘层    | 对外入口                                    |
+| ----------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------- | ------------------------------------------- |
+| TaskOrder   | `taskId`, `creatorActorId`, `requirements`, `budget`, `expiryAt`, `hash`     | `task_open/task_awarded/task_closed/task_cancelled/task_expired`    | `market-core` | `web3.market.publishTask/listTasks/getTask` |
+| TaskBid     | `bidId`, `taskId`, `bidderActorId`, `price`, `eta`, `hash`                   | `bid_submitted/bid_withdrawn/bid_accepted/bid_rejected`             | `market-core` | `web3.market.placeBid/listBids`             |
+| TaskAward   | `awardId`, `taskId`, `bidId`, `awarderActorId`, `hash`                       | `award_active/award_revoked`                                        | `market-core` | `web3.market.awardBid`                      |
+| TaskResult  | `resultId`, `taskId`, `bidId`, `delivererActorId`, `artifacts`, `hash`       | `result_submitted/result_accepted/result_rejected`                  | `market-core` | `web3.market.submitResult/reviewResult`     |
+| TaskReceipt | `receiptId`, `taskId`, `bidId`, `amount`, `settlementId`                     | `receipt_pending/receipt_settled/receipt_refunded/receipt_disputed` | `market-core` | `web3.market.reviewResult`                  |
+| Dispute     | `disputeId`, `taskId`, `bidId`, `initiatorActorId`, `resolution`, `evidence` | `dispute_open/dispute_resolved/dispute_rejected`                    | `market-core` | `web3.dispute.open/submitEvidence/resolve`  |
+
+### **状态机迁移规则简表（MVP）**
+
+| 对象        | 允许迁移                                                                                                                     | 禁止迁移（示例）                    | 触发入口                                            |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------- |
+| TaskOrder   | `task_open → task_awarded → task_closed`，`task_open → task_cancelled`，`task_open → task_expired`                           | 已关闭/已取消后回到 `task_open`     | `web3.market.awardBid/cancelTask/expireSweep`       |
+| TaskBid     | `bid_submitted → bid_withdrawn`，`bid_submitted → bid_accepted/bid_rejected`                                                 | `bid_withdrawn → bid_accepted`      | `web3.market.placeBid/awardBid`                     |
+| TaskAward   | `award_active → award_revoked`                                                                                               | `award_revoked → award_active`      | `web3.market.awardBid`（撤销入口可复用）            |
+| TaskResult  | `result_submitted → result_accepted/result_rejected`                                                                         | `result_rejected → result_accepted` | `web3.market.submitResult/reviewResult`             |
+| TaskReceipt | `receipt_pending → receipt_settled/receipt_refunded/receipt_disputed`，`receipt_disputed → receipt_settled/receipt_refunded` | 终态回到 `receipt_pending`          | `web3.market.reviewResult` + `web3.dispute.resolve` |
+| Dispute     | `dispute_open → dispute_resolved/dispute_rejected`                                                                           | `dispute_resolved → dispute_open`   | `web3.dispute.open/resolve`                         |
+
+### **状态机触发条件与守卫规则（MVP）**
+
+| 对象        | 触发条件（示例）                          | 守卫规则（必须满足）                                          |
+| ----------- | ----------------------------------------- | ------------------------------------------------------------- |
+| TaskOrder   | `awardBid` / `cancelTask` / `expireSweep` | 仅 `task_open` 可授标或取消；`expireSweep` 需超时且无活跃授标 |
+| TaskBid     | `placeBid` / `awardBid`                   | 仅 `task_open` 可竞标；同一 `bidId` 不可重复提交              |
+| TaskAward   | `awardBid`                                | 竞标必须 `bid_submitted`；预算锁定成功才可 `award_active`     |
+| TaskResult  | `submitResult` / `reviewResult`           | 仅 `award_active` 可提交结果；`reviewResult` 需具备验收权限   |
+| TaskReceipt | `reviewResult` / `dispute.resolve`        | 结算释放/退款必须绑定有效 `settlementId`                      |
+| Dispute     | `dispute.open` / `dispute.resolve`        | 仅结果被拒绝或验收超时可开争议；裁决需审计锚定完成            |
+
+### **权限/风控/预算守卫规则（MVP）**
+
+| 维度 | 规则（示例）                                                 | 适用入口                                            |
+| ---- | ------------------------------------------------------------ | --------------------------------------------------- |
+| 权限 | 仅 `creatorActorId` 可取消任务；仅 `awarderActorId` 可授标   | `web3.market.cancelTask/awardBid`                   |
+| 权限 | 仅 `delivererActorId` 可提交结果；仅 `creatorActorId` 可验收 | `web3.market.submitResult/reviewResult`             |
+| 风控 | 单任务预算上限/币种白名单校验                                | `web3.market.publishTask/awardBid`                  |
+| 风控 | 单账户并发任务数与竞标频率限制                               | `web3.market.placeBid/listBids`                     |
+| 风控 | 争议频率限制与重复争议合并                                   | `web3.dispute.open`                                 |
+| 预算 | 授标前必须完成预算锁定（escrow 预锁）                        | `web3.market.awardBid`                              |
+| 预算 | 结算释放/退款需对账一致（账本与 escrow）                     | `web3.market.reviewResult` + `web3.dispute.resolve` |
+
+---
+
+### **现状快照（与代码一致，供参考）**
 
 - **B-1（主脑切换）已实现**：`before_model_resolve` + `resolve_stream_fn` 已在 core 与 `web3-core` 接通，`web3.status.summary` 与 `/pay_status` 已输出主脑来源与结算状态。
 - **B-2（资源共享）已实现**：`market.resource.*` / `market.lease.*` / `market.ledger.*` 已落地；`web3.resources.*` + Provider HTTP routes + consumer tools 已可用。
@@ -30,7 +142,7 @@
 
 ---
 
-### **未实现项开发清单与里程碑（建议）**
+### **未实现项开发清单与里程碑（历史参考）**
 
 - **P0：独立索引服务（index-service）**
   - 现状：`web3.index.report/list` 为本地 indexer（`web3/resource-index.json`）

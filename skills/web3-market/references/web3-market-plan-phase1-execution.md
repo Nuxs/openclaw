@@ -1,20 +1,18 @@
-### OpenClaw Web3 Market：Phase 1 执行型迭代清单（按周/按模块）
+### OpenClaw Web3 Market：Phase 1 执行型迭代清单（单入口体验层 + 任务市场协议 MVP）
 
-- **版本**: v1.0
-- **定位**: 结算链路 + 资源发现冷启动落地
-- **前置要求**: 已确认采用外部 ERC-20 作为结算媒介（自有代币后置）
+- **版本**: v2.0
+- **定位**: 对外单入口 `web3.*` + 能力自描述 + 任务市场协议 MVP + 仲裁入口基础
+- **前置要求**: `web3-core` 与 `market-core` 的 B-1/B-2 已可用，结算仍以外部 ERC-20 为主（自有代币后置）
 
 ### **现状对齐（基于当前代码）**
 
 - **已具备**：`market.resource/lease/ledger`、`web3.resources.*`、Provider HTTP routes、consumer tools、`web3.status.summary` 与 `/pay_status`。
-- **待补齐**：索引服务的对外化/稳定性、争议仲裁、监控告警、Web UI，以及跨插件 E2E 覆盖强度。
+- **需调整**：对外入口统一为 `web3.*`，补齐 `web3.capabilities.*` 能力自描述。
 
-### **未实现项与周计划映射**
+### **本 Phase 目标与边界**
 
-- **独立索引服务** → Week 2
-- **争议仲裁** → Week 3
-- **监控告警 + Web UI** → Week 4
-- **任务市场协议层（TaskOrder/Bid/Result）** → Phase 3（不在本计划内）
+- **目标**：完成任务市场协议 MVP，并通过 `web3.*` 单入口让管家无歧义调用。
+- **边界**：不引入 core 重型编排，只在插件与独立服务内实现；仲裁暂为链下流程，证据做审计锚定。
 
 ---
 
@@ -49,57 +47,166 @@
 
 ## 执行型迭代清单（按周）
 
-### Week 1：结算链路“可闭环”
+### Week 1：单入口语义冻结 + 能力自描述
+
+**模块**: `web3-core` / `market-core`
+
+- **入口收敛**：对外仅保留 `web3.*`，完成方法清单与命名约束
+- **能力自描述**：实现 `web3.capabilities.list/describe`，并填充权限/风控/成本/前置条件
+- **语义映射表**：`web3.*` 到 `market-core` 权威方法的映射清单
+
+**交付物**:
+
+- 单入口 API 清单 + 版本策略
+- 可供管家直接调用的能力描述 JSON
+
+### Week 2：任务市场协议 MVP
+
+**模块**: `web3-core` / `market-core`
+
+- **Task 协议结构**：TaskOrder/Bid/Result/Receipt 与状态机
+- **签名与不可抵赖**：关键对象 hash 与签名校验
+- **`web3.market.*` 方法集**：发布、竞标、授标、交付、验收
+
+**交付物**:
+
+- 协议对象与状态机文档
+- 任务发布到结算的最小闭环
+
+---
+
+## 任务市场协议规范（MVP）
+
+### 任务协议对象与字段
+
+- **TaskOrder**（任务发布）
+  - `taskId`：任务唯一标识
+  - `creatorActorId`：发布者身份
+  - `title` / `summary`：任务标题与摘要
+  - `requirements`：交付要求（结构化数组）
+  - `budget`：预算上限（单位与币种）
+  - `expiryAt`：到期时间（ISO）
+  - `status`：`task_open` / `task_awarded` / `task_closed` / `task_cancelled` / `task_expired`
+  - `hash` / `signature`：可审计签名与哈希
+
+- **TaskBid**（竞标）
+  - `bidId`、`taskId`
+  - `bidderActorId`
+  - `price`：报价（单位与币种）
+  - `eta`：交付周期
+  - `status`：`bid_submitted` / `bid_withdrawn` / `bid_accepted` / `bid_rejected`
+  - `hash` / `signature`
+
+- **TaskAward**（授标）
+  - `awardId`、`taskId`、`bidId`
+  - `awarderActorId`
+  - `status`：`award_active` / `award_revoked`
+  - `hash` / `signature`
+
+- **TaskResult**（交付）
+  - `resultId`、`taskId`、`bidId`
+  - `delivererActorId`
+  - `artifacts`：交付物引用（CID 或 URL）
+  - `proofs`：可验证证据（可选）
+  - `status`：`result_submitted` / `result_accepted` / `result_rejected`
+  - `hash` / `signature`
+
+- **TaskReceipt**（结算回执）
+  - `receiptId`、`taskId`、`bidId`
+  - `payerActorId`、`payeeActorId`
+  - `amount` / `currency`
+  - `settlementId`：关联 `market-core` 结算
+  - `status`：`receipt_pending` / `receipt_settled` / `receipt_refunded` / `receipt_disputed`
+
+### 状态机约束
+
+- 任务必须从 `task_open` 开始，`task_awarded` 后才能进入交付与结算。
+- 竞标只能在 `task_open` 时提交。
+- `result_accepted` 才能进入 `receipt_settled`。
+- 任何取消或过期均不可逆转为活跃状态。
+
+### `web3.market.*` API 清单
+
+- **`web3.market.publishTask`**：创建任务
+- **`web3.market.listTasks`**：任务查询（过滤、分页）
+- **`web3.market.getTask`**：任务详情
+- **`web3.market.placeBid`**：提交竞标
+- **`web3.market.listBids`**：竞标查询
+- **`web3.market.awardBid`**：授标并触发结算预锁定
+- **`web3.market.submitResult`**：提交交付物
+- **`web3.market.reviewResult`**：验收或拒绝
+- **`web3.market.cancelTask`**：取消任务
+- **`web3.market.expireSweep`**：任务过期清扫
+
+### `market-core` 权威映射
+
+- `awardBid` 触发 `market.order.create` + `market.settlement.lock`
+- `reviewResult(accept)` 触发 `market.settlement.release`
+- `reviewResult(reject)` 可触发 `web3.dispute.open`
+
+---
+
+## 仲裁体系规范（MVP）
+
+### 争议对象与字段
+
+- **Dispute**
+  - `disputeId`、`taskId`、`bidId`
+  - `initiatorActorId`、`respondentActorId`
+  - `reason`、`status`：`dispute_open` / `dispute_resolved` / `dispute_rejected`
+  - `resolution`：`release` / `refund` / `partial`
+  - `evidence`：证据列表（摘要、CID、时间戳）
+  - `openedAt` / `resolvedAt`
+
+### `web3.dispute.*` API 清单
+
+- **`web3.dispute.open`**：发起争议
+- **`web3.dispute.submitEvidence`**：提交证据
+- **`web3.dispute.resolve`**：裁决并回写结算
+- **`web3.dispute.list`**：争议查询
+- **`web3.dispute.get`**：争议详情
+
+---
+
+## 测试矩阵（MVP）
+
+| 用例    | 场景       | 关键断言                                       | 存储模式      |
+| ------- | ---------- | ---------------------------------------------- | ------------- |
+| TASK-01 | 发布任务   | `task_open` 状态、签名校验通过                 | file + sqlite |
+| TASK-02 | 竞标提交   | 仅 `task_open` 可提交                          | file + sqlite |
+| TASK-03 | 授标       | 创建 `award` 且触发结算预锁定                  | file + sqlite |
+| TASK-04 | 提交结果   | 结果可被检索，`result_submitted`               | file + sqlite |
+| TASK-05 | 验收通过   | 触发 `receipt_settled` 与 `settlement.release` | file + sqlite |
+| TASK-06 | 验收拒绝   | `result_rejected`，可进入争议                  | file + sqlite |
+| DSP-01  | 发起争议   | `dispute_open` 写入审计                        | file + sqlite |
+| DSP-02  | 提交证据   | 证据摘要锚定，敏感信息不暴露                   | file + sqlite |
+| DSP-03  | 裁决释放   | 结算 release 或 refund 正确                    | file + sqlite |
+| SEC-01  | 签名篡改   | 拒绝写入权威状态                               | file + sqlite |
+| SEC-02  | 未授权调用 | `web3.market.*` 返回权限错误                   | file + sqlite |
+
+### Week 3：仲裁体系 MVP
 
 **模块**: `market-core` / `web3-core`
 
-- **结算协议整理**: 账本写入 → 结算队列 → escrow 操作闭环核对
-- **结算一致性校验**: File/SQLite 双存储行为一致性补齐
-- **Escrow 适配层**: 与外部 ERC-20 对接参数与失败路径完善
+- **争议入口**：`web3.dispute.open/submitEvidence/resolve`
+- **证据锚定**：证据摘要接入审计与锚定管线
+- **仲裁 SLA**：链下裁决流程与责任分配
 
 **交付物**:
 
-- 结算链路时序图（链下账本 + 链上 escrow）
-- 结算失败/回滚策略说明
-- 关键路径测试通过（双存储模式）
+- 仲裁流程文档与最小闭环测试
 
-### Week 2：资源发现（冷启动最小可用）
+### Week 4：索引闭环 + 监控告警 + 管理台 MVP
 
-**模块**: `web3-core` / 新增 `index-service`（可选轻量服务）
+**模块**: `web3-core` / `index-service` / `ui`
 
-- **资源目录服务 MVP**: Provider 上报 → Consumer 查询
-- **资源元数据结构**: 统一字段（资源类型、价格、容量、SLA）
-- **索引 API**: `list/search` + `provider heartbeat`
+- **索引服务 MVP**：Provider 上报、Consumer 查询、健康心跳
+- **监控告警**：指标与 P0/P1 规则、历史记录
+- **管理台 MVP**：概览、资源、租约、账本、争议视图
 
 **交付物**:
 
-- 资源发现 API 文档与样例
-- Provider 上报与 Consumer 查询跑通
-
-### Week 3：争议仲裁 + 审计锚定
-
-**模块**: `market-core` / `web3-core`
-
-- **争议入口**: `market.dispute.open/resolve`
-- **证据锚定**: 争议证据摘要写入审计/锚定管线
-- **仲裁策略**: 先链下流程与 SLA，后续可迁移链上仲裁协议
-
-**交付物**:
-
-- 争议流程文档 + 仲裁 SLA
-- 争议流程最小闭环测试
-
-### Week 4：监控告警 + Web UI 最小可用
-
-**模块**: `web3-core` / `ui`
-
-- **Metrics 指标**: 结算队列长度、ledger 写入失败、租约失效率、audit/anchor 失败率
-- **基础告警**: P0/P1 阈值
-- **Web UI**: 状态概览 + 资源管理 + 租约列表 + 账本查询
-
-**交付物**:
-
-- 可观测指标与告警示例
+- 可观测指标、告警规则与历史查询
 - 最小可用管理台
 
 ---
@@ -108,27 +215,27 @@
 
 ### 1) `market-core`
 
-- 结算闭环可靠性（双存储模式一致）
-- 争议与证据接口扩展
-- Escrow 适配层与支付失败处理
+- TaskOrder/Bid/Result/Receipt 的权威存储与状态机
+- 争议与证据接口扩展（dispute + evidence）
+- 结算与 escrow 失败回滚语义
 
 ### 2) `web3-core`
 
-- Provider 上报资源元数据
-- Consumer 查询与租约触发
-- 指标与审计对接
+- `web3.capabilities.*` 能力自描述与版本管理
+- `web3.market.*` 体验层编排与语义收敛
+- 争议编排与审计锚定接入
 
-### 3) `index-service`（可选新模块）
+### 3) `index-service`（独立服务）
 
-- 资源目录 API
-- Provider 心跳与健康
-- 可扩展到 DHT 的存储模型
+- 资源与任务索引 API
+- Provider 心跳与信誉数据
+- DHT 兼容的存储与同步接口
 
 ### 4) `ui`
 
-- 状态概览
-- 资源与租约查询
-- 账本审计可视化
+- 概览与告警
+- 资源与任务管理
+- 租约、账本、争议视图
 
 ---
 
