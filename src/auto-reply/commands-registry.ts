@@ -372,6 +372,24 @@ export function resolveCommandArgMenu(params: {
 export function normalizeCommandBody(raw: string, options?: CommandNormalizeOptions): string {
   const trimmed = raw.trim();
   if (!trimmed.startsWith("/")) {
+    const normalized = trimmed.replace(/[!?！？。．，,;；:：]+$/g, "").trim();
+    const lowered = normalized.toLowerCase();
+    const marketStartPhrases = new Set([
+      "启动web3市场",
+      "开启web3市场",
+      "启用web3市场",
+      "打开web3市场",
+      "启动web3 market",
+      "开启web3 market",
+      "启用web3 market",
+      "打开web3 market",
+      "start web3 market",
+      "enable web3 market",
+      "open web3 market",
+    ]);
+    if (marketStartPhrases.has(lowered)) {
+      return "/web3-market start";
+    }
     return trimmed;
   }
 

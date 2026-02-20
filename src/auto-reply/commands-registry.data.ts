@@ -181,6 +181,35 @@ function buildChatCommands(): ChatCommandDefinition[] {
       category: "management",
     }),
     defineChatCommand({
+      key: "web3-market",
+      nativeName: "web3-market",
+      description: "Enable or check Web3 Market mode.",
+      textAliases: [
+        "/web3-market",
+        "/web3market",
+        "/market",
+        "/启动web3市场",
+        "/开启web3市场",
+        "/启用web3市场",
+        "/启动市场",
+      ],
+      acceptsArgs: true,
+      category: "management",
+      args: [
+        {
+          name: "action",
+          description: "Action (start|status|help)",
+          type: "string",
+          required: false,
+          choices: [
+            { value: "start", label: "Start" },
+            { value: "status", label: "Status" },
+            { value: "help", label: "Help" },
+          ],
+        },
+      ],
+    }),
+    defineChatCommand({
       key: "approve",
       nativeName: "approve",
       description: "Approve or deny exec requests.",

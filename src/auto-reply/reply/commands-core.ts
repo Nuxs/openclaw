@@ -34,6 +34,7 @@ import type {
   CommandHandlerResult,
   HandleCommandsParams,
 } from "./commands-types.js";
+import { handleWeb3MarketCommand } from "./commands-web3-market.js";
 import { routeReply } from "./route-reply.js";
 
 let HANDLERS: CommandHandler[] | null = null;
@@ -52,6 +53,7 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
       handleHelpCommand,
       handleCommandsListCommand,
       handleStatusCommand,
+      handleWeb3MarketCommand,
       handleAllowlistCommand,
       handleApproveCommand,
       handleContextCommand,
