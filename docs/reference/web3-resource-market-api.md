@@ -116,7 +116,9 @@ title: "Web3 Resource Market API"
 - `web3.index.report`
 - `web3.index.list`
 
-这些方法用于发现与测试，可能携带 endpoint 形态的数据字段。默认不应作为“公网可见”的发现机制。
+这些方法用于发现与测试，但**默认不返回 Provider endpoint**。对外的发现应只返回可租用资源的摘要信息；如需建立连接，必须通过“租约签发后的受控路由”或“本地受信配置解析”等受控机制完成。
+
+如确需在调试中携带“连接提示”，只能返回不可直接使用的引用（例如 `providerRef` / `connectionRef`），不得包含网络地址、token 或真实路径。
 
 ## Provider HTTP routes（调用面）
 

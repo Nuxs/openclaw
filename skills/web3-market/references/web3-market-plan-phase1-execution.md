@@ -34,7 +34,7 @@
 > Phase 1 的目标是“管家无感闭环 + 用户看见价值”。为了避免上线后出现安全/可用性事故，以下 Gate 必须作为硬门槛执行。
 
 - **Gate-SEC-01（敏感信息零泄露）**：任何输出面（gateway method 返回、HTTP route 错误、CLI 状态、logs、审计摘要、能力自描述、tool 结果）不得包含 `accessToken`、provider endpoint、真实文件路径。
-- **Gate-ERR-01（稳定错误码）**：对外返回必须使用稳定错误码（例如 `E_INVALID_ARGUMENT`/`E_FORBIDDEN`/`E_NOT_FOUND`/`E_CONFLICT`/`E_INTERNAL` 等），并保持机器可解析；错误契约以 `web3-market-resource-api.md` 为准。
+- **Gate-ERR-01（稳定错误码）**：对外返回必须使用稳定错误码（例如 `E_INVALID_ARGUMENT`/`E_FORBIDDEN`/`E_NOT_FOUND`/`E_CONFLICT`/`E_INTERNAL` 等；最低集合见 `web3-market-resource-api.md`），并保持机器可解析；错误契约以 `web3-market-resource-api.md` 为准。
 - **Gate-CAP-01（能力自描述可操作）**：`web3.capabilities.*` 必须提供字段级输入结构（必填/可选/范围/格式）与关键前置条件/风险/成本提示，使管家无需外部文档即可构造有效请求。
 - **Gate-LEDGER-01（权威记账防伪造）**：Provider 才能写入权威 `market.ledger.append`；Consumer 侧不得伪造权威账本（以 `market-core` 校验为准）。
 - **Gate-STORE-01（双存储一致性）**：file/sqlite 两种 store 行为一致，且关键路径用例必须在两种模式下通过（至少覆盖发布→租约→调用→记账→撤销/过期）。

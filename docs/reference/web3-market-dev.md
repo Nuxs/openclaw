@@ -56,6 +56,8 @@ graph TD
 
 ### `web3-core`（已存在）
 
+- `web3.capabilities.list`（params: `includeUnavailable?`, `includeDetails?`, `group?`）
+- `web3.capabilities.describe`（params: `name`, `includeUnavailable?`）
 - `web3.siwe.challenge`（params: `address`）
 - `web3.siwe.verify`（params: `message`, `signature`）
 - `web3.audit.query`（params: `limit?`）

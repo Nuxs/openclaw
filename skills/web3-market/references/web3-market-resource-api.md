@@ -125,7 +125,7 @@
 - `web3.resources.lease`：调用 `market.lease.issue`，把 accessToken 交给 Consumer 内存态或安全存储（不进 session transcript）；若提供 `sessionKey`，则把 `orderId/payer` 写入 session metadata 供结算使用
 - `web3.resources.revokeLease`：调用 `market.lease.revoke`
 - `web3.resources.status`：调用 `market.resource.get` 或 `market.lease.get`
-- `web3.index.report` / `web3.index.list`：资源索引上报与查询（内置 indexer）
+- `web3.index.report` / `web3.index.list`：资源索引上报与查询（内置 indexer；默认不返回 Provider `endpoint`）
 
 ---
 

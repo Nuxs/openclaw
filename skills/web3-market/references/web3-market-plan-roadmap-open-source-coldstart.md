@@ -27,11 +27,11 @@
 ### 1) 单入口体验层
 
 - **对外唯一入口**: `web3.*`
-- **能力自描述**: `web3.capabilities.list/describe` 返回权限、风控、成本与前置条件
+- **能力自描述**: `web3.capabilities.list/describe` 返回权限、风控、成本与前置条件，并提供字段级 `paramsSchema`、常见错误码与最小示例（使管家可构造有效请求）
 
 **验收标准**:
 
-- 管家仅凭 `web3.capabilities.*` 即可安全调用全部能力
+- 管家仅凭 `web3.capabilities.*` 即可安全调用全部能力（不依赖外部文档）
 
 ---
 

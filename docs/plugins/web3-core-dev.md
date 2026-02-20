@@ -177,7 +177,9 @@ The plugin exposes an internal index surface used for discovery and testing:
 - `web3.index.report`
 - `web3.index.list`
 
-These methods can carry endpoint-like fields in their stored entries. Do not treat them as public APIs.
+These methods are internal and **must not expose provider endpoints by default**. Treat any endpoint-like data as a sensitive asset: return only safe summaries to users/agents, and use a controlled mechanism (for example, lease issuance plus gateway-controlled routing, or trusted local configuration) to resolve routing.
+
+If you keep endpoint-like values for local debugging, ensure they are redacted in outputs and never appear in logs, errors, status output, or tool results.
 
 ### Commands
 
@@ -194,6 +196,75 @@ These methods can carry endpoint-like fields in their stored entries. Do not tre
 - **Billing**: `before_tool_call`, `llm_output`
 
 ### Gateway RPC
+
+#### `web3.capabilities.list`
+
+**Intent**: List `web3.*` capabilities and their availability so an agent/UI can discover safe entrypoints without reading external docs.
+
+**Contract (target)**
+
+- **Params**:
+  - `includeUnavailable?`: boolean
+  - `includeDetails?`: boolean
+  - `group?`: string (one of `capabilities|identity|audit|billing|status|resources|market|index|monitor|tools`)
+- **Response**:
+  - `{ "capabilities": CapabilitySummary[] }` when `includeDetails=false` (default)
+  - `{ "capabilities": CapabilityDescriptor[] }` when `includeDetails=true`
+
+**Example (summaries)**
+
+```json
+{
+  "capabilities": [
+    {
+      "name": "web3.resources.list",
+      "summary": "List published resource offers.",
+      "kind": "gateway",
+      "group": "resources",
+      "availability": { "enabled": true }
+    }
+  ]
+}
+```
+
+**Implementation notes (current code)**
+
+- `capabilities[*].paramsSchema` is currently a lightweight hint map (often string placeholders), not a fully machine-validated schema.
+
+#### `web3.capabilities.describe`
+
+**Intent**: Describe a single capability by name, including parameter hints, guards, and pricing signals.
+
+**Contract (target)**
+
+- **Params**:
+  - `name`: string (capability name, e.g. `web3.market.resource.publish`)
+  - `includeUnavailable?`: boolean
+- **Response**:
+  - `{ "capability": CapabilityDescriptor }`
+- **Errors (target, stable)**:
+  - `E_INVALID_ARGUMENT`: missing/invalid `name`
+  - `E_NOT_FOUND`: capability not found
+
+**Example**
+
+```json
+{
+  "capability": {
+    "name": "web3.market.resource.publish",
+    "summary": "Market entrypoint for resource publish (proxy to market-core).",
+    "kind": "gateway",
+    "group": "market",
+    "availability": { "enabled": true },
+    "paramsSchema": { "resource": "ResourceOffer" },
+    "aliases": ["web3.resources.publish"]
+  }
+}
+```
+
+**Implementation notes (current code)**
+
+- Errors are currently returned as short message strings (e.g. `name is required`, `capability not found`) rather than stable `E_*` codes; treat these strings as unstable until Gate-ERR-01 is fully satisfied.
 
 #### `web3.siwe.challenge`
 
