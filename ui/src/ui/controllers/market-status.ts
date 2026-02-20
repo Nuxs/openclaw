@@ -1,8 +1,10 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type {
   MarketDispute,
+  MarketLedgerEntry,
   MarketLedgerSummary,
   MarketLease,
+  MarketMetricsSnapshot,
   MarketResource,
   MarketStatusSummary,
 } from "../types.ts";
@@ -13,9 +15,11 @@ type MarketStatusState = {
   marketLoading: boolean;
   marketError: string | null;
   marketStatus: MarketStatusSummary | null;
+  marketMetrics: MarketMetricsSnapshot | null;
   marketResources: MarketResource[];
   marketLeases: MarketLease[];
   marketLedgerSummary: MarketLedgerSummary | null;
+  marketLedgerEntries: MarketLedgerEntry[];
   marketDisputes: MarketDispute[];
   marketLastSuccess: number | null;
 };
@@ -31,11 +35,21 @@ export async function loadMarketStatus(state: MarketStatusState) {
   state.marketError = null;
 
   try {
-    const [statusRes, resourcesRes, leasesRes, ledgerRes, disputesRes] = await Promise.allSettled([
+    const [
+      statusRes,
+      metricsRes,
+      resourcesRes,
+      leasesRes,
+      ledgerRes,
+      ledgerEntriesRes,
+      disputesRes,
+    ] = await Promise.allSettled([
       state.client.request("market.status.summary", {}),
+      state.client.request("market.metrics.snapshot", {}),
       state.client.request("market.resource.list", { limit: 200 }),
       state.client.request("market.lease.list", { limit: 50 }),
       state.client.request("market.ledger.summary", {}),
+      state.client.request("market.ledger.list", { limit: 50 }),
       state.client.request("market.dispute.list", { limit: 50 }),
     ]);
 
@@ -47,6 +61,13 @@ export async function loadMarketStatus(state: MarketStatusState) {
       anySuccess = true;
     } else {
       errors.push(String(statusRes.reason ?? "Failed to load market status"));
+    }
+
+    if (metricsRes.status === "fulfilled") {
+      state.marketMetrics = normalizePayload<MarketMetricsSnapshot>(metricsRes.value);
+      anySuccess = true;
+    } else {
+      errors.push(String(metricsRes.reason ?? "Failed to load market metrics"));
     }
 
     if (resourcesRes.status === "fulfilled") {
@@ -71,6 +92,14 @@ export async function loadMarketStatus(state: MarketStatusState) {
       anySuccess = true;
     } else {
       errors.push(String(ledgerRes.reason ?? "Failed to load market ledger"));
+    }
+
+    if (ledgerEntriesRes.status === "fulfilled") {
+      const payload = normalizePayload<{ entries?: MarketLedgerEntry[] }>(ledgerEntriesRes.value);
+      state.marketLedgerEntries = payload?.entries ?? [];
+      anySuccess = true;
+    } else {
+      errors.push(String(ledgerEntriesRes.reason ?? "Failed to load market ledger entries"));
     }
 
     if (disputesRes.status === "fulfilled") {

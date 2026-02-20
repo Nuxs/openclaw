@@ -24,8 +24,11 @@ import type {
   LogEntry,
   LogLevel,
   MarketDispute,
+  MarketFilters,
+  MarketLedgerEntry,
   MarketLedgerSummary,
   MarketLease,
+  MarketMetricsSnapshot,
   MarketResource,
   MarketResourceKind,
   MarketStatusSummary,
@@ -163,12 +166,15 @@ export type AppViewState = {
   marketLoading: boolean;
   marketError: string | null;
   marketStatus: MarketStatusSummary | null;
+  marketMetrics: MarketMetricsSnapshot | null;
   marketResources: MarketResource[];
   marketLeases: MarketLease[];
   marketLedgerSummary: MarketLedgerSummary | null;
+  marketLedgerEntries: MarketLedgerEntry[];
   marketDisputes: MarketDispute[];
   marketLastSuccess: number | null;
   marketResourceKind: MarketResourceKind | "all";
+  marketFilters: MarketFilters;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;

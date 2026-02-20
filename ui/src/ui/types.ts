@@ -605,6 +605,58 @@ export type MarketStatusSummary = {
   };
 };
 
+export type MarketAlertSeverity = "p0" | "p1";
+
+export type MarketAlert = {
+  rule: string;
+  severity: MarketAlertSeverity;
+  triggered: boolean;
+  value: number;
+};
+
+export type MarketMetricsGroup = {
+  total: number;
+  byStatus: Record<string, number>;
+};
+
+export type MarketSettlementMetrics = MarketMetricsGroup & {
+  failureRate: number;
+};
+
+export type MarketLeaseMetrics = MarketMetricsGroup & {
+  active: number;
+  expired: number;
+  revoked: number;
+};
+
+export type MarketDisputeMetrics = MarketMetricsGroup & {
+  open: number;
+  resolved: number;
+  rejected: number;
+};
+
+export type MarketRevocationMetrics = {
+  total: number;
+  pending: number;
+  failed: number;
+};
+
+export type MarketAuditMetrics = {
+  events: number;
+  anchorPending: number;
+};
+
+export type MarketMetricsSnapshot = {
+  offers: MarketMetricsGroup;
+  orders: MarketMetricsGroup;
+  settlements: MarketSettlementMetrics;
+  leases: MarketLeaseMetrics;
+  disputes: MarketDisputeMetrics;
+  revocations: MarketRevocationMetrics;
+  audit: MarketAuditMetrics;
+  alerts: MarketAlert[];
+};
+
 export type MarketResourceKind = "model" | "search" | "storage";
 export type MarketResourceStatus = "resource_draft" | "resource_published" | "resource_unpublished";
 export type MarketLeaseStatus = "lease_active" | "lease_revoked" | "lease_expired";
@@ -653,6 +705,26 @@ export type MarketLedgerSummary = {
   currency: string;
 };
 
+export type MarketLedgerUnit = "token" | "call" | "query" | "byte";
+
+export type MarketLedgerEntry = {
+  ledgerId: string;
+  timestamp: string;
+  leaseId: string;
+  resourceId: string;
+  kind: MarketResourceKind;
+  providerActorId: string;
+  consumerActorId: string;
+  unit: MarketLedgerUnit;
+  quantity: string;
+  cost: string;
+  currency: string;
+  tokenAddress?: string;
+  sessionId?: string;
+  runId?: string;
+  entryHash: string;
+};
+
 export type MarketDispute = {
   disputeId: string;
   orderId: string;
@@ -662,6 +734,31 @@ export type MarketDispute = {
   status: MarketDisputeStatus;
   openedAt: string;
   resolvedAt?: string;
+};
+
+export type MarketResourceStatusFilter = MarketResourceStatus | "all";
+export type MarketLeaseStatusFilter = MarketLeaseStatus | "all";
+export type MarketDisputeStatusFilter = MarketDisputeStatus | "all";
+export type MarketLedgerUnitFilter = MarketLedgerUnit | "all";
+
+export type MarketResourceSort = "updated_desc" | "updated_asc";
+export type MarketLeaseSort = "issued_desc" | "issued_asc";
+export type MarketDisputeSort = "opened_desc" | "opened_asc";
+export type MarketLedgerSort = "time_desc" | "time_asc";
+
+export type MarketFilters = {
+  resourceSearch: string;
+  resourceStatus: MarketResourceStatusFilter;
+  resourceSort: MarketResourceSort;
+  leaseSearch: string;
+  leaseStatus: MarketLeaseStatusFilter;
+  leaseSort: MarketLeaseSort;
+  disputeSearch: string;
+  disputeStatus: MarketDisputeStatusFilter;
+  disputeSort: MarketDisputeSort;
+  ledgerSearch: string;
+  ledgerUnit: MarketLedgerUnitFilter;
+  ledgerSort: MarketLedgerSort;
 };
 
 export type HealthSnapshot = Record<string, unknown>;

@@ -247,12 +247,28 @@ export class OpenClawApp extends LitElement {
   @state() marketLoading = false;
   @state() marketError: string | null = null;
   @state() marketStatus: import("./types.js").MarketStatusSummary | null = null;
+  @state() marketMetrics: import("./types.js").MarketMetricsSnapshot | null = null;
   @state() marketResources: import("./types.js").MarketResource[] = [];
   @state() marketLeases: import("./types.js").MarketLease[] = [];
   @state() marketLedgerSummary: import("./types.js").MarketLedgerSummary | null = null;
+  @state() marketLedgerEntries: import("./types.js").MarketLedgerEntry[] = [];
   @state() marketDisputes: import("./types.js").MarketDispute[] = [];
   @state() marketLastSuccess: number | null = null;
   @state() marketResourceKind: import("./types.js").MarketResourceKind | "all" = "all";
+  @state() marketFilters: import("./types.js").MarketFilters = {
+    resourceSearch: "",
+    resourceStatus: "all",
+    resourceSort: "updated_desc",
+    leaseSearch: "",
+    leaseStatus: "all",
+    leaseSort: "issued_desc",
+    disputeSearch: "",
+    disputeStatus: "all",
+    disputeSort: "opened_desc",
+    ledgerSearch: "",
+    ledgerUnit: "all",
+    ledgerSort: "time_desc",
+  };
 
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;

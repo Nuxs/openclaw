@@ -254,12 +254,16 @@ export function renderApp(state: AppViewState) {
                 error: state.marketError,
                 lastSuccessAt: state.marketLastSuccess,
                 status: state.marketStatus,
+                metrics: state.marketMetrics,
                 resources: state.marketResources,
                 leases: state.marketLeases,
                 ledger: state.marketLedgerSummary,
+                ledgerEntries: state.marketLedgerEntries,
                 disputes: state.marketDisputes,
                 resourceKind: state.marketResourceKind,
+                filters: state.marketFilters,
                 onResourceKindChange: (next) => (state.marketResourceKind = next),
+                onFiltersChange: (next) => (state.marketFilters = next),
                 onRefresh: () => state.loadMarket(),
               })
             : nothing
