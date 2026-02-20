@@ -9,7 +9,7 @@ title: "Web3 Resource Market API"
 
 ## 目标与适用范围
 
-本文档描述 Web3 资源共享市场的“可机器执行”接口契约，用于 AI 管家在底层代办复杂流程。
+本文档描述 Web3 资源共享市场的“可机器执行”接口契约，用于 AI 管家在底层代办复杂流程。对外入口统一为 `web3.*`，`market.*` 为内部权威接口。
 
 - **用户侧**：操作极简，只做发布和租用的少量决策。
 - **AI 管家侧**：用本页定义的 Gateway RPC 与 Provider HTTP routes 完成租约签发、调用、记账与对账。
@@ -48,7 +48,7 @@ title: "Web3 Resource Market API"
 
 ## Gateway RPC（market-core，资源与租约）
 
-以下方法由 `market-core` 暴露，属于资源共享市场的权威状态面。
+以下方法由 `market-core` 暴露，属于资源共享市场的权威状态面，仅供 `web3-core` 与受信运维使用（对外入口统一为 `web3.*`）。
 
 ### Resource
 
@@ -91,7 +91,7 @@ title: "Web3 Resource Market API"
 
 ## Gateway RPC（web3-core，编排与体验）
 
-以下方法由 `web3-core` 暴露，用于把资源共享能力变成“AI 管家可用”的高层接口。
+以下方法由 `web3-core` 暴露，是对外单入口（`web3.*`），用于把资源共享能力变成“AI 管家可用”的高层接口。
 
 ### Orchestration
 
@@ -100,7 +100,7 @@ title: "Web3 Resource Market API"
 - `web3.resources.lease`
 - `web3.resources.revokeLease`
 
-这些方法一般会在内部调用 `market.resource.*` / `market.lease.*`，并负责把“资源调用面”封装为用户不可见的实现细节。
+这些方法一般会在内部调用 `market.resource.*` / `market.lease.*`，并负责把“资源调用面”封装为用户不可见的实现细节。对外入口统一为 `web3.*`，不直接暴露 `market.*`。
 
 ### Consumer tools
 

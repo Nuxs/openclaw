@@ -1,5 +1,6 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayError } from "../errors.js";
 
 type GatewayCallResult = {
   ok?: boolean;
@@ -90,12 +91,12 @@ function createMarketProxyHandler(
       });
       const normalized = normalizeGatewayResult(response);
       if (!normalized.ok) {
-        respond(false, { error: normalized.error });
+        respond(false, { error: formatWeb3GatewayError(normalized.error) });
         return;
       }
       respond(true, normalized.result ?? {});
     } catch (err) {
-      respond(false, { error: err instanceof Error ? err.message : String(err) });
+      respond(false, { error: formatWeb3GatewayError(err) });
     }
   };
 }

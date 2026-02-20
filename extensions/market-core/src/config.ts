@@ -87,7 +87,7 @@ export const DEFAULT_CONFIG: MarketPluginConfig = {
   },
   access: {
     mode: "allowlist",
-    allowClientIds: ["gateway-client", "cli"],
+    allowClientIds: ["gateway-client"],
     requireActor: false,
     actorSource: "param",
     requireActorMatch: false,

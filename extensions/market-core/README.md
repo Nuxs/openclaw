@@ -7,7 +7,7 @@
 与 `web3-core` 的关系：
 
 - **`web3-core`**：对外入口语义与体验层（推荐使用 `web3.*` / `web3.market.*`），并提供身份、审计、归档、计费等横切能力。
-- **`market-core`**：对内/对运维的权威执行层（也会注册 `market.*` 低层方法；在产品化叙事上建议视为“底层 API”）。
+- **`market-core`**：内部权威执行层（会注册 `market.*` 低层方法，但仅供 `web3-core` 与受信运维使用）。
 
 ## 快速开始
 
@@ -20,9 +20,11 @@ cd extensions/market-core
 node --import tsx demo.ts
 ```
 
-## Gateway API（注册的 `market.*` 方法）
+## Gateway API（内部 `market.*` 方法）
 
-入口注册见 `src/index.ts`。主要分组：
+入口注册见 `src/index.ts`。`market.*` 仅供 `web3-core` 与受信运维使用，对外入口应使用 `web3.*`。
+
+主要分组：
 
 - **Offers**：`market.offer.create` / `market.offer.publish` / `market.offer.update` / `market.offer.close`
 - **Resources**：`market.resource.publish` / `market.resource.unpublish` / `market.resource.get` / `market.resource.list`
@@ -43,7 +45,7 @@ node --import tsx demo.ts
 - allowlist/scopes/roles/clientIds：用于把写操作锁到受信客户端
 - `access.requireActor` / `access.requireActorMatch`：用于约束 `actorId` 与买卖/支付身份匹配
 
-默认值为 `open`，适合本地开发与演示，但**不建议在不受信环境直接暴露**。
+默认值为 `allowlist`（仅允许 `gateway-client`），适合生产默认安全姿态；若需要临时演示可显式放宽，但**不建议在不受信环境直接暴露**。
 
 ## 数据存储
 

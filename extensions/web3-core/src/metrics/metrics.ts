@@ -1,5 +1,6 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayError } from "../errors.js";
 import type { ResourceIndexEntry } from "../state/store.js";
 import { Web3StateStore } from "../state/store.js";
 
@@ -152,7 +153,7 @@ export function createWeb3MetricsSnapshotHandler(
     try {
       respond(true, buildWeb3MetricsSnapshot(store, config));
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatWeb3GatewayError(err) });
     }
   };
 }
@@ -175,12 +176,12 @@ export function createWeb3MonitorSnapshotHandler(
         });
         const normalized = normalizeGatewayResult(response);
         if (!normalized.ok) {
-          marketError = normalized.error ?? "market metrics unavailable";
+          marketError = formatWeb3GatewayError(normalized.error ?? "market metrics unavailable");
         } else {
           market = normalized.result ?? null;
         }
       } catch (err) {
-        marketError = err instanceof Error ? err.message : String(err);
+        marketError = formatWeb3GatewayError(err);
       }
 
       respond(true, {
@@ -189,7 +190,7 @@ export function createWeb3MonitorSnapshotHandler(
         marketError,
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatWeb3GatewayError(err) });
     }
   };
 }

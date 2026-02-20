@@ -36,7 +36,9 @@
 - **RevocationJob**: 撤回失败后的重试任务。
 - **AuditEvent**: 审计事件流，支持审计链路与透明度汇总。
 
-### 网关方法
+### 网关方法（内部 `market.*`）
+
+> `market.*` 仅供 `web3-core` 与受信运维使用，对外入口请使用 `web3.*`。
 
 - **Offer**: `market.offer.create` `market.offer.publish` `market.offer.update` `market.offer.close`
 - **Order**: `market.order.create` `market.order.cancel`

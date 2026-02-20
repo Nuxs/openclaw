@@ -54,6 +54,8 @@ graph TD
 
 ## 接口：已有 Gateway 方法（可直接集成）
 
+> 对外入口统一为 `web3.*`；`market.*` 仅供 `web3-core` 与受信运维使用。
+
 ### `web3-core`（已存在）
 
 - `web3.capabilities.list`（params: `includeUnavailable?`, `includeDetails?`, `group?`）
@@ -67,7 +69,9 @@ graph TD
 
 > `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口：能力描述应包含字段级 `paramsSchema`、常见稳定错误码集合（以 `web3-market-resource-api.md` 为准）与最小示例，且不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
 
-### `market-core`（已存在）
+### `market-core`（已存在，内部权威层）
+
+> `market.*` 属于内部权威方法，仅供 `web3-core` 与受信运维使用；对外入口统一为 `web3.*`。
 
 交易与结算（Offer/Order/Settlement/Consent/Delivery/Transparency）：
 
