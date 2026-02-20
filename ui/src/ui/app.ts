@@ -39,6 +39,7 @@ import {
 import {
   applySettings as applySettingsInternal,
   loadCron as loadCronInternal,
+  loadMarket as loadMarketInternal,
   loadOverview as loadOverviewInternal,
   setTab as setTabInternal,
   setTheme as setThemeInternal,
@@ -242,6 +243,16 @@ export class OpenClawApp extends LitElement {
 
   @state() overviewWeb3Status: import("./types.js").Web3StatusSummary | null = null;
   @state() overviewWeb3Error: string | null = null;
+
+  @state() marketLoading = false;
+  @state() marketError: string | null = null;
+  @state() marketStatus: import("./types.js").MarketStatusSummary | null = null;
+  @state() marketResources: import("./types.js").MarketResource[] = [];
+  @state() marketLeases: import("./types.js").MarketLease[] = [];
+  @state() marketLedgerSummary: import("./types.js").MarketLedgerSummary | null = null;
+  @state() marketDisputes: import("./types.js").MarketDispute[] = [];
+  @state() marketLastSuccess: number | null = null;
+  @state() marketResourceKind: import("./types.js").MarketResourceKind | "all" = "all";
 
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;
@@ -452,6 +463,10 @@ export class OpenClawApp extends LitElement {
 
   async loadOverview() {
     await loadOverviewInternal(this as unknown as Parameters<typeof loadOverviewInternal>[0]);
+  }
+
+  async loadMarket() {
+    await loadMarketInternal(this as unknown as Parameters<typeof loadMarketInternal>[0]);
   }
 
   async loadCron() {

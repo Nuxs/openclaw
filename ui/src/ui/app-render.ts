@@ -64,6 +64,7 @@ import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
+import { renderMarket } from "./views/market.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
@@ -242,6 +243,24 @@ export function renderApp(state: AppViewState) {
                 },
                 onConnect: () => state.connect(),
                 onRefresh: () => state.loadOverview(),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "market"
+            ? renderMarket({
+                loading: state.marketLoading,
+                error: state.marketError,
+                lastSuccessAt: state.marketLastSuccess,
+                status: state.marketStatus,
+                resources: state.marketResources,
+                leases: state.marketLeases,
+                ledger: state.marketLedgerSummary,
+                disputes: state.marketDisputes,
+                resourceKind: state.marketResourceKind,
+                onResourceKindChange: (next) => (state.marketResourceKind = next),
+                onRefresh: () => state.loadMarket(),
               })
             : nothing
         }

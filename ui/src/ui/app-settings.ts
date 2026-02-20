@@ -17,6 +17,7 @@ import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
+import { loadMarketStatus } from "./controllers/market-status.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
@@ -182,6 +183,9 @@ export function setTheme(host: SettingsHost, next: ThemeMode, context?: ThemeTra
 export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "overview") {
     await loadOverview(host);
+  }
+  if (host.tab === "market") {
+    await loadMarket(host);
   }
   if (host.tab === "channels") {
     await loadChannelsTab(host);
@@ -412,6 +416,10 @@ export async function loadOverview(host: SettingsHost) {
     loadDebug(host as unknown as OpenClawApp),
     loadWeb3Status(host as unknown as OpenClawApp),
   ]);
+}
+
+export async function loadMarket(host: SettingsHost) {
+  await loadMarketStatus(host as unknown as OpenClawApp);
 }
 
 export async function loadChannelsTab(host: SettingsHost) {

@@ -23,6 +23,12 @@ import type {
   HealthSnapshot,
   LogEntry,
   LogLevel,
+  MarketDispute,
+  MarketLedgerSummary,
+  MarketLease,
+  MarketResource,
+  MarketResourceKind,
+  MarketStatusSummary,
   NostrProfile,
   PresenceEntry,
   SessionsUsageResult,
@@ -154,6 +160,15 @@ export type AppViewState = {
   sessionsIncludeUnknown: boolean;
   overviewWeb3Status: import("./types.ts").Web3StatusSummary | null;
   overviewWeb3Error: string | null;
+  marketLoading: boolean;
+  marketError: string | null;
+  marketStatus: MarketStatusSummary | null;
+  marketResources: MarketResource[];
+  marketLeases: MarketLease[];
+  marketLedgerSummary: MarketLedgerSummary | null;
+  marketDisputes: MarketDispute[];
+  marketLastSuccess: number | null;
+  marketResourceKind: MarketResourceKind | "all";
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
@@ -238,6 +253,7 @@ export type AppViewState = {
   setTheme: (theme: ThemeMode, context?: ThemeTransitionContext) => void;
   applySettings: (next: UiSettings) => void;
   loadOverview: () => Promise<void>;
+  loadMarket: () => Promise<void>;
   loadAssistantIdentity: () => Promise<void>;
   loadCron: () => Promise<void>;
   handleWhatsAppStart: (force: boolean) => Promise<void>;

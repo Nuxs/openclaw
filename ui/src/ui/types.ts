@@ -592,6 +592,78 @@ export type Web3StatusSummary = {
   };
 };
 
+export type MarketStatusSummary = {
+  offers: Record<string, number>;
+  orders: Record<string, number>;
+  deliveries: Record<string, number>;
+  settlements: Record<string, number>;
+  totals: {
+    offers: number;
+    orders: number;
+    deliveries: number;
+    settlements: number;
+  };
+};
+
+export type MarketResourceKind = "model" | "search" | "storage";
+export type MarketResourceStatus = "resource_draft" | "resource_published" | "resource_unpublished";
+export type MarketLeaseStatus = "lease_active" | "lease_revoked" | "lease_expired";
+export type MarketDisputeStatus =
+  | "dispute_opened"
+  | "dispute_evidence_submitted"
+  | "dispute_resolved"
+  | "dispute_rejected";
+
+export type MarketPrice = {
+  unit: "token" | "call" | "query" | "gb_day" | "put" | "get";
+  amount: string;
+  currency: string;
+  tokenAddress?: string;
+};
+
+export type MarketResource = {
+  resourceId: string;
+  kind: MarketResourceKind;
+  status: MarketResourceStatus;
+  providerActorId: string;
+  offerId?: string;
+  label: string;
+  description?: string;
+  tags?: string[];
+  price: MarketPrice;
+  updatedAt?: string;
+};
+
+export type MarketLease = {
+  leaseId: string;
+  resourceId: string;
+  kind: MarketResourceKind;
+  providerActorId: string;
+  consumerActorId: string;
+  orderId: string;
+  status: MarketLeaseStatus;
+  issuedAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+};
+
+export type MarketLedgerSummary = {
+  byUnit: Record<string, { quantity: string; cost: string }>;
+  totalCost: string;
+  currency: string;
+};
+
+export type MarketDispute = {
+  disputeId: string;
+  orderId: string;
+  initiatorActorId: string;
+  respondentActorId: string;
+  reason: string;
+  status: MarketDisputeStatus;
+  openedAt: string;
+  resolvedAt?: string;
+};
+
 export type HealthSnapshot = Record<string, unknown>;
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
