@@ -25,6 +25,10 @@ import {
 import { flushPendingSettlements } from "./billing/settlement.js";
 import { resolveBrainModelOverride } from "./brain/resolve.js";
 import { createWeb3StreamFn } from "./brain/stream.js";
+import {
+  createCapabilitiesDescribeHandler,
+  createCapabilitiesListHandler,
+} from "./capabilities/handlers.js";
 import { resolveConfig } from "./config.js";
 import {
   createBindWalletCommand,
@@ -33,6 +37,19 @@ import {
 } from "./identity/commands.js";
 import { createSiweChallengeHandler, createSiweVerifyHandler } from "./identity/gateway.js";
 import { createBrowserIngestHandler } from "./ingest/browser-handler.js";
+import {
+  createMarketLedgerListHandler,
+  createMarketLedgerSummaryHandler,
+  createMarketLeaseExpireSweepHandler,
+  createMarketLeaseGetHandler,
+  createMarketLeaseIssueHandler,
+  createMarketLeaseListHandler,
+  createMarketLeaseRevokeHandler,
+  createMarketResourceGetHandler,
+  createMarketResourceListHandler,
+  createMarketResourcePublishHandler,
+  createMarketResourceUnpublishHandler,
+} from "./market/handlers.js";
 import {
   createResourceModelChatHandler,
   createResourceSearchQueryHandler,
@@ -144,6 +161,11 @@ const plugin: OpenClawPluginDefinition = {
     }
 
     // ---- Gateway methods ----
+    api.registerGatewayMethod("web3.capabilities.list", createCapabilitiesListHandler(config));
+    api.registerGatewayMethod(
+      "web3.capabilities.describe",
+      createCapabilitiesDescribeHandler(config),
+    );
     api.registerGatewayMethod("web3.siwe.challenge", createSiweChallengeHandler(store, config));
     api.registerGatewayMethod("web3.siwe.verify", createSiweVerifyHandler(store, config));
     api.registerGatewayMethod("web3.audit.query", createAuditQueryHandler(store));
@@ -160,6 +182,31 @@ const plugin: OpenClawPluginDefinition = {
       createResourceRevokeLeaseHandler(config),
     );
     api.registerGatewayMethod("web3.resources.status", createResourceStatusHandler(config));
+
+    api.registerGatewayMethod(
+      "web3.market.resource.publish",
+      createMarketResourcePublishHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.resource.unpublish",
+      createMarketResourceUnpublishHandler(config),
+    );
+    api.registerGatewayMethod("web3.market.resource.get", createMarketResourceGetHandler(config));
+    api.registerGatewayMethod("web3.market.resource.list", createMarketResourceListHandler(config));
+    api.registerGatewayMethod("web3.market.lease.issue", createMarketLeaseIssueHandler(config));
+    api.registerGatewayMethod("web3.market.lease.revoke", createMarketLeaseRevokeHandler(config));
+    api.registerGatewayMethod("web3.market.lease.get", createMarketLeaseGetHandler(config));
+    api.registerGatewayMethod("web3.market.lease.list", createMarketLeaseListHandler(config));
+    api.registerGatewayMethod(
+      "web3.market.lease.expireSweep",
+      createMarketLeaseExpireSweepHandler(config),
+    );
+    api.registerGatewayMethod("web3.market.ledger.list", createMarketLedgerListHandler(config));
+    api.registerGatewayMethod(
+      "web3.market.ledger.summary",
+      createMarketLedgerSummaryHandler(config),
+    );
+
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
 
