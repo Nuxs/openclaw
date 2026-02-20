@@ -40,6 +40,10 @@ import {
   createResourceStorageListHandler,
   createResourceStoragePutHandler,
 } from "./resources/http.js";
+import {
+  createResourceIndexListHandler,
+  createResourceIndexReportHandler,
+} from "./resources/indexer.js";
 import { getConsumerLeaseAccess } from "./resources/leases.js";
 import {
   createResourceLeaseHandler,
@@ -156,6 +160,8 @@ const plugin: OpenClawPluginDefinition = {
       createResourceRevokeLeaseHandler(config),
     );
     api.registerGatewayMethod("web3.resources.status", createResourceStatusHandler(config));
+    api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
+    api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
 
     const web3SearchTool = createWeb3SearchTool(config);
     if (web3SearchTool) {

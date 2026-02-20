@@ -43,6 +43,28 @@ export type PendingSettlement = {
   lastError?: string;
 };
 
+export type IndexedResourceKind = "model" | "search" | "storage";
+
+export type IndexedResource = {
+  resourceId: string;
+  kind: IndexedResourceKind;
+  label?: string;
+  description?: string;
+  tags?: string[];
+  price?: string;
+  unit?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type ResourceIndexEntry = {
+  providerId: string;
+  endpoint?: string;
+  resources: IndexedResource[];
+  updatedAt: string;
+  expiresAt?: string;
+  meta?: Record<string, unknown>;
+};
+
 export type AnchorReceipt = {
   anchorId: string;
   tx: string;
@@ -219,6 +241,37 @@ export class Web3StateStore {
     if (!existsSync(this.usagePath)) return [];
     const map = JSON.parse(readFileSync(this.usagePath, "utf-8")) as Record<string, UsageRecord>;
     return Object.values(map);
+  }
+
+  // ---- Resource index ----
+
+  private get resourceIndexPath() {
+    return join(this.dir, "resource-index.json");
+  }
+
+  getResourceIndex(): ResourceIndexEntry[] {
+    if (!existsSync(this.resourceIndexPath)) return [];
+    return JSON.parse(readFileSync(this.resourceIndexPath, "utf-8")) as ResourceIndexEntry[];
+  }
+
+  saveResourceIndex(entries: ResourceIndexEntry[]): void {
+    writeFileSync(this.resourceIndexPath, JSON.stringify(entries, null, 2));
+  }
+
+  upsertResourceIndex(entry: ResourceIndexEntry): void {
+    const list = this.getResourceIndex();
+    const index = list.findIndex((item) => item.providerId === entry.providerId);
+    if (index >= 0) {
+      list[index] = entry;
+    } else {
+      list.push(entry);
+    }
+    this.saveResourceIndex(list);
+  }
+
+  removeResourceIndex(providerId: string): void {
+    const list = this.getResourceIndex().filter((item) => item.providerId !== providerId);
+    this.saveResourceIndex(list);
   }
 
   // ---- Pending settlements (retry queue) ----
