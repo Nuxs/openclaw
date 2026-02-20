@@ -52,7 +52,8 @@ if [[ "$TARGET_REF" != "upstream/main" ]]; then
   if ! git rev-parse "$TARGET_REF" &>/dev/null; then
     echo "❌ 找不到 ref: $TARGET_REF"
     echo "   可用的最近 tags:"
-    git tag --sort=-creatordate | head -10
+    # Avoid pipefail+head SIGPIPE failures.
+    git tag --sort=-creatordate | sed -n '1,10p'
     exit 1
   fi
 fi
@@ -78,7 +79,8 @@ fi
 if $CHECK_ONLY; then
   echo ""
   echo "📋 最近的 upstream 变更:"
-  git --no-pager log --oneline "HEAD..$TARGET_REF" | head -20
+  # Avoid pipefail+head SIGPIPE failures.
+  git --no-pager log --oneline -n 20 "HEAD..$TARGET_REF"
   [[ "$BEHIND" -gt 20 ]] && echo "   ... 还有 $((BEHIND - 20)) 个提交"
   exit 0
 fi
