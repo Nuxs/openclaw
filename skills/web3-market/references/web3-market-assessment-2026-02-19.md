@@ -1,7 +1,7 @@
 ### OpenClaw + Web3 分布式助理网络评审报告（仅评审）
 
-- **评估日期**: 2026-02-19
-- **文档类型**: 技术架构与实现进度评审
+- **评估日期**: 2026-02-20
+- **文档类型**: 技术架构与实现进度评审（对照当前实现如实更新）
 - **评估者**: AI Assistant
 - **范围说明**: 基于当前代码库的可验证实现与测试；不包含未在代码中出现的推断。
 
@@ -14,24 +14,43 @@
 
 ### 📋 执行摘要
 
-**结论**: 架构设计与关键实现已达到生产级 MVP 的可验证水平，但仍存在若干上线阻断项与一致性风险，需要在上线前收敛。
+**结论**: 核心交易闭环（资源发布 → 租约 → 调用 → 权威记账 → 结算/审计）已达到生产级 MVP 的可验证水平；但当前实现与 Phase 1 的“硬 Gate”（敏感信息零泄露、稳定错误码、能力自描述可操作）仍有明显差距，存在上线前必须收敛的安全/一致性风险。
 
-- **综合评分**: **4.2/5**
-- **高置信亮点**:
-  - **双向账本与权威记账** 已落地且具备拒绝伪造机制
-  - **结算闭环** 已可执行并有单元测试覆盖
-  - **原子性事务** 在 SQLite 下可靠；File 模式无回滚（需额外锁）
-  - **安全加固** 包含时序攻击防护与路径穿越防护
-- **关键阻断项**:
-  - 争议仲裁机制缺失
-  - 资源发现/索引服务缺失
-  - 监控告警缺失
-  - Web UI 缺失
-  - 跨插件 E2E 覆盖不足
+- **综合评分**: **4.0/5**
+- **高置信亮点（可在代码中直接核验）**:
+  - **结算闭环**（pending 重试 + 单测覆盖）已落地
+  - **Provider 权威记账** 已落地且具备拒绝伪造机制（`actorId == providerActorId` + lease/resource/kind 校验）
+  - **双后端存储**（File + SQLite）已实现，SQLite 事务回滚可靠
+  - **能力自描述入口**（`web3.capabilities.list/describe`）已上线
+  - **体验层代理入口**（`web3.market.*` 代理到 `market.*` 子集）已上线
+- **关键阻断项（上线前必须收敛）**:
+  - **争议仲裁/Dispute** 未实现（`web3.dispute.*` / `market.dispute.*` 不存在）
+  - **索引可迁移契约缺失**：`web3.index.*` 仅本地 indexer，**无签名/验签**，且返回包含 `endpoint`
+  - **敏感信息零泄露未达标（Gate-SEC-01）**：多处对外透传原始错误/上游响应文本，存在泄露 endpoint/路径等细节的风险
+  - **稳定错误码未达标（Gate-ERR-01）**：多处返回 `err.message` / `String(err)`，缺少统一错误码契约
+  - **监控告警与 Web UI 缺失**（当前 UI 仅覆盖 `web3.status/usage/debug` 子集）
+  - **跨插件 E2E 覆盖不足**（关键链路更多依赖单测/模块内测试）
 
 ---
 
 ### ✅ 事实核验（与代码一致的可验证结论）
+
+- **已实现能力规模（用于评审引用，非主观估计）**
+  - `web3-core` **gateway methods：27**；`market-core` **gateway methods：33**
+  - `web3-core` Provider HTTP routes：**6**（另有 1 条可配置 browser ingest route）；Consumer tools：**4**
+  - 证据: `extensions/web3-core/src/index.ts`、`extensions/market-core/src/index.ts`
+
+- **能力自描述入口已上线**（Day 0 基础设施）
+  - `web3.capabilities.list` / `web3.capabilities.describe`
+  - 证据: `extensions/web3-core/src/capabilities/*` + `extensions/web3-core/src/index.ts` 注册
+
+- **体验层代理入口已上线（web3.market.\*）**
+  - `web3.market.resource.*` / `web3.market.lease.*` / `web3.market.ledger.*` 代理到 `market.*` 子集
+  - 证据: `extensions/web3-core/src/market/handlers.ts`
+
+- **索引（web3.index.\*）已存在，但仅为本地 indexer**
+  - `web3.index.report` / `web3.index.list` 写入/读取本地 `web3/resource-index.json`（带 TTL）
+  - 证据: `extensions/web3-core/src/resources/indexer.ts` + `extensions/web3-core/src/state/store.ts`
 
 - **结算闭环**（`flushPendingSettlements` 调用 `market.settlement.lock` 并在成功时移除队列）
   - 证据: `extensions/web3-core/src/billing/settlement.ts`（`isSettlementReady` / `flushPendingSettlements`）
@@ -41,7 +60,7 @@
   - 证据: `extensions/web3-core/src/resources/http.ts`（`appendModelLedger` + handler 末尾写入）
   - 测试: `extensions/web3-core/src/resources/http.test.ts`
 
-- **Provider-only 记账防伪造**（`actorId` 必须匹配 `providerActorId`）
+- **Provider-only 记账防伪造**（`actorId` 必须匹配 `providerActorId`，且校验 lease/resource/kind/过期等）
   - 证据: `extensions/market-core/src/market/handlers/ledger.ts`
 
 - **原子性事务（SQLite）**
@@ -80,6 +99,25 @@
 
 ### 🎯 关键 Gate 状态（基于代码与测试）
 
+> Gate 命名以 Phase 1 规划文档为主（`web3-market-plan-overview.md` / `web3-market-plan-phase1-execution.md`）。本节只做“当前实现是否满足”的如实标注。
+
+- **Gate-SEC-01（敏感信息零泄露）**: ❌ **未满足**
+  - 多处对外透传 `err.message` / `String(err)`，consumer tools 也可能回显 provider 的 `response.text()`；并且 `web3.index.list` 返回结构包含 `endpoint` 字段。
+
+- **Gate-ERR-01（稳定错误码）**: ❌ **未满足**
+  - 多处返回原始错误字符串，缺少统一稳定错误码（`E_INVALID_ARGUMENT/E_FORBIDDEN/...`）契约。
+
+- **Gate-CAP-01（能力自描述可操作）**: ⚠️ **部分满足**
+  - `web3.capabilities.list/describe` 已存在，但 `paramsSchema` 当前更多是字符串占位；未系统声明常见错误码集合。
+
+- **Gate-LEDGER-01（权威记账防伪造）**: ✅ **满足**
+  - `market.ledger.append` 强制 `actorId == providerActorId`，且校验 lease/resource/kind/过期等一致性。
+
+- **Gate-STORE-01（双存储一致性）**: ⚠️ **部分满足**
+  - SQLite 事务回滚可靠；File 模式无回滚，存在部分写入风险（需外部锁或上线前强制 SQLite）。
+
+---
+
 - **Gate-SETTLE-01（结算闭环）**: ✅ **满足**
   - `flushPendingSettlements` + 测试覆盖成功/重试路径。
 
@@ -96,16 +134,16 @@
 
 ### 📊 评分（基于已验证实现）
 
-| 维度         | 评分       | 依据                                |
-| ------------ | ---------- | ----------------------------------- |
-| 数据流完整性 | ⭐⭐⭐⭐⭐ | 结算闭环、账本写入与审计链路已闭合  |
-| 隐私安全     | ⭐⭐⭐⭐⭐ | 关键位置时序攻击防护 + 路径穿越防护 |
-| 可维护性     | ⭐⭐⭐⭐⭐ | handlers 拆分、职责清晰             |
-| 功能完善性   | ⭐⭐⭐⭐☆  | MVP 完整，生产级功能缺失            |
-| 易用性       | ⭐⭐⭐⭐☆  | CLI 友好，但缺少 Web UI             |
-| 测试覆盖     | ⭐⭐⭐⭐☆  | 关键路径覆盖足够，E2E 不足          |
+| 维度         | 评分       | 依据                                                                   |
+| ------------ | ---------- | ---------------------------------------------------------------------- |
+| 数据流完整性 | ⭐⭐⭐⭐⭐ | 资源→租约→调用→权威记账→结算闭环可核验                                 |
+| 隐私安全     | ⭐⭐⭐☆☆   | 时序/路径防护已做；但存在原始错误/endpoint 透传风险                    |
+| 可维护性     | ⭐⭐⭐⭐⭐ | handlers 拆分、职责清晰、接口边界明确                                  |
+| 功能完善性   | ⭐⭐⭐⭐☆  | 核心 B-2 完整；Dispute/索引签名/监控/UI 等缺失                         |
+| 易用性       | ⭐⭐⭐☆☆   | 具备 `web3.market.*` 子集代理与能力入口，但缺少面向用户的仪表盘/管理台 |
+| 测试覆盖     | ⭐⭐⭐⭐☆  | 关键路径覆盖足够，但跨插件 E2E 仍不足                                  |
 
-**综合评分**: **4.2/5**
+**综合评分**: **4.0/5**
 
 ---
 
@@ -191,14 +229,17 @@
 
 #### 2) 资源发现/索引服务（P0）
 
-- **选型方案**: **“中心化索引服务 + 定期上报”**
+- **当前实现现状（如实）**:
+  - `web3.index.report/list` 已存在，但仅为**本地 indexer**（写入 `web3/resource-index.json`，带 TTL）。
+  - index entry 结构包含 `endpoint` 字段；当前 **无签名/验签** 能力。
+
+- **选型方案（建议）**: **“先补齐索引条目签名（可迁移契约），再决定中心化服务/去中心化传输层”**
 - **方案概述**:
-  - Provider 定期上报资源元数据到索引服务（最小可用版）。
-  - Consumer 查询索引服务获取资源列表，再通过 `market.resource.*`/`market.lease.*` 完成交易。
+  - 先定义 index entry 的**自包含签名**字段（Provider 自签名），并在 consumer 侧提供验签能力。
+  - 冷启动阶段可以是中心化索引服务聚合；后续可切换到 gossip/DHT（只替换传输层，不改数据结构）。
 - **为什么选**:
-  - **最快解决冷启动**问题
-  - **不影响现有资源发布链路**
-  - 后续可扩展为 DHT 或去中心化目录
+  - **先解决信任与可迁移性**，避免后续重做数据格式
+  - 兼容“中心化 MVP → 去中心化目录”的演进路径
 
 #### 3) 监控告警（P0）
 
@@ -212,13 +253,16 @@
 
 #### 4) Web UI（P0）
 
-- **选型方案**: **“最小可用管理台（Dashboard + 资源/租约/账本）”**
+- **当前实现现状（如实）**:
+  - UI 目前仅覆盖 `web3.status/usage/debug` 等子集；尚无面向市场的资源/租约/账本/结算视图。
+
+- **选型方案（建议）**: **“先做管家经济仪表盘，再逐步补齐管理能力”**
 - **方案概述**:
-  - 复用现有 `ui` 模块与 `web3.status.summary`。
-  - 页面最小集合：状态概览、资源管理、租约列表、账本查询。
+  - 第一版以“看见价值”为目标：收入/支出/净收益、活跃资源、最近交易与异常提示。
+  - 管理能力（资源上下线、租约列表、账本查询）作为高级页面逐步补齐。
 - **为什么选**:
-  - **直接提升可用性**，降低普通用户门槛
-  - **复用已有 API**，无需新增复杂后端
+  - 更贴近产品目标（用户 10 秒理解 + 看见价值）
+  - 能复用现有 `web3.billing.summary`、`web3.status.summary` 与 `web3.market.*` 子集
 
 #### 5) E2E 测试补齐（P0）
 
@@ -233,11 +277,20 @@
 
 ### 📌 风险与建议
 
+- **Gate-SEC-01 风险（敏感信息泄露）**: 多处对外透传原始错误字符串/上游响应文本，`web3.index.list` 还会返回 `endpoint`。
+  - **建议**: 对外统一使用稳定错误码 + 安全提示；详细错误仅写本地日志且做脱敏；重新评估索引返回 `endpoint` 的策略（例如只在 provider 侧存储、consumer 侧通过租约/连接信息解析）。
+
+- **Gate-ERR-01 风险（错误契约不稳定）**: UI/Agent 难以做可预测的降级与重试策略。
+  - **建议**: 统一错误码（`E_INVALID_ARGUMENT/E_FORBIDDEN/E_NOT_FOUND/E_CONFLICT/E_INTERNAL` 等）并在 `web3.capabilities.*` 中声明常见错误集合。
+
+- **Gate-CAP-01 风险（能力自描述不可操作）**: `paramsSchema` 多为字符串占位，会导致管家反复试错。
+  - **建议**: 对高频/高风险能力补齐字段级结构（必填/可选/范围/格式）并附常见示例。
+
 - **File 模式一致性风险**: 缺少真正回滚，易出现部分写入。
   - **建议**: 上线前强制 SQLite 模式或引入 `withFileLock` 强制锁。
 
-- **冷启动风险**: 缺少资源目录会导致生态无法形成。
-  - **建议**: 首期必须上线中心化索引服务，后续再去中心化。
+- **冷启动风险（索引可迁移契约缺失）**: 现有 indexer 仅本地；缺少签名会导致未来迁移到中心化服务或 DHT 时信任模型不清。
+  - **建议**: 先补齐索引条目自签名与验签，再选择中心化聚合服务或去中心化传输层。
 
 - **争议处理缺口**: 缺乏仲裁会放大用户信任问题。
   - **建议**: 先链下仲裁 + 证据锚定，再链上升级。
@@ -246,9 +299,9 @@
 
 ### ✅ 最终结论
 
-OpenClaw + Web3 已达到“可上线 MVP”的工程质量，但仍需补齐 5 个 P0 阻断项，特别是**争议仲裁**与**资源发现服务**。当前技术路线在隐私、安全与可扩展性方面具备明显优势，建议以 **2 周 P0 计划**完成上线准备，同时并行启动生态冷启动策略。
+OpenClaw + Web3 已达到“可上线 MVP”的工程质量，但就当前实现而言，仍存在若干**上线前必须收敛的 P0 阻断项**：至少包括 **Dispute/仲裁缺失**、**索引签名/可迁移契约缺失**，以及 **敏感信息零泄露（Gate-SEC-01）与稳定错误码（Gate-ERR-01）未达标**。建议以“先修 Gate（SEC/ERR/CAP）→ 再补 Dispute/索引签名 → 再做监控与面向用户的仪表盘”为顺序推进，避免带风险上线。
 
 ---
 
-**文档版本**: v1.1
-**最后更新**: 2026-02-19
+**文档版本**: v1.2
+**最后更新**: 2026-02-20
