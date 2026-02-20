@@ -38,6 +38,8 @@ import {
 import { createSiweChallengeHandler, createSiweVerifyHandler } from "./identity/gateway.js";
 import { createBrowserIngestHandler } from "./ingest/browser-handler.js";
 import {
+  createMarketDisputeGetHandler,
+  createMarketDisputeListHandler,
   createMarketLedgerListHandler,
   createMarketLedgerSummaryHandler,
   createMarketLeaseExpireSweepHandler,
@@ -45,10 +47,12 @@ import {
   createMarketLeaseIssueHandler,
   createMarketLeaseListHandler,
   createMarketLeaseRevokeHandler,
+  createMarketMetricsSnapshotHandler,
   createMarketResourceGetHandler,
   createMarketResourceListHandler,
   createMarketResourcePublishHandler,
   createMarketResourceUnpublishHandler,
+  createMarketStatusSummaryHandler,
 } from "./market/handlers.js";
 import { createWeb3MetricsSnapshotHandler } from "./metrics/metrics.js";
 import {
@@ -209,6 +213,16 @@ const plugin: OpenClawPluginDefinition = {
       "web3.market.ledger.summary",
       createMarketLedgerSummaryHandler(config),
     );
+    api.registerGatewayMethod(
+      "web3.market.metrics.snapshot",
+      createMarketMetricsSnapshotHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.status.summary",
+      createMarketStatusSummaryHandler(config),
+    );
+    api.registerGatewayMethod("web3.market.dispute.get", createMarketDisputeGetHandler(config));
+    api.registerGatewayMethod("web3.market.dispute.list", createMarketDisputeListHandler(config));
 
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));

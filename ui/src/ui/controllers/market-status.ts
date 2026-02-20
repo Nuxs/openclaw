@@ -44,13 +44,13 @@ export async function loadMarketStatus(state: MarketStatusState) {
       ledgerEntriesRes,
       disputesRes,
     ] = await Promise.allSettled([
-      state.client.request("market.status.summary", {}),
-      state.client.request("market.metrics.snapshot", {}),
-      state.client.request("market.resource.list", { limit: 200 }),
-      state.client.request("market.lease.list", { limit: 50 }),
-      state.client.request("market.ledger.summary", {}),
-      state.client.request("market.ledger.list", { limit: 50 }),
-      state.client.request("market.dispute.list", { limit: 50 }),
+      state.client.request("web3.market.status.summary", {}),
+      state.client.request("web3.market.metrics.snapshot", {}),
+      state.client.request("web3.market.resource.list", { limit: 200 }),
+      state.client.request("web3.market.lease.list", { limit: 50 }),
+      state.client.request("web3.market.ledger.summary", {}),
+      state.client.request("web3.market.ledger.list", { limit: 50 }),
+      state.client.request("web3.market.dispute.list", { limit: 50 }),
     ]);
 
     const errors: string[] = [];

@@ -86,7 +86,8 @@ export const DEFAULT_CONFIG: MarketPluginConfig = {
     migrateFromFile: true,
   },
   access: {
-    mode: "open",
+    mode: "allowlist",
+    allowClientIds: ["gateway-client", "cli"],
     requireActor: false,
     actorSource: "param",
     requireActorMatch: false,

@@ -113,11 +113,11 @@ export function createMarketResourceUnpublishHandler(
 }
 
 export function createMarketResourceGetHandler(config: Web3PluginConfig): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.resource.get");
+  return createMarketProxyHandler(config, "market.resource.get", { requireResources: false });
 }
 
 export function createMarketResourceListHandler(config: Web3PluginConfig): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.resource.list");
+  return createMarketProxyHandler(config, "market.resource.list", { requireResources: false });
 }
 
 export function createMarketLeaseIssueHandler(config: Web3PluginConfig): GatewayRequestHandler {
@@ -129,11 +129,11 @@ export function createMarketLeaseRevokeHandler(config: Web3PluginConfig): Gatewa
 }
 
 export function createMarketLeaseGetHandler(config: Web3PluginConfig): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.lease.get");
+  return createMarketProxyHandler(config, "market.lease.get", { requireResources: false });
 }
 
 export function createMarketLeaseListHandler(config: Web3PluginConfig): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.lease.list");
+  return createMarketProxyHandler(config, "market.lease.list", { requireResources: false });
 }
 
 export function createMarketLeaseExpireSweepHandler(
@@ -143,9 +143,27 @@ export function createMarketLeaseExpireSweepHandler(
 }
 
 export function createMarketLedgerListHandler(config: Web3PluginConfig): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.ledger.list");
+  return createMarketProxyHandler(config, "market.ledger.list", { requireResources: false });
 }
 
 export function createMarketLedgerSummaryHandler(config: Web3PluginConfig): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.ledger.summary");
+  return createMarketProxyHandler(config, "market.ledger.summary", { requireResources: false });
+}
+
+export function createMarketStatusSummaryHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.status.summary", { requireResources: false });
+}
+
+export function createMarketMetricsSnapshotHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.metrics.snapshot", { requireResources: false });
+}
+
+export function createMarketDisputeGetHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.dispute.get", { requireResources: false });
+}
+
+export function createMarketDisputeListHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.dispute.list", { requireResources: false });
 }
