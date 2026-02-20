@@ -65,6 +65,8 @@ graph TD
 - `web3.billing.summary`（params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`）
 - `web3.status.summary`（no params）
 
+> `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口：能力描述应包含字段级 `paramsSchema`、常见稳定错误码集合（以 `web3-market-resource-api.md` 为准）与最小示例，且不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
+
 ### `market-core`（已存在）
 
 交易与结算（Offer/Order/Settlement/Consent/Delivery/Transparency）：

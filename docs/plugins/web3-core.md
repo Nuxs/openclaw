@@ -22,8 +22,8 @@ It also acts as the orchestration layer for Web3 Market mode:
 
 Security note:
 
-- Never treat provider endpoints as public API surface.
-- Avoid exposing index data that includes endpoints except in tightly controlled admin contexts.
+- Provider endpoints are sensitive assets. Do not treat them as public API surface.
+- `web3.index.*` is an internal discovery surface and **must not expose provider endpoints by default**. If endpoint-like values exist for local debugging, they must be redacted in outputs and never appear in logs, errors, status output, or tool results.
 
 Quick mental model:
 
