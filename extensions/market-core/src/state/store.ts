@@ -15,6 +15,7 @@ import type {
   AuditEvent,
   Consent,
   Delivery,
+  Dispute,
   Offer,
   Order,
   RevocationJob,
@@ -41,6 +42,10 @@ type MarketStore = {
   getSettlement: (settlementId: string) => Settlement | undefined;
   getSettlementByOrder: (orderId: string) => Settlement | undefined;
   saveSettlement: (settlement: Settlement) => void;
+  listDisputes: () => Dispute[];
+  getDispute: (disputeId: string) => Dispute | undefined;
+  getDisputeByOrder: (orderId: string) => Dispute | undefined;
+  saveDispute: (dispute: Dispute) => void;
   listLeases: (filter?: MarketLeaseFilter) => MarketLease[];
   getLease: (leaseId: string) => MarketLease | undefined;
   saveLease: (lease: MarketLease) => void;
@@ -205,6 +210,28 @@ class MarketFileStore implements MarketStore {
     this.writeMap(this.settlementsPath, map);
   }
 
+  private get disputesPath() {
+    return "disputes.json";
+  }
+
+  listDisputes(): Dispute[] {
+    return Object.values(this.readMap<Dispute>(this.disputesPath));
+  }
+
+  getDispute(disputeId: string): Dispute | undefined {
+    return this.readMap<Dispute>(this.disputesPath)[disputeId];
+  }
+
+  getDisputeByOrder(orderId: string): Dispute | undefined {
+    return this.listDisputes().find((entry) => entry.orderId === orderId);
+  }
+
+  saveDispute(dispute: Dispute): void {
+    const map = this.readMap<Dispute>(this.disputesPath);
+    map[dispute.disputeId] = dispute;
+    this.writeMap(this.disputesPath, map);
+  }
+
   private get leasesPath() {
     return "leases.json";
   }
@@ -360,6 +387,7 @@ class MarketFileStore implements MarketStore {
       this.listConsents().length > 0 ||
       this.listDeliveries().length > 0 ||
       this.listSettlements().length > 0 ||
+      this.listDisputes().length > 0 ||
       this.listLeases().length > 0 ||
       this.listLedger({ limit: 1 }).length > 0 ||
       this.listRevocations().length > 0 ||
@@ -399,12 +427,14 @@ class MarketSqliteStore implements MarketStore {
         "CREATE TABLE IF NOT EXISTS consents (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS deliveries (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS settlements (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS disputes (id TEXT PRIMARY KEY, order_id TEXT, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS leases (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS revocations (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS ledger (id TEXT PRIMARY KEY, timestamp TEXT NOT NULL, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS audit (id TEXT PRIMARY KEY, timestamp TEXT NOT NULL, data TEXT NOT NULL);" +
         "CREATE INDEX IF NOT EXISTS ledger_ts ON ledger(timestamp);" +
-        "CREATE INDEX IF NOT EXISTS audit_ts ON audit(timestamp);",
+        "CREATE INDEX IF NOT EXISTS audit_ts ON audit(timestamp);" +
+        "CREATE INDEX IF NOT EXISTS disputes_order ON disputes(order_id);",
     );
   }
 
@@ -423,6 +453,7 @@ class MarketSqliteStore implements MarketStore {
       this.countRows("consents") === 0 &&
       this.countRows("deliveries") === 0 &&
       this.countRows("settlements") === 0 &&
+      this.countRows("disputes") === 0 &&
       this.countRows("leases") === 0 &&
       this.countRows("revocations") === 0 &&
       this.countRows("ledger") === 0 &&
@@ -441,6 +472,7 @@ class MarketSqliteStore implements MarketStore {
     for (const consent of fileStore.listConsents()) this.saveConsent(consent);
     for (const delivery of fileStore.listDeliveries()) this.saveDelivery(delivery);
     for (const settlement of fileStore.listSettlements()) this.saveSettlement(settlement);
+    for (const dispute of fileStore.listDisputes()) this.saveDispute(dispute);
     for (const lease of fileStore.listLeases()) this.saveLease(lease);
     for (const entry of fileStore.listLedger({ limit: 1_000_000 })) this.appendLedger(entry);
     for (const revocation of fileStore.listRevocations()) this.saveRevocation(revocation);
@@ -555,6 +587,27 @@ class MarketSqliteStore implements MarketStore {
 
   saveSettlement(settlement: Settlement): void {
     this.saveTo("settlements", settlement.settlementId, settlement);
+  }
+
+  listDisputes(): Dispute[] {
+    return this.listFrom<Dispute>("disputes");
+  }
+
+  getDispute(disputeId: string): Dispute | undefined {
+    return this.getFrom<Dispute>("disputes", disputeId);
+  }
+
+  getDisputeByOrder(orderId: string): Dispute | undefined {
+    const row = this.db.prepare("SELECT data FROM disputes WHERE order_id = ?").get(orderId) as
+      | { data: string }
+      | undefined;
+    return row ? (JSON.parse(row.data) as Dispute) : undefined;
+  }
+
+  saveDispute(dispute: Dispute): void {
+    this.db
+      .prepare("INSERT OR REPLACE INTO disputes (id, order_id, data) VALUES (?, ?, ?)")
+      .run(dispute.disputeId, dispute.orderId, JSON.stringify(dispute));
   }
 
   listLeases(filter?: MarketLeaseFilter): MarketLease[] {
@@ -771,6 +824,22 @@ export class MarketStateStore {
 
   saveSettlement(settlement: Settlement): void {
     this.store.saveSettlement(settlement);
+  }
+
+  listDisputes(): Dispute[] {
+    return this.store.listDisputes();
+  }
+
+  getDispute(disputeId: string): Dispute | undefined {
+    return this.store.getDispute(disputeId);
+  }
+
+  getDisputeByOrder(orderId: string): Dispute | undefined {
+    return this.store.getDisputeByOrder(orderId);
+  }
+
+  saveDispute(dispute: Dispute): void {
+    this.store.saveDispute(dispute);
   }
 
   listLeases(filter?: MarketLeaseFilter): MarketLease[] {

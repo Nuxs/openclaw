@@ -1,5 +1,11 @@
 import type { MarketLeaseStatus, MarketResourceStatus } from "./resources.js";
-import type { DeliveryStatus, OfferStatus, OrderStatus, SettlementStatus } from "./types.js";
+import type {
+  DeliveryStatus,
+  DisputeStatus,
+  OfferStatus,
+  OrderStatus,
+  SettlementStatus,
+} from "./types.js";
 
 export function assertOfferTransition(from: OfferStatus, to: OfferStatus) {
   const allowed: Record<OfferStatus, OfferStatus[]> = {
@@ -66,4 +72,16 @@ export function assertLeaseTransition(from: MarketLeaseStatus, to: MarketLeaseSt
     return;
   }
   throw conflict(`invalid lease transition: ${from} -> ${to}`);
+}
+
+export function assertDisputeTransition(from: DisputeStatus, to: DisputeStatus) {
+  const allowed: Record<DisputeStatus, DisputeStatus[]> = {
+    dispute_opened: ["dispute_evidence_submitted", "dispute_resolved", "dispute_rejected"],
+    dispute_evidence_submitted: ["dispute_resolved", "dispute_rejected"],
+    dispute_resolved: [],
+    dispute_rejected: [],
+  };
+  if (!allowed[from].includes(to)) {
+    throw conflict(`invalid dispute transition: ${from} -> ${to}`);
+  }
 }

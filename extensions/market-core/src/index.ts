@@ -6,6 +6,12 @@ import {
   createDeliveryCompleteHandler,
   createDeliveryIssueHandler,
   createDeliveryRevokeHandler,
+  createDisputeEvidenceHandler,
+  createDisputeGetHandler,
+  createDisputeListHandler,
+  createDisputeOpenHandler,
+  createDisputeRejectHandler,
+  createDisputeResolveHandler,
   createLedgerAppendHandler,
   createLedgerListHandler,
   createLedgerSummaryHandler,
@@ -15,6 +21,7 @@ import {
   createLeaseListHandler,
   createLeaseRevokeHandler,
   createMarketAuditQueryHandler,
+  createMarketMetricsSnapshotHandler,
   createMarketRepairRetryHandler,
   createMarketRevocationRetryHandler,
   createMarketStatusSummaryHandler,
@@ -106,9 +113,23 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("market.ledger.list", createLedgerListHandler(store, config));
     api.registerGatewayMethod("market.ledger.summary", createLedgerSummaryHandler(store, config));
 
+    api.registerGatewayMethod("market.dispute.open", createDisputeOpenHandler(store, config));
+    api.registerGatewayMethod(
+      "market.dispute.submitEvidence",
+      createDisputeEvidenceHandler(store, config),
+    );
+    api.registerGatewayMethod("market.dispute.resolve", createDisputeResolveHandler(store, config));
+    api.registerGatewayMethod("market.dispute.reject", createDisputeRejectHandler(store, config));
+    api.registerGatewayMethod("market.dispute.get", createDisputeGetHandler(store, config));
+    api.registerGatewayMethod("market.dispute.list", createDisputeListHandler(store, config));
+
     api.registerGatewayMethod(
       "market.status.summary",
       createMarketStatusSummaryHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.metrics.snapshot",
+      createMarketMetricsSnapshotHandler(store, config),
     );
     api.registerGatewayMethod("market.audit.query", createMarketAuditQueryHandler(store, config));
     api.registerGatewayMethod(

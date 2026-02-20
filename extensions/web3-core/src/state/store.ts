@@ -10,7 +10,7 @@
  *   web3/pending-tx.json         — pending chain transactions (retry queue)
  */
 
-import { randomBytes } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AuditEvent } from "../audit/types.js";
@@ -62,7 +62,24 @@ export type ResourceIndexEntry = {
   resources: IndexedResource[];
   updatedAt: string;
   expiresAt?: string;
+  lastHeartbeatAt?: string;
   meta?: Record<string, unknown>;
+  signature?: IndexSignature;
+};
+
+export type IndexSignature = {
+  scheme: "ed25519";
+  publicKey: string;
+  signature: string;
+  payloadHash: string;
+  signedAt: string;
+};
+
+export type IndexSigningKey = {
+  scheme: "ed25519";
+  publicKey: string;
+  privateKey: string;
+  createdAt: string;
 };
 
 export type AnchorReceipt = {
@@ -241,6 +258,54 @@ export class Web3StateStore {
     if (!existsSync(this.usagePath)) return [];
     const map = JSON.parse(readFileSync(this.usagePath, "utf-8")) as Record<string, UsageRecord>;
     return Object.values(map);
+  }
+
+  // ---- Provider identity ----
+
+  private get providerIdPath() {
+    return join(this.dir, "provider-id.json");
+  }
+
+  getProviderId(): string | null {
+    if (!existsSync(this.providerIdPath)) return null;
+    const stored = JSON.parse(readFileSync(this.providerIdPath, "utf-8")) as {
+      providerId?: string;
+    };
+    return stored.providerId ?? null;
+  }
+
+  saveProviderId(providerId: string): void {
+    writeFileSync(this.providerIdPath, JSON.stringify({ providerId }, null, 2));
+  }
+
+  ensureProviderId(): string {
+    const existing = this.getProviderId();
+    if (existing) return existing;
+    const next = `provider-${randomBytes(6).toString("hex")}`;
+    this.saveProviderId(next);
+    return next;
+  }
+
+  // ---- Index signing ----
+
+  private get indexSigningKeyPath() {
+    return join(this.dir, "index-signing.json");
+  }
+
+  getIndexSigningKey(): IndexSigningKey {
+    if (existsSync(this.indexSigningKeyPath)) {
+      return JSON.parse(readFileSync(this.indexSigningKeyPath, "utf-8")) as IndexSigningKey;
+    }
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const createdAt = new Date().toISOString();
+    const record: IndexSigningKey = {
+      scheme: "ed25519",
+      publicKey: publicKey.export({ type: "spki", format: "der" }).toString("base64"),
+      privateKey: privateKey.export({ type: "pkcs8", format: "der" }).toString("base64"),
+      createdAt,
+    };
+    writeFileSync(this.indexSigningKeyPath, JSON.stringify(record, null, 2));
+    return record;
   }
 
   // ---- Resource index ----

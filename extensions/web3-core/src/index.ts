@@ -50,6 +50,7 @@ import {
   createMarketResourcePublishHandler,
   createMarketResourceUnpublishHandler,
 } from "./market/handlers.js";
+import { createWeb3MetricsSnapshotHandler } from "./metrics/metrics.js";
 import {
   createResourceModelChatHandler,
   createResourceSearchQueryHandler,
@@ -58,8 +59,10 @@ import {
   createResourceStoragePutHandler,
 } from "./resources/http.js";
 import {
+  createResourceIndexHeartbeatHandler,
   createResourceIndexListHandler,
   createResourceIndexReportHandler,
+  createResourceIndexStatsHandler,
 } from "./resources/indexer.js";
 import { getConsumerLeaseAccess } from "./resources/leases.js";
 import {
@@ -209,6 +212,16 @@ const plugin: OpenClawPluginDefinition = {
 
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
+    api.registerGatewayMethod(
+      "web3.index.heartbeat",
+      createResourceIndexHeartbeatHandler(store, config),
+    );
+    api.registerGatewayMethod("web3.index.stats", createResourceIndexStatsHandler(store, config));
+
+    api.registerGatewayMethod(
+      "web3.metrics.snapshot",
+      createWeb3MetricsSnapshotHandler(store, config),
+    );
 
     const web3SearchTool = createWeb3SearchTool(config);
     if (web3SearchTool) {

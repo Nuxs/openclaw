@@ -43,6 +43,15 @@ export {
   createLedgerSummaryHandler,
 } from "./ledger.js";
 export {
+  createDisputeEvidenceHandler,
+  createDisputeGetHandler,
+  createDisputeListHandler,
+  createDisputeOpenHandler,
+  createDisputeRejectHandler,
+  createDisputeResolveHandler,
+} from "./dispute.js";
+export { createMarketMetricsSnapshotHandler } from "./metrics.js";
+export {
   createMarketStatusSummaryHandler,
   createMarketAuditQueryHandler,
   createMarketTransparencySummaryHandler,

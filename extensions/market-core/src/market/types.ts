@@ -139,6 +139,10 @@ export type AuditEventKind =
   | "ledger_appended"
   | "settlement_released"
   | "settlement_refunded"
+  | "dispute_opened"
+  | "dispute_evidence_submitted"
+  | "dispute_resolved"
+  | "dispute_rejected"
   | "repair_retry"
   | "revocation_retry"
   | "revocation_succeeded"
@@ -169,5 +173,38 @@ export type RevocationJob = {
   lastError?: string;
   nextAttemptAt: string;
   createdAt: string;
+  updatedAt: string;
+};
+
+export type DisputeStatus =
+  | "dispute_opened"
+  | "dispute_evidence_submitted"
+  | "dispute_resolved"
+  | "dispute_rejected";
+
+export type DisputeResolution = "release" | "refund" | "partial";
+
+export type DisputeEvidence = {
+  evidenceId: string;
+  summary: string;
+  cid?: string;
+  hash: string;
+  submittedAt: string;
+  actorId?: string;
+};
+
+export type Dispute = {
+  disputeId: string;
+  orderId: string;
+  initiatorActorId: string;
+  respondentActorId: string;
+  arbitratorType: "platform" | "community" | "onchain";
+  reason: string;
+  status: DisputeStatus;
+  resolution?: DisputeResolution;
+  evidence: DisputeEvidence[];
+  disputeHash: string;
+  openedAt: string;
+  resolvedAt?: string;
   updatedAt: string;
 };

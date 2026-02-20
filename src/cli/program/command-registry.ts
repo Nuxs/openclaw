@@ -94,6 +94,19 @@ const coreEntries: CoreCliEntry[] = [
   {
     commands: [
       {
+        name: "share",
+        description: "Share local resources to the Web3 market",
+        hasSubcommands: true,
+      },
+    ],
+    register: async ({ program }) => {
+      const mod = await import("./register.share.js");
+      mod.registerShareCommands(program);
+    },
+  },
+  {
+    commands: [
+      {
         name: "doctor",
         description: "Health checks + quick fixes for the gateway and channels",
         hasSubcommands: false,
