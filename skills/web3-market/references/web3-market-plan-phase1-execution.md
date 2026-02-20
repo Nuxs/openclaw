@@ -4,6 +4,10 @@
 - **定位**: 对外单入口 `web3.*` + 能力自描述（Day 0）+ 资源发现/租约/调用的“管家无感”闭环 + 经济仪表盘
 - **前置要求**: `web3-core` 与 `market-core` 的 B-1/B-2 已可用，结算仍以外部 ERC-20 为主（自有代币后置）
 
+### **产品一句话（10 秒懂）**
+
+让 AI 管家可以像调用本地能力一样，自动**发现/租用/调用**外部的模型、搜索、存储资源；用户最终只看到“今天赚了多少/花了多少/净收益多少”，成本与风险由系统用租约与结算规则兜住。
+
 ### **现状对齐（基于当前代码）**
 
 - **已具备**：`market.resource/lease/ledger`、`web3.resources.*`、Provider HTTP routes、consumer tools、`web3.status.summary` 与 `/pay_status`。
@@ -22,6 +26,18 @@
 - **Provider**：我有一台闲置设备或能力 → `openclaw share start` 一键共享并开始计费。
 - **Consumer**：我的管家需要更强能力 → 自动发现可用资源 → 租约签发 → 直接调用。
 - **双向**：月末查看“收入/支出/净收益”与活跃资源，理解系统价值。
+
+---
+
+### **Phase 1 上线硬 Gate（必须全部通过）**
+
+> Phase 1 的目标是“管家无感闭环 + 用户看见价值”。为了避免上线后出现安全/可用性事故，以下 Gate 必须作为硬门槛执行。
+
+- **Gate-SEC-01（敏感信息零泄露）**：任何输出面（gateway method 返回、HTTP route 错误、CLI 状态、logs、审计摘要、能力自描述、tool 结果）不得包含 `accessToken`、provider endpoint、真实文件路径。
+- **Gate-ERR-01（稳定错误码）**：对外返回必须使用稳定错误码（例如 `E_INVALID_ARGUMENT`/`E_FORBIDDEN`/`E_NOT_FOUND`/`E_CONFLICT`/`E_INTERNAL` 等），并保持机器可解析；错误契约以 `web3-market-resource-api.md` 为准。
+- **Gate-CAP-01（能力自描述可操作）**：`web3.capabilities.*` 必须提供字段级输入结构（必填/可选/范围/格式）与关键前置条件/风险/成本提示，使管家无需外部文档即可构造有效请求。
+- **Gate-LEDGER-01（权威记账防伪造）**：Provider 才能写入权威 `market.ledger.append`；Consumer 侧不得伪造权威账本（以 `market-core` 校验为准）。
+- **Gate-STORE-01（双存储一致性）**：file/sqlite 两种 store 行为一致，且关键路径用例必须在两种模式下通过（至少覆盖发布→租约→调用→记账→撤销/过期）。
 
 ---
 
@@ -62,11 +78,13 @@
 
 - **能力自描述**：`web3.capabilities.list/describe` 作为 Day 0 基础协议
 - **能力结构**：统一输出权限/风控/代价/前置条件/返回含义
+- **错误码契约**：能力描述必须声明常见错误码与降级策略（以 `web3-market-resource-api.md` 为准）
+- **可操作 schema**：对高风险/高频能力（例如租约签发、存储读写、搜索查询）必须提供字段级输入结构（必填/可选/范围/格式）
 - **版本策略**：新增能力必须先出能力描述，再出入口实现
 
 **交付物**:
 
-- 能力描述 JSON（可被管家直接消费）
+- 能力描述 JSON（可被管家直接消费，且足够构造有效请求）
 - 能力变更的版本约束
 
 ### Week 1：索引签名 + 一键 Provider 引导
