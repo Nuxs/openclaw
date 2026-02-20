@@ -1,7 +1,7 @@
-### OpenClaw Web3 Market：Phase 1 执行型迭代清单（单入口体验层 + 任务市场协议 MVP）
+### OpenClaw Web3 Market：Phase 1 执行型迭代清单（单入口体验层 + 能力自描述 + 资源租约闭环）
 
-- **版本**: v2.0
-- **定位**: 对外单入口 `web3.*` + 能力自描述 + 任务市场协议 MVP + 仲裁入口基础
+- **版本**: v2.1
+- **定位**: 对外单入口 `web3.*` + 能力自描述（Day 0）+ 资源发现/租约/调用的“管家无感”闭环 + 经济仪表盘
 - **前置要求**: `web3-core` 与 `market-core` 的 B-1/B-2 已可用，结算仍以外部 ERC-20 为主（自有代币后置）
 
 ### **现状对齐（基于当前代码）**
@@ -11,8 +11,17 @@
 
 ### **本 Phase 目标与边界**
 
-- **目标**：完成任务市场协议 MVP，并通过 `web3.*` 单入口让管家无歧义调用。
-- **边界**：不引入 core 重型编排，只在插件与独立服务内实现；仲裁暂为链下流程，证据做审计锚定。
+- **目标**：把既有 B-2 能力打磨到“管家自动发现/租用/调用、用户无感知”的体验；能力自描述成为 Day 0 基础协议。
+- **边界**：任务市场协议（TaskOrder/Bid/Result）**推迟到 Phase 3**；Phase 1 不引入重型撮合与竞标流程。
+- **仲裁**：Phase 1 仅做链下裁决入口与证据锚定，保留去中心化仲裁扩展位。
+
+---
+
+### **核心用户故事（三条）**
+
+- **Provider**：我有一台闲置设备或能力 → `openclaw share start` 一键共享并开始计费。
+- **Consumer**：我的管家需要更强能力 → 自动发现可用资源 → 租约签发 → 直接调用。
+- **双向**：月末查看“收入/支出/净收益”与活跃资源，理解系统价值。
 
 ---
 
@@ -47,35 +56,69 @@
 
 ## 执行型迭代清单（按周）
 
-### Week 1：单入口语义冻结 + 能力自描述
+### Day 0：能力自描述协议（必须先行）
 
-**模块**: `web3-core` / `market-core`
+**模块**: `web3-core`
 
-- **入口收敛**：对外仅保留 `web3.*`，完成方法清单与命名约束
-- **能力自描述**：实现 `web3.capabilities.list/describe`，并填充权限/风控/成本/前置条件
-- **语义映射表**：`web3.*` 到 `market-core` 权威方法的映射清单
-
-**交付物**:
-
-- 单入口 API 清单 + 版本策略
-- 可供管家直接调用的能力描述 JSON
-
-### Week 2：任务市场协议 MVP
-
-**模块**: `web3-core` / `market-core`
-
-- **Task 协议结构**：TaskOrder/Bid/Result/Receipt 与状态机
-- **签名与不可抵赖**：关键对象 hash 与签名校验
-- **`web3.market.*` 方法集**：发布、竞标、授标、交付、验收
+- **能力自描述**：`web3.capabilities.list/describe` 作为 Day 0 基础协议
+- **能力结构**：统一输出权限/风控/代价/前置条件/返回含义
+- **版本策略**：新增能力必须先出能力描述，再出入口实现
 
 **交付物**:
 
-- 协议对象与状态机文档
-- 任务发布到结算的最小闭环
+- 能力描述 JSON（可被管家直接消费）
+- 能力变更的版本约束
+
+### Week 1：索引签名 + 一键 Provider 引导
+
+**模块**: `web3-core` / `index-service`
+
+- **索引条目签名**：Provider 自签名能力描述（为未来 DHT 迁移保留格式）
+- **一键共享**：`openclaw share start` 引导 Provider 配置并上报
+- **发现链路**：`web3.index.report/list` 支持签名字段与验证
+
+**交付物**:
+
+- 可迁移的索引条目 schema（含签名）
+- 一键 Provider 引导说明
+
+### Week 2：管家经济仪表盘（用户可见价值）
+
+**模块**: `ui` / `web3-core` / `market-core`
+
+- **仪表盘**：收入/支出/净收益、活跃资源、最近交易
+- **低门槛入口**：默认展示“管家今天做了什么”
+
+**交付物**:
+
+- 用户可理解的经济仪表盘 MVP
+
+### Week 3：监控告警 + 部分释放结算
+
+**模块**: `market-core` / `web3-core`
+
+- **监控告警**：P0/P1 规则与历史
+- **部分释放**：结算支持 partial release（按 ledger 累计释放）
+
+**交付物**:
+
+- 监控告警可触发
+- partial release 规则与审计记录
+
+### Week 4：仲裁入口 MVP（链下平台裁决）
+
+**模块**: `market-core` / `web3-core`
+
+- **争议入口**：`web3.dispute.open/submitEvidence/resolve`
+- **裁决来源**：预留 `arbitratorType`（platform/community/onchain）
+
+**交付物**:
+
+- 可发起争议、提交证据与裁决落账
 
 ---
 
-## 任务市场协议规范（MVP）
+## Phase 3：任务市场协议规范（MVP，后续）
 
 ### 任务协议对象与字段
 
@@ -153,6 +196,7 @@
 - **Dispute**
   - `disputeId`、`taskId`、`bidId`
   - `initiatorActorId`、`respondentActorId`
+  - `arbitratorType`：`platform` / `community` / `onchain`
   - `reason`、`status`：`dispute_open` / `dispute_resolved` / `dispute_rejected`
   - `resolution`：`release` / `refund` / `partial`
   - `evidence`：证据列表（摘要、CID、时间戳）
