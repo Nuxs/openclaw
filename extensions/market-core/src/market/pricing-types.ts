@@ -1,153 +1,218 @@
 /**
- * 动态定价系统类型定义
- * Dynamic Pricing System Type Definitions
+ * 市场透明度与定价系统类型定义
+ * Market Transparency & Pricing System Type Definitions
+ *
+ * ⚠️ 重要原则：卖方完全自主定价
+ * - 系统不决定价格，系统提供信息
+ * - 所有"定价算法"都是建议性质，非强制
+ * - Provider可以选择使用或忽略任何建议
  */
 
-/**
- * 定价策略类型
- */
-export type PricingStrategy =
-  | "fixed" // 固定价格
-  | "dynamic" // 动态定价（基于供需）
-  | "surge" // 高峰定价
-  | "tiered" // 分级定价（基于用量）
-  | "auction" // 竞价模式
-  | "negotiable"; // 可协商价格
+// ============================================================================
+// 一、Provider自主定价相关类型
+// ============================================================================
 
 /**
- * 定价模型配置
+ * Provider定价配置
+ *
+ * 这是Provider在发布资源时设定的价格
+ * 系统记录但不修改
  */
-export type PricingModel = {
-  strategy: PricingStrategy;
-  basePrice: number; // 基础价格
-  currency: string; // 货币单位
-  dynamicConfig?: DynamicPricingConfig; // 动态定价配置
-  tierConfig?: TierPricingConfig; // 分级定价配置
-  surgeConfig?: SurgePricingConfig; // 高峰定价配置
-  auctionConfig?: AuctionConfig; // 竞价配置
-  constraints?: PricingConstraints; // 价格约束
+export type ProviderPricing = {
+  basePrice: number; // Provider设定的价格
+  currency: string; // 货币单位（如 "USD", "MATIC"）
+  billingUnit: string; // 计费单位（如 "token", "minute", "hour"）
+  priceDescription?: string; // 价格说明（如 "0.05 USD per 1K tokens"）
+  lastUpdatedBy: "provider"; // 明确标注由Provider更新
+  lastUpdatedAt: string;
 };
 
 /**
- * 动态定价配置（基于供需关系）
+ * Provider可选的自动调价配置
+ *
+ * 重要：这是完全可选的功能
+ * - Provider需要主动启用
+ * - Provider设定所有参数
+ * - Provider可以随时禁用
  */
-export type DynamicPricingConfig = {
+export type AutoPricingConfig = {
   enabled: boolean;
-  demandWeight: number; // 需求权重 (0-1)
-  supplyWeight: number; // 供给权重 (0-1)
-  elasticity: number; // 价格弹性系数
-  updateInterval: number; // 价格更新间隔（秒）
-  lookbackWindow: number; // 回溯窗口（秒）
+  resourceId: string;
+
+  // Provider选择的策略
+  strategy: "match_market" | "undercut_by_percent" | "premium";
+
+  // Provider设定的参数
+  parameters: {
+    targetPercentile?: number; // 目标分位数（用于 match_market）
+    undercutPercent?: number; // 削价百分比（用于 undercut_by_percent）
+    premiumPercent?: number; // 溢价百分比（用于 premium）
+
+    // 价格边界（Provider的绝对控制）
+    minPrice: number; // 绝对底线，算法不能突破
+    maxPrice: number; // 绝对上限，算法不能突破
+  };
+
+  // 更新频率
+  updateInterval: "hourly" | "daily" | "manual";
+
+  // Provider随时可以暂停
+  pausedUntil?: string;
 };
 
 /**
- * 分级定价配置
+ * 自动调价报告
+ *
+ * 用途：让Provider了解自动调价的效果
  */
-export type TierPricingConfig = {
-  enabled: boolean;
-  tiers: PriceTier[];
+export type AutoPricingReport = {
+  resourceId: string;
+  reportPeriod: {
+    start: string;
+    end: string;
+  };
+
+  // 价格变化历史
+  priceChanges: Array<{
+    price: number;
+    timestamp: string;
+    reason: string;
+  }>;
+
+  // 收入影响
+  revenueImpact: {
+    before: number; // 启用前的收入
+    after: number; // 启用后的收入
+    change: number; // 变化量
+    changePercent: number; // 变化百分比
+  };
+
+  // 订单影响
+  orderImpact: {
+    before: number;
+    after: number;
+    change: number;
+    changePercent: number;
+  };
 };
 
-export type PriceTier = {
-  minQuantity: number; // 最小数量
-  maxQuantity?: number; // 最大数量（可选）
-  pricePerUnit: number; // 单价
-  discount?: number; // 折扣百分比
-};
+// ============================================================================
+// 二、市场信息透明度相关类型
+// ============================================================================
 
 /**
- * 高峰定价配置
+ * 市场价格统计
+ *
+ * 用途：提供市场行情的客观数据
+ * 面向：Consumer查看价格分布 / Provider了解竞争
  */
-export type SurgePricingConfig = {
-  enabled: boolean;
-  surgeMultiplier: number; // 高峰倍数
-  thresholdUtilization: number; // 触发阈值（利用率）
-  cooldownPeriod: number; // 冷却期（秒）
+export type MarketStatistics = {
+  resourceType: string;
+  timestamp: string;
+  offerCount: number; // 市场上的总供应数
+
+  // 价格统计
+  priceStats: {
+    min: number; // 最低价
+    max: number; // 最高价
+    median: number; // 中位价
+    p25: number; // 25分位
+    p75: number; // 75分位
+    avg: number; // 平均价
+  };
+
+  // 价格波动率（帮助判断市场稳定性）
+  volatility: number; // 0-1之间，越高越不稳定
 };
 
 /**
- * 竞价配置
+ * 价格分布详情
+ *
+ * 用途：查看每个Provider的具体定价
  */
-export type AuctionConfig = {
-  enabled: boolean;
-  startingPrice: number; // 起拍价
-  reservePrice?: number; // 保留价（最低成交价）
-  bidIncrement: number; // 加价幅度
-  auctionDuration: number; // 竞价时长（秒）
-  autoExtend: boolean; // 是否自动延时
+export type PriceDistribution = {
+  resourceType: string;
+  timestamp: string;
+
+  offers: Array<{
+    offerId: string;
+    providerId: string;
+    price: number;
+    capability?: string; // 服务能力标签
+    reputation?: number; // 信誉评分
+  }>;
 };
 
 /**
- * 价格约束条件
+ * 定价建议
+ *
+ * 重要：这是**建议**而非**决定**
+ * - Provider可以接受或忽略
+ * - 最终价格由Provider自己设定
  */
-export type PricingConstraints = {
-  minPrice?: number; // 最低价格
-  maxPrice?: number; // 最高价格
-  maxDiscount?: number; // 最大折扣（百分比）
-  priceChangeLimit?: number; // 单次价格变动限制（百分比）
+export type PriceRecommendation = {
+  recommendedPrice: number;
+  priceRange: {
+    min: number;
+    max: number;
+  };
+  confidence: number; // 0-1，建议的置信度
+  reasoning: string; // 建议的理由（透明化）
+  marketContext: {
+    totalOffers: number;
+    similarOffers: number;
+    yourCompetitivePosition: "first-mover" | "premium" | "mid-tier" | "budget";
+  };
 };
 
+// ============================================================================
+// 三、市场指标（用于生成统计和建议）
+// ============================================================================
+
 /**
- * 市场指标（用于计算动态价格）
+ * 市场指标快照
+ *
+ * 用途：系统收集的市场数据，用于生成统计和建议
  */
 export type MarketMetrics = {
   timestamp: string;
-  offerId: string;
+  resourceType: string;
 
   // 供给指标
-  totalProviders: number; // 总供应商数量
-  activeProviders: number; // 活跃供应商数量
-  totalCapacity: number; // 总容量
-  availableCapacity: number; // 可用容量
-  utilizationRate: number; // 利用率 (0-1)
+  totalProviders: number;
+  activeProviders: number;
+  totalCapacity: number;
+  availableCapacity: number;
+  utilizationRate: number; // 0-1
 
   // 需求指标
-  totalOrders: number; // 总订单数
-  pendingOrders: number; // 待处理订单数
-  completedOrders: number; // 已完成订单数
-  orderRate: number; // 订单速率（单位时间）
+  totalOrders24h: number;
+  pendingOrders: number;
+  completedOrders24h: number;
+  orderRate: number; // 单位时间订单数
 
-  // 竞争指标
-  similarOffers: number; // 相似服务数量
-  avgCompetitorPrice: number; // 竞争对手平均价格
-  priceRank: number; // 价格排名（1=最低）
+  // 价格指标
+  avgPrice24h: number;
+  priceChange24h: number; // 百分比
 };
 
-/**
- * 价格计算结果
- */
-export type PriceCalculation = {
-  offerId: string;
-  originalPrice: number;
-  calculatedPrice: number;
-  adjustments: PriceAdjustment[];
-  effectiveAt: string;
-  expiresAt?: string;
-  metrics?: MarketMetrics;
-  reason?: string;
-};
-
-/**
- * 价格调整项
- */
-export type PriceAdjustment = {
-  type: string; // 调整类型
-  amount: number; // 调整金额
-  percentage: number; // 调整百分比
-  reason: string; // 调整原因
-};
+// ============================================================================
+// 四、订单簿模式（真正的自由市场撮合）
+// ============================================================================
 
 /**
  * 订单簿条目
+ *
+ * 用途：买卖双方自由报价，系统撮合
+ * 这是真正的去中心化定价机制
  */
 export type OrderBookEntry = {
   entryId: string;
-  offerId: string;
+  resourceType: string;
   side: "buy" | "sell"; // 买单/卖单
   price: number;
   quantity: number;
-  buyerId?: string;
-  sellerId?: string;
+  userId: string; // 买方或卖方ID
   status: "pending" | "partial" | "filled" | "cancelled";
   createdAt: string;
   updatedAt: string;
@@ -158,48 +223,116 @@ export type OrderBookEntry = {
  * 订单簿快照
  */
 export type OrderBook = {
-  offerId: string;
-  assetType: string;
+  resourceType: string;
   timestamp: string;
   bids: OrderBookEntry[]; // 买单（按价格降序）
   asks: OrderBookEntry[]; // 卖单（按价格升序）
   spread?: number; // 买卖价差
   midPrice?: number; // 中间价
+  lastTradePrice?: number; // 最新成交价
 };
+
+// ============================================================================
+// 五、价格历史记录
+// ============================================================================
 
 /**
  * 价格历史记录
+ *
+ * 用途：追踪价格变化，用于生成趋势分析
  */
 export type PriceHistory = {
   historyId: string;
+  resourceType: string;
   offerId: string;
   price: number;
-  volume: number; // 交易量
   timestamp: string;
-  source: "system" | "manual" | "market";
+  source: "provider_manual" | "provider_auto" | "market_trade"; // 明确标注价格来源
+  providerId: string;
+};
+
+// ============================================================================
+// 六、已废弃的类型（保留用于向后兼容）
+// ============================================================================
+
+/**
+ * @deprecated 已废弃 - 违背自由市场原则
+ *
+ * 原因：系统不应该"策略性地"决定价格
+ * 替代：Provider自主选择 AutoPricingConfig
+ */
+export type PricingStrategy =
+  | "fixed" // ✅ 保留：Provider固定定价
+  | "dynamic" // ❌ 废弃：改为Provider可选的AutoPricing
+  | "surge" // ❌ 废弃：改为Provider可选的AutoPricing
+  | "tiered" // ✅ 保留：Provider可以设置阶梯价
+  | "auction" // ✅ 保留：订单簿模式
+  | "negotiable"; // ✅ 保留：协商定价
+
+/**
+ * @deprecated 已废弃 - 违背自由市场原则
+ *
+ * 原因：这个配置暗示系统会"动态计算"价格
+ * 替代：使用 AutoPricingConfig（明确是Provider可选的助手）
+ */
+export type DynamicPricingConfig = {
+  enabled: boolean;
+  demandWeight: number;
+  supplyWeight: number;
+  elasticity: number;
+  updateInterval: number;
+  lookbackWindow: number;
 };
 
 /**
- * 市场行情统计
+ * ✅ 保留 - 阶梯定价由Provider自行设定
  */
-export type MarketStatistics = {
-  assetType: string;
-  timestamp: string;
+export type TierPricingConfig = {
+  enabled: boolean;
+  tiers: PriceTier[];
+};
 
-  // 价格统计
-  avgPrice: number;
-  minPrice: number;
-  maxPrice: number;
-  medianPrice: number;
-  priceVolatility: number; // 价格波动率
+export type PriceTier = {
+  minQuantity: number;
+  maxQuantity?: number;
+  pricePerUnit: number;
+  discount?: number;
+};
 
-  // 交易统计
-  totalVolume: number;
-  totalOrders: number;
-  avgOrderSize: number;
+/**
+ * @deprecated 已废弃 - 违背自由市场原则
+ *
+ * 原因：系统不应该在"高峰时"自动涨价
+ * 替代：Provider可以选择启用AutoPricing的premium策略
+ */
+export type SurgePricingConfig = {
+  enabled: boolean;
+  surgeMultiplier: number;
+  thresholdUtilization: number;
+  cooldownPeriod: number;
+};
 
-  // 趋势指标
-  priceChange24h: number; // 24小时价格变化
-  volumeChange24h: number; // 24小时交易量变化
-  trendDirection: "up" | "down" | "stable";
+/**
+ * ✅ 保留 - 竞价是合理的市场机制
+ */
+export type AuctionConfig = {
+  enabled: boolean;
+  startingPrice: number;
+  reservePrice?: number;
+  bidIncrement: number;
+  auctionDuration: number;
+  autoExtend: boolean;
+};
+
+/**
+ * @deprecated 已废弃
+ *
+ * 原因：价格约束应该由Provider在AutoPricingConfig中设定
+ * 替代：AutoPricingConfig.parameters.{minPrice, maxPrice}
+ */
+export type PricingConstraints = {
+  minPrice?: number;
+  maxPrice?: number;
+  maxDiscount?: number;
+  priceChangeLimit?: number;
 };
