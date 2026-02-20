@@ -13,6 +13,18 @@ The Web3 Core plugin provides audit anchoring, decentralized storage, wallet ide
 usage billing for OpenClaw. It runs inside the Gateway process and exposes commands,
 hooks, and gateway methods for UI and integrations.
 
+It also acts as the orchestration layer for Web3 Market mode:
+
+- It helps the UI and the agent get **identity, audit, archive, and usage summaries**.
+- It can integrate with `market-core` for **settlement status** (escrow lock/release/refund).
+- When resource sharing is enabled, it can expose **provider routes** (model/search/storage) and
+  **consumer tools**, while keeping sensitive data out of logs and docs.
+
+Security note:
+
+- Never treat provider endpoints as public API surface.
+- Avoid exposing index data that includes endpoints except in tightly controlled admin contexts.
+
 Quick mental model:
 
 - Install plugin
@@ -71,6 +83,9 @@ Set config under `plugins.entries.web3-core.config`.
             quotaPerSession: 1000,
             costPerLlmCall: 1,
             costPerToolCall: 0.5,
+
+            // Usage billing is a credits/quota guard. Settlement escrow is owned by market-core.
+            // These fields are optional metadata for downstream settlement UI/integrations.
             paymentTokenAddress: "0xPAYMENT_TOKEN",
             paymentReceiverAddress: "0xRECEIVER_ADDRESS",
           },
@@ -171,5 +186,8 @@ Suggested UI refresh cadence:
 
 ## Related docs
 
+- Web3 Market overview: [Web3 Market](/concepts/web3-market)
+- Web3 Market dev guide: [Web3 Market Dev](/reference/web3-market-dev)
+- Web3 resource sharing API: [Web3 Resource Market API](/reference/web3-resource-market-api)
 - [Plugins](/tools/plugin)
 - [Plugin manifest](/plugins/manifest)

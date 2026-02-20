@@ -65,12 +65,23 @@ graph TD
 
 ### `market-core`（已存在）
 
+交易与结算（Offer/Order/Settlement/Consent/Delivery/Transparency）：
+
 - Offer：`market.offer.create|publish|update|close`
 - Order：`market.order.create|cancel`
 - Settlement：`market.settlement.lock|release|refund|status`
 - Consent：`market.consent.grant|revoke`
 - Delivery：`market.delivery.issue|complete|revoke`
 - Transparency：`market.status.summary` `market.audit.query` `market.transparency.summary` `market.transparency.trace`
+
+资源共享（resources/leases/ledger）：
+
+- Resource：`market.resource.publish|unpublish|get|list`
+- Lease：`market.lease.issue|revoke|get|list|expireSweep`
+- Ledger：`market.ledger.append|list|summary`
+- Repair：`market.repair.retry`
+
+资源共享的详细 API 契约与 Provider routes 见：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)。
 
 ## 状态机（严格按 `market-core` 实现）
 
@@ -132,5 +143,7 @@ graph TD
 ## 相关文档
 
 - `web3-core` 插件：[/plugins/web3-core](/plugins/web3-core)
+- `web3-core` 开发者文档：[/plugins/web3-core-dev](/plugins/web3-core-dev)
 - `market-core` 插件：[/plugins/market-core](/plugins/market-core)
 - Web3 Market 概览：[/concepts/web3-market](/concepts/web3-market)
+- Web3 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)

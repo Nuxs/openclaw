@@ -158,6 +158,27 @@ State lives under the Gateway state directory in `web3/`:
 
 ## Interfaces
 
+## Resource sharing (B-2) and provider routes
+
+If you are building the AI butler flows for the resource-sharing market (model/search/storage),
+use the API contract page as the source of truth:
+
+- [Web3 Resource Market API](/reference/web3-resource-market-api)
+
+Important security constraints:
+
+- Never expose `accessToken`, provider endpoints, or real filesystem paths in docs, logs, errors, or status output.
+- If you use resource discovery/indexing, treat endpoint data as a sensitive asset and only return safe summaries by default.
+
+### Resource index (discovery)
+
+The plugin exposes an internal index surface used for discovery and testing:
+
+- `web3.index.report`
+- `web3.index.list`
+
+These methods can carry endpoint-like fields in their stored entries. Do not treat them as public APIs.
+
 ### Commands
 
 - **`/bind_wallet <0x...>`**: validate address input and guide SIWE verification

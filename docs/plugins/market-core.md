@@ -20,11 +20,19 @@
 
 ### 核心对象
 
+`market-core` 同时覆盖两条能力链路：
+
+- **交易与结算市场**：Offer/Order/Consent/Delivery/Settlement（面向“买卖与托管”）。
+- **资源共享市场**：Resource/Lease/Ledger（面向“出租能力并由 Provider 权威记账”）。
+
 - **Offer**: 资产发布与定价信息，包含 `assetId`、`assetType`、`usageScope` 与 `offerHash`。
 - **Order**: 订单状态机与支付托管状态。
 - **Consent**: 由买方签名的用途同意，确保用途约束一致。
 - **Delivery**: 交付凭证或访问入口，支持 download、api、service。
 - **Settlement**: 托管锁定、释放与退款的结算记录。
+- **Resource**: 可出租的资源（模型、搜索、存储或其它服务）。
+- **Lease**: 对 Resource 的时间窗授权与一次性访问 token（明文 token 只允许签发时返回一次）。
+- **Ledger**: Provider 权威账本条目，用于结算与审计。
 - **RevocationJob**: 撤回失败后的重试任务。
 - **AuditEvent**: 审计事件流，支持审计链路与透明度汇总。
 
@@ -37,6 +45,13 @@
 - **Delivery**: `market.delivery.issue` `market.delivery.complete` `market.delivery.revoke`
 - **Transparency**: `market.status.summary` `market.audit.query` `market.transparency.summary` `market.transparency.trace`
 - **Revocation**: `market.revocation.retry`
+
+资源共享（B-2，resources/leases/ledger）：
+
+- **Resource**: `market.resource.publish` `market.resource.unpublish` `market.resource.get` `market.resource.list`
+- **Lease**: `market.lease.issue` `market.lease.revoke` `market.lease.get` `market.lease.list` `market.lease.expireSweep`
+- **Ledger**: `market.ledger.append` `market.ledger.list` `market.ledger.summary`
+- **Repair**: `market.repair.retry`
 
 ### 数据链路概览
 
@@ -102,9 +117,16 @@
   },
   "revocation": {
     "mode": "webhook",
+
+    // Placeholder only. Treat revocation endpoints as sensitive infrastructure.
+    // Do not expose them publicly without strong auth (mTLS/JWT), signature checks,
+    // and network controls (allowlist, private ingress).
     "endpoint": "https://revocation.example.com/hook",
+
+    // Never put real secrets in docs.
     "apiKey": "REPLACE_WITH_TOKEN",
     "signingSecret": "REPLACE_WITH_SECRET",
+
     "timeoutMs": 8000,
     "maxAttempts": 3,
     "retryDelayMs": 60000
@@ -143,3 +165,9 @@
 
 - sqlite 适合单实例网关与有限并发场景，多实例部署需迁移到共享数据库与统一锁。
 - 外部撤回执行器依赖 Webhook 可用性，建议结合重试与告警。
+
+### 相关文档
+
+- Web3 Market 概览：[/concepts/web3-market](/concepts/web3-market)
+- Web3 Market 开发者文档：[/reference/web3-market-dev](/reference/web3-market-dev)
+- Web3 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
