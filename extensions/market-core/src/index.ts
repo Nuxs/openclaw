@@ -41,6 +41,13 @@ import {
   createSettlementRefundHandler,
   createSettlementReleaseHandler,
   createSettlementStatusHandler,
+  createPricingModelHandler,
+  getPricingModelHandler,
+  calculatePriceHandler,
+  getPriceHistoryHandler,
+  getMarketStatisticsHandler,
+  createOrderBookEntryHandler,
+  getOrderBookHandler,
 } from "./market/handlers.js";
 import { MarketStateStore } from "./state/store.js";
 
@@ -145,6 +152,21 @@ const plugin: OpenClawPluginDefinition = {
       "market.revocation.retry",
       createMarketRevocationRetryHandler(store, config),
     );
+
+    // ---- Dynamic Pricing methods ----
+    api.registerGatewayMethod("market.pricing.setModel", createPricingModelHandler(store, config));
+    api.registerGatewayMethod("market.pricing.getModel", getPricingModelHandler(store, config));
+    api.registerGatewayMethod("market.pricing.calculate", calculatePriceHandler(store, config));
+    api.registerGatewayMethod("market.pricing.history", getPriceHistoryHandler(store, config));
+    api.registerGatewayMethod(
+      "market.pricing.statistics",
+      getMarketStatisticsHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.orderbook.create",
+      createOrderBookEntryHandler(store, config),
+    );
+    api.registerGatewayMethod("market.orderbook.get", getOrderBookHandler(store, config));
 
     api.logger.info("Market Core plugin registered");
   },

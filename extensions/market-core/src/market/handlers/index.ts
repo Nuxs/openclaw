@@ -58,3 +58,12 @@ export {
   createMarketTransparencyTraceHandler,
 } from "./transparency.js";
 export { createMarketRepairRetryHandler, createMarketRevocationRetryHandler } from "./repair.js";
+export {
+  createPricingModelHandler,
+  getPricingModelHandler,
+  calculatePriceHandler,
+  getPriceHistoryHandler,
+  getMarketStatisticsHandler,
+  createOrderBookEntryHandler,
+  getOrderBookHandler,
+} from "./pricing.js";
