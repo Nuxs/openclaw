@@ -2,7 +2,7 @@
 
 > 本文档是 `web3-brain-architecture.md` 的子文档，提供可直接拷贝的配置片段，覆盖三种部署形态：provider-only / consumer-only / hybrid。
 >
-> 说明：配置键以主文档中提议的 `resources.*` / `maintenance.*` 为准；实际落地时以 `extensions/web3-core/src/config.ts` 与 `extensions/market-core/src/config.ts` 的 schema 为最终权威。
+> 说明：配置键以 `resources.*` 为准；`maintenance.*` 当前未实现，后续如引入再补示例。实际落地以 `extensions/web3-core/src/config.ts` 与 `extensions/market-core/src/config.ts` 的 schema 为最终权威。
 
 ---
 
@@ -102,9 +102,11 @@ plugins:
           migrateFromFile: true
         access:
           mode: allowlist
-          requireActorId: true
-          allowedActors:
-            - "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" # provider actor
+          requireActor: true
+          actorSource: param
+          requireActorMatch: true
+          allowClientIds:
+            - "provider-node-1" # 示例 clientId
         settlement:
           mode: contract
 ```
@@ -194,12 +196,6 @@ plugins:
             enabled: true
             preferLocalFirst: true
 
-        maintenance:
-          enabled: true
-          leaseExpireSweepIntervalMs: 60000
-          repairRetryIntervalMs: 60000
-          maxBatchSize: 200
-
     - id: market-core
       enabled: true
       config:
@@ -208,10 +204,12 @@ plugins:
           migrateFromFile: true
         access:
           mode: allowlist
-          requireActorId: true
-          allowedActors:
-            - "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            - "0xcccccccccccccccccccccccccccccccccccccccc"
+          requireActor: true
+          actorSource: param
+          requireActorMatch: true
+          allowClientIds:
+            - "provider-node-1"
+            - "consumer-node-1"
 ```
 
 ---
@@ -221,4 +219,4 @@ plugins:
 - `resources.provider.listen.bind` 默认应为 `loopback`
 - `allowedConsumers` 不应为空（除非你确实要拒绝所有外部）
 - 不要把 endpoint、backendConfig、真实路径写入任何 status/summary 输出
-- `maintenance.enabled=true` 时，确保 batch size 与 interval 不会压垮 I/O
+- 若未来引入 `maintenance.*`，需确保 batch size 与 interval 不会压垮 I/O

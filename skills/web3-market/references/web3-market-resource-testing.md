@@ -50,7 +50,7 @@
 
 ### 6.1 `web3.status.summary` handler 测试
 
-- **文件**：`extensions/web3-core/src/index.test.ts`（新建）
+- **文件**：`extensions/web3-core/src/index.test.ts`（扩展现有）
 - **测试要点**：
   - 返回 `brain.source` / `brain.provider` / `brain.model` / `brain.availability` 字段
   - 返回 `billing.status` / `billing.credits` 字段
@@ -60,7 +60,7 @@
 
 ### 6.2 `flushPendingSettlements` 测试
 
-- **文件**：`extensions/web3-core/src/billing/settlement.test.ts`（新建）
+- **文件**：`extensions/web3-core/src/billing/settlement.test.ts`（扩展现有）
 - **测试要点**：
   - **ready 条目**（orderId/payer/amount 齐全）：调用 `market.settlement.lock` 并从队列移除
   - **not-ready 条目**（缺少必要字段）：跳过，保留在队列中
@@ -70,7 +70,7 @@
 
 ### 6.3 Model chat ledger 记账测试
 
-- **文件**：`extensions/web3-core/src/resources/http.test.ts`（追加）
+- **文件**：`extensions/web3-core/src/resources/http.test.ts`（扩展现有）
 - **测试要点**：
   - pipeline 完成后调用 `market.ledger.append`，kind 为 `"model"`，unit 为 `"token"`
   - 上游返回 `usage.total_tokens` 时，quantity 取该值
@@ -79,7 +79,7 @@
 
 ### 6.4 原子性事务回滚测试
 
-- **文件**：`extensions/market-core/src/state/store.test.ts`（新建）
+- **文件**：`extensions/market-core/src/state/store.test.ts`（扩展现有）
 - **测试要点（SQLite 模式）**：
   - `runInTransaction` 中途抛错：验证所有写入完全回滚（读取确认无脏数据）
   - `runInTransaction` 正常完成：验证所有写入均持久化

@@ -1,9 +1,14 @@
-### OpenClaw + Web3 分布式助理网络全面评估报告（最终版）
+### OpenClaw + Web3 分布式助理网络评审报告（仅评审）
 
 - **评估日期**: 2026-02-19
 - **文档类型**: 技术架构与实现进度评审
 - **评估者**: AI Assistant
 - **范围说明**: 基于当前代码库的可验证实现与测试；不包含未在代码中出现的推断。
+
+### **文档定位**
+
+- 本文为评审文档，不作为实施规范。
+- 实施以 `web3-brain-architecture.md` 与 `web3-market-resource-implementation-checklist.md` 为准。
 
 ---
 
@@ -59,7 +64,7 @@
   - 测试: `extensions/web3-core/src/index.test.ts`
 
 - **`market-core` handlers 拆分已完成**（barrel re-export）
-  - 证据: `extensions/market-core/src/market/handlers.ts` 与 `extensions/market-core/src/market/handlers/index.ts`
+  - 证据: `extensions/market-core/src/market/handlers/*` 与 `extensions/market-core/src/market/handlers/index.ts`
 
 ---
 

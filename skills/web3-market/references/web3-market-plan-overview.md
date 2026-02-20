@@ -1,16 +1,73 @@
-### OpenClaw Web3 市场化集成方案评审与设计文档（`web3-core` + `market-core`）
+### OpenClaw Web3 Market：方案总纲与阶段设计（`web3-core` + `market-core`）
 
 ### **文档目的**
 
 对你提出的 **Web3 Market + Node 网络**方案进行评审，并基于现有 `web3-core` 与 `market-core` 的真实能力，给出 **可落地、可扩展、可演进** 的设计方案与实现边界，最终形成 AI 代理可直接执行的实现方向。
 
+### **文档定位与导航**
+
+- 本文是方案总纲与阶段设计，具体执行与权威入口见下述文档。
+- 主文档：`web3-brain-architecture.md`
+- 执行清单附录：`web3-market-resource-implementation-checklist.md`
+- 评审文档（仅评审，不作为规范）：`web3-market-assessment-2026-02-19.md`
+- 具体方案文档：
+  - `web3-market-plan-phase1-execution.md`
+  - `web3-market-plan-roadmap-open-source-coldstart.md`
+  - `web3-market-plan-parallel-execution-ray-celery.md`
+- 若与资源共享细节冲突，以以下文档为权威：
+  - `web3-market-resource-api.md`
+  - `web3-market-resource-security.md`
+  - `web3-market-resource-ops.md`
+  - `web3-market-resource-testing.md`
+  - `web3-market-resource-implementation-checklist.md`
+- 快速进入：先读 `web3-brain-architecture.md`，再读资源共享 API 与安全文档。
+
+### **现状快照（与代码一致）**
+
+- **B-1（主脑切换）已实现**：`before_model_resolve` + `resolve_stream_fn` 已在 core 与 `web3-core` 接通，`web3.status.summary` 与 `/pay_status` 已输出主脑来源与结算状态。
+- **B-2（资源共享）已实现**：`market.resource.*` / `market.lease.*` / `market.ledger.*` 已落地；`web3.resources.*` + Provider HTTP routes + consumer tools 已可用。
+- **仍未覆盖**：任务市场协议（TaskOrder/Bid/Result）、争议仲裁、独立索引服务、监控告警与 Web UI。
+
 ---
 
-### **一、方案评审结论（针对你提供的 Market/Node 方案）**
+### **未实现项开发清单与里程碑（建议）**
+
+- **P0：独立索引服务（index-service）**
+  - 现状：`web3.index.report/list` 为本地 indexer（`web3/resource-index.json`）
+  - 里程碑：Week 2（资源发现冷启动）
+- **P0：争议仲裁入口（`market.dispute.open/resolve`）**
+  - 现状：未实现
+  - 里程碑：Week 3（争议仲裁 + 审计锚定）
+- **P0：监控告警（指标 + 规则 + 历史）**
+  - 现状：未实现
+  - 里程碑：Week 4（监控告警 + Web UI）
+- **P0：Web 管理台最小可用**
+  - 现状：未实现
+  - 里程碑：Week 4（管理台 MVP）
+- **P1：任务市场协议层（TaskOrder/Bid/Result）**
+  - 现状：未实现
+  - 里程碑：Phase 3（生态扩展阶段）
+
+### **评审方案中的未完成项清单（含实现方案推荐）**
+
+- **P0：争议仲裁机制**
+  - 推荐方案：链下仲裁 + 证据摘要写入审计/锚定管线，后续可升级链上仲裁。
+- **P0：资源发现/索引服务**
+  - 推荐方案：中心化索引服务 + Provider 定期上报；后续演进 DHT/去中心化目录。
+- **P0：监控告警**
+  - 推荐方案：Prometheus metrics + P0/P1 告警规则（结算队列、ledger 失败、租约失效、audit/anchor 失败率）。
+- **P0：Web 管理台**
+  - 推荐方案：最小可用管理台（概览/资源/租约/账本），复用现有 `web3.status.summary` 与 market API。
+- **P0：跨插件 E2E 覆盖**
+  - 推荐方案：file/sqlite 双模式的端到端用例（发布 → 租约 → 调用 → 记账 → 撤销/过期）。
+
+---
+
+### **一、方案对齐结论（针对你提供的 Market/Node 方案）**
 
 #### **结论：方向正确，但与现有插件能力存在落地鸿沟**
 
-该方案将 OpenClaw 变成“Client + Node”双角色的 **去中心化任务市场**，这是合理方向；但**当前代码基座**（`web3-core` + `market-core`）仅提供 **身份/审计/归档/计费/结算** 的基础设施，并未实现：
+该方案将 OpenClaw 变成“Client + Node”双角色的 **去中心化任务市场**，这是合理方向；但**当前代码基座**（`web3-core` + `market-core`）已具备 **身份/审计/归档/计费/结算 + 资源共享（B-2）** 的基础设施，仍未实现：
 
 - **任务广播/竞标/撮合**
 - **节点注册与能力声明**
@@ -308,7 +365,7 @@ sequenceDiagram
 - **涉及模块/文件**：
   - `extensions/web3-core/src/billing/commands.ts`
   - `extensions/web3-core/src/index.ts`
-  - `extensions/market-core/src/market/handlers.ts`（如需补齐汇总字段）
+  - `extensions/market-core/src/market/handlers/*`（如需补齐汇总字段）
   - `extensions/web3-core/src/state/store.ts`（如需新增汇总缓存）
 - **测试建议**：
   - **单元**：`commands.test.ts` 覆盖 `/pay_status` 与 `status summary` 字段对齐。
@@ -357,7 +414,7 @@ sequenceDiagram
 - `extensions/web3-core/src/audit/hooks.ts`
 - `extensions/web3-core/src/billing/commands.ts`
 - `extensions/web3-core/src/index.ts`
-- `extensions/market-core/src/market/handlers.ts`
+- `extensions/market-core/src/market/handlers/*`
 - `extensions/web3-core/src/billing/commands.test.ts`
 - `extensions/web3-core/src/billing/guard.test.ts`
 - `extensions/web3-core/src/audit/hooks.test.ts`

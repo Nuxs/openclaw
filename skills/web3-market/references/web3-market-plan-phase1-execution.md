@@ -4,6 +4,18 @@
 - **定位**: 结算链路 + 资源发现冷启动落地
 - **前置要求**: 已确认采用外部 ERC-20 作为结算媒介（自有代币后置）
 
+### **现状对齐（基于当前代码）**
+
+- **已具备**：`market.resource/lease/ledger`、`web3.resources.*`、Provider HTTP routes、consumer tools、`web3.status.summary` 与 `/pay_status`。
+- **待补齐**：索引服务的对外化/稳定性、争议仲裁、监控告警、Web UI，以及跨插件 E2E 覆盖强度。
+
+### **未实现项与周计划映射**
+
+- **独立索引服务** → Week 2
+- **争议仲裁** → Week 3
+- **监控告警 + Web UI** → Week 4
+- **任务市场协议层（TaskOrder/Bid/Result）** → Phase 3（不在本计划内）
+
 ---
 
 ## 先行调研：开源方案参考（可复用或对标）

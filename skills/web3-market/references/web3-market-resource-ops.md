@@ -19,7 +19,7 @@
 - `resources.enabled`
 - `resources.provider.listen.bind`（默认 loopback）
 - `resources.provider.listen.publicBaseUrl?`（反代时）
-- `maintenance.enabled`
+- `access.mode` / `access.requireActor`（market-core 访问控制）
 
 ---
 
@@ -44,7 +44,7 @@
 - `market.revocation.retry`
   - 若撤销 webhook 积压，先查 `revocations.json`/`revocations` 表
 - `market.repair.retry`
-  - 导入后出现 orphan/invalid 增多时运行
+  - 当前仅修复过期/孤儿租约并同步撤销 delivery（不处理 ledger/resource 的深度修复）
 
 ---
 

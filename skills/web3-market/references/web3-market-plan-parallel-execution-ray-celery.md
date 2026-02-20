@@ -1,4 +1,4 @@
-### OpenClaw 并联多设备执行方案（Ray 主线 + Celery 补充）
+### OpenClaw Web3 Market：并联多设备执行方案（Ray 主线 + Celery 补充）
 
 - **版本**: v1.0
 - **目标**: 多台设备并行执行（Mac mini / 个人设备 / NPU / TPU）

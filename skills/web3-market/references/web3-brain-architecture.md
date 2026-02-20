@@ -8,6 +8,26 @@
 - **范围**：Core 层 hook 扩展 + `web3-core` 与 `market-core` 插件适配；主脑候选注册、推理路径接入、结算绑定、状态汇总与回退策略。
 - **原则**：可降级、可回滚；`market-core` 为结算权威；失败不阻断对话链路。
 
+### **相关文档与权威优先级**
+
+- 接口与错误契约：`web3-market-resource-api.md`
+- 安全与威胁模型：`web3-market-resource-security.md`
+- 运维与可观测性：`web3-market-resource-ops.md`
+- 测试与验收：`web3-market-resource-testing.md`
+- 实施清单：`web3-market-resource-implementation-checklist.md`
+- 配置示例：`web3-market-resource-config-examples.md`
+
+### **主文档与执行入口**
+
+- **主文档**：本文（`web3-brain-architecture.md`）。
+- **执行方案（具体计划）**：
+  - `web3-market-plan-overview.md`
+  - `web3-market-plan-phase1-execution.md`
+  - `web3-market-plan-roadmap-open-source-coldstart.md`
+  - `web3-market-plan-parallel-execution-ray-celery.md`
+- **执行清单附录**：`web3-market-resource-implementation-checklist.md`
+- **评审文档（仅评审，不作为规范）**：`web3-market-assessment-2026-02-19.md`
+
 ---
 
 ### **一、技术选型与依据**
@@ -75,32 +95,31 @@
 
 ---
 
-### **三、Core 层改动（B-1 阶段）**
+### **三、Core 层现状（B-1 已实现）**
 
-#### **3.1 新增 hook 类型（`src/plugins/types.ts`）**
+#### **3.1 hook 类型（已实现，`src/plugins/types.ts`）**
 
 ```typescript
-// --- 新增 ---
-export type PluginHookResolveStreamEvent = {
+export type PluginHookResolveStreamFnEvent = {
   provider: string; // 当前选中的 provider
   modelId: string; // 当前选中的 model
-  modelApi: ModelApi; // 当前 API 类型（openai-completions 等）
+  modelApi?: string; // 当前 API 类型
   baseUrl?: string; // 当前 provider 的 baseUrl
 };
 
-export type PluginHookResolveStreamResult = {
+export type PluginHookResolveStreamFnResult = {
   streamFn?: StreamFn; // 如果返回，则替代默认的 streamSimple/ollamaStreamFn
 };
 ```
 
-在 `PluginHookName` union 中新增 `"resolve_stream_fn"`。
+`PluginHookName` 已包含 `"resolve_stream_fn"`。
 
-#### **3.2 hook 调用点（`src/agents/pi-embedded-runner/run/attempt.ts`）**
+#### **3.2 hook 调用点（已实现，`src/agents/pi-embedded-runner/run/attempt.ts`）**
 
-在当前 `StreamFn` 分配逻辑**之前**插入：
+已在 `StreamFn` 分配逻辑**之前**插入：
 
 ```typescript
-// --- 新增：允许插件提供自定义 StreamFn ---
+// 已支持：允许插件提供自定义 StreamFn
 const streamOverride = await hookRunner.runResolveStream(
   {
     provider: params.model.provider,
@@ -123,68 +142,28 @@ if (streamOverride?.streamFn) {
 
 #### **3.3 hook 执行器（`src/plugins/hooks.ts`）**
 
-新增 `runResolveStream` 方法，使用 `runModifyingHook`（串行、按优先级、错误不阻断）。
+已提供 `runResolveStream` 方法，使用 `runModifyingHook`（串行、按优先级、错误不阻断）。
 
-#### **3.4 涉及 Core 文件清单**
+#### **3.4 已落地 Core 文件清单**
 
-| 文件                                           | 改动                                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------- |
-| `src/plugins/types.ts`                         | 新增 `PluginHookResolveStreamEvent/Result` 类型，扩展 `PluginHookName` |
-| `src/plugins/hooks.ts`                         | 新增 `runResolveStream` 方法                                           |
-| `src/agents/pi-embedded-runner/run/attempt.ts` | 在 StreamFn 分配前插入 hook 调用                                       |
-| `src/plugins/runtime/types.ts`                 | 新增 `on("resolve_stream_fn", ...)` 类型签名（如需类型安全）           |
+| 文件                                           | 现状                                                                  |
+| ---------------------------------------------- | --------------------------------------------------------------------- |
+| `src/plugins/types.ts`                         | 已包含 `PluginHookResolveStreamFnEvent/Result` 与 `resolve_stream_fn` |
+| `src/plugins/hooks.ts`                         | 已实现 `runResolveStream`                                             |
+| `src/agents/pi-embedded-runner/run/attempt.ts` | 已在 StreamFn 分配前调用 `runResolveStream`                           |
+| `src/plugins/runtime/types.ts`                 | 已包含 `on("resolve_stream_fn", ...)` 类型签名                        |
 
 ---
 
 ### **四、`web3-core` 插件改动**
 
-#### **4.1 新增 `before_model_resolve` hook（动态主脑切换）**
+#### **4.1 `before_model_resolve` hook（已注册）**
 
-当前 `web3-core` 完全没有注册 `before_model_resolve`。需新增：
+`web3-core` 已注册 `before_model_resolve`，并通过 `resolveBrainModelOverride` 做 allowlist 与可用性判断（含租约可用性）。
 
-```typescript
-// extensions/web3-core/src/index.ts
-api.on(
-  "before_model_resolve",
-  (event, ctx) => {
-    const brainConfig = resolveConfig(api.pluginConfig).brain;
-    if (!brainConfig?.enabled) return {};
+#### **4.2 `resolve_stream_fn` hook（已注册）**
 
-    // 检查 allowlist
-    const allowed = brainConfig.allowlist?.includes(brainConfig.defaultModel);
-    if (!allowed) return {};
-
-    // 检查可用性（可选：探测节点）
-    return {
-      providerOverride: brainConfig.providerId,
-      modelOverride: brainConfig.defaultModel,
-    };
-  },
-  { priority: 10 },
-);
-```
-
-#### **4.2 新增 `resolve_stream_fn` hook（自定义推理传输）**
-
-```typescript
-// extensions/web3-core/src/index.ts
-api.on(
-  "resolve_stream_fn",
-  (event, ctx) => {
-    const brainConfig = resolveConfig(api.pluginConfig).brain;
-    if (!brainConfig?.enabled) return {};
-    if (event.provider !== brainConfig.providerId) return {};
-
-    // 返回自定义 StreamFn，连接去中心化节点
-    return {
-      streamFn: createWeb3StreamFn(brainConfig),
-    };
-  },
-  { priority: 10 },
-);
-```
-
-`createWeb3StreamFn` 实现自定义 HTTP/WebSocket/P2P 传输，连接去中心化模型节点。
+`web3-core` 已注册 `resolve_stream_fn`，仅在 `provider` 匹配且租约可用时返回 `createWeb3StreamFn`。当前实现支持 `openai-compat` 协议，并在无可用 endpoint 时回退。
 
 #### **4.3 配置扩展（`extensions/web3-core/src/config.ts`）**
 
@@ -196,8 +175,8 @@ brain: {
   providerId: string;         // 注册的 provider ID，如 "web3-decentralized"
   defaultModel: string;       // 默认模型 ID
   allowlist: string[];        // 允许的模型/节点列表
-  endpoint: string;           // 去中心化网关/节点地址
-  protocol: string;           // 传输协议（"openai-compat" | "custom-ws" | "p2p" 等）
+  endpoint?: string;          // 去中心化网关/节点地址（可选）
+  protocol: "openai-compat" | "custom-ws" | "p2p"; // 传输协议
   fallback: "centralized";    // 回退策略
   timeoutMs: number;          // 请求超时，默认 30000
 }
@@ -217,11 +196,11 @@ brain: {
 
 #### **4.5 `session_end` 结算可靠性兜底**
 
-当前 `session_end` 是 `runVoidHook`（fire-and-forget），结算写入失败无重试。兜底方案：
+当前 `session_end` 是 `runVoidHook`（fire-and-forget），结算写入失败无重试。现状实现如下：
 
-- 在 `web3-core` 内部维护 `pendingSettlements` 队列（复用 `Web3StateStore` 的 JSONL 持久化）
-- `session_end` 写入失败 → 追加到 `pendingSettlements`
-- 复用现有 `web3-anchor-service` 的 60 秒重试机制，增加结算重试逻辑
+- `web3-core` 内部维护 `pendingSettlements` 队列（`Web3StateStore` 的 `web3/pending-settlements.json`）
+- `session_end` 仅在存在 settlement 上下文时入队（`orderId`/`payer` 必填）
+- `web3-anchor-service` 以 60 秒周期触发 `flushPendingSettlements` 重试
 
 ##### **4.5.1 `PendingSettlement` 字段来源与填充规范（必须）**
 
@@ -229,22 +208,22 @@ brain: {
 
 **字段来源映射**：
 
-| 字段            | 来源                                                                                             | 说明                                          |
-| --------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| `sessionIdHash` | `sha256(sessionId)`                                                                              | 去标识化，关联审计                            |
-| `createdAt`     | `new Date().toISOString()`                                                                       | 入队时间戳                                    |
-| `orderId`       | `web3.resources.lease` 成功后写入 session metadata → `session_end` 读取                          | 以租约签发作为结算权威来源                    |
-| `payer`         | `web3.resources.lease` 的 `consumerActorId`                                                      | 即 Consumer 的 actorId                        |
-| `amount`        | `event.usage.totalCost`（由 `llm_output` hook 累计的会话总费用，格式为字符串化的 BigNumber-ish） | 取自会话 usage 汇总；若无法获取则回退为 `"0"` |
-| `actorId`       | 同 `payer`                                                                                       | 冗余字段，便于查询                            |
-| `attempts`      | 初始 `0`                                                                                         | 重试计数器                                    |
-| `lastError`     | 初始 `undefined`                                                                                 | 最近一次重试失败原因                          |
+| 字段            | 来源                                                                    | 说明                       |
+| --------------- | ----------------------------------------------------------------------- | -------------------------- |
+| `sessionIdHash` | `sha256(sessionId)`                                                     | 去标识化，关联审计         |
+| `createdAt`     | `new Date().toISOString()`                                              | 入队时间戳                 |
+| `orderId`       | `web3.resources.lease` 成功后写入 session metadata → `session_end` 读取 | 以租约签发作为结算权威来源 |
+| `payer`         | `web3.resources.lease` 的 `consumerActorId`                             | 即 Consumer 的 actorId     |
+| `amount`        | `settlement.amount` 或 `usage.creditsUsed`（字符串化）                  | 若缺失则回退为 `"0"`       |
+| `actorId`       | 同 `payer`                                                              | 冗余字段，便于查询         |
+| `attempts`      | 初始 `0`                                                                | 重试计数器                 |
+| `lastError`     | 初始 `undefined`                                                        | 最近一次重试失败原因       |
 
 **实现要点**：
 
-- `onSessionEnd`（`audit/hooks.ts`）回调签名需接收 session 上下文（含 orderId/actorId/usage），而非仅 sessionId。
-- 若 `orderId` 在当前 session 上下文中不可得（例如非 Web3 主脑会话），**不入队**——仅 Web3 去中心化模型会话需要结算兜底。
-- `amount` 字段取 `event.usage.totalCost`；如果 usage 缺失或为零，仍入队但 `amount = "0"`，以便后续对账发现异常。
+- `onSessionEnd`（`audit/hooks.ts`）直接读取 `event.settlement`（来自 session store），并结合 usage 入队。
+- 若 `orderId` 在当前 session 上下文中不可得（例如非 Web3 主脑会话），**不入队**——仅需要结算绑定的会话进入兜底。
+- `amount` 优先取 `settlement.amount`，否则回退为 `usage.creditsUsed`（缺失时为 `"0"`）。
 
 #### **4.6 涉及 `web3-core` 文件清单**
 
@@ -263,28 +242,26 @@ brain: {
 
 ### **五、接口设计**
 
-#### **5.1 `web3.status.summary`（扩展现有 gateway handler）**
+#### **5.1 `web3.status.summary`（已实现）**
 
-在现有返回字段（`auditEventsRecent`, `archiveProvider`, `anchorNetwork` 等）基础上**新增**：
+在现有返回字段（`auditEventsRecent`, `archiveProvider`, `anchorNetwork` 等）基础上，以下字段**已实现**：
 
-| 字段                 | 类型                                            | 说明                 | 状态       |
-| -------------------- | ----------------------------------------------- | -------------------- | ---------- |
-| `brain.source`       | `"web3/decentralized" \| "centralized" \| null` | 当前主脑来源         | **待新增** |
-| `brain.provider`     | `string \| null`                                | 当前主脑 provider ID | **待新增** |
-| `brain.model`        | `string \| null`                                | 当前主脑 model ID    | **待新增** |
-| `brain.availability` | `"ok" \| "degraded" \| "unavailable"`           | 主脑可用性           | **待新增** |
-| `billing.status`     | `"active" \| "exhausted" \| "unbound"`          | 结算状态             | **待新增** |
-| `billing.credits`    | `number`                                        | 剩余 credits         | **待新增** |
-| `settlement.pending` | `number`                                        | 待结算条目数         | **待新增** |
+| 字段                 | 类型                                            | 说明                   | 状态       |
+| -------------------- | ----------------------------------------------- | ---------------------- | ---------- |
+| `brain.source`       | `"web3/decentralized" \| "centralized" \| null` | 配置决定的主脑来源     | **已实现** |
+| `brain.provider`     | `string \| null`                                | 配置的主脑 provider ID | **已实现** |
+| `brain.model`        | `string \| null`                                | 配置的主脑 model ID    | **已实现** |
+| `brain.availability` | `"ok" \| "degraded" \| "unavailable"`           | 基于配置的可用性判断   | **已实现** |
+| `billing.status`     | `"active" \| "exhausted" \| "unbound"`          | 结算状态               | **已实现** |
+| `billing.credits`    | `number`                                        | 剩余 credits           | **已实现** |
+| `settlement.pending` | `number`                                        | 待结算条目数           | **已实现** |
 
-#### **5.2 `/pay_status`（扩展现有命令）**
+#### **5.2 `/pay_status`（已实现输出）**
 
-现有 `/pay_status` 已对接 `market-core` SQLite/文件存储查结算状态。新增字段：
+现有 `/pay_status` 已对接 `market-core` SQLite/文件存储查结算状态，并**已输出**：
 
-| 字段                      | 说明         | 状态       |
-| ------------------------- | ------------ | ---------- |
-| `brain.source`            | 当前主脑来源 | **待新增** |
-| `settlement.pendingCount` | 待重试结算数 | **待新增** |
+- `Brain source`（当前主脑来源）
+- `Pending settlements`（待重试结算数）
 
 #### **5.3 Core 新增 hook 接口**
 
@@ -334,7 +311,7 @@ brain: {
 - **涉及模块**：
   - `extensions/web3-core/src/billing/commands.ts`
   - `extensions/web3-core/src/index.ts`（gateway handler 扩展）
-  - `extensions/market-core/src/market/handlers.ts`（如需补齐汇总字段）
+  - `extensions/market-core/src/market/handlers/*`（如需补齐汇总字段）
   - `extensions/web3-core/src/state/store.ts`（主脑状态持久化）
 - **测试建议**：
   - `commands.test.ts` 覆盖新增字段与降级文案
@@ -636,14 +613,14 @@ resources: {
   - Provider 侧：每次请求也记录 `usage`（防止 Consumer 侧伪造）
   - `market-core` 作为权威对齐：最终结算以 Provider 侧账本为准，Consumer 侧账本用于体验与预估
 
-**缺口**（本轮一起补齐）：
+**现状**（已实现）：
 
-- `market-core` 增加资源目录/租约/账本结构（不必上链，先本地权威）
-- `web3-core` 增加 `pendingSettlements` 的资源调用场景（不仅 LLM output）
+- `market-core` 已包含资源目录/租约/账本结构（本地权威，未上链）
+- `web3-core` 通过 `web3.resources.lease` 写入 session settlement 元数据，使 `pendingSettlements` 覆盖资源调用场景
 
-##### **12.8.1 模型调用 Provider 权威记账规范（必须）**
+##### **12.8.1 模型调用 Provider 权威记账规范（已实现）**
 
-> search 与 storage 路由已在请求完成后调用 `appendSearchLedger` / `appendStorageLedger` 写入 Provider 权威账本，但 **model/chat 路由缺失此记账调用**，导致模型调用——作为 B-2 最核心的共享资源——无法审计与结算。
+> search 与 storage 路由已在请求完成后调用 `appendSearchLedger` / `appendStorageLedger` 写入 Provider 权威账本；**model/chat 路由也已实现对应记账调用**，与 search/storage 对齐。
 
 **`appendModelLedger` 规范**：
 
@@ -651,17 +628,17 @@ resources: {
 - **调用目标**：`market.ledger.append`（与 search/storage 完全一致的 gateway method）。
 - **记账字段**：
 
-| 字段              | 值                                                                                                                |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `leaseId`         | 从鉴权阶段已解析的 lease                                                                                          |
-| `resourceId`      | lease 关联的 resourceId                                                                                           |
-| `providerActorId` | 当前 Provider 的 actorId                                                                                          |
-| `consumerActorId` | lease 的 consumerActorId                                                                                          |
-| `kind`            | `"model"`                                                                                                         |
-| `unit`            | `"token"`（对齐 `price.unit`）                                                                                    |
-| `quantity`        | 优先从上游响应 header `x-usage-tokens` 或响应体 `usage.total_tokens` 提取；无法获取时回退为 `1`（按调用次数计量） |
-| `cost`            | `quantity * offer.price.perUnit`（字符串化 BigNumber-ish）                                                        |
-| `requestId`       | 请求的 `X-OpenClaw-Request-Id`（可选，用于对账）                                                                  |
+| 字段              | 值                                                                              |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `leaseId`         | 从鉴权阶段已解析的 lease                                                        |
+| `resourceId`      | lease 关联的 resourceId                                                         |
+| `providerActorId` | 当前 Provider 的 actorId                                                        |
+| `consumerActorId` | lease 的 consumerActorId                                                        |
+| `kind`            | `"model"`                                                                       |
+| `unit`            | `"token"`（对齐 `price.unit`）                                                  |
+| `quantity`        | 从上游响应 header `x-usage-tokens` 提取；无法获取时回退为 `1`（按调用次数计量） |
+| `cost`            | `quantity * offer.price.perUnit`（字符串化 BigNumber-ish）                      |
+| `requestId`       | 请求的 `X-OpenClaw-Request-Id`（可选，用于对账）                                |
 
 - **实现位置**：`extensions/web3-core/src/resources/http.ts`，紧跟 `createResourceModelChatHandler` 的 pipeline 完成回调。
 - **与 search/storage 对齐**：三种资源类型的 ledger append 遵循相同的 `callGateway("market.ledger.append", params)` 模式，仅 `kind`/`unit`/`quantity` 不同。
@@ -691,24 +668,24 @@ resources: {
   - Consumer 侧：`web3.storage.put/get/list` 工具
   - 测试：ACL、大小限制、mime allowlist、对账
 
-#### **12.10 涉及文件清单（B-2 增量）**
+#### **12.10 涉及文件清单（B-2 现状）**
 
 - **`web3-core`**：
-  - MODIFY `extensions/web3-core/src/config.ts`（新增 `resources` 配置节）
-  - MODIFY `extensions/web3-core/src/index.ts`（新增 gateway methods + tools + http routes）
-  - MODIFY `extensions/web3-core/src/state/store.ts`（新增资源目录缓存/租约缓存/资源账本）
-  - **NEW** `extensions/web3-core/src/resources/registry.ts`（资源发布/发现逻辑）
-  - **NEW** `extensions/web3-core/src/resources/leases.ts`（租约 token 生成/校验/撤销）
-  - **NEW** `extensions/web3-core/src/resources/http.ts`（Provider HTTP routes：model/search/storage）
-  - **NEW** `extensions/web3-core/src/resources/tools.ts`（Consumer tools：search/storage）
+  - `extensions/web3-core/src/config.ts`（已包含 `resources` 配置节）
+  - `extensions/web3-core/src/index.ts`（已注册 gateway methods + tools + http routes）
+  - `extensions/web3-core/src/state/store.ts`（已支持资源目录/租约/账本相关状态）
+  - `extensions/web3-core/src/resources/registry.ts`（已实现资源发布/发现逻辑）
+  - `extensions/web3-core/src/resources/leases.ts`（已实现租约 token 生成/校验/撤销）
+  - `extensions/web3-core/src/resources/http.ts`（已实现 Provider HTTP routes）
+  - `extensions/web3-core/src/resources/tools.ts`（已实现 Consumer tools）
 
 - **`market-core`**（权威目录与结算）：
-  - MODIFY `extensions/market-core/src/market/handlers.ts`（增加资源目录/租约/账本查询能力）
-  - **NEW** `extensions/market-core/src/market/resources.ts`（resources/leasses/ledger 的 store + 读写）
+  - `extensions/market-core/src/market/handlers/*`（resource/lease/ledger/repair handlers）
+  - `extensions/market-core/src/market/resources.ts`（已定义 resources/leases/ledger 类型）
 
 - **测试**：
-  - NEW `extensions/web3-core/src/resources/*.test.ts`（发布/租约/ACL/调用）
-  - MODIFY `src/gateway/tools-invoke-http.test.ts`（覆盖 web3 工具通过 HTTP 调用 Provider）
+  - `extensions/web3-core/src/resources/*.test.ts`（已有覆盖，按需补齐）
+  - `src/gateway/tools-invoke-http.test.ts`（如需补齐跨插件调用，建议扩展）
 
 ---
 
@@ -888,7 +865,7 @@ export type MarketLedgerEntry = {
   - `listLedger(filter?: { leaseId?: string; resourceId?: string; providerActorId?: string; consumerActorId?: string; since?: string; until?: string; limit?: number }): Promise<MarketLedgerEntry[]>`
   - `summarizeLedger(filter?: { leaseId?: string; resourceId?: string; providerActorId?: string; consumerActorId?: string; since?: string; until?: string }): Promise<{ byUnit: Record<string, { quantity: string; cost: string }>; totalCost: string; currency: string }>`
 
-##### **12.11.5 `market-core` Gateway Methods（handlers.ts）读写契约**
+##### **12.11.5 `market-core` Gateway Methods（`market/handlers/*`）读写契约**
 
 > 原则：尽量复用既有对象：
 >
@@ -899,14 +876,14 @@ export type MarketLedgerEntry = {
 **Resources**
 
 - `market.resource.publish`
-  - **输入**：`{ actorId?; resource: { kind; label; description?; tags?; price; policy?; offer: { assetId; assetType; currency; usageScope; deliveryType; assetMeta? } } }`
+  - **输入**：`{ actorId; resource: { kind; label; description?; tags?; price; policy?; offer: { assetId; assetType; currency; usageScope; deliveryType; assetMeta? } } }`
   - **行为**：
     - 创建或更新 Offer（并 publish）
     - 写 `MarketResource`（offerId 绑定、status=published、version+1）
   - **输出**：`{ ok: true; resourceId; offerId; offerHash; status: "resource_published" }`
 
 - `market.resource.unpublish`
-  - **输入**：`{ actorId?; resourceId }`
+  - **输入**：`{ actorId; resourceId }`
   - **行为**：资源 status->unpublished（必要时 offer.close）
   - **输出**：`{ ok: true; resourceId; status: "resource_unpublished" }`
 
@@ -921,7 +898,7 @@ export type MarketLedgerEntry = {
 **Leases**
 
 - `market.lease.issue`
-  - **输入**：`{ actorId?; resourceId; consumerActorId; ttlMs; maxCost? }`
+  - **输入**：`{ actorId; resourceId; consumerActorId; ttlMs; maxCost? }`
   - **行为**：
     - 创建 Order（buyerId=consumerActorId）
     - 生成/验证 Consent（可选：要求 SIWE/签名，复用 `market.consent.grant`）
@@ -930,7 +907,7 @@ export type MarketLedgerEntry = {
   - **输出**：`{ ok: true; leaseId; orderId; consentId?; deliveryId; expiresAt }`
 
 - `market.lease.revoke`
-  - **输入**：`{ actorId?; leaseId; reason? }`
+  - **输入**：`{ actorId; leaseId; reason? }`
   - **行为**：lease status->revoked；并触发 delivery revoke（复用现有 revoke webhook 体系）
   - **输出**：`{ ok: true; leaseId; status: "lease_revoked"; revokedAt }`
 
@@ -945,7 +922,7 @@ export type MarketLedgerEntry = {
 **Ledger**
 
 - `market.ledger.append`
-  - **输入**：`{ actorId?; entry: Omit<MarketLedgerEntry, "ledgerId"|"timestamp"|"entryHash"> }`
+  - **输入**：`{ actorId; entry: Omit<MarketLedgerEntry, "ledgerId"|"timestamp"|"entryHash"> }`
   - **行为**：
     - 服务器端补齐 `ledgerId/timestamp/entryHash`
     - 校验 lease 有效（active + 未过期）
@@ -994,10 +971,10 @@ export type MarketLedgerEntry = {
 - **`requireLimit(params, key="limit", defaultValue: number, max: number): number`**：
   - `limit` 默认值 + 上限钳制（避免全表扫描）。
 
-**逐字段校验规则（handlers.ts 新增 methods 必须遵循）**
+**逐字段校验规则（`market/handlers/*` 新增 methods 必须遵循）**
 
 - **`market.resource.publish`**
-  - `actorId?`：若 `config.access.requireActorId=true` 则必填（复用 `requireActorId`）
+  - `actorId`：必填（当前实现强制；缺失返回 `E_AUTH_REQUIRED`）
   - `resource.kind`：`requireEnum(["model","search","storage"])`
   - `resource.label`：`requireString`（1..80）
   - `resource.description?`：可选（0..400）
@@ -1057,7 +1034,7 @@ export type MarketLedgerEntry = {
 
 ##### **12.11.8 Gateway Methods 请求/响应 JSON 示例（含失败示例）**
 
-> 示例按 `handlers.ts` 的 `opts.params` 约定给出；`actorId` 用占位地址 `0xaaaaaaaa...`。
+> 示例按 `market/handlers/*` 的 `opts.params` 约定给出；`actorId` 用占位地址 `0xaaaaaaaa...`。
 
 **`market.resource.publish`（成功）**
 
@@ -1575,7 +1552,7 @@ export type MarketLedgerEntry = {
 
 **3) 脱敏与日志规则（强制）**
 
-- `handlers.ts` 的任何错误/日志都不得输出：
+- `market/handlers/*` 的任何错误/日志都不得输出：
   - `accessToken` 明文
   - Provider 的内网 `endpoint`
   - Provider 的真实文件路径
@@ -1784,17 +1761,18 @@ assertLeaseTransition(from, to):
   - 统一返回字段：`{ processed, succeeded, failed, pending }`
   - 失败原因 audit 需脱敏
 
-**任务 3：修复队列重试（Repair Retry）**
+**任务 3：修复重试（Repair Retry）**
 
 - **gateway method**：`market.repair.retry`
 - **输入**：
   - `{ actorId?; limit?: number; maxAttempts?: number; dryRun?: boolean }`
-- **行为**（最小闭环）
-  - 扫描 `repairs` 中 `status=pending` 且 `attempts < maxAttempts`
-  - 目前只做两类自动修复：
-    - `orphan_ledger_entry`：若现在能找到 lease/resource，则允许重新纳入 summary（更新策略：把 entry 重新 append 不可行，因此推荐在 summary 时动态过滤；repair 只负责标记 job done）
-    - `invalid_resource_missing_offer`：若 offer 已补齐，则允许把 resource 从 invalid 恢复到 unpublished（需重新 publish 才能被发现）
-  - 修复失败：`attempts++`，超过上限标记 `failed`
+- **当前实现行为**：
+  - 扫描 `leases`，仅处理两类问题：
+    - **过期租约**：`lease_active` 且 `expiresAt <= now` → 标记为 `lease_expired`
+    - **孤儿租约**：缺失 `resource/order/delivery` → 标记为 `lease_revoked`
+  - 如存在 `delivery` 且未完成/未撤销：同步撤销 delivery
+  - 生成 `repair_retry` 审计事件
+  - `maxAttempts` 仅用于本次迭代上限控制（当前无 repair 队列持久化）
 - **输出**：
   - `{ ok: true; processed; succeeded; failed; pending }`
 
@@ -1812,12 +1790,9 @@ assertLeaseTransition(from, to):
   - `market.ledger.summary` 优先使用最新快照 + 增量区间
 - **输出**：`{ ok: true; snapshotId; buckets; totalCost }`
 
-**建议新增配置（可选，放 `extensions/market-core/src/config.ts`）**
+**未来可选配置（当前未实现，`market-core` 尚无 maintenance 配置节）**
 
-- `maintenance.enabled`（默认 false）
-- `maintenance.leaseExpireSweepIntervalMs`（默认 60000）
-- `maintenance.repairRetryIntervalMs`（默认 60000）
-- `maintenance.maxBatchSize`（默认 200）
+- 若需要后台任务调度，可在后续版本引入 `maintenance.*` 配置（例如启用开关与周期参数）。
 
 ---
 

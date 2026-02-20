@@ -1,6 +1,6 @@
 ### OpenClaw Web3 资源共享 API 契约（B-2 附录）
 
-> 本文档是 `web3-brain-architecture.md` 的子文档，聚焦 **接口与错误契约**，用于 AI 直接落地 `extensions/market-core/src/market/handlers.ts`、`extensions/web3-core/src/index.ts` 以及 Provider HTTP routes。
+> 本文档是 `web3-brain-architecture.md` 的子文档，聚焦 **接口与错误契约**，用于 AI 直接落地 `extensions/market-core/src/market/handlers/*`、`extensions/web3-core/src/index.ts` 以及 Provider HTTP routes。
 
 ---
 
@@ -42,7 +42,7 @@
 
 ### 2.2 `market.resource.unpublish`
 
-- **params**：`{ actorId?, resourceId }`
+- **params**：`{ actorId, resourceId }`
 - **success**：`{ ok:true, resourceId, status:"resource_unpublished" }`
 - **errors**：`E_NOT_FOUND | E_FORBIDDEN | E_CONFLICT`
 
@@ -58,7 +58,7 @@
 
 ### 2.5 `market.lease.issue`
 
-- **params**：`{ actorId?, resourceId, consumerActorId, ttlMs, maxCost? }`
+- **params**：`{ actorId, resourceId, consumerActorId, ttlMs, maxCost? }`
 - **success**：
   - `{ ok:true, leaseId, orderId, consentId?, deliveryId, expiresAt, accessToken }`
   - `accessToken` 必须是一次性返回；不得落盘明文。
@@ -69,7 +69,7 @@
 
 ### 2.6 `market.lease.revoke`
 
-- **params**：`{ actorId?, leaseId, reason? }`
+- **params**：`{ actorId, leaseId, reason? }`
 - **success**：`{ ok:true, leaseId, status:"lease_revoked", revokedAt }`
 - **errors**：`E_NOT_FOUND | E_FORBIDDEN | E_EXPIRED | E_CONFLICT`
 
@@ -87,7 +87,7 @@
 
 ### 2.9 `market.ledger.append`
 
-- **params**：`{ actorId?, entry: Omit<MarketLedgerEntry,"ledgerId"|"timestamp"|"entryHash"> }`
+- **params**：`{ actorId, entry: Omit<MarketLedgerEntry,"ledgerId"|"timestamp"|"entryHash"> }`
 - **success**：`{ ok:true, ledgerId, entryHash }`
 - **errors**：
   - `E_FORBIDDEN`：actor 非 provider
@@ -120,10 +120,12 @@
 
 > `web3-core` 侧负责把 Consumer/Provider 体验做完整：发现、租用、状态展示、与主脑切换整合。
 
-- `web3.resources.publish`：调用 `market.resource.publish` + 建立 Provider 本地 offer/route 映射（不暴露 endpoint）
+- `web3.resources.publish`：调用 `market.resource.publish`（不暴露 endpoint）
 - `web3.resources.list`：聚合 market list + 本地可见性过滤
 - `web3.resources.lease`：调用 `market.lease.issue`，把 accessToken 交给 Consumer 内存态或安全存储（不进 session transcript）；若提供 `sessionKey`，则把 `orderId/payer` 写入 session metadata 供结算使用
 - `web3.resources.revokeLease`：调用 `market.lease.revoke`
+- `web3.resources.status`：调用 `market.resource.get` 或 `market.lease.get`
+- `web3.index.report` / `web3.index.list`：资源索引上报与查询（内置 indexer）
 
 ---
 
@@ -145,6 +147,7 @@
 - **协议**：
   - `openai-compat`：OpenAI Chat Completions 或 Responses（二选一）
   - `custom`：必须在 `resources.provider.offers.models[].backend` 中声明
+- **兼容路由**：同时提供 `POST /v1/chat/completions` 作为 OpenAI 兼容入口
 
 #### 4.2.1 Provider 权威记账（model chat）
 
@@ -154,7 +157,7 @@
 - **ledger entry 字段**：
   - `kind`: `"model"`
   - `unit`: `"token"`
-  - `quantity`: 优先取上游响应 header `x-usage-tokens` 或响应体 `usage.total_tokens`；无法获取时回退为 `1`
+  - `quantity`: 从上游响应 header `x-usage-tokens` 提取；无法获取时回退为 `1`
   - `cost`: `quantity * offer.price.perUnit`
   - `leaseId` / `resourceId` / `providerActorId` / `consumerActorId`：从鉴权阶段的 lease 上下文获取
 - **失败处理**：记账失败不影响已发送的流式响应，仅记录 warn 日志。

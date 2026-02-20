@@ -22,7 +22,7 @@
 
 ### 1.1 `src/plugins/types.ts`
 
-- **新增**：`PluginHookResolveStreamEvent/Result` + `PluginHookName` 增加 `resolve_stream_fn`
+- **新增**：`PluginHookResolveStreamFnEvent/Result` + `PluginHookName` 增加 `resolve_stream_fn`
 - **AC**：
   - 只增加类型与 hook name，不影响现有 hook 行为
 
@@ -52,7 +52,7 @@
 
 ### 2.1 `extensions/market-core/src/market/resources.ts`
 
-- **新增文件**：导出 `MarketResource/MarketLease/MarketLedgerEntry` types
+- **现有文件**：已导出 `MarketResource/MarketLease/MarketLedgerEntry` types（需核对完整性）
 - **AC**：
   - 不引入破坏性改动到现有 `market/types.ts`
 
@@ -70,7 +70,7 @@
 ### 2.3 `extensions/market-core/src/market/validators.ts`
 
 - **修改**：保留/复用现有基础校验（如 `requireString/requireAddress/...`），避免把资源共享的全部校验器堆进单一文件。
-- **新增（建议拆分）**：将资源共享相关校验器放到独立模块（例如 `extensions/market-core/src/market/resources/validators.ts`），集中承载 `requireEnum/requireStringArray/requireBigNumberishString/requireLimit/...`。
+- **现有模块**：`extensions/market-core/src/market/resources/validators.ts` 已承载资源共享校验器，后续新增规则继续落在该文件。
 - **AC**：
   - 所有新增 methods 入参校验有稳定错误码（推荐 `E_INVALID_ARGUMENT`）
 
@@ -80,7 +80,7 @@
 - **AC**：
   - 非法迁移必须抛错（映射为 `E_CONFLICT`）
 
-### 2.5 `extensions/market-core/src/market/handlers.ts`
+### 2.5 `extensions/market-core/src/market/handlers/*`
 
 - **修改**：新增 gateway methods
   - `market.resource.publish/unpublish/get/list`
@@ -105,7 +105,7 @@
 
 ### 3.1 `extensions/web3-core/src/config.ts`
 
-- **修改**：新增 `brain` + `resources` 配置节
+- **现有配置**：已包含 `brain` + `resources` 配置节（需核对默认值）
 - **AC**：默认值不改变现有行为（默认关闭）
 
 ### 3.2 `extensions/web3-core/src/index.ts`
@@ -120,16 +120,16 @@
   - 资源功能关闭时不暴露 routes/tools
   - route 必须校验 token hash + lease status + expiry + policy
 
-### 3.3 新增模块建议
+### 3.3 现有模块清单（已实现）
 
-- **新增**：`extensions/web3-core/src/resources/http.ts`（Provider routes）
-- **新增**：`extensions/web3-core/src/resources/tools.ts`（Consumer tools）
-- **新增**：`extensions/web3-core/src/brain/stream.ts`（StreamFn）
-- **新增**：`extensions/web3-core/src/brain/resolve.ts`（选择与回退）
+- `extensions/web3-core/src/resources/http.ts`（Provider routes）
+- `extensions/web3-core/src/resources/tools.ts`（Consumer tools）
+- `extensions/web3-core/src/brain/stream.ts`（StreamFn）
+- `extensions/web3-core/src/brain/resolve.ts`（选择与回退）
 
 ### 3.4 测试（web3-core）
 
-- **新增/修改**：
+- **现有/扩展**：
   - `brain/resolve.test.ts`（allowlist/回退）
   - `resources/http.test.ts`（token 校验/路径穿越/限流）
   - `resources/tools.test.ts`（脱敏/错误映射）
