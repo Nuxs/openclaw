@@ -48,7 +48,13 @@ describe("web3 resource index", () => {
     const listHandler = createResourceIndexListHandler(store, config);
 
     const resources: IndexedResource[] = [
-      { resourceId: "res-model", kind: "model", label: "LLM", tags: ["llm", "gpu"] },
+      {
+        resourceId: "res-model",
+        kind: "model",
+        label: "LLM",
+        tags: ["llm", "gpu"],
+        metadata: { endpoint: "https://sensitive.local" },
+      },
       { resourceId: "res-search", kind: "search", label: "Search", tags: ["search"] },
     ];
 
@@ -75,8 +81,11 @@ describe("web3 resource index", () => {
     const entries = (list.result()?.payload.entries as ResourceIndexEntry[]) ?? [];
     expect(entries).toHaveLength(1);
     expect(entries[0]?.providerId).toBe("provider-1");
+    expect(entries[0]?.endpoint).toBeUndefined();
+    expect(entries[0]?.meta).toBeUndefined();
     expect(entries[0]?.resources).toHaveLength(1);
     expect(entries[0]?.resources[0]?.resourceId).toBe("res-model");
+    expect(entries[0]?.resources[0]?.metadata).toBeUndefined();
   });
 
   it("filters out expired index entries", async () => {

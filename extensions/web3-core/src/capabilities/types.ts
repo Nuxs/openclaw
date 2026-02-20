@@ -15,6 +15,7 @@ export type CapabilityGroup =
   | "market"
   | "index"
   | "monitor"
+  | "dispute"
   | "tools";
 
 export type CapabilityDescriptor = {

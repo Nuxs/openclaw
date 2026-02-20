@@ -7,6 +7,9 @@ import type {
   MarketMetricsSnapshot,
   MarketResource,
   MarketStatusSummary,
+  Web3IndexEntry,
+  Web3IndexStats,
+  Web3MonitorSnapshot,
 } from "../types.ts";
 
 type MarketStatusState = {
@@ -16,6 +19,9 @@ type MarketStatusState = {
   marketError: string | null;
   marketStatus: MarketStatusSummary | null;
   marketMetrics: MarketMetricsSnapshot | null;
+  marketIndexEntries: Web3IndexEntry[];
+  marketIndexStats: Web3IndexStats | null;
+  marketMonitor: Web3MonitorSnapshot | null;
   marketResources: MarketResource[];
   marketLeases: MarketLease[];
   marketLedgerSummary: MarketLedgerSummary | null;
@@ -38,6 +44,9 @@ export async function loadMarketStatus(state: MarketStatusState) {
     const [
       statusRes,
       metricsRes,
+      indexListRes,
+      indexStatsRes,
+      monitorRes,
       resourcesRes,
       leasesRes,
       ledgerRes,
@@ -46,11 +55,14 @@ export async function loadMarketStatus(state: MarketStatusState) {
     ] = await Promise.allSettled([
       state.client.request("web3.market.status.summary", {}),
       state.client.request("web3.market.metrics.snapshot", {}),
+      state.client.request("web3.index.list", { limit: 200 }),
+      state.client.request("web3.index.stats", {}),
+      state.client.request("web3.monitor.snapshot", {}),
       state.client.request("web3.market.resource.list", { limit: 200 }),
       state.client.request("web3.market.lease.list", { limit: 50 }),
       state.client.request("web3.market.ledger.summary", {}),
       state.client.request("web3.market.ledger.list", { limit: 50 }),
-      state.client.request("web3.market.dispute.list", { limit: 50 }),
+      state.client.request("web3.dispute.list", { limit: 50 }),
     ]);
 
     const errors: string[] = [];
@@ -68,6 +80,29 @@ export async function loadMarketStatus(state: MarketStatusState) {
       anySuccess = true;
     } else {
       errors.push(String(metricsRes.reason ?? "Failed to load market metrics"));
+    }
+
+    if (indexListRes.status === "fulfilled") {
+      const payload = normalizePayload<{ entries?: Web3IndexEntry[] }>(indexListRes.value);
+      state.marketIndexEntries = payload?.entries ?? [];
+      anySuccess = true;
+    } else {
+      errors.push(String(indexListRes.reason ?? "Failed to load index entries"));
+    }
+
+    if (indexStatsRes.status === "fulfilled") {
+      const payload = normalizePayload<Web3IndexStats>(indexStatsRes.value);
+      state.marketIndexStats = payload;
+      anySuccess = true;
+    } else {
+      errors.push(String(indexStatsRes.reason ?? "Failed to load index stats"));
+    }
+
+    if (monitorRes.status === "fulfilled") {
+      state.marketMonitor = normalizePayload<Web3MonitorSnapshot>(monitorRes.value);
+      anySuccess = true;
+    } else {
+      errors.push(String(monitorRes.reason ?? "Failed to load monitor snapshot"));
     }
 
     if (resourcesRes.status === "fulfilled") {

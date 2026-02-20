@@ -248,6 +248,9 @@ export class OpenClawApp extends LitElement {
   @state() marketError: string | null = null;
   @state() marketStatus: import("./types.js").MarketStatusSummary | null = null;
   @state() marketMetrics: import("./types.js").MarketMetricsSnapshot | null = null;
+  @state() marketIndexEntries: import("./types.js").Web3IndexEntry[] = [];
+  @state() marketIndexStats: import("./types.js").Web3IndexStats | null = null;
+  @state() marketMonitor: import("./types.js").Web3MonitorSnapshot | null = null;
   @state() marketResources: import("./types.js").MarketResource[] = [];
   @state() marketLeases: import("./types.js").MarketLease[] = [];
   @state() marketLedgerSummary: import("./types.js").MarketLedgerSummary | null = null;

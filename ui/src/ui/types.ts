@@ -592,6 +592,66 @@ export type Web3StatusSummary = {
   };
 };
 
+export type Web3IndexResourceKind = "model" | "search" | "storage";
+
+export type Web3IndexResource = {
+  resourceId: string;
+  kind: Web3IndexResourceKind;
+  label?: string;
+  description?: string;
+  tags?: string[];
+  price?: string;
+  unit?: string;
+};
+
+export type Web3IndexSignature = {
+  scheme: "ed25519";
+  publicKey: string;
+  signature: string;
+  payloadHash: string;
+  signedAt: string;
+};
+
+export type Web3IndexEntry = {
+  providerId: string;
+  resources: Web3IndexResource[];
+  updatedAt: string;
+  expiresAt?: string;
+  lastHeartbeatAt?: string;
+  signature?: Web3IndexSignature;
+};
+
+export type Web3IndexStats = {
+  providers: number;
+  resources: number;
+  byKind: Record<string, number>;
+};
+
+export type Web3AlertSeverity = "p0" | "p1";
+
+export type Web3Alert = {
+  rule: string;
+  severity: Web3AlertSeverity;
+  triggered: boolean;
+  value: number;
+};
+
+export type Web3MetricsSnapshot = {
+  audit: { total: number; byKind: Record<string, number> };
+  anchoring: { enabled: boolean; pending: number };
+  archive: { provider: string | null; pending: number };
+  settlement: { pending: number };
+  billing: { enabled: boolean; usageRecords: number; creditsUsed: number };
+  resources: { providers: number; total: number; byKind: Record<string, number> };
+  alerts: Web3Alert[];
+};
+
+export type Web3MonitorSnapshot = {
+  web3: Web3MetricsSnapshot;
+  market: MarketMetricsSnapshot | null;
+  marketError: string | null;
+};
+
 export type MarketStatusSummary = {
   offers: Record<string, number>;
   orders: Record<string, number>;

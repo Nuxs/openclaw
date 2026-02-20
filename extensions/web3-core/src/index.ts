@@ -40,6 +40,10 @@ import { createBrowserIngestHandler } from "./ingest/browser-handler.js";
 import {
   createMarketDisputeGetHandler,
   createMarketDisputeListHandler,
+  createMarketDisputeOpenHandler,
+  createMarketDisputeRejectHandler,
+  createMarketDisputeResolveHandler,
+  createMarketDisputeSubmitEvidenceHandler,
   createMarketLedgerListHandler,
   createMarketLedgerSummaryHandler,
   createMarketLeaseExpireSweepHandler,
@@ -54,7 +58,10 @@ import {
   createMarketResourceUnpublishHandler,
   createMarketStatusSummaryHandler,
 } from "./market/handlers.js";
-import { createWeb3MetricsSnapshotHandler } from "./metrics/metrics.js";
+import {
+  createWeb3MetricsSnapshotHandler,
+  createWeb3MonitorSnapshotHandler,
+} from "./metrics/metrics.js";
 import {
   createResourceModelChatHandler,
   createResourceSearchQueryHandler,
@@ -223,6 +230,15 @@ const plugin: OpenClawPluginDefinition = {
     );
     api.registerGatewayMethod("web3.market.dispute.get", createMarketDisputeGetHandler(config));
     api.registerGatewayMethod("web3.market.dispute.list", createMarketDisputeListHandler(config));
+    api.registerGatewayMethod("web3.dispute.open", createMarketDisputeOpenHandler(config));
+    api.registerGatewayMethod(
+      "web3.dispute.submitEvidence",
+      createMarketDisputeSubmitEvidenceHandler(config),
+    );
+    api.registerGatewayMethod("web3.dispute.resolve", createMarketDisputeResolveHandler(config));
+    api.registerGatewayMethod("web3.dispute.reject", createMarketDisputeRejectHandler(config));
+    api.registerGatewayMethod("web3.dispute.get", createMarketDisputeGetHandler(config));
+    api.registerGatewayMethod("web3.dispute.list", createMarketDisputeListHandler(config));
 
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
@@ -235,6 +251,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod(
       "web3.metrics.snapshot",
       createWeb3MetricsSnapshotHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "web3.monitor.snapshot",
+      createWeb3MonitorSnapshotHandler(store, config),
     );
 
     const web3SearchTool = createWeb3SearchTool(config);

@@ -100,6 +100,22 @@ function filterResources(
   return list;
 }
 
+function redactIndexedResource(resource: IndexedResource): IndexedResource {
+  return {
+    ...resource,
+    metadata: undefined,
+  };
+}
+
+function redactIndexEntry(entry: ResourceIndexEntry): ResourceIndexEntry {
+  return {
+    ...entry,
+    endpoint: undefined,
+    meta: undefined,
+    resources: entry.resources.map(redactIndexedResource),
+  };
+}
+
 function refreshEntry(entry: ResourceIndexEntry, ttlMs?: number): ResourceIndexEntry {
   const updatedAt = new Date().toISOString();
   const ttl = typeof ttlMs === "number" && ttlMs > 0 ? ttlMs : DEFAULT_TTL_MS;
@@ -201,9 +217,10 @@ export function createResourceIndexListHandler(
         })
         .filter((entry): entry is ResourceIndexEntry => Boolean(entry));
 
+      const redacted = filtered.map(redactIndexEntry);
       respond(true, {
-        entries: filtered,
-        total: filtered.reduce((sum, entry) => sum + entry.resources.length, 0),
+        entries: redacted,
+        total: redacted.reduce((sum, entry) => sum + entry.resources.length, 0),
       });
     } catch (err) {
       respond(false, { error: String(err) });

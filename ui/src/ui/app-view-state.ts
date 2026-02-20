@@ -32,6 +32,9 @@ import type {
   MarketResource,
   MarketResourceKind,
   MarketStatusSummary,
+  Web3IndexEntry,
+  Web3IndexStats,
+  Web3MonitorSnapshot,
   NostrProfile,
   PresenceEntry,
   SessionsUsageResult,
@@ -167,6 +170,9 @@ export type AppViewState = {
   marketError: string | null;
   marketStatus: MarketStatusSummary | null;
   marketMetrics: MarketMetricsSnapshot | null;
+  marketIndexEntries: Web3IndexEntry[];
+  marketIndexStats: Web3IndexStats | null;
+  marketMonitor: Web3MonitorSnapshot | null;
   marketResources: MarketResource[];
   marketLeases: MarketLease[];
   marketLedgerSummary: MarketLedgerSummary | null;

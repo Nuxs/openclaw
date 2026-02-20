@@ -167,3 +167,23 @@ export function createMarketDisputeGetHandler(config: Web3PluginConfig): Gateway
 export function createMarketDisputeListHandler(config: Web3PluginConfig): GatewayRequestHandler {
   return createMarketProxyHandler(config, "market.dispute.list", { requireResources: false });
 }
+
+export function createMarketDisputeOpenHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.dispute.open", { requireResources: false });
+}
+
+export function createMarketDisputeSubmitEvidenceHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.dispute.submitEvidence", {
+    requireResources: false,
+  });
+}
+
+export function createMarketDisputeResolveHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.dispute.resolve", { requireResources: false });
+}
+
+export function createMarketDisputeRejectHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.dispute.reject", { requireResources: false });
+}

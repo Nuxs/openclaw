@@ -95,6 +95,9 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "web3.market.ledger.summary",
     "web3.market.dispute.get",
     "web3.market.dispute.list",
+    "web3.dispute.get",
+    "web3.dispute.list",
+    "web3.monitor.snapshot",
   ],
   [WRITE_SCOPE]: [
     "send",
@@ -144,6 +147,10 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "web3.market.lease.issue",
     "web3.market.lease.revoke",
     "web3.market.lease.expireSweep",
+    "web3.dispute.open",
+    "web3.dispute.submitEvidence",
+    "web3.dispute.resolve",
+    "web3.dispute.reject",
   ],
   [ADMIN_SCOPE]: [
     "channels.logout",

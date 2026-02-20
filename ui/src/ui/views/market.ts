@@ -11,7 +11,11 @@ import type {
   MarketResource,
   MarketResourceKind,
   MarketStatusSummary,
+  Web3IndexEntry,
+  Web3IndexStats,
+  Web3MonitorSnapshot,
 } from "../types.ts";
+import { renderIndexOverview, renderMonitorOverview } from "./market-sections.ts";
 
 type MarketProps = {
   loading: boolean;
@@ -19,6 +23,9 @@ type MarketProps = {
   lastSuccessAt: number | null;
   status: MarketStatusSummary | null;
   metrics: MarketMetricsSnapshot | null;
+  indexEntries: Web3IndexEntry[];
+  indexStats: Web3IndexStats | null;
+  monitor: Web3MonitorSnapshot | null;
   resources: MarketResource[];
   leases: MarketLease[];
   ledger: MarketLedgerSummary | null;
@@ -262,6 +269,18 @@ export function renderMarket(props: MarketProps) {
         <div class="card-sub">Triggered rules that need attention.</div>
         ${renderAlerts(activeAlerts, metrics?.alerts ?? [])}
       </div>
+    </section>
+
+    <section class="grid grid-cols-2" style="margin-top: 18px;">
+      ${renderIndexOverview({
+        loading: props.loading,
+        indexEntries: props.indexEntries,
+        indexStats: props.indexStats,
+      })}
+      ${renderMonitorOverview({
+        loading: props.loading,
+        monitor: props.monitor,
+      })}
     </section>
 
     <section class="card" style="margin-top: 18px;">
