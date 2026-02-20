@@ -2,13 +2,13 @@
 
 ## 📋 概述
 
-OpenClaw Web3 Core 插件为 OpenClaw AI 系统提供去中心化基础设施，包括：
+OpenClaw Web3 Core 插件是 OpenClaw Web3 “自由市场”叙事的基础设施与入口层，包括：
 
 - 🔐 **钱包身份认证** (SIWE EIP-4361)
 - 📝 **审计追踪** (本地日志 + 链上锚定)
-- 💾 **去中心化存储** (IPFS/Arweave/Filecoin)
+- 💾 **去中心化归档** (IPFS/Arweave/Filecoin)
 - 💰 **使用计费** (配额追踪 + 支付保护)
-- 🔒 **隐私保护** (加密 + 敏感字段脱敏)
+- 🔒 **隐私保护** (归档加密 + 敏感字段脱敏；链上默认仅锚定哈希)
 
 ---
 

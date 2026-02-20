@@ -1,18 +1,22 @@
 # OpenClaw Web3 Core Plugin
 
-> 🌐 为 OpenClaw AI 系统提供去中心化基础设施
+> 🌐 OpenClaw Web3：AI 服务的自由市场（身份 / 审计 / 归档 / 计费 / 市场入口）
 
 [![Version](https://img.shields.io/badge/version-2026.2.16-blue.svg)](./package.json)
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../LICENSE)
 
+## 产品一句话
+
+让用户在 AI 时代拥有**选择权、成本透明与可迁移性**：同一套 `web3.*` 入口可以发现/租用/提供能力，行为可审计、可归档、可结算。
+
 ## ✨ 特性
 
 - 🔐 **钱包身份认证** - 基于 SIWE (EIP-4361) 的以太坊钱包登录
 - 📝 **审计追踪** - 完整的 LLM 交互日志记录与链上锚定
-- 💾 **去中心化存储** - IPFS/Arweave/Filecoin 内容归档
+- 💾 **去中心化归档** - 会话数据可归档到 IPFS/Arweave/Filecoin
 - 💰 **使用计费** - 配额管理与支付保护机制
-- 🔒 **隐私保护** - 端到端加密 + 敏感字段脱敏
+- 🔒 **隐私保护** - 归档加密（AES-256-GCM）+ 敏感字段脱敏（默认仅哈希上链）
 
 ## 🚀 快速开始
 
