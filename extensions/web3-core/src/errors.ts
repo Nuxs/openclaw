@@ -1,3 +1,5 @@
+import { ErrorCode, type ErrorResponse } from "./errors/codes.js";
+
 /**
  * Redact sensitive information from error messages to prevent information leakage.
  * Removes: file paths, URLs with tokens/endpoints, environment variables
@@ -24,7 +26,7 @@ function redactSensitiveInfo(message: string): string {
   return redacted;
 }
 
-export function formatWeb3GatewayError(err: unknown, fallback = "E_INTERNAL"): string {
+export function formatWeb3GatewayError(err: unknown, fallback = ErrorCode.E_INTERNAL): ErrorCode {
   const message = err instanceof Error ? err.message : String(err ?? "");
   const safeMessage = message.length > 0 ? message : "unknown error";
 
@@ -32,16 +34,17 @@ export function formatWeb3GatewayError(err: unknown, fallback = "E_INTERNAL"): s
   const redactedMessage = redactSensitiveInfo(safeMessage);
 
   if (redactedMessage.startsWith("E_")) {
-    return redactedMessage;
+    // Return as ErrorCode if it's already a valid error code
+    return redactedMessage as ErrorCode;
   }
 
   const normalized = redactedMessage.toLowerCase();
 
   if (normalized.includes("actorid is required")) {
-    return `E_AUTH_REQUIRED: ${redactedMessage}`;
+    return ErrorCode.E_AUTH_REQUIRED;
   }
   if (normalized.includes("disabled")) {
-    return `E_FORBIDDEN: ${redactedMessage}`;
+    return ErrorCode.E_FORBIDDEN;
   }
   if (
     normalized.includes("access denied") ||
@@ -50,16 +53,16 @@ export function formatWeb3GatewayError(err: unknown, fallback = "E_INTERNAL"): s
     normalized.includes("does not match") ||
     normalized.includes("mismatch")
   ) {
-    return `E_FORBIDDEN: ${redactedMessage}`;
+    return ErrorCode.E_FORBIDDEN;
   }
   if (normalized.includes("not found")) {
-    return `E_NOT_FOUND: ${redactedMessage}`;
+    return ErrorCode.E_NOT_FOUND;
   }
   if (normalized.includes("expired")) {
-    return `E_EXPIRED: ${redactedMessage}`;
+    return ErrorCode.E_EXPIRED;
   }
   if (normalized.includes("revoked")) {
-    return `E_REVOKED: ${redactedMessage}`;
+    return ErrorCode.E_REVOKED;
   }
   if (
     normalized.includes("conflict") ||
@@ -67,7 +70,7 @@ export function formatWeb3GatewayError(err: unknown, fallback = "E_INTERNAL"): s
     normalized.includes("not published") ||
     normalized.includes("transition")
   ) {
-    return `E_CONFLICT: ${redactedMessage}`;
+    return ErrorCode.E_CONFLICT;
   }
   if (
     normalized.includes("invalid") ||
@@ -76,7 +79,16 @@ export function formatWeb3GatewayError(err: unknown, fallback = "E_INTERNAL"): s
     normalized.includes("missing") ||
     normalized.includes("exceeds")
   ) {
-    return `E_INVALID_ARGUMENT: ${redactedMessage}`;
+    return ErrorCode.E_INVALID_ARGUMENT;
   }
-  return `${fallback}: ${redactedMessage}`;
+  if (normalized.includes("quota") || normalized.includes("limit")) {
+    return ErrorCode.E_QUOTA_EXCEEDED;
+  }
+  if (normalized.includes("timeout")) {
+    return ErrorCode.E_TIMEOUT;
+  }
+  if (normalized.includes("unavailable") || normalized.includes("unreachable")) {
+    return ErrorCode.E_UNAVAILABLE;
+  }
+  return fallback;
 }
