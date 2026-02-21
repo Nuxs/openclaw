@@ -112,6 +112,7 @@ Week 0     Week 5     Week 10    Week 15    Week 20    Week 25
    - 添加 `orderId` 参数
 
 4. **添加单元测试**
+
    ```typescript
    // tests/billing/settlement.test.ts
    describe("flushPendingSettlements", () => {
@@ -227,6 +228,7 @@ Week 0     Week 5     Week 10    Week 15    Week 20    Week 25
    ```
 
 3. **添加集成测试**
+
    ```typescript
    // tests/e2e/model-chat-ledger.test.ts
    describe("Model chat ledger integration", () => {

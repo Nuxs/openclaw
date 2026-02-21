@@ -230,6 +230,7 @@
    ```
 
 2. **链上订单簿**
+
    ```solidity
    contract OrderBook {
        struct Offer {
