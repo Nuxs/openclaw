@@ -31,6 +31,14 @@ import {
 } from "./capabilities/handlers.js";
 import { resolveConfig } from "./config.js";
 import {
+  createDisputeGetHandler,
+  createDisputeListHandler,
+  createDisputeOpenHandler,
+  createDisputeRejectHandler,
+  createDisputeResolveHandler,
+  createDisputeSubmitEvidenceHandler,
+} from "./disputes/handlers.js";
+import {
   createBindWalletCommand,
   createUnbindWalletCommand,
   createWhoamiCommand,
@@ -228,17 +236,17 @@ const plugin: OpenClawPluginDefinition = {
       "web3.market.status.summary",
       createMarketStatusSummaryHandler(config),
     );
-    api.registerGatewayMethod("web3.market.dispute.get", createMarketDisputeGetHandler(config));
-    api.registerGatewayMethod("web3.market.dispute.list", createMarketDisputeListHandler(config));
-    api.registerGatewayMethod("web3.dispute.open", createMarketDisputeOpenHandler(config));
+    api.registerGatewayMethod("web3.market.dispute.get", createDisputeGetHandler(store, config));
+    api.registerGatewayMethod("web3.market.dispute.list", createDisputeListHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.open", createDisputeOpenHandler(store, config));
     api.registerGatewayMethod(
       "web3.dispute.submitEvidence",
-      createMarketDisputeSubmitEvidenceHandler(config),
+      createDisputeSubmitEvidenceHandler(store, config),
     );
-    api.registerGatewayMethod("web3.dispute.resolve", createMarketDisputeResolveHandler(config));
-    api.registerGatewayMethod("web3.dispute.reject", createMarketDisputeRejectHandler(config));
-    api.registerGatewayMethod("web3.dispute.get", createMarketDisputeGetHandler(config));
-    api.registerGatewayMethod("web3.dispute.list", createMarketDisputeListHandler(config));
+    api.registerGatewayMethod("web3.dispute.resolve", createDisputeResolveHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.reject", createDisputeRejectHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.get", createDisputeGetHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.list", createDisputeListHandler(store, config));
 
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
