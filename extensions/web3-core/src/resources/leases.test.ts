@@ -120,7 +120,9 @@ describe("leases - validateLeaseAccess", () => {
   });
 
   it("returns ok for a valid active lease with matching token", async () => {
-    callGatewayMock.mockResolvedValue(activeLease());
+    callGatewayMock
+      .mockResolvedValueOnce(activeLease())
+      .mockResolvedValueOnce({ ok: true, result: { resource: { status: "resource_published" } } });
 
     const { validateLeaseAccess } = await import("./leases.js");
     const config = resolveConfig({
@@ -225,8 +227,34 @@ describe("leases - validateLeaseAccess", () => {
     if (!result.ok) expect(result.error).toContain("invalid lease token");
   });
 
+  it("rejects when resource is not published", async () => {
+    callGatewayMock.mockResolvedValueOnce(activeLease()).mockResolvedValueOnce({
+      ok: true,
+      result: { resource: { status: "resource_unpublished" } },
+    });
+
+    const { validateLeaseAccess } = await import("./leases.js");
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: { auth: { allowedConsumers: [] } },
+      },
+    });
+
+    const result = await validateLeaseAccess({
+      leaseId: "lease-1",
+      token: "tok_valid",
+      config,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("not published");
+  });
+
   it("rejects when consumer is not in allowedConsumers", async () => {
-    callGatewayMock.mockResolvedValue(activeLease());
+    callGatewayMock
+      .mockResolvedValueOnce(activeLease())
+      .mockResolvedValueOnce({ ok: true, result: { resource: { status: "resource_published" } } });
 
     const { validateLeaseAccess } = await import("./leases.js");
     const config = resolveConfig({

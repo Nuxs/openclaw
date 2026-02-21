@@ -116,6 +116,26 @@ export async function validateLeaseAccess(params: {
     if (!isTokenValid(lease.accessTokenHash, params.token)) {
       return { ok: false, error: "invalid lease token" };
     }
+
+    // Strong consistency reject: also ensure the resource is still published.
+    // (A lease might remain active after a resource is unpublished.)
+    const resourceResponse = await callGateway({
+      method: "market.resource.get",
+      params: { resourceId: lease.resourceId },
+      timeoutMs: params.config.brain.timeoutMs,
+    });
+    const resourceNormalized = normalizeGatewayResult(resourceResponse);
+    if (!resourceNormalized.ok) {
+      return { ok: false, error: resourceNormalized.error ?? "resource lookup failed" };
+    }
+    const resourcePayload = resourceNormalized.result as
+      | { resource?: { status?: string } | null }
+      | undefined;
+    const resource = resourcePayload?.resource ?? null;
+    if (!resource || resource.status !== "resource_published") {
+      return { ok: false, error: "resource not published" };
+    }
+
     const allowed = params.config.resources.provider.auth.allowedConsumers;
     if (allowed && allowed.length > 0 && !allowed.includes(lease.consumerActorId)) {
       return { ok: false, error: "consumer not allowed" };

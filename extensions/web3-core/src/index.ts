@@ -58,6 +58,8 @@ import {
   createMarketResourceUnpublishHandler,
   createMarketStatusSummaryHandler,
 } from "./market/handlers.js";
+import { createWeb3MarketCommand } from "./market/web3-market-command.js";
+import { createWeb3MarketStatusTool } from "./market/web3-market-status-tool.js";
 import {
   createWeb3MetricsSnapshotHandler,
   createWeb3MonitorSnapshotHandler,
@@ -76,6 +78,15 @@ import {
   createResourceIndexStatsHandler,
 } from "./resources/indexer.js";
 import { getConsumerLeaseAccess } from "./resources/leases.js";
+import {
+  createWeb3MarketIndexListTool,
+  createWeb3MarketLedgerListTool,
+  createWeb3MarketLedgerSummaryTool,
+  createWeb3MarketLeaseTool,
+  createWeb3MarketPublishTool,
+  createWeb3MarketRevokeLeaseTool,
+  createWeb3MarketUnpublishTool,
+} from "./resources/market-tools.js";
 import {
   createResourceLeaseHandler,
   createResourceListHandler,
@@ -142,6 +153,13 @@ const plugin: OpenClawPluginDefinition = {
       name: "audit_status",
       description: "Show recent audit anchoring events",
       handler: createAuditStatusCommand(store),
+    });
+
+    api.registerCommand({
+      name: "web3-market",
+      description: "Show Web3 Market status or print enable steps",
+      acceptsArgs: true,
+      handler: createWeb3MarketCommand(config),
     });
 
     // ---- Hooks: Brain selection ----
@@ -272,6 +290,23 @@ const plugin: OpenClawPluginDefinition = {
     const web3StorageListTool = createWeb3StorageListTool(config);
     if (web3StorageListTool) {
       api.registerTool(web3StorageListTool);
+    }
+
+    api.registerTool(createWeb3MarketStatusTool(config));
+
+    // Web3 Market orchestration tools (redacted by default).
+    for (const tool of [
+      createWeb3MarketIndexListTool(config),
+      createWeb3MarketLeaseTool(config),
+      createWeb3MarketRevokeLeaseTool(config),
+      createWeb3MarketPublishTool(config),
+      createWeb3MarketUnpublishTool(config),
+      createWeb3MarketLedgerSummaryTool(config),
+      createWeb3MarketLedgerListTool(config),
+    ]) {
+      if (tool) {
+        api.registerTool(tool);
+      }
     }
 
     // ---- Browser ingest HTTP route ----
