@@ -4,8 +4,8 @@
  * User-facing commands for alert monitoring.
  */
 
-import type { CommandHandler } from "openclaw/plugin-sdk";
-import type { Web3Config } from "../config.js";
+// import type { CommandHandler } from "openclaw/plugin-sdk";
+// import type { Web3Config } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import { AlertEngine } from "./engine.js";
 import { AlertLevel, AlertStatus } from "./types.js";

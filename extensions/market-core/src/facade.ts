@@ -275,9 +275,9 @@ export function createMarketFacade(
       const handler = createResourcePublishHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as PublishResourceResult);
+            resolve({ success, ...(data || {}) } as PublishResourceResult);
           },
         });
       });
@@ -288,9 +288,9 @@ export function createMarketFacade(
       const handler = createResourceUnpublishHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as UnpublishResourceResult);
+            resolve({ success, ...(data || {}) } as UnpublishResourceResult);
           },
         });
       });
@@ -301,9 +301,9 @@ export function createMarketFacade(
       const handler = createResourceGetHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as GetResourceResult);
+            resolve({ success, ...(data || {}) } as GetResourceResult);
           },
         });
       });
@@ -314,9 +314,9 @@ export function createMarketFacade(
       const handler = createResourceListHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as ListResourcesResult);
+            resolve({ success, ...(data || {}) } as ListResourcesResult);
           },
         });
       });
@@ -327,9 +327,9 @@ export function createMarketFacade(
       const handler = createLeaseIssueHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as IssueLeaseResult);
+            resolve({ success, ...(data || {}) } as IssueLeaseResult);
           },
         });
       });
@@ -340,9 +340,9 @@ export function createMarketFacade(
       const handler = createLeaseRevokeHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as RevokeLeaseResult);
+            resolve({ success, ...(data || {}) } as RevokeLeaseResult);
           },
         });
       });
@@ -353,9 +353,9 @@ export function createMarketFacade(
       const handler = createLeaseGetHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as GetLeaseResult);
+            resolve({ success, ...(data || {}) } as GetLeaseResult);
           },
         });
       });
@@ -366,9 +366,9 @@ export function createMarketFacade(
       const handler = createLeaseListHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as ListLeasesResult);
+            resolve({ success, ...(data || {}) } as ListLeasesResult);
           },
         });
       });
@@ -379,9 +379,9 @@ export function createMarketFacade(
       const handler = createLeaseExpireSweepHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as ExpireLeasesResult);
+            resolve({ success, ...(data || {}) } as ExpireLeasesResult);
           },
         });
       });
@@ -392,9 +392,9 @@ export function createMarketFacade(
       const handler = createLedgerListHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as ListLedgerResult);
+            resolve({ success, ...(data || {}) } as ListLedgerResult);
           },
         });
       });
@@ -405,9 +405,9 @@ export function createMarketFacade(
       const handler = createLedgerSummaryHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as GetLedgerSummaryResult);
+            resolve({ success, ...(data || {}) } as GetLedgerSummaryResult);
           },
         });
       });
@@ -418,9 +418,9 @@ export function createMarketFacade(
       const handler = createDisputeOpenHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as OpenDisputeResult);
+            resolve({ success, ...(data || {}) } as OpenDisputeResult);
           },
         });
       });
@@ -431,9 +431,9 @@ export function createMarketFacade(
       const handler = createDisputeEvidenceHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as SubmitEvidenceResult);
+            resolve({ success, ...(data || {}) } as SubmitEvidenceResult);
           },
         });
       });
@@ -444,9 +444,9 @@ export function createMarketFacade(
       const handler = createDisputeResolveHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as ResolveDisputeResult);
+            resolve({ success, ...(data || {}) } as ResolveDisputeResult);
           },
         });
       });
@@ -457,9 +457,9 @@ export function createMarketFacade(
       const handler = createDisputeRejectHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as RejectDisputeResult);
+            resolve({ success, ...(data || {}) } as RejectDisputeResult);
           },
         });
       });
@@ -470,9 +470,9 @@ export function createMarketFacade(
       const handler = createDisputeGetHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as GetDisputeResult);
+            resolve({ success, ...(data || {}) } as GetDisputeResult);
           },
         });
       });
@@ -483,9 +483,9 @@ export function createMarketFacade(
       const handler = createDisputeListHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as ListDisputesResult);
+            resolve({ success, ...(data || {}) } as ListDisputesResult);
           },
         });
       });
@@ -496,9 +496,9 @@ export function createMarketFacade(
       const handler = createMarketMetricsSnapshotHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as GetMetricsResult);
+            resolve({ success, ...(data || {}) } as GetMetricsResult);
           },
         });
       });
@@ -509,9 +509,9 @@ export function createMarketFacade(
       const handler = createMarketStatusSummaryHandler(store, config);
       return new Promise((resolve) => {
         handler({
-          params,
+          params: params as Record<string, unknown>,
           respond: (success, data) => {
-            resolve({ success, ...data } as GetStatusResult);
+            resolve({ success, ...(data || {}) } as GetStatusResult);
           },
         });
       });

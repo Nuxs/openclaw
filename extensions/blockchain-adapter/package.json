@@ -1,0 +1,100 @@
+{
+  "name": "@openclaw/blockchain-adapter",
+  "version": "1.0.0",
+  "description": "Multi-chain blockchain adapter for OpenClaw decentralized compute marketplace",
+  "keywords": [
+    "adapter",
+    "base",
+    "blockchain",
+    "multi-chain",
+    "openclaw",
+    "solana",
+    "sui",
+    "ton",
+    "web3"
+  ],
+  "homepage": "https://openclaw.io",
+  "bugs": {
+    "url": "https://github.com/openclaw/openclaw/issues"
+  },
+  "license": "MIT",
+  "author": "OpenClaw Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openclaw/openclaw.git",
+    "directory": "extensions/blockchain-adapter"
+  },
+  "files": [
+    "dist",
+    "contracts",
+    "blockchain-adapter.config.json",
+    "README.md"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./providers/ton": {
+      "types": "./dist/providers/ton/index.d.ts",
+      "import": "./dist/providers/ton/index.js",
+      "require": "./dist/providers/ton/index.cjs"
+    },
+    "./factory": {
+      "types": "./dist/factory.d.ts",
+      "import": "./dist/factory.js",
+      "require": "./dist/factory.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "contracts:build": "cd contracts/ton && func -o settlement.fif -SPA settlement.fc",
+    "contracts:deploy": "node scripts/deploy-contracts.js",
+    "dev": "tsup --watch",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "test:watch": "vitest watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ton/core": "^0.56.0",
+    "@ton/crypto": "^3.2.0",
+    "@ton/ton": "^13.11.0",
+    "@tonconnect/sdk": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "prettier": "^3.1.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@mysten/sui.js": "^0.50.0",
+    "@solana/web3.js": "^1.87.0",
+    "viem": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@solana/web3.js": {
+      "optional": true
+    },
+    "@mysten/sui.js": {
+      "optional": true
+    },
+    "viem": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

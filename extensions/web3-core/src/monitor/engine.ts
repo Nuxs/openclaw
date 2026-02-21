@@ -5,7 +5,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import type { Web3Config } from "../config.js";
+// import type { Web3Config } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import { AlertNotifier } from "./notifications.js";
 import { ALERT_RULES, formatAlertMessage, getEnabledRules } from "./rules.js";

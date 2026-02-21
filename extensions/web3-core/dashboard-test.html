@@ -116,86 +116,82 @@
         testResults.push(
           await test("1. Health Check", async () => {
             return await api.healthCheck();
-          })
+          }),
         );
 
         // Test 2: System Status
         testResults.push(
           await test("2. System Status", async () => {
             return await api.getSystemStatus();
-          })
+          }),
         );
 
         // Test 3: System Metrics
         testResults.push(
           await test("3. System Metrics", async () => {
             return await api.getSystemMetrics();
-          })
+          }),
         );
 
         // Test 4: Get Resources
         testResults.push(
           await test("4. Get Resources", async () => {
             return await api.getResources();
-          })
+          }),
         );
 
         // Test 5: Get Disputes
         testResults.push(
           await test("5. Get Disputes", async () => {
             return await api.getDisputes();
-          })
+          }),
         );
 
         // Test 6: Get Alerts
         testResults.push(
           await test("6. Get Alerts", async () => {
             return await api.getAlerts();
-          })
+          }),
         );
 
         // Test 7: Get Recent Activity
         testResults.push(
           await test("7. Get Recent Activity", async () => {
             return await api.getRecentActivity(10);
-          })
+          }),
         );
 
         // Test 8: Get Lease Stats
         testResults.push(
           await test("8. Get Lease Stats", async () => {
             return await api.getLeaseStats();
-          })
+          }),
         );
 
         // Test 9: Get Dispute Stats
         testResults.push(
           await test("9. Get Dispute Stats", async () => {
             return await api.getDisputeStats();
-          })
+          }),
         );
 
         // Test 10: Get Alert Stats
         testResults.push(
           await test("10. Get Alert Stats", async () => {
             return await api.getAlertStats();
-          })
+          }),
         );
 
         // Summary
         const successCount = testResults.filter((r) => r.success).length;
         const failCount = testResults.filter((r) => !r.success).length;
 
-        addResult(
-          "Test Summary",
-          successCount === testResults.length ? "success" : "error",
-          {
-            total: testResults.length,
-            passed: successCount,
-            failed: failCount,
-            passRate: `${((successCount / testResults.length) * 100).toFixed(1)}%`,
-          }
-        );
+        addResult("Test Summary", successCount === testResults.length ? "success" : "error", {
+          total: testResults.length,
+          passed: successCount,
+          failed: failCount,
+          passRate: `${((successCount / testResults.length) * 100).toFixed(1)}%`,
+        });
 
         console.log("✅ Tests completed!");
         console.log(`Passed: ${successCount}/${testResults.length}`);

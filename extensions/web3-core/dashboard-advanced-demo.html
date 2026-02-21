@@ -231,11 +231,35 @@
       // ==================== Toast Tests ====================
 
       const messages = {
-        success: ["Resource created successfully!", "Changes saved!", "Dispute resolved!", "Alert acknowledged!"],
-        error: ["Failed to connect to server", "Invalid resource data", "Permission denied", "Operation failed"],
-        warning: ["Resource quota nearly full", "Dispute deadline approaching", "Maintenance scheduled", "API rate limit reached"],
-        info: ["New resource available", "System update completed", "5 new alerts", "Dashboard refreshed"],
-        p0: ["CRITICAL: System overload detected!", "P0 ALERT: Database connection lost!", "URGENT: Security breach attempt!"],
+        success: [
+          "Resource created successfully!",
+          "Changes saved!",
+          "Dispute resolved!",
+          "Alert acknowledged!",
+        ],
+        error: [
+          "Failed to connect to server",
+          "Invalid resource data",
+          "Permission denied",
+          "Operation failed",
+        ],
+        warning: [
+          "Resource quota nearly full",
+          "Dispute deadline approaching",
+          "Maintenance scheduled",
+          "API rate limit reached",
+        ],
+        info: [
+          "New resource available",
+          "System update completed",
+          "5 new alerts",
+          "Dashboard refreshed",
+        ],
+        p0: [
+          "CRITICAL: System overload detected!",
+          "P0 ALERT: Database connection lost!",
+          "URGENT: Security breach attempt!",
+        ],
       };
 
       function testToast(type) {
@@ -289,7 +313,7 @@
         `,
           {
             width: "600px",
-          }
+          },
         );
 
         modal.open("create-resource");
@@ -337,7 +361,7 @@
               </button>
             </div>
           </form>
-        `
+        `,
         );
 
         modal.open("edit-resource");
@@ -385,7 +409,7 @@
               </button>
             </div>
           </form>
-        `
+        `,
         );
 
         modal.open("file-dispute");
@@ -440,7 +464,7 @@
             </div>
           </div>
         `,
-          { width: "700px" }
+          { width: "700px" },
         );
 
         modal.open("resource-detail");

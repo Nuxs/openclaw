@@ -149,7 +149,7 @@ describe("Index Signature Verification", () => {
 
   it("rejects entry with incomplete signature fields", () => {
     const entry = createSignedEntry();
-    delete entry.signature!.payloadHash;
+    delete (entry.signature as any).payloadHash;
     const result = verifyIndexSignature(entry);
     expect(result.valid).toBe(false);
     expect(result.reason).toBe("incomplete signature (missing publicKey/signature/payloadHash)");

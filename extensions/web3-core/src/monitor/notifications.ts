@@ -4,7 +4,7 @@
  * Handles alert notifications via various channels (webhook, email, etc.)
  */
 
-import type { Web3Config } from "../config.js";
+// import type { Web3Config } from "../config.js";
 import type { AlertEvent } from "./types.js";
 
 /**
