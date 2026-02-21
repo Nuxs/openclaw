@@ -499,6 +499,65 @@ describe("handleCommands bash alias", () => {
   });
 });
 
+describe("handleCommands unknown slash command suggestions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPluginCommands();
+    registerPluginCommand("web3-core", {
+      name: "web3-market",
+      description: "Web3 Market status",
+      acceptsArgs: true,
+      handler: async () => ({ text: "ok" }),
+    });
+  });
+
+  afterAll(() => {
+    clearPluginCommands();
+  });
+
+  it("suggests /web3-market for a close typo", async () => {
+    const cfg = {
+      commands: { text: true },
+      whatsapp: { allowFrom: ["*"] },
+    } as OpenClawConfig;
+
+    const params = buildParams("/web3-marlet", cfg);
+    const result = await handleCommands(params);
+
+    expect(result.shouldContinue).toBe(false);
+    expect(result.reply?.text).toContain("didn't recognize that command");
+    expect(result.reply?.text).toContain("/web3-market");
+  });
+
+  it("skips suggestions for path-like inputs", async () => {
+    const cfg = {
+      commands: { text: true },
+      whatsapp: { allowFrom: ["*"] },
+    } as OpenClawConfig;
+
+    const params = buildParams("/Users/someone/file.txt", cfg);
+    const result = await handleCommands(params);
+
+    expect(result.shouldContinue).toBe(true);
+    expect(result.reply).toBeUndefined();
+  });
+
+  it("skips suggestions for unauthorized senders", async () => {
+    const cfg = {
+      commands: { text: true },
+      whatsapp: { allowFrom: ["*"] },
+    } as OpenClawConfig;
+
+    const params = buildParams("/web3-marlet", cfg);
+    params.command.isAuthorizedSender = false;
+
+    const result = await handleCommands(params);
+
+    expect(result.shouldContinue).toBe(true);
+    expect(result.reply).toBeUndefined();
+  });
+});
+
 function buildPolicyParams(
   commandBody: string,
   cfg: OpenClawConfig,

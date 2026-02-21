@@ -1,9 +1,15 @@
 import fs from "node:fs/promises";
 import { logVerbose } from "../../globals.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
+import { listPluginCommands } from "../../plugins/commands.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
-import { shouldHandleTextCommands } from "../commands-registry.js";
+import {
+  listChatCommandsForConfig,
+  type ChatCommandDefinition,
+  shouldHandleTextCommands,
+} from "../commands-registry.js";
+import { suggestUnknownCommand } from "../commands-suggest.js";
 import { handleAllowlistCommand } from "./commands-allowlist.js";
 import { handleApproveCommand } from "./commands-approve.js";
 import { handleBashCommand } from "./commands-bash.js";
@@ -34,7 +40,6 @@ import type {
   CommandHandlerResult,
   HandleCommandsParams,
 } from "./commands-types.js";
-import { handleWeb3MarketCommand } from "./commands-web3-market.js";
 import { routeReply } from "./route-reply.js";
 
 let HANDLERS: CommandHandler[] | null = null;
@@ -53,7 +58,6 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
       handleHelpCommand,
       handleCommandsListCommand,
       handleStatusCommand,
-      handleWeb3MarketCommand,
       handleAllowlistCommand,
       handleApproveCommand,
       handleContextCommand,
@@ -177,6 +181,43 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
   if (sendPolicy === "deny") {
     logVerbose(`Send blocked by policy for session ${params.sessionKey ?? "unknown"}`);
     return { shouldContinue: false };
+  }
+
+  // If the input looks like a slash command but none of the handlers matched,
+  // offer a small set of suggestions. Keep this safe-by-default:
+  // - never auto-execute a corrected command
+  // - only respond to authorized senders (avoid spam)
+  // - skip path-like inputs (e.g. /Users/...)
+  if (allowTextCommands && params.command.isAuthorizedSender) {
+    const pluginCommandDefs: ChatCommandDefinition[] = listPluginCommands().map((cmd) => ({
+      key: `plugin:${cmd.pluginId}:${cmd.name}`,
+      description: cmd.description,
+      textAliases: [`/${cmd.name}`],
+      acceptsArgs: true,
+      scope: "text",
+    }));
+
+    const suggestions = suggestUnknownCommand({
+      commandBodyNormalized: params.command.commandBodyNormalized,
+      commands: [...listChatCommandsForConfig(params.cfg), ...pluginCommandDefs],
+    });
+
+    if (suggestions.length > 0) {
+      const token = params.command.commandBodyNormalized.trim().split(/\s+/)[0] ?? "";
+      const lines: string[] = [];
+      lines.push(`⚠️ I didn't recognize that command: ${token}`);
+      lines.push("Did you mean:");
+      for (const suggestion of suggestions) {
+        lines.push(`- ${suggestion.canonical}`);
+      }
+      lines.push("Tip: run /commands to see all available commands.");
+      lines.push("Tip: if you were just chatting, no worries — just continue with your message.");
+
+      return {
+        shouldContinue: false,
+        reply: { text: lines.join("\n") },
+      };
+    }
   }
 
   return { shouldContinue: true };

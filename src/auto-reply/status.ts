@@ -635,7 +635,8 @@ function formatCommandEntry(command: ChatCommandDefinition): string {
     });
   const aliasLabel = aliases.length ? ` (${aliases.join(", ")})` : "";
   const scopeLabel = command.scope === "text" ? " [text]" : "";
-  return `${primary}${aliasLabel}${scopeLabel} - ${command.description}`;
+  const featuredLabel = command.key === "web3-market" ? " [featured]" : "";
+  return `${primary}${aliasLabel}${scopeLabel}${featuredLabel} - ${command.description}`;
 }
 
 type CommandsListItem = {
