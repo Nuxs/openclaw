@@ -1,15 +1,51 @@
 /**
  * Dashboard API Client
- * Connects the UI with Web3 Core Gateway APIs
+ * Connects the UI with Web3 Core Gateway APIs via RPC
  */
 
 class DashboardAPI {
   constructor(baseUrl = "http://localhost:3000") {
     this.baseUrl = baseUrl;
+    this.gatewayUrl = `${baseUrl}/gateway`;
   }
 
   /**
-   * Generic API call handler
+   * Call Gateway RPC method
+   */
+  async callGateway(method, params = {}) {
+    try {
+      const response = await fetch(this.gatewayUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method,
+          params,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gateway Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error.message || "Gateway call failed");
+      }
+
+      return data.result;
+    } catch (error) {
+      console.error(`Gateway call failed: ${method}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Legacy REST API call handler (fallback)
    */
   async call(endpoint, method = "GET", body = null) {
     const options = {
@@ -41,57 +77,64 @@ class DashboardAPI {
    * Get all resources
    */
   async getResources(filters = {}) {
-    const params = new URLSearchParams(filters);
-    return await this.call(`/api/web3/resources?${params}`);
+    return await this.callGateway("web3.market.resource.list", filters);
   }
 
   /**
    * Get resource by ID
    */
   async getResource(resourceId) {
-    return await this.call(`/api/web3/resources/${resourceId}`);
+    return await this.callGateway("web3.market.resource.get", { resourceId });
   }
 
   /**
-   * Create new resource
+   * Publish/Create new resource
    */
   async createResource(resourceData) {
-    return await this.call("/api/web3/resources", "POST", resourceData);
+    return await this.callGateway("web3.market.resource.publish", resourceData);
   }
 
   /**
-   * Update resource
+   * Update resource (unpublish + republish)
    */
   async updateResource(resourceId, updates) {
-    return await this.call(`/api/web3/resources/${resourceId}`, "PATCH", updates);
+    // Note: Web3 market doesn't have direct update, need to unpublish then republish
+    await this.callGateway("web3.market.resource.unpublish", { resourceId });
+    return await this.callGateway("web3.market.resource.publish", { ...updates, resourceId });
   }
 
   /**
-   * Delete resource
+   * Delete/Unpublish resource
    */
   async deleteResource(resourceId) {
-    return await this.call(`/api/web3/resources/${resourceId}`, "DELETE");
+    return await this.callGateway("web3.market.resource.unpublish", { resourceId });
   }
 
   /**
    * Get leases for a resource
    */
   async getResourceLeases(resourceId) {
-    return await this.call(`/api/web3/resources/${resourceId}/leases`);
+    const result = await this.callGateway("web3.market.lease.list", { resourceId });
+    return result.leases || [];
   }
 
   /**
    * Create new lease
    */
   async createLease(leaseData) {
-    return await this.call("/api/web3/leases", "POST", leaseData);
+    return await this.callGateway("web3.market.lease.issue", leaseData);
   }
 
   /**
    * Get lease statistics
    */
   async getLeaseStats() {
-    return await this.call("/api/web3/leases/stats");
+    const summary = await this.callGateway("web3.market.status.summary");
+    return {
+      total: summary.leases?.total || 0,
+      active: summary.leases?.active || 0,
+      expired: summary.leases?.expired || 0,
+    };
   }
 
   // ==================== Dispute APIs ====================
@@ -100,29 +143,29 @@ class DashboardAPI {
    * Get all disputes
    */
   async getDisputes(filters = {}) {
-    const params = new URLSearchParams(filters);
-    return await this.call(`/api/web3/disputes?${params}`);
+    return await this.callGateway("web3.dispute.list", filters);
   }
 
   /**
    * Get dispute by ID
    */
   async getDispute(disputeId) {
-    return await this.call(`/api/web3/disputes/${disputeId}`);
+    return await this.callGateway("web3.dispute.get", { disputeId });
   }
 
   /**
    * Create new dispute
    */
   async createDispute(disputeData) {
-    return await this.call("/api/web3/disputes", "POST", disputeData);
+    return await this.callGateway("web3.market.dispute.open", disputeData);
   }
 
   /**
    * Submit evidence for dispute
    */
   async submitEvidence(disputeId, evidence) {
-    return await this.call(`/api/web3/disputes/${disputeId}/evidence`, "POST", {
+    return await this.callGateway("web3.dispute.submitEvidence", {
+      disputeId,
       evidence,
     });
   }
@@ -131,8 +174,9 @@ class DashboardAPI {
    * Resolve dispute
    */
   async resolveDispute(disputeId, resolution) {
-    return await this.call(`/api/web3/disputes/${disputeId}/resolve`, "POST", {
-      resolution,
+    return await this.callGateway("web3.dispute.resolve", {
+      disputeId,
+      ...resolution,
     });
   }
 
@@ -140,7 +184,13 @@ class DashboardAPI {
    * Get dispute statistics
    */
   async getDisputeStats() {
-    return await this.call("/api/web3/disputes/stats");
+    const summary = await this.callGateway("web3.status.summary");
+    return {
+      total: summary.disputes?.total || 0,
+      open: summary.disputes?.open || 0,
+      investigating: summary.disputes?.investigating || 0,
+      resolved: summary.disputes?.resolved || 0,
+    };
   }
 
   // ==================== Alert APIs ====================
@@ -149,43 +199,49 @@ class DashboardAPI {
    * Get all alerts
    */
   async getAlerts(filters = {}) {
-    const params = new URLSearchParams(filters);
-    return await this.call(`/api/web3/alerts?${params}`);
+    const result = await this.callGateway("web3.monitor.alerts.list", filters);
+    return result.alerts || [];
   }
 
   /**
    * Get alert by ID
    */
   async getAlert(alertId) {
-    return await this.call(`/api/web3/alerts/${alertId}`);
+    const result = await this.callGateway("web3.monitor.alerts.get", { alertId });
+    return result.alert;
   }
 
   /**
    * Acknowledge alert
    */
   async acknowledgeAlert(alertId) {
-    return await this.call(`/api/web3/alerts/${alertId}/acknowledge`, "POST");
+    return await this.callGateway("web3.monitor.alerts.acknowledge", { alertId });
   }
 
   /**
    * Resolve alert
    */
   async resolveAlert(alertId) {
-    return await this.call(`/api/web3/alerts/${alertId}/resolve`, "POST");
+    return await this.callGateway("web3.monitor.alerts.resolve", { alertId });
   }
 
   /**
    * Get alert statistics
    */
   async getAlertStats() {
-    return await this.call("/api/web3/alerts/stats");
+    const result = await this.callGateway("web3.monitor.metrics");
+    return result.metrics || {};
   }
 
   /**
    * Get alert history
    */
   async getAlertHistory(limit = 50) {
-    return await this.call(`/api/web3/alerts/history?limit=${limit}`);
+    const result = await this.callGateway("web3.monitor.alerts.list", {
+      limit,
+      status: "resolved",
+    });
+    return result.alerts || [];
   }
 
   // ==================== System APIs ====================
@@ -194,28 +250,58 @@ class DashboardAPI {
    * Get system status
    */
   async getSystemStatus() {
-    return await this.call("/api/web3/status/summary");
+    return await this.callGateway("web3.status.summary");
   }
 
   /**
    * Get system metrics
    */
   async getSystemMetrics() {
-    return await this.call("/api/web3/metrics");
+    const [marketMetrics, monitorMetrics] = await Promise.all([
+      this.callGateway("web3.market.metrics.snapshot").catch(() => ({})),
+      this.callGateway("web3.monitor.metrics").catch(() => ({})),
+    ]);
+
+    return {
+      market: marketMetrics,
+      monitor: monitorMetrics.metrics || {},
+    };
   }
 
   /**
    * Get recent activity
    */
   async getRecentActivity(limit = 10) {
-    return await this.call(`/api/web3/activity?limit=${limit}`);
+    const result = await this.callGateway("web3.audit.query", { limit });
+    return (result.events || []).map((event) => ({
+      title: this.formatEventTitle(event),
+      description: event.action || "",
+      timestamp: event.timestamp,
+    }));
+  }
+
+  /**
+   * Format event title for display
+   */
+  formatEventTitle(event) {
+    const actionMap = {
+      dispute_open: "Dispute Filed",
+      dispute_resolve: "Dispute Resolved",
+      resource_publish: "Resource Listed",
+      resource_unpublish: "Resource Removed",
+      lease_issue: "Lease Created",
+      lease_revoke: "Lease Revoked",
+      alert_trigger: "Alert Triggered",
+      alert_resolve: "Alert Resolved",
+    };
+    return actionMap[event.action] || event.action || "Activity";
   }
 
   /**
    * Health check
    */
   async healthCheck() {
-    return await this.call("/health");
+    return await this.callGateway("web3.monitor.health");
   }
 }
 
