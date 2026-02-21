@@ -1345,10 +1345,19 @@
           // Load real data
           await dashboard.initialize();
 
+          // Show welcome notification
+          if (window.toast) {
+            toast.success("Dashboard loaded successfully! 🎉");
+          }
+
           // Enable auto-refresh every 30 seconds
           // dashboard.enableAutoRefresh(30000);
         } catch (error) {
           console.warn("⚠️ API not available, using mock data", error);
+
+          if (window.toast) {
+            toast.warning("Using offline mode with mock data");
+          }
 
           // Fallback to mock data
           updateOverviewStats();
@@ -1360,5 +1369,8 @@
         console.log("✅ Dashboard ready");
       };
     </script>
+
+    <!-- Advanced Features -->
+    <script src="dashboard-advanced.js"></script>
   </body>
 </html>
