@@ -110,6 +110,9 @@ Notes:
 - **`/credits`**: Show usage credits and quota.
 - **`/pay_status`**: Query settlement status from market state (orderId or settlementId).
 - **`/audit_status`**: Show recent audit anchoring events.
+- **`/web3-market`**: Web3 Market status and enable guidance.
+  - `status [deep]`: probes market endpoints (default `fast`; use `deep` for lists)
+  - `start`: prints the `/config set ...` steps to enable Web3 Market (does not write config)
 
 ## Hooks
 
@@ -135,6 +138,29 @@ Billing hooks:
 - `web3.billing.status` (params: `sessionIdHash`)
 - `web3.billing.summary` (params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`)
 - `web3.status.summary` (no params)
+
+## Agent tools (LLM)
+
+Consumer tools (require an active lease; output must be redacted):
+
+- `web3.search.query`
+- `web3.storage.put`
+- `web3.storage.get`
+- `web3.storage.list`
+
+Web3 Market orchestration tools (help the agent complete buyer/seller flows; output is redacted):
+
+Status tool (redacted, safe to paste/share):
+
+- `web3_market_status` (params: `profile=fast|deep`)
+
+- `web3.market.index.list`
+- `web3.market.lease`
+- `web3.market.lease.revoke`
+- `web3.market.resource.publish`
+- `web3.market.resource.unpublish`
+- `web3.market.ledger.summary`
+- `web3.market.ledger.list`
 
 ## Example debug flow
 

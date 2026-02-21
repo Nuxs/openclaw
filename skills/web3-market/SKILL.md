@@ -32,6 +32,7 @@ Read these files as needed:
 - `skills/web3-market/references/web3-market-resource-testing.md`
 - `skills/web3-market/references/web3-market-resource-config-examples.md`
 - `skills/web3-market/references/web3-market-resource-implementation-checklist.md`
+- `skills/web3-market/references/web3-market-tools-commands-evolution.md`
 - `skills/web3-market/references/web3-market-assessment-2026-02-19.md`
 
 ## Non-negotiables
