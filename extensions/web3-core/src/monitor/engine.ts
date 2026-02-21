@@ -5,7 +5,9 @@
  */
 
 import { randomBytes } from "node:crypto";
+import type { Web3Config } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
+import { AlertNotifier } from "./notifications.js";
 import { ALERT_RULES, formatAlertMessage, getEnabledRules } from "./rules.js";
 import {
   AlertStatus,
@@ -26,7 +28,14 @@ const lastAlertTime = new Map<string, number>();
  * Alert engine
  */
 export class AlertEngine {
-  constructor(private readonly store: Web3StateStore) {}
+  private readonly notifier: AlertNotifier;
+
+  constructor(
+    private readonly store: Web3StateStore,
+    private readonly config: Web3Config,
+  ) {
+    this.notifier = new AlertNotifier(config);
+  }
 
   /**
    * Clear all cooldown timers (for testing)
@@ -108,7 +117,7 @@ export class AlertEngine {
 
     const message = formatAlertMessage(rule.messageTemplate, context);
 
-    return {
+    const alert: AlertEvent = {
       id: `alert-${randomBytes(8).toString("hex")}`,
       level: rule.level,
       category: rule.category,
@@ -118,6 +127,15 @@ export class AlertEngine {
       details: this.extractContextDetails(context),
       timestamp: new Date().toISOString(),
     };
+
+    // Send notifications asynchronously (don't wait)
+    if (this.config?.monitor?.notifications?.enabled) {
+      this.notifier.notify(alert).catch((error) => {
+        console.error(`[AlertEngine] Failed to send notification:`, error);
+      });
+    }
+
+    return alert;
   }
 
   /**

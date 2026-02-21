@@ -6,6 +6,7 @@
 
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { formatWeb3GatewayError, Web3ErrorCode } from "../_shared.js";
+import type { Web3Config } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import { AlertEngine } from "./engine.js";
 import { AlertLevel, AlertCategory, AlertStatus, type AlertQuery } from "./types.js";
@@ -15,8 +16,11 @@ import { AlertLevel, AlertCategory, AlertStatus, type AlertQuery } from "./types
  *
  * List alerts with optional filtering
  */
-export function createAlertsListHandler(store: Web3StateStore): GatewayRequestHandler {
-  const engine = new AlertEngine(store);
+export function createAlertsListHandler(
+  store: Web3StateStore,
+  config: Web3Config,
+): GatewayRequestHandler {
+  const engine = new AlertEngine(store, config);
 
   return async (params, _opts) => {
     try {
@@ -47,7 +51,10 @@ export function createAlertsListHandler(store: Web3StateStore): GatewayRequestHa
  *
  * Get a specific alert by ID
  */
-export function createAlertGetHandler(store: Web3StateStore): GatewayRequestHandler {
+export function createAlertGetHandler(
+  store: Web3StateStore,
+  config: Web3Config,
+): GatewayRequestHandler {
   return async (params, _opts) => {
     try {
       const alertId = params?.alertId as string | undefined;
@@ -85,8 +92,11 @@ export function createAlertGetHandler(store: Web3StateStore): GatewayRequestHand
  *
  * Acknowledge an alert
  */
-export function createAlertAcknowledgeHandler(store: Web3StateStore): GatewayRequestHandler {
-  const engine = new AlertEngine(store);
+export function createAlertAcknowledgeHandler(
+  store: Web3StateStore,
+  config: Web3Config,
+): GatewayRequestHandler {
+  const engine = new AlertEngine(store, config);
 
   return async (params, _opts) => {
     try {
@@ -120,8 +130,11 @@ export function createAlertAcknowledgeHandler(store: Web3StateStore): GatewayReq
  *
  * Resolve an alert
  */
-export function createAlertResolveHandler(store: Web3StateStore): GatewayRequestHandler {
-  const engine = new AlertEngine(store);
+export function createAlertResolveHandler(
+  store: Web3StateStore,
+  config: Web3Config,
+): GatewayRequestHandler {
+  const engine = new AlertEngine(store, config);
 
   return async (params, _opts) => {
     try {
@@ -154,8 +167,11 @@ export function createAlertResolveHandler(store: Web3StateStore): GatewayRequest
  *
  * Get monitoring metrics and statistics
  */
-export function createMonitorMetricsHandler(store: Web3StateStore): GatewayRequestHandler {
-  const engine = new AlertEngine(store);
+export function createMonitorMetricsHandler(
+  store: Web3StateStore,
+  config: Web3Config,
+): GatewayRequestHandler {
+  const engine = new AlertEngine(store, config);
 
   return async (_params, _opts) => {
     try {
@@ -176,7 +192,10 @@ export function createMonitorMetricsHandler(store: Web3StateStore): GatewayReque
  *
  * Get service health status
  */
-export function createHealthCheckHandler(store: Web3StateStore): GatewayRequestHandler {
+export function createHealthCheckHandler(
+  store: Web3StateStore,
+  config: Web3Config,
+): GatewayRequestHandler {
   return async (_params, _opts) => {
     try {
       const now = Date.now();

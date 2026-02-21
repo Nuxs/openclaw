@@ -5,6 +5,7 @@
  */
 
 import type { CommandHandler } from "openclaw/plugin-sdk";
+import type { Web3Config } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import { AlertEngine } from "./engine.js";
 import { AlertLevel, AlertStatus } from "./types.js";
@@ -12,8 +13,8 @@ import { AlertLevel, AlertStatus } from "./types.js";
 /**
  * /alerts - Show recent alerts
  */
-export function createAlertsCommand(store: Web3StateStore): CommandHandler {
-  const engine = new AlertEngine(store);
+export function createAlertsCommand(store: Web3StateStore, config: Web3Config): CommandHandler {
+  const engine = new AlertEngine(store, config);
 
   return async () => {
     try {
@@ -71,8 +72,11 @@ export function createAlertsCommand(store: Web3StateStore): CommandHandler {
 /**
  * /alert_ack <alertId> - Acknowledge an alert
  */
-export function createAlertAcknowledgeCommand(store: Web3StateStore): CommandHandler {
-  const engine = new AlertEngine(store);
+export function createAlertAcknowledgeCommand(
+  store: Web3StateStore,
+  config: Web3Config,
+): CommandHandler {
+  const engine = new AlertEngine(store, config);
 
   return async (args?: string) => {
     const alertId = args?.trim();
@@ -92,8 +96,11 @@ export function createAlertAcknowledgeCommand(store: Web3StateStore): CommandHan
 /**
  * /alert_resolve <alertId> [note] - Resolve an alert
  */
-export function createAlertResolveCommand(store: Web3StateStore): CommandHandler {
-  const engine = new AlertEngine(store);
+export function createAlertResolveCommand(
+  store: Web3StateStore,
+  config: Web3Config,
+): CommandHandler {
+  const engine = new AlertEngine(store, config);
 
   return async (args?: string) => {
     const parts = args?.trim().split(/\s+/);
@@ -116,7 +123,7 @@ export function createAlertResolveCommand(store: Web3StateStore): CommandHandler
 /**
  * /health - Check Web3 service health
  */
-export function createHealthCommand(store: Web3StateStore): CommandHandler {
+export function createHealthCommand(store: Web3StateStore, config: Web3Config): CommandHandler {
   return async () => {
     try {
       const alerts = store.getAlerts();
