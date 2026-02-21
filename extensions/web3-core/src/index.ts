@@ -31,6 +31,14 @@ import {
 } from "./capabilities/handlers.js";
 import { resolveConfig } from "./config.js";
 import {
+  createDisputeGetHandler,
+  createDisputeListHandler,
+  createDisputeOpenHandler,
+  createDisputeRejectHandler,
+  createDisputeResolveHandler,
+  createDisputeSubmitEvidenceHandler,
+} from "./disputes/handlers.js";
+import {
   createBindWalletCommand,
   createUnbindWalletCommand,
   createWhoamiCommand,
@@ -64,6 +72,20 @@ import {
   createWeb3MetricsSnapshotHandler,
   createWeb3MonitorSnapshotHandler,
 } from "./metrics/metrics.js";
+import {
+  createAlertsCommand,
+  createAlertAcknowledgeCommand,
+  createAlertResolveCommand,
+  createHealthCommand,
+} from "./monitor/commands.js";
+import {
+  createAlertsListHandler,
+  createAlertGetHandler,
+  createAlertAcknowledgeHandler,
+  createAlertResolveHandler,
+  createMonitorMetricsHandler,
+  createHealthCheckHandler,
+} from "./monitor/handlers.js";
 import {
   createResourceModelChatHandler,
   createResourceSearchQueryHandler,
@@ -153,6 +175,28 @@ const plugin: OpenClawPluginDefinition = {
       name: "audit_status",
       description: "Show recent audit anchoring events",
       handler: createAuditStatusCommand(store),
+    });
+    api.registerCommand({
+      name: "alerts",
+      description: "Show recent alerts and monitoring status",
+      handler: createAlertsCommand(store, config),
+    });
+    api.registerCommand({
+      name: "alert_ack",
+      description: "Acknowledge an alert by ID",
+      acceptsArgs: true,
+      handler: createAlertAcknowledgeCommand(store, config),
+    });
+    api.registerCommand({
+      name: "alert_resolve",
+      description: "Resolve an alert by ID with optional note",
+      acceptsArgs: true,
+      handler: createAlertResolveCommand(store, config),
+    });
+    api.registerCommand({
+      name: "health",
+      description: "Check Web3 service health status",
+      handler: createHealthCommand(store, config),
     });
 
     api.registerCommand({
@@ -246,17 +290,17 @@ const plugin: OpenClawPluginDefinition = {
       "web3.market.status.summary",
       createMarketStatusSummaryHandler(config),
     );
-    api.registerGatewayMethod("web3.market.dispute.get", createMarketDisputeGetHandler(config));
-    api.registerGatewayMethod("web3.market.dispute.list", createMarketDisputeListHandler(config));
-    api.registerGatewayMethod("web3.dispute.open", createMarketDisputeOpenHandler(config));
+    api.registerGatewayMethod("web3.market.dispute.get", createDisputeGetHandler(store, config));
+    api.registerGatewayMethod("web3.market.dispute.list", createDisputeListHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.open", createDisputeOpenHandler(store, config));
     api.registerGatewayMethod(
       "web3.dispute.submitEvidence",
-      createMarketDisputeSubmitEvidenceHandler(config),
+      createDisputeSubmitEvidenceHandler(store, config),
     );
-    api.registerGatewayMethod("web3.dispute.resolve", createMarketDisputeResolveHandler(config));
-    api.registerGatewayMethod("web3.dispute.reject", createMarketDisputeRejectHandler(config));
-    api.registerGatewayMethod("web3.dispute.get", createMarketDisputeGetHandler(config));
-    api.registerGatewayMethod("web3.dispute.list", createMarketDisputeListHandler(config));
+    api.registerGatewayMethod("web3.dispute.resolve", createDisputeResolveHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.reject", createDisputeRejectHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.get", createDisputeGetHandler(store, config));
+    api.registerGatewayMethod("web3.dispute.list", createDisputeListHandler(store, config));
 
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
@@ -274,6 +318,18 @@ const plugin: OpenClawPluginDefinition = {
       "web3.monitor.snapshot",
       createWeb3MonitorSnapshotHandler(store, config),
     );
+    api.registerGatewayMethod("web3.monitor.alerts.list", createAlertsListHandler(store, config));
+    api.registerGatewayMethod("web3.monitor.alerts.get", createAlertGetHandler(store, config));
+    api.registerGatewayMethod(
+      "web3.monitor.alerts.acknowledge",
+      createAlertAcknowledgeHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "web3.monitor.alerts.resolve",
+      createAlertResolveHandler(store, config),
+    );
+    api.registerGatewayMethod("web3.monitor.metrics", createMonitorMetricsHandler(store, config));
+    api.registerGatewayMethod("web3.monitor.health", createHealthCheckHandler(store, config));
 
     const web3SearchTool = createWeb3SearchTool(config);
     if (web3SearchTool) {

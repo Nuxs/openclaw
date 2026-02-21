@@ -4,6 +4,7 @@ import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayError } from "../errors.js";
 import type { IndexedResource, ResourceIndexEntry } from "../state/store.js";
 import { Web3StateStore } from "../state/store.js";
+import { verifyIndexEntries } from "./signature-verification.js";
 
 const DEFAULT_TTL_MS = 10 * 60_000;
 const MAX_LIMIT = 500;
@@ -199,6 +200,12 @@ export function createResourceIndexListHandler(
       const limit = parseLimit(input.limit);
 
       let entries = filterExpired(store.getResourceIndex());
+
+      // Verify signatures on all entries (consumer-side protection)
+      entries = verifyIndexEntries(entries, {
+        skipVerification: process.env.NODE_ENV === "test",
+      });
+
       if (providerId) {
         entries = entries.filter((entry) => entry.providerId === providerId);
       }

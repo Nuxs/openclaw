@@ -5,6 +5,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "../../config.js";
+import { ErrorCode } from "../../errors/codes.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { EvmAnchorAdapter, type AnchorResult } from "../chain.js";
 import { createDeliveryCredentialsStore } from "../credentials.js";
@@ -50,16 +51,44 @@ export const RESOURCE_PRICE_UNITS: Record<
 
 // ---- Error formatting ----
 
-export function formatGatewayError(err: unknown, fallback = "E_INTERNAL"): string {
+/**
+ * Redact sensitive information from error messages to prevent information leakage.
+ * Removes: file paths, URLs with tokens/endpoints, environment variables
+ */
+function redactSensitiveInfo(message: string): string {
+  let redacted = message;
+
+  // Redact absolute file paths (Unix and Windows)
+  redacted = redacted.replace(/\/[a-zA-Z0-9_\-./]+/g, "[PATH]");
+  redacted = redacted.replace(/[A-Z]:\\[a-zA-Z0-9_\-.\\]+/g, "[PATH]");
+
+  // Redact URLs with potential sensitive data
+  redacted = redacted.replace(/https?:\/\/[^\s]+/g, "[URL]");
+
+  // Redact environment variable patterns
+  redacted = redacted.replace(/[A-Z_]+=[^\s]+/g, "[ENV]");
+
+  // Redact hex addresses that might be endpoints
+  redacted = redacted.replace(/0x[a-fA-F0-9]{40,}/g, "[ADDRESS]");
+
+  // Redact JWT-like tokens
+  redacted = redacted.replace(/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, "[TOKEN]");
+
+  return redacted;
+}
+
+export function formatGatewayError(err: unknown, fallback = ErrorCode.E_INTERNAL): ErrorCode {
   const message = err instanceof Error ? err.message : String(err);
-  if (message.startsWith("E_")) {
-    return message;
+  const redactedMessage = redactSensitiveInfo(message);
+
+  if (redactedMessage.startsWith("E_")) {
+    return redactedMessage as ErrorCode;
   }
 
-  const normalized = message.toLowerCase();
+  const normalized = redactedMessage.toLowerCase();
 
   if (normalized.includes("actorid is required")) {
-    return `E_AUTH_REQUIRED: ${message}`;
+    return ErrorCode.E_AUTH_REQUIRED;
   }
   if (
     normalized.includes("access denied") ||
@@ -68,16 +97,16 @@ export function formatGatewayError(err: unknown, fallback = "E_INTERNAL"): strin
     normalized.includes("does not match") ||
     normalized.includes("mismatch")
   ) {
-    return `E_FORBIDDEN: ${message}`;
+    return ErrorCode.E_FORBIDDEN;
   }
   if (normalized.includes("not found")) {
-    return `E_NOT_FOUND: ${message}`;
+    return ErrorCode.E_NOT_FOUND;
   }
   if (normalized.includes("expired")) {
-    return `E_EXPIRED: ${message}`;
+    return ErrorCode.E_EXPIRED;
   }
   if (normalized.includes("revoked")) {
-    return `E_REVOKED: ${message}`;
+    return ErrorCode.E_REVOKED;
   }
   if (
     normalized.includes("conflict") ||
@@ -85,7 +114,7 @@ export function formatGatewayError(err: unknown, fallback = "E_INTERNAL"): strin
     normalized.includes("not published") ||
     normalized.includes("transition")
   ) {
-    return `E_CONFLICT: ${message}`;
+    return ErrorCode.E_CONFLICT;
   }
   if (
     normalized.includes("invalid") ||
@@ -94,9 +123,18 @@ export function formatGatewayError(err: unknown, fallback = "E_INTERNAL"): strin
     normalized.includes("missing") ||
     normalized.includes("exceeds")
   ) {
-    return `E_INVALID_ARGUMENT: ${message}`;
+    return ErrorCode.E_INVALID_ARGUMENT;
   }
-  return `${fallback}: ${message}`;
+  if (normalized.includes("quota") || normalized.includes("limit")) {
+    return ErrorCode.E_QUOTA_EXCEEDED;
+  }
+  if (normalized.includes("timeout")) {
+    return ErrorCode.E_TIMEOUT;
+  }
+  if (normalized.includes("unavailable") || normalized.includes("unreachable")) {
+    return ErrorCode.E_UNAVAILABLE;
+  }
+  return fallback;
 }
 
 // ---- Token/price helpers ----

@@ -101,6 +101,30 @@ export type BrowserIngestConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Monitor & Alerts
+// ---------------------------------------------------------------------------
+
+export type MonitorConfig = {
+  enabled: boolean;
+  notifications?: {
+    enabled: boolean;
+    channels?: {
+      webhook?: {
+        url: string;
+        method?: "POST" | "PUT";
+        headers?: Record<string, string>;
+        timeout?: number;
+      };
+      wecom?: {
+        webhookUrl: string;
+        mentionUsers?: string[];
+        mentionAll?: boolean;
+      };
+    };
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Resources sharing (B-2)
 // ---------------------------------------------------------------------------
 
@@ -191,6 +215,7 @@ export type Web3PluginConfig = {
   brain: BrainConfig;
   resources: ResourceSharingConfig;
   browserIngest: BrowserIngestConfig;
+  monitor: MonitorConfig;
 };
 
 // ---------------------------------------------------------------------------
@@ -266,6 +291,13 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
     allowLoopback: true,
     maxBodyBytes: 64 * 1024,
   },
+  monitor: {
+    enabled: true,
+    notifications: {
+      enabled: false, // disabled by default, user must configure
+      channels: {},
+    },
+  },
 };
 
 /** Merge user-supplied partial config with defaults. */
@@ -284,5 +316,6 @@ export function resolveConfig(raw?: Record<string, unknown>): Web3PluginConfig {
     brain: merge(DEFAULT_CONFIG.brain, raw.brain),
     resources: merge(DEFAULT_CONFIG.resources, raw.resources),
     browserIngest: merge(DEFAULT_CONFIG.browserIngest, raw.browserIngest),
+    monitor: merge(DEFAULT_CONFIG.monitor, raw.monitor),
   };
 }

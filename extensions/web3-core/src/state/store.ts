@@ -15,7 +15,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { join } from "node:path";
 import type { AuditEvent } from "../audit/types.js";
 import type { UsageRecord } from "../billing/types.js";
+import type { DisputeRecord } from "../disputes/types.js";
 import type { SiweChallenge, WalletBinding } from "../identity/types.js";
+import type { AlertEvent } from "../monitor/types.js";
 
 export type PendingAnchor = {
   anchorId: string;
@@ -470,5 +472,71 @@ export class Web3StateStore {
   removePendingTx(anchorId: string): void {
     const list = this.getPendingTxs().filter((entry) => entry.anchorId !== anchorId);
     this.savePendingTxs(list);
+  }
+
+  // ---- Disputes ----
+
+  private get disputesPath() {
+    return join(this.dir, "disputes.json");
+  }
+
+  getDisputes(): DisputeRecord[] {
+    if (!existsSync(this.disputesPath)) return [];
+    return JSON.parse(readFileSync(this.disputesPath, "utf-8"));
+  }
+
+  saveDisputes(disputes: DisputeRecord[]): void {
+    writeFileSync(this.disputesPath, JSON.stringify(disputes, null, 2));
+  }
+
+  getDispute(disputeId: string): DisputeRecord | undefined {
+    return this.getDisputes().find((d) => d.disputeId === disputeId);
+  }
+
+  upsertDispute(dispute: DisputeRecord): void {
+    const list = this.getDisputes();
+    const index = list.findIndex((d) => d.disputeId === dispute.disputeId);
+    if (index >= 0) {
+      list[index] = dispute;
+    } else {
+      list.push(dispute);
+    }
+    this.saveDisputes(list);
+  }
+
+  removeDispute(disputeId: string): void {
+    const list = this.getDisputes().filter((d) => d.disputeId !== disputeId);
+    this.saveDisputes(list);
+  }
+
+  // ---- Alerts ----
+
+  private get alertsPath() {
+    return join(this.dir, "alerts.jsonl");
+  }
+
+  appendAlert(alert: AlertEvent): void {
+    appendFileSync(this.alertsPath, JSON.stringify(alert) + "\n");
+  }
+
+  getAlerts(limit = 1000): AlertEvent[] {
+    if (!existsSync(this.alertsPath)) return [];
+    const lines = readFileSync(this.alertsPath, "utf-8")
+      .trim()
+      .split("\n")
+      .filter((l) => l);
+    return lines.slice(-limit).map((l) => JSON.parse(l) as AlertEvent);
+  }
+
+  updateAlert(alert: AlertEvent): void {
+    const alerts = this.getAlerts();
+    const index = alerts.findIndex((a) => a.id === alert.id);
+    if (index < 0) {
+      throw new Error(`Alert not found: ${alert.id}`);
+    }
+    alerts[index] = alert;
+    // Rewrite entire file (for JSONL we need to update)
+    // In production, consider using a database for updates
+    writeFileSync(this.alertsPath, alerts.map((a) => JSON.stringify(a)).join("\n") + "\n");
   }
 }
