@@ -108,6 +108,7 @@ export type AutoPricingReport = {
  */
 export type MarketStatistics = {
   resourceType: string;
+  assetType?: string; // 资产类型（可选）
   timestamp: string;
   offerCount: number; // 市场上的总供应数
 
@@ -177,6 +178,7 @@ export type PriceRecommendation = {
 export type MarketMetrics = {
   timestamp: string;
   resourceType: string;
+  offerId?: string; // 供应ID（可选）
 
   // 供给指标
   totalProviders: number;
@@ -194,6 +196,11 @@ export type MarketMetrics = {
   // 价格指标
   avgPrice24h: number;
   priceChange24h: number; // 百分比
+
+  // 竞争指标（可选）
+  similarOffers?: number;
+  avgCompetitorPrice?: number;
+  priceRank?: number;
 };
 
 // ============================================================================
@@ -208,6 +215,7 @@ export type MarketMetrics = {
  */
 export type OrderBookEntry = {
   entryId: string;
+  offerId?: string; // 供应ID（可选）
   resourceType: string;
   side: "buy" | "sell"; // 买单/卖单
   price: number;
@@ -223,6 +231,7 @@ export type OrderBookEntry = {
  * 订单簿快照
  */
 export type OrderBook = {
+  offerId?: string; // 供应ID（可选）
   resourceType: string;
   timestamp: string;
   bids: OrderBookEntry[]; // 买单（按价格降序）
@@ -247,7 +256,7 @@ export type PriceHistory = {
   offerId: string;
   price: number;
   timestamp: string;
-  source: "provider_manual" | "provider_auto" | "market_trade"; // 明确标注价格来源
+  source: "provider_manual" | "provider_auto" | "market_trade" | "system"; // 明确标注价格来源
   providerId: string;
 };
 
@@ -335,4 +344,41 @@ export type PricingConstraints = {
   maxPrice?: number;
   maxDiscount?: number;
   priceChangeLimit?: number;
+};
+
+// ============================================================================
+// 补充类型定义 - 用于定价引擎
+// ============================================================================
+
+/**
+ * 定价模型配置
+ */
+export type PricingModel = {
+  strategy: PricingStrategy;
+  basePrice: number;
+  dynamic?: DynamicPricingConfig;
+  tiered?: TierPricingConfig;
+  surge?: SurgePricingConfig;
+  auction?: AuctionConfig;
+  constraints?: PricingConstraints;
+};
+
+/**
+ * 价格计算结果
+ */
+export type PriceCalculation = {
+  basePrice: number;
+  finalPrice: number;
+  adjustments: PriceAdjustment[];
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * 价格调整项
+ */
+export type PriceAdjustment = {
+  type: string;
+  amount: number;
+  reason: string;
+  metadata?: Record<string, unknown>;
 };

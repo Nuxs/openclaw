@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import { DEFAULT_WEB3_CONFIG } from "../config.js";
+// import { DEFAULT_WEB3_CONFIG } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
 import { AlertEngine } from "./engine.js";
 import { ALERT_RULES } from "./rules.js";

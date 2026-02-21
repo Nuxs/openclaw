@@ -279,8 +279,12 @@
           <button onclick="runAllTests()" id="runAllBtn">▶️ Run All Tests</button>
           <button onclick="runCategoryTests('api')" id="runApiBtn">📡 API Tests</button>
           <button onclick="runCategoryTests('ui')" id="runUiBtn">🎨 UI Tests</button>
-          <button onclick="runCategoryTests('integration')" id="runIntBtn">🔗 Integration Tests</button>
-          <button onclick="runCategoryTests('performance')" id="runPerfBtn">⚡ Performance Tests</button>
+          <button onclick="runCategoryTests('integration')" id="runIntBtn">
+            🔗 Integration Tests
+          </button>
+          <button onclick="runCategoryTests('performance')" id="runPerfBtn">
+            ⚡ Performance Tests
+          </button>
           <button class="danger" onclick="clearResults()">🗑️ Clear Results</button>
         </div>
         <div class="progress-bar">
@@ -461,10 +465,12 @@
         document.getElementById("failedCount").textContent = testState.failed;
         document.getElementById("totalCount").textContent = testState.total;
 
-        const successRate = testState.total > 0 ? ((testState.passed / testState.total) * 100).toFixed(1) : 0;
+        const successRate =
+          testState.total > 0 ? ((testState.passed / testState.total) * 100).toFixed(1) : 0;
         const rateEl = document.getElementById("successRate");
         rateEl.textContent = successRate + "%";
-        rateEl.style.color = successRate >= 90 ? "#10b981" : successRate >= 70 ? "#f59e0b" : "#ef4444";
+        rateEl.style.color =
+          successRate >= 90 ? "#10b981" : successRate >= 70 ? "#f59e0b" : "#ef4444";
 
         const duration = ((Date.now() - testState.startTime) / 1000).toFixed(2);
         document.getElementById("duration").textContent = duration + "s";
@@ -497,7 +503,13 @@
         const suite = testSuites[category];
         if (!suite) return;
 
-        testState = { passed: 0, failed: 0, total: suite.tests.length, startTime: Date.now(), results: {} };
+        testState = {
+          passed: 0,
+          failed: 0,
+          total: suite.tests.length,
+          startTime: Date.now(),
+          results: {},
+        };
 
         log(`🚀 Starting ${suite.title}...`, "info");
         disableButtons(true);
@@ -505,7 +517,10 @@
         await runCategoryTestsInternal(category, suite);
 
         updateSummary();
-        log(`\n✅ Category tests completed: ${testState.passed}/${testState.total} passed`, "success");
+        log(
+          `\n✅ Category tests completed: ${testState.passed}/${testState.total} passed`,
+          "success",
+        );
         disableButtons(false);
       }
 

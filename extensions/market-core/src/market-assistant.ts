@@ -1,7 +1,7 @@
 // extensions/market-agent/src/market-assistant.ts
 // AI 管家：处理用户自然语言指令，编排市场 API 调用
 
-import { OpenClawRuntime } from "@openclaw/core";
+// import { OpenClawRuntime } from "@openclaw/core";
 
 /**
  * 用户意图类型
@@ -233,7 +233,7 @@ ${suggestion}`;
 
     // 多个资源，需要用户明确
     const resourceList = resources
-      .map((r, i) => `${i + 1}. ${r.name} (当前 $${r.price}/小时)`)
+      .map((r: any, i: number) => `${i + 1}. ${r.name} (当前 $${r.price}/小时)`)
       .join("\n");
 
     return `您有多个在售服务：\n${resourceList}\n\n请明确指定，例如：\"把 GPU 改成 $15\"`;
@@ -256,9 +256,9 @@ ${suggestion}`;
     const orders = await this.openclaw.callGatewayMethod("market.order.list", { status: "active" });
 
     // 3. 计算每个资源的剩余量
-    const inventory = resources.map((resource) => {
-      const resourceOrders = orders.filter((o) => o.resourceId === resource.id);
-      const used = resourceOrders.reduce((sum, o) => sum + o.quantity, 0);
+    const inventory = resources.map((resource: any) => {
+      const resourceOrders = orders.filter((o: any) => o.resourceId === resource.id);
+      const used = resourceOrders.reduce((sum: number, o: any) => sum + o.quantity, 0);
       const remaining = resource.totalCapacity - used;
 
       return {
@@ -274,7 +274,7 @@ ${suggestion}`;
     // 4. 生成报告
     const inventoryText = inventory
       .map(
-        (item) =>
+        (item: any) =>
           `• ${item.name}: 剩余 ${item.remaining} ${item.unit} (利用率 ${item.utilization}%)`,
       )
       .join("\n");
@@ -296,12 +296,12 @@ ${suggestion}`;
       timeRange,
     });
 
-    const timeText =
-      {
-        today: "今天",
-        week: "本周",
-        month: "本月",
-      }[timeRange] || "今天";
+    const timeRangeMap: Record<string, string> = {
+      today: "今天",
+      week: "本周",
+      month: "本月",
+    };
+    const timeText = timeRangeMap[timeRange as string] || "今天";
 
     return `💰 ${timeText}收入：$${earnings.total.toFixed(2)}
 
@@ -325,7 +325,7 @@ ${suggestion}`;
 
     const orderText = orders
       .map(
-        (o, i) =>
+        (o: any, i: number) =>
           `${i + 1}. ${o.resourceName} → @${o.buyerId}
    💰 $${o.price}/${o.unit} | ⏱ 已运行 ${o.duration}h | 预计结束 ${o.estimatedEnd}`,
       )

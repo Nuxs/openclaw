@@ -6,7 +6,7 @@
 
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { formatWeb3GatewayError, Web3ErrorCode } from "../_shared.js";
-import type { Web3Config } from "../config.js";
+// import type { Web3Config } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import { AlertEngine } from "./engine.js";
 import { AlertLevel, AlertCategory, AlertStatus, type AlertQuery } from "./types.js";
@@ -22,7 +22,7 @@ export function createAlertsListHandler(
 ): GatewayRequestHandler {
   const engine = new AlertEngine(store, config);
 
-  return async (params, _opts) => {
+  return async (params: any, _opts: any, context: any = {}) => {
     try {
       const query: AlertQuery = {
         level: params?.level as AlertLevel | undefined,
@@ -55,7 +55,7 @@ export function createAlertGetHandler(
   store: Web3StateStore,
   config: Web3Config,
 ): GatewayRequestHandler {
-  return async (params, _opts) => {
+  return async (params: any, _opts: any, context: any = {}) => {
     try {
       const alertId = params?.alertId as string | undefined;
       if (!alertId) {
@@ -98,7 +98,7 @@ export function createAlertAcknowledgeHandler(
 ): GatewayRequestHandler {
   const engine = new AlertEngine(store, config);
 
-  return async (params, _opts) => {
+  return async (params: any, _opts: any, context: any = {}) => {
     try {
       const alertId = params?.alertId as string | undefined;
       if (!alertId) {
@@ -136,7 +136,7 @@ export function createAlertResolveHandler(
 ): GatewayRequestHandler {
   const engine = new AlertEngine(store, config);
 
-  return async (params, _opts) => {
+  return async (params: any, _opts: any, context: any = {}) => {
     try {
       const alertId = params?.alertId as string | undefined;
       if (!alertId) {
@@ -173,7 +173,7 @@ export function createMonitorMetricsHandler(
 ): GatewayRequestHandler {
   const engine = new AlertEngine(store, config);
 
-  return async (_params, _opts) => {
+  return async (_params: any, _opts: any, context: any = {}) => {
     try {
       const metrics = await engine.getMetrics();
 
@@ -196,7 +196,7 @@ export function createHealthCheckHandler(
   store: Web3StateStore,
   config: Web3Config,
 ): GatewayRequestHandler {
-  return async (_params, _opts) => {
+  return async (_params: any, _opts: any, context: any = {}) => {
     try {
       const now = Date.now();
       const alerts = store.getAlerts();

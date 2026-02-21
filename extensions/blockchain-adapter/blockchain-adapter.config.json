@@ -1,0 +1,87 @@
+{
+  "defaultChain": "ton-mainnet",
+  "chains": {
+    "ton-mainnet": {
+      "rpcUrl": "https://toncenter.com/api/v2/jsonRPC",
+      "explorerUrl": "https://tonscan.org",
+      "apiKey": "",
+      "contracts": {
+        "settlement": "EQD...",
+        "marketplace": "EQD...",
+        "token": "EQD..."
+      },
+      "testnet": false
+    },
+    "ton-testnet": {
+      "rpcUrl": "https://testnet.toncenter.com/api/v2/jsonRPC",
+      "explorerUrl": "https://testnet.tonscan.org",
+      "apiKey": "",
+      "contracts": {
+        "settlement": "kQD...",
+        "marketplace": "kQD...",
+        "token": "kQD..."
+      },
+      "testnet": true
+    },
+    "solana-mainnet": {
+      "rpcUrl": "https://api.mainnet-beta.solana.com",
+      "explorerUrl": "https://explorer.solana.com",
+      "contracts": {
+        "settlement": "So1...",
+        "marketplace": "So2...",
+        "token": "So3..."
+      },
+      "testnet": false
+    },
+    "solana-devnet": {
+      "rpcUrl": "https://api.devnet.solana.com",
+      "explorerUrl": "https://explorer.solana.com/?cluster=devnet",
+      "contracts": {
+        "settlement": "So1...",
+        "marketplace": "So2...",
+        "token": "So3..."
+      },
+      "testnet": true
+    },
+    "sui-mainnet": {
+      "rpcUrl": "https://fullnode.mainnet.sui.io",
+      "explorerUrl": "https://suiexplorer.com",
+      "contracts": {
+        "settlement": "0x...",
+        "marketplace": "0x...",
+        "token": "0x..."
+      },
+      "testnet": false
+    },
+    "base-mainnet": {
+      "rpcUrl": "https://mainnet.base.org",
+      "explorerUrl": "https://basescan.org",
+      "contracts": {
+        "settlement": "0x...",
+        "marketplace": "0x...",
+        "token": "0x..."
+      },
+      "testnet": false
+    }
+  },
+  "features": {
+    "multiChain": true,
+    "autoSwitch": true,
+    "eventPolling": true,
+    "pollingInterval": 5000
+  },
+  "tokens": {
+    "oct": {
+      "symbol": "OCT",
+      "name": "OpenClaw Token",
+      "decimals": 9,
+      "totalSupply": "1000000000",
+      "addresses": {
+        "ton-mainnet": "EQD...",
+        "solana-mainnet": "So1...",
+        "sui-mainnet": "0x...",
+        "base-mainnet": "0x..."
+      }
+    }
+  }
+}

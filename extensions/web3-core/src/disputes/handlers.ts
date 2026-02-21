@@ -6,7 +6,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
-import { ErrorCode, formatWeb3GatewayError } from "../errors.js";
+import { formatWeb3GatewayError } from "../errors.js";
+import { ErrorCode } from "../errors/codes.js";
 import type { Web3StateStore } from "../state/store.js";
 import {
   DEFAULT_DISPUTE_CONFIG,
@@ -200,7 +201,7 @@ export function createDisputeSubmitEvidenceHandler(
         contentHash: calculateContentHash(JSON.stringify({ description, data })),
         description,
         submittedAt: new Date().toISOString(),
-        data,
+        data: data as Record<string, unknown>,
       };
 
       const updatedDispute: DisputeRecord = {

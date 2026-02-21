@@ -252,7 +252,7 @@ export function calculateTieredPrice(model: PricingModel, quantity: number): Pri
   // 找到适用的价格梯度
   const tier =
     model.tierConfig.tiers.find(
-      (t) =>
+      (t: any) =>
         quantity >= t.minQuantity && (t.maxQuantity === undefined || quantity <= t.maxQuantity),
     ) || model.tierConfig.tiers[model.tierConfig.tiers.length - 1];
 

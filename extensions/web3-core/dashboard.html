@@ -1036,13 +1036,13 @@
         document.getElementById("stat-total-resources").textContent = mockData.resources.length;
         document.getElementById("stat-active-leases").textContent = mockData.resources.reduce(
           (sum, r) => sum + r.leases,
-          0
+          0,
         );
         document.getElementById("stat-open-disputes").textContent = mockData.disputes.filter(
-          (d) => d.status !== "resolved"
+          (d) => d.status !== "resolved",
         ).length;
         document.getElementById("stat-active-alerts").textContent = mockData.alerts.filter(
-          (a) => a.status === "active"
+          (a) => a.status === "active",
         ).length;
       }
 
@@ -1142,13 +1142,13 @@
 
         // Update alert statistics
         document.getElementById("stat-p0-alerts").textContent = mockData.alerts.filter(
-          (a) => a.priority === "P0" && a.status === "active"
+          (a) => a.priority === "P0" && a.status === "active",
         ).length;
         document.getElementById("stat-p1-alerts").textContent = mockData.alerts.filter(
-          (a) => a.priority === "P1" && a.status === "active"
+          (a) => a.priority === "P1" && a.status === "active",
         ).length;
         document.getElementById("stat-p2-alerts").textContent = mockData.alerts.filter(
-          (a) => a.priority === "P2" && a.status === "active"
+          (a) => a.priority === "P2" && a.status === "active",
         ).length;
       }
 
