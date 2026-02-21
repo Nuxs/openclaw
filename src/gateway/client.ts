@@ -363,7 +363,25 @@ export class GatewayClient {
         if (parsed.ok) {
           pending.resolve(parsed.payload);
         } else {
-          pending.reject(new Error(parsed.error?.message ?? "unknown error"));
+          const payloadRecord =
+            typeof parsed.payload === "object" && parsed.payload !== null
+              ? (parsed.payload as Record<string, unknown>)
+              : null;
+          const payloadError = payloadRecord?.error ?? payloadRecord?.message;
+          let payloadMessage = "";
+          if (typeof parsed.payload === "string") {
+            payloadMessage = parsed.payload;
+          } else if (typeof payloadError === "string") {
+            payloadMessage = payloadError;
+          } else if (payloadError !== undefined) {
+            try {
+              payloadMessage = JSON.stringify(payloadError);
+            } catch {
+              payloadMessage = "";
+            }
+          }
+          const message = parsed.error?.message ?? payloadMessage;
+          pending.reject(new Error(message && message.length > 0 ? message : "unknown error"));
         }
       }
     } catch (err) {
