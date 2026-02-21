@@ -17,6 +17,7 @@ import type { AuditEvent } from "../audit/types.js";
 import type { UsageRecord } from "../billing/types.js";
 import type { DisputeRecord } from "../disputes/types.js";
 import type { SiweChallenge, WalletBinding } from "../identity/types.js";
+import type { AlertEvent } from "../monitor/types.js";
 
 export type PendingAnchor = {
   anchorId: string;
@@ -506,5 +507,36 @@ export class Web3StateStore {
   removeDispute(disputeId: string): void {
     const list = this.getDisputes().filter((d) => d.disputeId !== disputeId);
     this.saveDisputes(list);
+  }
+
+  // ---- Alerts ----
+
+  private get alertsPath() {
+    return join(this.dir, "alerts.jsonl");
+  }
+
+  appendAlert(alert: AlertEvent): void {
+    appendFileSync(this.alertsPath, JSON.stringify(alert) + "\n");
+  }
+
+  getAlerts(limit = 1000): AlertEvent[] {
+    if (!existsSync(this.alertsPath)) return [];
+    const lines = readFileSync(this.alertsPath, "utf-8")
+      .trim()
+      .split("\n")
+      .filter((l) => l);
+    return lines.slice(-limit).map((l) => JSON.parse(l) as AlertEvent);
+  }
+
+  updateAlert(alert: AlertEvent): void {
+    const alerts = this.getAlerts();
+    const index = alerts.findIndex((a) => a.id === alert.id);
+    if (index < 0) {
+      throw new Error(`Alert not found: ${alert.id}`);
+    }
+    alerts[index] = alert;
+    // Rewrite entire file (for JSONL we need to update)
+    // In production, consider using a database for updates
+    writeFileSync(this.alertsPath, alerts.map((a) => JSON.stringify(a)).join("\n") + "\n");
   }
 }

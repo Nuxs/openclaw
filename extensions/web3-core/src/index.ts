@@ -71,6 +71,20 @@ import {
   createWeb3MonitorSnapshotHandler,
 } from "./metrics/metrics.js";
 import {
+  createAlertsCommand,
+  createAlertAcknowledgeCommand,
+  createAlertResolveCommand,
+  createHealthCommand,
+} from "./monitor/commands.js";
+import {
+  createAlertsListHandler,
+  createAlertGetHandler,
+  createAlertAcknowledgeHandler,
+  createAlertResolveHandler,
+  createMonitorMetricsHandler,
+  createHealthCheckHandler,
+} from "./monitor/handlers.js";
+import {
   createResourceModelChatHandler,
   createResourceSearchQueryHandler,
   createResourceStorageGetHandler,
@@ -150,6 +164,28 @@ const plugin: OpenClawPluginDefinition = {
       name: "audit_status",
       description: "Show recent audit anchoring events",
       handler: createAuditStatusCommand(store),
+    });
+    api.registerCommand({
+      name: "alerts",
+      description: "Show recent alerts and monitoring status",
+      handler: createAlertsCommand(store),
+    });
+    api.registerCommand({
+      name: "alert_ack",
+      description: "Acknowledge an alert by ID",
+      acceptsArgs: true,
+      handler: createAlertAcknowledgeCommand(store),
+    });
+    api.registerCommand({
+      name: "alert_resolve",
+      description: "Resolve an alert by ID with optional note",
+      acceptsArgs: true,
+      handler: createAlertResolveCommand(store),
+    });
+    api.registerCommand({
+      name: "health",
+      description: "Check Web3 service health status",
+      handler: createHealthCommand(store),
     });
 
     // ---- Hooks: Brain selection ----
@@ -264,6 +300,15 @@ const plugin: OpenClawPluginDefinition = {
       "web3.monitor.snapshot",
       createWeb3MonitorSnapshotHandler(store, config),
     );
+    api.registerGatewayMethod("web3.monitor.alerts.list", createAlertsListHandler(store));
+    api.registerGatewayMethod("web3.monitor.alerts.get", createAlertGetHandler(store));
+    api.registerGatewayMethod(
+      "web3.monitor.alerts.acknowledge",
+      createAlertAcknowledgeHandler(store),
+    );
+    api.registerGatewayMethod("web3.monitor.alerts.resolve", createAlertResolveHandler(store));
+    api.registerGatewayMethod("web3.monitor.metrics", createMonitorMetricsHandler(store));
+    api.registerGatewayMethod("web3.monitor.health", createHealthCheckHandler(store));
 
     const web3SearchTool = createWeb3SearchTool(config);
     if (web3SearchTool) {
