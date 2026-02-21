@@ -8,6 +8,7 @@ import { normalizeBuyerId, requireAddress, requireNumber, requireString } from "
 import {
   assertAccess,
   assertActorMatch,
+  formatGatewayError,
   nowIso,
   randomUUID,
   recordAudit,
@@ -70,7 +71,7 @@ export function createOrderCreateHandler(
       });
       respond(true, { orderId, orderHash, status: order.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -103,7 +104,7 @@ export function createOrderCancelHandler(
       recordAudit(store, "order_cancelled", orderId, order.orderHash, actorId || order.buyerId);
       respond(true, { orderId, status: order.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }

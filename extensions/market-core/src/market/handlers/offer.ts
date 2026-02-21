@@ -14,6 +14,7 @@ import {
 import {
   assertAccess,
   assertActorMatch,
+  formatGatewayError,
   nowIso,
   randomUUID,
   recordAudit,
@@ -77,7 +78,7 @@ export function createOfferCreateHandler(
 
       respond(true, { offerId, offerHash, status: offer.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -103,7 +104,7 @@ export function createOfferPublishHandler(
       recordAudit(store, "offer_published", offerId, offer.offerHash, actorId || undefined);
       respond(true, { offerId, status: offer.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -165,7 +166,7 @@ export function createOfferUpdateHandler(
       });
       respond(true, { offerId, offerHash, status: offer.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -191,7 +192,7 @@ export function createOfferCloseHandler(
       recordAudit(store, "offer_closed", offerId, offer.offerHash, actorId || undefined);
       respond(true, { offerId, status: offer.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }

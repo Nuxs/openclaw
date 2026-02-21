@@ -11,6 +11,7 @@ import {
   assertAccess,
   assertActorMatch,
   createRevocationJob,
+  formatGatewayError,
   nowIso,
   randomUUID,
   recordAudit,
@@ -110,7 +111,7 @@ export function createConsentGrantHandler(
       });
       respond(true, { consentId, consentHash, status: consent.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -239,7 +240,7 @@ export function createConsentRevokeHandler(
       });
       respond(true, { consentId, revokedAt, revokeHash });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }

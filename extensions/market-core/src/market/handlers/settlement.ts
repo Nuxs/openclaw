@@ -9,6 +9,7 @@ import { normalizeBuyerId, requireString } from "../validators.js";
 import {
   assertAccess,
   assertActorMatch,
+  formatGatewayError,
   nowIso,
   randomUUID,
   recordAudit,
@@ -80,7 +81,7 @@ export function createSettlementLockHandler(
 
       respond(true, { orderId, status: order.status, txHash, settlementId });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -149,7 +150,7 @@ export function createSettlementReleaseHandler(
       });
       respond(true, { orderId, status: order.status, txHash, settlementId, settlementHash });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -228,7 +229,7 @@ export function createSettlementRefundHandler(
       });
       respond(true, { orderId, status: order.status, txHash, settlementId });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -283,7 +284,7 @@ export function createSettlementStatusHandler(
         refundedAt: settlement.refundedAt ?? null,
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }

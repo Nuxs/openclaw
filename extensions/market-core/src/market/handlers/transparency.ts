@@ -1,7 +1,7 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
-import { assertAccess } from "./_shared.js";
+import { assertAccess, formatGatewayError } from "./_shared.js";
 
 export function createMarketStatusSummaryHandler(
   store: MarketStateStore,
@@ -38,7 +38,7 @@ export function createMarketStatusSummaryHandler(
         },
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -55,7 +55,7 @@ export function createMarketAuditQueryHandler(
       const events = store.readAuditEvents(limit ?? 100);
       respond(true, { events, count: events.length });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -142,7 +142,7 @@ export function createMarketTransparencySummaryHandler(
         },
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -234,7 +234,7 @@ export function createMarketTransparencyTraceHandler(
         },
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }

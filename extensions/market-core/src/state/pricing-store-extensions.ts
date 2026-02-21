@@ -133,8 +133,8 @@ export const fileStoreExtensions = {
   getOffersByAssetType(assetType: string) {
     // @ts-expect-error - accessing existing method
     return this.listOffers()
-      .filter((o) => o.assetType === assetType)
-      .map((o) => ({
+      .filter((o: { assetType: string }) => o.assetType === assetType)
+      .map((o: { offerId: string; price: number; assetType: string }) => ({
         offerId: o.offerId,
         price: o.price,
         assetType: o.assetType,
@@ -262,8 +262,8 @@ export const sqliteStoreExtensions = {
   getOffersByAssetType(assetType: string) {
     // @ts-expect-error - accessing existing method
     return this.listOffers()
-      .filter((o) => o.assetType === assetType)
-      .map((o) => ({
+      .filter((o: { assetType: string }) => o.assetType === assetType)
+      .map((o: { offerId: string; price: number; assetType: string }) => ({
         offerId: o.offerId,
         price: o.price,
         assetType: o.assetType,

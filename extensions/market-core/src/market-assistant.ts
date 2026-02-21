@@ -1,7 +1,9 @@
 // extensions/market-agent/src/market-assistant.ts
 // AI 管家：处理用户自然语言指令，编排市场 API 调用
 
-// import { OpenClawRuntime } from "@openclaw/core";
+export type MarketAssistantRuntime = {
+  callGatewayMethod: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
+};
 
 /**
  * 用户意图类型
@@ -22,7 +24,7 @@ export enum IntentType {
  */
 export interface ParsedIntent {
   type: IntentType;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   confidence: number;
 }
 
@@ -36,9 +38,9 @@ export interface ParsedIntent {
  * 4. 生成友好的用户反馈
  */
 export class MarketAssistant {
-  private openclaw: OpenClawRuntime;
+  private openclaw: MarketAssistantRuntime;
 
-  constructor(openclaw: OpenClawRuntime) {
+  constructor(openclaw: MarketAssistantRuntime) {
     this.openclaw = openclaw;
   }
 
@@ -76,8 +78,9 @@ export class MarketAssistant {
         default:
           return this.generateHelpMessage();
       }
-    } catch (error: any) {
-      return `❌ 操作失败：${error.message}\n\n请重试或输入"帮助"查看可用指令`;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
+      return `❌ 操作失败：${message}\n\n请重试或输入"帮助"查看可用指令`;
     }
   }
 
@@ -171,7 +174,7 @@ export class MarketAssistant {
     const resourceType = this.inferResourceType(resourceName);
 
     // 2. 发布资源
-    const result = await this.openclaw.callGatewayMethod("market.resource.publish", {
+    const result = await this.openclaw.callGatewayMethod<unknown>("market.resource.publish", {
       name: resourceName,
       resourceType,
       basePrice: price,
@@ -183,12 +186,16 @@ export class MarketAssistant {
         },
       },
     });
+    void result;
 
     // 3. 查询市场行情
-    const marketStats = await this.openclaw.callGatewayMethod("market.query", {
-      type: "marketStats",
-      resourceType,
-    });
+    const marketStats = await this.openclaw.callGatewayMethod<{ avgPrice: number }>(
+      "market.query",
+      {
+        type: "marketStats",
+        resourceType,
+      },
+    );
 
     // 4. 生成建议
     const suggestion = this.generatePricingSuggestion(price, marketStats.avgPrice);
@@ -213,7 +220,9 @@ ${suggestion}`;
     }
 
     // 获取用户的资源列表
-    const resources = await this.openclaw.callGatewayMethod("market.resource.list", {
+    const resources = await this.openclaw.callGatewayMethod<
+      Array<{ id: string; name: string; price: number; totalCapacity: number; unit: string }>
+    >("market.resource.list", {
       status: "available",
     });
 
@@ -243,8 +252,11 @@ ${suggestion}`;
    * 处理查询库存
    */
   private async handleQueryInventory(params: any): Promise<string> {
+    void params;
     // 1. 获取资源列表
-    const resources = await this.openclaw.callGatewayMethod("market.resource.list", {
+    const resources = await this.openclaw.callGatewayMethod<
+      Array<{ id: string; name: string; price: number; totalCapacity: number; unit: string }>
+    >("market.resource.list", {
       status: "available",
     });
 
@@ -253,7 +265,18 @@ ${suggestion}`;
     }
 
     // 2. 获取活跃订单
-    const orders = await this.openclaw.callGatewayMethod("market.order.list", { status: "active" });
+    const orders = await this.openclaw.callGatewayMethod<
+      Array<{
+        resourceId: string;
+        resourceName: string;
+        buyerId: string;
+        quantity: number;
+        price: number;
+        unit: string;
+        duration?: number;
+        estimatedEnd?: string;
+      }>
+    >("market.order.list", { status: "active" });
 
     // 3. 计算每个资源的剩余量
     const inventory = resources.map((resource: any) => {
@@ -279,8 +302,18 @@ ${suggestion}`;
       )
       .join("\n");
 
-    const ordersText = orders
-      .map((o) => `• ${o.resourceName} → @${o.buyerId} ($${o.price}/${o.unit})`)
+    const ordersText = (Array.isArray(orders) ? orders : [])
+      .map((o: unknown) => {
+        const rec = (o && typeof o === "object" ? (o as Record<string, unknown>) : {}) as Record<
+          string,
+          unknown
+        >;
+        const resourceName = typeof rec.resourceName === "string" ? rec.resourceName : "unknown";
+        const buyerId = typeof rec.buyerId === "string" ? rec.buyerId : "unknown";
+        const price = typeof rec.price === "number" ? rec.price : 0;
+        const unit = typeof rec.unit === "string" ? rec.unit : "unit";
+        return `• ${resourceName} → @${buyerId} ($${price}/${unit})`;
+      })
       .join("\n");
 
     return `📦 当前库存：\n${inventoryText}\n\n🔥 活跃订单：${orders.length} 个\n${ordersText || "暂无订单"}`;
@@ -292,7 +325,13 @@ ${suggestion}`;
   private async handleQueryEarnings(params: any): Promise<string> {
     const { timeRange = "today" } = params;
 
-    const earnings = await this.openclaw.callGatewayMethod("market.settlement.query", {
+    const earnings = await this.openclaw.callGatewayMethod<{
+      total: number;
+      settled: number;
+      pending: number;
+      orderCount: number;
+      trend: number;
+    }>("market.settlement.query", {
       timeRange,
     });
 
@@ -317,7 +356,19 @@ ${suggestion}`;
    * 处理查询订单
    */
   private async handleQueryOrders(params: any): Promise<string> {
-    const orders = await this.openclaw.callGatewayMethod("market.order.list", { status: "active" });
+    void params;
+    const orders = await this.openclaw.callGatewayMethod<
+      Array<{
+        resourceId: string;
+        resourceName: string;
+        buyerId: string;
+        quantity: number;
+        price: number;
+        unit: string;
+        duration?: number;
+        estimatedEnd?: string;
+      }>
+    >("market.order.list", { status: "active" });
 
     if (orders.length === 0) {
       return "📋 当前没有活跃订单";
@@ -367,9 +418,12 @@ ${suggestion}`;
     const { cancelAll } = params;
 
     if (cancelAll) {
-      const result = await this.openclaw.callGatewayMethod("market.order.cancel", {
-        cancelAll: true,
-      });
+      const result = await this.openclaw.callGatewayMethod<{ count: number }>(
+        "market.order.cancel",
+        {
+          cancelAll: true,
+        },
+      );
 
       return `✅ 已取消 ${result.count} 个订单`;
     }

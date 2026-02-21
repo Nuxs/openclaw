@@ -19,7 +19,7 @@ import type {
   OrderBook,
   OrderBookEntry,
 } from "../pricing-types.js";
-import { assertAccess, requireActorId, nowIso, randomUUID } from "./_shared.js";
+import { assertAccess, formatGatewayError, requireActorId, nowIso, randomUUID } from "./_shared.js";
 
 // 本地辅助函数
 function requireString(value: unknown, name: string): string {
@@ -53,19 +53,18 @@ export function createPricingModelHandler(
 
       // 验证 offer 存在且属于当前用户
       const offer = store.getOffer(offerId);
-      if (!offer) throw new Error("offer not found");
+      if (!offer) throw new Error("E_NOT_FOUND: offer not found");
       if (actorId && offer.sellerId !== actorId) {
-        throw new Error("unauthorized: not offer owner");
+        throw new Error("E_FORBIDDEN: actorId does not match offer owner");
       }
 
       const pricingModel: PricingModel = {
         strategy: (input.strategy as PricingModel["strategy"]) || "fixed",
         basePrice: requireNumber(input.basePrice, "basePrice"),
-        currency: requireString(input.currency, "currency"),
-        dynamicConfig: input.dynamicConfig as PricingModel["dynamicConfig"],
-        tierConfig: input.tierConfig as PricingModel["tierConfig"],
-        surgeConfig: input.surgeConfig as PricingModel["surgeConfig"],
-        auctionConfig: input.auctionConfig as PricingModel["auctionConfig"],
+        dynamic: input.dynamic as PricingModel["dynamic"],
+        tiered: input.tiered as PricingModel["tiered"],
+        surge: input.surge as PricingModel["surge"],
+        auction: input.auction as PricingModel["auction"],
         constraints: input.constraints as PricingModel["constraints"],
       };
 
@@ -79,7 +78,7 @@ export function createPricingModelHandler(
         message: "定价模型已保存",
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -98,15 +97,20 @@ export function getPricingModelHandler(
       const input = (params ?? {}) as Record<string, unknown>;
       const offerId = requireString(input.offerId, "offerId");
 
-      const pricingModel = null; // store.getPricingModel not implemented
-      if (!pricingModel) {
-        respond(false, { error: "定价模型不存在" });
-        return;
+      const offer = store.getOffer(offerId);
+      if (!offer) {
+        throw new Error("E_NOT_FOUND: offer not found");
       }
+
+      // 当前实现：若未持久化额外定价模型，则回退到 Offer 的固定价格。
+      const pricingModel: PricingModel = {
+        strategy: "fixed",
+        basePrice: offer.price,
+      };
 
       respond(true, { offerId, pricingModel });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -126,54 +130,68 @@ export function calculatePriceHandler(
       const offerId = requireString(input.offerId, "offerId");
       const quantity = input.quantity ? requireNumber(input.quantity, "quantity") : 1;
 
-      const pricingModel = null; // store.getPricingModel not implemented
-      if (!pricingModel) {
-        respond(false, { error: "定价模型不存在" });
-        return;
+      const offer = store.getOffer(offerId);
+      if (!offer) {
+        throw new Error("E_NOT_FOUND: offer not found");
       }
+
+      // 当前实现：未持久化额外定价模型时，使用 Offer 的固定价格。
+      const pricingModel: PricingModel = {
+        strategy: "fixed",
+        basePrice: offer.price,
+      };
 
       let priceCalculation;
 
-      // 如果是分级定价
-      if (pricingModel.strategy === "tiered" && pricingModel.tierConfig?.enabled) {
+      // 分级定价（如果提供了 tiered 配置）
+      if (pricingModel.strategy === "tiered" && pricingModel.tiered?.enabled) {
         priceCalculation = calculateTieredPrice(pricingModel, quantity);
-        priceCalculation.offerId = offerId;
       }
-      // 如果是动态定价
-      else if (pricingModel.strategy === "dynamic" || pricingModel.surgeConfig?.enabled) {
-        // 收集市场指标
-        const orders = []; // store.getOrdersByOffer not implemented
-        const providers = []; // store.getProvidersByOffer?.(offerId) || [];
-        const competitorOffers = []; // store.getCompetitorOffers?.(offerId) || [];
+      // 动态定价（如果提供了 dynamic/surge 配置）
+      else if (pricingModel.strategy === "dynamic" || pricingModel.surge?.enabled) {
+        const orders = store
+          .listOrders()
+          .filter((o) => o.offerId === offerId)
+          .map((o) => ({ status: o.status, createdAt: o.createdAt }));
 
-        const metrics = collectMarketMetrics(offerId, orders, providers, competitorOffers);
+        const providers: Array<{ active: boolean; capacity: number; available: number }> = [];
+        const competitorOffers: Array<{ price: number }> = [];
+
+        const metrics = collectMarketMetrics({
+          offerId,
+          resourceType: offer.assetType,
+          orders,
+          providers,
+          competitorOffers,
+        });
+
         priceCalculation = calculateDynamicPrice(pricingModel, metrics);
       }
       // 固定价格
       else {
         priceCalculation = {
-          offerId,
-          originalPrice: pricingModel.basePrice,
-          calculatedPrice: pricingModel.basePrice * quantity,
+          basePrice: pricingModel.basePrice,
+          finalPrice: pricingModel.basePrice * quantity,
           adjustments: [],
-          effectiveAt: nowIso(),
+          metadata: { quantity },
         };
       }
 
-      // 记录价格历史
+      // 记录价格历史（当前未持久化，保留为将来扩展）
       const priceHistory: PriceHistory = {
         historyId: randomUUID(),
+        resourceType: offer.assetType,
         offerId,
-        price: priceCalculation.calculatedPrice,
-        volume: quantity,
+        price: priceCalculation.finalPrice,
         timestamp: nowIso(),
         source: "system",
+        providerId: offer.sellerId,
       };
-      // store.savePriceHistory(priceHistory);
+      void priceHistory;
 
-      respond(true, priceCalculation);
+      respond(true, { offerId, ...priceCalculation });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -193,7 +211,8 @@ export function getPriceHistoryHandler(
       const offerId = requireString(input.offerId, "offerId");
       const limit = input.limit ? requireNumber(input.limit, "limit") : 100;
 
-      const history = []; // store.getPriceHistory(offerId, limit);
+      const history: PriceHistory[] = []; // store.getPriceHistory(offerId, limit);
+      void limit;
 
       respond(true, {
         offerId,
@@ -201,7 +220,7 @@ export function getPriceHistoryHandler(
         history,
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -220,75 +239,40 @@ export function getMarketStatisticsHandler(
       const input = (params ?? {}) as Record<string, unknown>;
       const assetType = requireString(input.assetType, "assetType");
 
-      // 获取该类型的所有 offers
-      const offers = []; // store.getOffersByAssetType(assetType);
-      if (!offers.length) {
-        respond(false, { error: "暂无该类型服务" });
-        return;
+      const offers = store.listOffers().filter((o) => o.assetType === assetType);
+      if (offers.length === 0) {
+        throw new Error("E_NOT_FOUND: no offers for assetType");
       }
 
-      // 计算价格统计
       const prices = offers.map((o) => o.price).sort((a, b) => a - b);
-      const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
-      const minPrice = prices[0];
-      const maxPrice = prices[prices.length - 1];
-      const medianPrice = prices[Math.floor(prices.length / 2)];
+      const avg = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+      const min = prices[0] ?? 0;
+      const max = prices[prices.length - 1] ?? 0;
+      const median = prices[Math.floor(prices.length / 2)] ?? avg;
+      const p25 = prices[Math.floor(prices.length * 0.25)] ?? min;
+      const p75 = prices[Math.floor(prices.length * 0.75)] ?? max;
 
-      // 获取价格历史计算波动率
-      const allHistory: PriceHistory[] = [];
-      for (const offer of offers) {
-        const history = []; // store.getPriceHistory(offer.offerId, 100);
-        allHistory.push(...history);
-      }
-      const priceVolatility = calculateVolatility(allHistory);
-
-      // 计算交易统计
-      const allOrders = offers.flatMap((o) => store.getOrdersByOffer(o.offerId));
-      const totalVolume = allOrders.reduce((sum, o) => sum + o.quantity, 0);
-      const avgOrderSize = allOrders.length > 0 ? totalVolume / allOrders.length : 0;
-
-      // 计算24小时变化
-      const oneDayAgo = Date.now() - 86400000;
-      const recentHistory = allHistory.filter((h) => new Date(h.timestamp).getTime() > oneDayAgo);
-      const oldHistory = allHistory.filter((h) => new Date(h.timestamp).getTime() <= oneDayAgo);
-
-      const recentAvgPrice =
-        recentHistory.length > 0
-          ? recentHistory.reduce((sum, h) => sum + h.price, 0) / recentHistory.length
-          : avgPrice;
-      const oldAvgPrice =
-        oldHistory.length > 0
-          ? oldHistory.reduce((sum, h) => sum + h.price, 0) / oldHistory.length
-          : avgPrice;
-
-      const priceChange24h =
-        oldAvgPrice > 0 ? ((recentAvgPrice - oldAvgPrice) / oldAvgPrice) * 100 : 0;
-
-      const recentVolume = recentHistory.reduce((sum, h) => sum + h.volume, 0);
-      const oldVolume = oldHistory.reduce((sum, h) => sum + h.volume, 0);
-      const volumeChange24h = oldVolume > 0 ? ((recentVolume - oldVolume) / oldVolume) * 100 : 0;
-
-      const trendDirection = priceChange24h > 5 ? "up" : priceChange24h < -5 ? "down" : "stable";
+      const priceVolatility = calculateVolatility([]);
 
       const statistics: MarketStatistics = {
+        resourceType: assetType,
         assetType,
         timestamp: nowIso(),
-        avgPrice,
-        minPrice,
-        maxPrice,
-        medianPrice,
-        priceVolatility,
-        totalVolume,
-        totalOrders: allOrders.length,
-        avgOrderSize,
-        priceChange24h,
-        volumeChange24h,
-        trendDirection,
+        offerCount: offers.length,
+        priceStats: {
+          min,
+          max,
+          median,
+          p25,
+          p75,
+          avg,
+        },
+        volatility: priceVolatility,
       };
 
       respond(true, statistics);
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -307,19 +291,26 @@ export function createOrderBookEntryHandler(
       const input = (params ?? {}) as Record<string, unknown>;
       const actorId = requireActorId(opts, config, input);
       const offerId = requireString(input.offerId, "offerId");
-      const side = requireString(input.side, "side") as "buy" | "sell";
+      const side = requireString(input.side, "side");
+      if (side !== "buy" && side !== "sell") {
+        throw new Error("E_INVALID_ARGUMENT: side must be buy or sell");
+      }
       const price = requireNumber(input.price, "price");
       const quantity = requireNumber(input.quantity, "quantity");
       const expiresIn = input.expiresIn ? requireNumber(input.expiresIn, "expiresIn") : undefined;
 
+      const offer = store.getOffer(offerId);
+      if (!offer) {
+        throw new Error("E_NOT_FOUND: offer not found");
+      }
       const entry: OrderBookEntry = {
         entryId: randomUUID(),
         offerId,
+        resourceType: offer.assetType,
         side,
         price,
         quantity,
-        buyerId: side === "buy" ? actorId : undefined,
-        sellerId: side === "sell" ? actorId : undefined,
+        userId: actorId,
         status: "pending",
         createdAt: nowIso(),
         updatedAt: nowIso(),
@@ -337,7 +328,7 @@ export function createOrderBookEntryHandler(
         matches: matches.length,
       });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -356,7 +347,7 @@ export function getOrderBookHandler(
       const input = (params ?? {}) as Record<string, unknown>;
       const offerId = requireString(input.offerId, "offerId");
 
-      const entries = []; // store.getOrderBookEntries(offerId);
+      const entries: OrderBookEntry[] = []; // store.getOrderBookEntries(offerId);
       const bids = entries
         .filter((e) => e.side === "buy" && e.status === "pending")
         .sort((a, b) => b.price - a.price); // 买单降序
@@ -368,9 +359,12 @@ export function getOrderBookHandler(
       const midPrice = spread !== undefined ? (asks[0].price + bids[0].price) / 2 : undefined;
 
       const offer = store.getOffer(offerId);
+      if (!offer) {
+        throw new Error("E_NOT_FOUND: offer not found");
+      }
       const orderBook: OrderBook = {
         offerId,
-        assetType: offer?.assetType || "unknown",
+        resourceType: offer.assetType,
         timestamp: nowIso(),
         bids,
         asks,
@@ -380,7 +374,7 @@ export function getOrderBookHandler(
 
       respond(true, orderBook);
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -399,7 +393,7 @@ function matchOrderBookEntries(
   matchPrice: number;
   matchQuantity: number;
 }> {
-  const entries = []; // store.getOrderBookEntries(offerId);
+  const entries: OrderBookEntry[] = []; // store.getOrderBookEntries(offerId);
   const bids = entries
     .filter((e) => e.side === "buy" && e.status === "pending")
     .sort((a, b) => b.price - a.price);

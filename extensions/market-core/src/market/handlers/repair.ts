@@ -7,6 +7,7 @@ import { assertDeliveryTransition, assertLeaseTransition } from "../state-machin
 import { requireLimit, requireOptionalPositiveInt } from "../validators.js";
 import {
   assertAccess,
+  formatGatewayError,
   maxAttempts,
   nextAttemptAt,
   nowIso,
@@ -105,7 +106,7 @@ export function createMarketRepairRetryHandler(
       const pending = Math.max(0, candidates.length - processed);
       respond(true, { processed, succeeded, failed, pending });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -190,7 +191,7 @@ export function createMarketRevocationRetryHandler(
 
       respond(true, { processed, succeeded, failed, pending: pending.length });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }

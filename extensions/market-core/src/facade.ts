@@ -11,6 +11,7 @@
  * - Provide clear error codes and messages
  */
 
+import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "./config.js";
 import type { MarketStateStore } from "./state/store.js";
 
@@ -269,252 +270,138 @@ export function createMarketFacade(
   // Import handlers lazily to avoid circular dependencies
   const handlers = import("./market/handlers.js");
 
+  const invoke = async <T>(handler: GatewayRequestHandler, params: unknown): Promise<T> => {
+    return new Promise((resolve) => {
+      const respond: GatewayRequestHandlerOptions["respond"] = (ok, payload) => {
+        const record =
+          payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+        resolve({ success: ok, ...record } as T);
+      };
+
+      const opts: GatewayRequestHandlerOptions = {
+        req: {} as unknown as GatewayRequestHandlerOptions["req"],
+        params: (params ?? {}) as unknown as Record<string, unknown>,
+        client: null,
+        isWebchatConnect: () => false,
+        respond,
+        context: {} as unknown as GatewayRequestHandlerOptions["context"],
+      };
+
+      Promise.resolve(handler(opts)).catch((err: unknown) => {
+        respond(false, { error: String(err) });
+      });
+    });
+  };
+
   return {
     async publishResource(params) {
       const { createResourcePublishHandler } = await handlers;
-      const handler = createResourcePublishHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as PublishResourceResult);
-          },
-        });
-      });
+      return await invoke<PublishResourceResult>(
+        createResourcePublishHandler(store, config),
+        params,
+      );
     },
 
     async unpublishResource(params) {
       const { createResourceUnpublishHandler } = await handlers;
-      const handler = createResourceUnpublishHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as UnpublishResourceResult);
-          },
-        });
-      });
+      return await invoke<UnpublishResourceResult>(
+        createResourceUnpublishHandler(store, config),
+        params,
+      );
     },
 
     async getResource(params) {
       const { createResourceGetHandler } = await handlers;
-      const handler = createResourceGetHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as GetResourceResult);
-          },
-        });
-      });
+      return await invoke<GetResourceResult>(createResourceGetHandler(store, config), params);
     },
 
     async listResources(params) {
       const { createResourceListHandler } = await handlers;
-      const handler = createResourceListHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as ListResourcesResult);
-          },
-        });
-      });
+      return await invoke<ListResourcesResult>(createResourceListHandler(store, config), params);
     },
 
     async issueLease(params) {
       const { createLeaseIssueHandler } = await handlers;
-      const handler = createLeaseIssueHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as IssueLeaseResult);
-          },
-        });
-      });
+      return await invoke<IssueLeaseResult>(createLeaseIssueHandler(store, config), params);
     },
 
     async revokeLease(params) {
       const { createLeaseRevokeHandler } = await handlers;
-      const handler = createLeaseRevokeHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as RevokeLeaseResult);
-          },
-        });
-      });
+      return await invoke<RevokeLeaseResult>(createLeaseRevokeHandler(store, config), params);
     },
 
     async getLease(params) {
       const { createLeaseGetHandler } = await handlers;
-      const handler = createLeaseGetHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as GetLeaseResult);
-          },
-        });
-      });
+      return await invoke<GetLeaseResult>(createLeaseGetHandler(store, config), params);
     },
 
     async listLeases(params) {
       const { createLeaseListHandler } = await handlers;
-      const handler = createLeaseListHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as ListLeasesResult);
-          },
-        });
-      });
+      return await invoke<ListLeasesResult>(createLeaseListHandler(store, config), params);
     },
 
     async expireLeases(params) {
       const { createLeaseExpireSweepHandler } = await handlers;
-      const handler = createLeaseExpireSweepHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as ExpireLeasesResult);
-          },
-        });
-      });
+      return await invoke<ExpireLeasesResult>(createLeaseExpireSweepHandler(store, config), params);
     },
 
     async listLedger(params) {
       const { createLedgerListHandler } = await handlers;
-      const handler = createLedgerListHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as ListLedgerResult);
-          },
-        });
-      });
+      return await invoke<ListLedgerResult>(createLedgerListHandler(store, config), params);
     },
 
     async getLedgerSummary(params) {
       const { createLedgerSummaryHandler } = await handlers;
-      const handler = createLedgerSummaryHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as GetLedgerSummaryResult);
-          },
-        });
-      });
+      return await invoke<GetLedgerSummaryResult>(
+        createLedgerSummaryHandler(store, config),
+        params,
+      );
     },
 
     async openDispute(params) {
       const { createDisputeOpenHandler } = await handlers;
-      const handler = createDisputeOpenHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as OpenDisputeResult);
-          },
-        });
-      });
+      return await invoke<OpenDisputeResult>(createDisputeOpenHandler(store, config), params);
     },
 
     async submitEvidence(params) {
       const { createDisputeEvidenceHandler } = await handlers;
-      const handler = createDisputeEvidenceHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as SubmitEvidenceResult);
-          },
-        });
-      });
+      return await invoke<SubmitEvidenceResult>(
+        createDisputeEvidenceHandler(store, config),
+        params,
+      );
     },
 
     async resolveDispute(params) {
       const { createDisputeResolveHandler } = await handlers;
-      const handler = createDisputeResolveHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as ResolveDisputeResult);
-          },
-        });
-      });
+      return await invoke<ResolveDisputeResult>(createDisputeResolveHandler(store, config), params);
     },
 
     async rejectDispute(params) {
       const { createDisputeRejectHandler } = await handlers;
-      const handler = createDisputeRejectHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as RejectDisputeResult);
-          },
-        });
-      });
+      return await invoke<RejectDisputeResult>(createDisputeRejectHandler(store, config), params);
     },
 
     async getDispute(params) {
       const { createDisputeGetHandler } = await handlers;
-      const handler = createDisputeGetHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as GetDisputeResult);
-          },
-        });
-      });
+      return await invoke<GetDisputeResult>(createDisputeGetHandler(store, config), params);
     },
 
     async listDisputes(params) {
       const { createDisputeListHandler } = await handlers;
-      const handler = createDisputeListHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as ListDisputesResult);
-          },
-        });
-      });
+      return await invoke<ListDisputesResult>(createDisputeListHandler(store, config), params);
     },
 
     async getMetricsSnapshot(params) {
       const { createMarketMetricsSnapshotHandler } = await handlers;
-      const handler = createMarketMetricsSnapshotHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as GetMetricsResult);
-          },
-        });
-      });
+      return await invoke<GetMetricsResult>(
+        createMarketMetricsSnapshotHandler(store, config),
+        params,
+      );
     },
 
     async getStatusSummary(params) {
       const { createMarketStatusSummaryHandler } = await handlers;
-      const handler = createMarketStatusSummaryHandler(store, config);
-      return new Promise((resolve) => {
-        handler({
-          params: params as Record<string, unknown>,
-          respond: (success, data) => {
-            resolve({ success, ...(data || {}) } as GetStatusResult);
-          },
-        });
-      });
+      return await invoke<GetStatusResult>(createMarketStatusSummaryHandler(store, config), params);
     },
   };
 }

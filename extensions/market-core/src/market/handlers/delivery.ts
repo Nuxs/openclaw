@@ -11,6 +11,7 @@ import {
   assertAccess,
   assertActorMatch,
   createRevocationJob,
+  formatGatewayError,
   nowIso,
   randomUUID,
   recordAudit,
@@ -89,7 +90,7 @@ export function createDeliveryIssueHandler(
       });
       respond(true, { deliveryId, deliveryHash, status: delivery.status, payload });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -175,7 +176,7 @@ export function createDeliveryRevokeHandler(
       });
       respond(true, { deliveryId, revokedAt, revokeResult });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
@@ -219,7 +220,7 @@ export function createDeliveryCompleteHandler(
       );
       respond(true, { deliveryId, status: delivery.status });
     } catch (err) {
-      respond(false, { error: String(err) });
+      respond(false, { error: formatGatewayError(err) });
     }
   };
 }
