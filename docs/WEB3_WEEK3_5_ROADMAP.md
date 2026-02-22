@@ -76,6 +76,15 @@ interface MetricsSnapshot {
     indexSize: number;
     disputesSize: number;
   };
+
+  // SLO 阈值（参考，运营按实际调整）
+  slo: {
+    settlementPendingWarnMinutes: number; // 默认 30
+    settlementPendingCritMinutes: number; // 默认 120
+    errorRateCritThreshold: number; // 默认 0.05
+    disputeSpikeWarnPerHour: number; // 默认 10
+    archivePendingWarnCount: number; // 默认 50
+  };
 }
 
 export function collectMetrics(store: Web3StateStore): MetricsSnapshot {

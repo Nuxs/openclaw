@@ -1,10 +1,6 @@
 ---
-summary: "Web3 双栈支付与结算参考：TON/EVM 两端支付、统一订单口径、汇率与对账输出、链上最小披露与安全约束"
-read_when:
-  - You are designing TON + EVM dual-stack payments for Web3 Market
-  - You need a single reconciliation output format across chains
-  - You are aligning docs/UI around non-disclosure of endpoints/tokens
 title: "Web3 Dual-Stack Payments & Settlement (Reference)"
+description: "Web3 双栈支付与结算参考：TON/EVM 两端支付、统一订单口径、汇率与对账输出、链上最小披露与安全约束"
 ---
 
 ## 1. 目标
@@ -47,6 +43,9 @@ PaymentReceipt 是链上最小披露：
 
 - TON：`txHash`/`seqno`/`network`/`amount`/`confirmedAt`
 - EVM：`txHash`/`chainId`/`tokenAddress?`/`amount`/`block`
+- 通用：`mode`（`"live"` 或 `"simulated"`，区分真实回执与演示/测试回执）
+
+> **关系约束**：一笔 Order 对应一笔 PaymentReceipt（1:1）。部分支付/补差价场景暂不支持，后续如需 1:N 关系在此扩展。
 
 示例：
 
@@ -57,7 +56,8 @@ PaymentReceipt 是链上最小披露：
   "txHash": "0x...",
   "amount": "1000000",
   "tokenAddress": "0x...",
-  "confirmedAt": "2026-02-22T12:00:10.000Z"
+  "confirmedAt": "2026-02-22T12:00:10.000Z",
+  "mode": "live"
 }
 ```
 
@@ -77,8 +77,11 @@ FXQuote 的最小结构：
 - `base`: 计价资产（例如 USD）
 - `quote`: 支付资产（例如 TON / USDC / Jetton）
 - `rate`: base/quote
-- `source`: 报价来源标识（预留）
+- `source`: 报价来源标识（例如 `"binance-spot"` / `"pyth-oracle"` / `"manual"`）
 - `expiresAt`: 过期时间
+- `roundingRule`: 取整规则（例如 `"round-half-up"` / `"ceil"` / `"floor"`，默认 `"round-half-up"`）
+
+> 候选报价来源与选型 tradeoff 见 `docs/WEB3_DUAL_STACK_STRATEGY.md` §3.3。MVP 阶段建议 CEX API + 手动 fallback。
 
 ---
 

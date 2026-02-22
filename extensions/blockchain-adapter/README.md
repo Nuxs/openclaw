@@ -474,6 +474,7 @@ const solBalance = await solanaProvider.getBalance(solWallet.address);
 ### 在 `market-core` 中使用（示意）
 
 ```typescript
+// ⚠️ 以下为规划接入示意，尚未集成到主线关键路径
 // extensions/market-core/src/settlement/lock.ts
 
 import { BlockchainFactory } from "@openclaw/blockchain-adapter";
@@ -501,6 +502,7 @@ export async function lockSettlement(order: TaskOrder) {
 ### 在web3-core中使用
 
 ```typescript
+// ⚠️ 以下为规划接入示意，尚未集成到主线关键路径
 // extensions/web3-core/src/billing/guard.ts
 
 import { BlockchainFactory } from "@openclaw/blockchain-adapter";
