@@ -153,7 +153,7 @@ describe("market-core handlers", () => {
     } as any);
 
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("client missing");
+    expect(result()?.payload.error).toBe("E_FORBIDDEN");
   });
 
   it("enforces actor match on offer publish", async () => {
@@ -191,11 +191,14 @@ describe("market-core handlers", () => {
     } as any);
 
     expect(publish.result()?.ok).toBe(false);
-    expect(publish.result()?.payload.error).toContain("actorId does not match offer.sellerId");
+    expect(publish.result()?.payload.error).toBe("E_FORBIDDEN");
   });
 
   it("validates consent signature hex format", async () => {
-    const config = resolveConfig({ store: { mode: "file" } });
+    const config = resolveConfig({
+      store: { mode: "file" },
+      access: { mode: "open" },
+    });
     const store = new MarketStateStore(tempDir, config);
 
     const offer = createOffer({ status: "offer_published" });
@@ -216,11 +219,14 @@ describe("market-core handlers", () => {
     } as any);
 
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("consent signature must be hex");
+    expect(result()?.payload.error).toBe("E_INVALID_ARGUMENT");
   });
 
   it("grants consent with valid signature and matching scope", async () => {
-    const config = resolveConfig({ store: { mode: "file" } });
+    const config = resolveConfig({
+      store: { mode: "file" },
+      access: { mode: "open" },
+    });
     const store = new MarketStateStore(tempDir, config);
 
     const offer = createOffer({ status: "offer_published" });
@@ -248,6 +254,7 @@ describe("market-core handlers", () => {
     const credentialsPath = path.join(tempDir, "credentials");
     const config = resolveConfig({
       store: { mode: "file" },
+      access: { mode: "open" },
       credentials: {
         mode: "external",
         storePath: credentialsPath,
@@ -288,6 +295,7 @@ describe("market-core handlers", () => {
       store: { mode: "file" },
       access: {
         mode: "scoped",
+        allowClientIds: ["test-client"],
         readScopes: ["operator.read"],
         writeScopes: ["operator.write"],
       },

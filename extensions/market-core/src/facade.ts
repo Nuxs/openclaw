@@ -13,6 +13,7 @@
 
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "./config.js";
+import { formatGatewayErrorResponse } from "./market/handlers/_shared.js";
 import type { MarketStateStore } from "./state/store.js";
 
 /**
@@ -288,7 +289,7 @@ export function createMarketFacade(
       };
 
       Promise.resolve(handler(opts)).catch((err: unknown) => {
-        respond(false, { error: String(err) });
+        respond(false, formatGatewayErrorResponse(err));
       });
     });
   };
