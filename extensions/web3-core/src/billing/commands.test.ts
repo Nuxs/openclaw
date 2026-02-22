@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveConfig } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
@@ -66,6 +67,54 @@ describe("/pay_status command", () => {
     } as any);
 
     expect(result.text).toContain("settlement_locked");
+    expect(result.text).toContain("order-1");
+    expect(result.text).toContain("Brain source:");
+    expect(result.text).toContain("Pending settlements:");
+  });
+
+  it("returns settlement status from sqlite store using settlement prefix", async () => {
+    const marketDir = path.join(tempDir, "market");
+    await fs.mkdir(marketDir, { recursive: true });
+    const dbPath = path.join(marketDir, "market.db");
+    const db = new DatabaseSync(dbPath);
+    db.exec("CREATE TABLE IF NOT EXISTS settlements (id TEXT PRIMARY KEY, data TEXT NOT NULL);");
+    db.exec("CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, data TEXT NOT NULL);");
+    db.prepare("INSERT INTO settlements (id, data) VALUES (?, ?)").run(
+      "settlement-1",
+      JSON.stringify({
+        settlementId: "settlement-1",
+        orderId: "order-1",
+        status: "settlement_locked",
+        lockTxHash: "0xlock",
+      }),
+    );
+    db.prepare("INSERT INTO orders (id, data) VALUES (?, ?)").run(
+      "order-1",
+      JSON.stringify({
+        orderId: "order-1",
+        status: "payment_locked",
+      }),
+    );
+    db.close();
+
+    const handler = createPayStatusCommand(new Web3StateStore(tempDir), {
+      stateDir: tempDir,
+      config: resolveConfig({}),
+      marketConfig: { store: { mode: "sqlite", dbPath } },
+    });
+
+    const result = await handler({
+      channel: "test",
+      isAuthorizedSender: true,
+      commandBody: "/pay_status settlement:settlement-1",
+      args: "settlement:settlement-1",
+      config: {
+        plugins: { entries: { "market-core": { config: { store: { mode: "sqlite", dbPath } } } } },
+      },
+    } as any);
+
+    expect(result.text).toContain("settlement_locked");
+    expect(result.text).toContain("settlement-1");
     expect(result.text).toContain("order-1");
     expect(result.text).toContain("Brain source:");
     expect(result.text).toContain("Pending settlements:");

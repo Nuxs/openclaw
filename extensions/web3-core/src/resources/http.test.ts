@@ -32,6 +32,10 @@ describe("web3 resource storage handlers", () => {
     callGatewayMock.mockReset().mockResolvedValue({ ok: true, result: {} });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("rejects storage put with path traversal", async () => {
     const tempDir = "/tmp/openclaw-web3-storage";
     const config = resolveConfig({
@@ -354,6 +358,375 @@ describe("web3 resource storage handlers", () => {
     expect(res.body).toContain("authorization");
   });
 
+  it("returns safe error when model backend fails", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        advertiseToMarket: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: {
+            models: [
+              {
+                id: "res_model_fail",
+                label: "Model",
+                backend: "openai-compat",
+                backendConfig: { baseUrl: "https://api.example.com/v1" },
+                price: { unit: "token", amount: 1, currency: "USDC" },
+              },
+            ],
+            search: [],
+            storage: [],
+          },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    validateLeaseAccessMock.mockResolvedValue({
+      ok: true,
+      lease: {
+        leaseId: "lease-model-1",
+        resourceId: "res_model_fail",
+        providerActorId: "0xprovider",
+        consumerActorId: "0xconsumer",
+        status: "lease_active",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const mockFetchResponse = new Response(JSON.stringify({ error: "boom" }), {
+      status: 502,
+      headers: { "content-type": "application/json" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-model-1",
+        "content-type": "application/json",
+      },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ messages: [{ role: "user", content: "hi" }] }));
+    await promise;
+
+    expect(res.statusCode).toBe(502);
+    expect(res.body).toContain("model backend error");
+  });
+
+  it("echoes request id header on model chat responses", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        advertiseToMarket: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: {
+            models: [
+              {
+                id: "res_model_echo",
+                label: "Model",
+                backend: "openai-compat",
+                backendConfig: { baseUrl: "https://api.example.com/v1" },
+                price: { unit: "token", amount: 1, currency: "USDC" },
+              },
+            ],
+            search: [],
+            storage: [],
+          },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    validateLeaseAccessMock.mockResolvedValue({
+      ok: true,
+      lease: {
+        leaseId: "lease-echo",
+        resourceId: "res_model_echo",
+        providerActorId: "0xprovider",
+        consumerActorId: "0xconsumer",
+        status: "lease_active",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("{}"));
+        controller.close();
+      },
+    });
+    const mockFetchResponse = new Response(stream, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-echo",
+        "x-openclaw-request-id": "req-123",
+        "content-type": "application/json",
+      },
+    });
+    const res = new PassThrough() as any;
+    res.statusCode = 200;
+    res.headers = new Map();
+    res.setHeader = (key: string, value: string) => res.headers.set(key, value);
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ messages: [] }));
+    await promise;
+
+    expect(res.headers.get("X-OpenClaw-Request-Id")).toBe("req-123");
+  });
+
+  it("rejects model chat when max_tokens exceeds policy", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        advertiseToMarket: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: {
+            models: [
+              {
+                id: "res_model_limit",
+                label: "Model",
+                backend: "openai-compat",
+                backendConfig: { baseUrl: "https://api.example.com/v1" },
+                price: { unit: "token", amount: 1, currency: "USDC" },
+                policy: { maxConcurrent: 2, maxTokens: 5, allowTools: true },
+              },
+            ],
+            search: [],
+            storage: [],
+          },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    validateLeaseAccessMock.mockResolvedValue({
+      ok: true,
+      lease: {
+        leaseId: "lease-limit",
+        resourceId: "res_model_limit",
+        providerActorId: "0xprovider",
+        consumerActorId: "0xconsumer",
+        status: "lease_active",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-limit",
+        "content-type": "application/json",
+      },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ max_tokens: 10, messages: [] }));
+    await promise;
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("max_tokens");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects model chat when tools are not allowed", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        advertiseToMarket: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: {
+            models: [
+              {
+                id: "res_model_no_tools",
+                label: "Model",
+                backend: "openai-compat",
+                backendConfig: { baseUrl: "https://api.example.com/v1" },
+                price: { unit: "token", amount: 1, currency: "USDC" },
+                policy: { maxConcurrent: 1, maxTokens: 100, allowTools: false },
+              },
+            ],
+            search: [],
+            storage: [],
+          },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    validateLeaseAccessMock.mockResolvedValue({
+      ok: true,
+      lease: {
+        leaseId: "lease-no-tools",
+        resourceId: "res_model_no_tools",
+        providerActorId: "0xprovider",
+        consumerActorId: "0xconsumer",
+        status: "lease_active",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-no-tools",
+        "content-type": "application/json",
+      },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(
+      JSON.stringify({
+        messages: [],
+        tools: [
+          {
+            type: "function",
+            function: { name: "noop", description: "noop", parameters: {} },
+          },
+        ],
+      }),
+    );
+    await promise;
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("tools not allowed");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects model chat when maxConcurrent exceeded", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        advertiseToMarket: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: {
+            models: [
+              {
+                id: "res_model_concurrent",
+                label: "Model",
+                backend: "openai-compat",
+                backendConfig: { baseUrl: "https://api.example.com/v1" },
+                price: { unit: "token", amount: 1, currency: "USDC" },
+                policy: { maxConcurrent: 1, maxTokens: 100, allowTools: true },
+              },
+            ],
+            search: [],
+            storage: [],
+          },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    validateLeaseAccessMock.mockResolvedValue({
+      ok: true,
+      lease: {
+        leaseId: "lease-concurrent",
+        resourceId: "res_model_concurrent",
+        providerActorId: "0xprovider",
+        consumerActorId: "0xconsumer",
+        status: "lease_active",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    let resolveFirst: (response: Response) => void;
+    const firstFetch = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    let notifyFetch: () => void = () => undefined;
+    const fetchCalled = new Promise<void>((resolve) => {
+      notifyFetch = resolve;
+    });
+    const fetchMock = vi.fn().mockImplementationOnce(() => {
+      notifyFetch();
+      return firstFetch;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const handler = createResourceModelChatHandler(config);
+    const req1 = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-concurrent",
+        "content-type": "application/json",
+      },
+    });
+    const res1 = new PassThrough() as any;
+    res1.statusCode = 200;
+    res1.headers = new Map();
+    res1.setHeader = (key: string, value: string) => res1.headers.set(key, value);
+
+    const req2 = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-concurrent",
+        "content-type": "application/json",
+      },
+    });
+    const res2 = createResponse();
+
+    const promise1 = handler(req1, res1);
+    req1.end(JSON.stringify({ messages: [] }));
+    await fetchCalled;
+
+    const promise2 = handler(req2, res2);
+    req2.end(JSON.stringify({ messages: [] }));
+    await promise2;
+
+    expect(res2.statusCode).toBe(429);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("{}"));
+        controller.close();
+      },
+    });
+    resolveFirst!(
+      new Response(stream, { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    await promise1;
+  });
+
   it("rejects search query with missing lease header", async () => {
     const config = resolveConfig({
       resources: {
@@ -379,6 +752,65 @@ describe("web3 resource storage handlers", () => {
     await promise;
 
     expect(res.statusCode).toBe(401);
+  });
+
+  it("rejects search query when query too long", async () => {
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: {
+          listen: { enabled: true, bind: "loopback", port: 0 },
+          auth: { mode: "token", tokenTtlMs: 600_000, allowedConsumers: [] },
+          offers: {
+            models: [],
+            search: [
+              {
+                id: "res_search_1",
+                label: "Search",
+                backend: "custom",
+                backendConfig: { baseUrl: "https://search.example.com" },
+                price: { unit: "query", amount: 1, currency: "USDC" },
+                policy: { maxQueryChars: 1000 },
+              },
+            ],
+            storage: [],
+          },
+        },
+        consumer: { enabled: false },
+      },
+    });
+
+    validateLeaseAccessMock.mockResolvedValue({
+      ok: true,
+      lease: {
+        leaseId: "lease-search",
+        resourceId: "res_search_1",
+        providerActorId: "0xprovider",
+        consumerActorId: "0xconsumer",
+        status: "lease_active",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const handler = createResourceSearchQueryHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-search",
+      },
+    });
+    const res = createResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ q: "x".repeat(2000) }));
+    await promise;
+
+    expect(res.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -476,7 +908,7 @@ describe("model chat ledger (appendModelLedger)", () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("calls market.ledger.append with usage tokens from response header", async () => {
@@ -545,6 +977,7 @@ describe("model chat ledger (appendModelLedger)", () => {
 
     // Return response with no x-usage-tokens and null body → hits early return path
     const mockFetchResponse = {
+      ok: true,
       status: 200,
       body: null,
       headers: new Headers({ "content-type": "application/json" }),
@@ -588,6 +1021,7 @@ describe("model chat ledger (appendModelLedger)", () => {
     callGatewayMock.mockRejectedValue(new Error("ledger unavailable"));
 
     const mockFetchResponse = {
+      ok: true,
       status: 200,
       body: null,
       headers: new Headers({ "content-type": "application/json" }),
