@@ -255,7 +255,7 @@ describe("E2E: Complete Market Flow with Dispute", () => {
 
     const response2 = responder2.getRawResponse();
     expect(response2.success).toBe(false);
-    expect((response2.data as any).error.code).toBe("E_CONFLICT");
+    expect((response2.data as any).error).toBe("E_CONFLICT");
   });
 
   it("Dispute evidence: enforce quota limits", async () => {
@@ -304,7 +304,7 @@ describe("E2E: Complete Market Flow with Dispute", () => {
 
     const extraResponse = extraResponder.getRawResponse();
     expect(extraResponse.success).toBe(false);
-    expect((extraResponse.data as any).error.code).toBe("E_QUOTA_EXCEEDED");
+    expect((extraResponse.data as any).error).toBe("E_QUOTA_EXCEEDED");
   });
 
   it("Dispute list: filter by status and orderId", async () => {
@@ -316,7 +316,7 @@ describe("E2E: Complete Market Flow with Dispute", () => {
       resourceId: "res1",
       consumerId: `0x${randomBytes(20).toString("hex")}`,
       providerId: `0x${randomBytes(20).toString("hex")}`,
-      reason: "Dispute 1",
+      reason: "Dispute 1 reason",
     };
 
     const dispute2Params = {
@@ -324,7 +324,7 @@ describe("E2E: Complete Market Flow with Dispute", () => {
       resourceId: "res2",
       consumerId: `0x${randomBytes(20).toString("hex")}`,
       providerId: `0x${randomBytes(20).toString("hex")}`,
-      reason: "Dispute 2",
+      reason: "Dispute 2 reason",
     };
 
     // Open dispute 1
@@ -344,7 +344,7 @@ describe("E2E: Complete Market Flow with Dispute", () => {
       params: {
         disputeId: disputeId1,
         ruling: "provider_wins",
-        reason: "Test",
+        reason: "Resolution reason",
         resolvedBy: "system",
       },
       respond: resolveResponder.respond,

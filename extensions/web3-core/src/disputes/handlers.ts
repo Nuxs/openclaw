@@ -6,7 +6,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
-import { formatWeb3GatewayError } from "../errors.js";
+import { formatWeb3GatewayError, formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode } from "../errors/codes.js";
 import type { Web3StateStore } from "../state/store.js";
 import {
@@ -116,7 +116,7 @@ export function createDisputeOpenHandler(
         expiresAt: dispute.expiresAt,
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -157,7 +157,7 @@ export function createDisputeSubmitEvidenceHandler(
         });
       }
 
-      if (dispute.status !== "open") {
+      if (dispute.status !== "open" && dispute.status !== "evidence_submitted") {
         return respond(false, {
           error: formatWeb3GatewayError(ErrorCode.E_INVALID_ARGUMENT),
           message: `Cannot submit evidence for dispute with status: ${dispute.status}`,
@@ -219,7 +219,7 @@ export function createDisputeSubmitEvidenceHandler(
         submittedAt: evidence.submittedAt,
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -297,7 +297,7 @@ export function createDisputeResolveHandler(
         resolution: updatedDispute.resolution,
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -354,7 +354,7 @@ export function createDisputeRejectHandler(
         reason,
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -391,7 +391,7 @@ export function createDisputeGetHandler(
 
       respond(true, { dispute });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -437,7 +437,7 @@ export function createDisputeListHandler(
         returned: disputes.length,
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
