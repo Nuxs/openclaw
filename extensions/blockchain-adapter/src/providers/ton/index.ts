@@ -31,7 +31,7 @@ import type {
   Unsubscribe,
   SettlementInfo,
   ProviderConfig,
-} from "../types/provider";
+} from "../../types/provider.js";
 
 // ============================================================================
 // TON Provider Configuration
@@ -41,6 +41,7 @@ interface TONProviderOptions {
   testnet?: boolean;
   rpcUrl?: string;
   apiKey?: string;
+  config?: ProviderConfig;
 }
 
 export class TONProvider implements IBlockchainProvider {
@@ -66,9 +67,15 @@ export class TONProvider implements IBlockchainProvider {
   constructor(options: TONProviderOptions = {}) {
     this.chainId = options.testnet ? "ton-testnet" : "ton-mainnet";
 
-    // 初始化TON Client
+    if (options.config && options.config.chainId !== this.chainId) {
+      throw new Error(
+        `TONProvider config chainId mismatch: expected ${this.chainId}, got ${options.config.chainId}`,
+      );
+    }
+
     const rpcUrl =
       options.rpcUrl ||
+      options.config?.rpcUrl ||
       (options.testnet
         ? "https://testnet.toncenter.com/api/v2/jsonRPC"
         : "https://toncenter.com/api/v2/jsonRPC");
@@ -78,8 +85,14 @@ export class TONProvider implements IBlockchainProvider {
       apiKey: options.apiKey,
     });
 
-    // 加载配置
-    this.config = this.loadConfig();
+    // 加载配置：优先使用外部注入 (factory/config file/env)
+    this.config = options.config
+      ? {
+          ...options.config,
+          chainId: this.chainId,
+          rpcUrl,
+        }
+      : this.loadConfig();
   }
 
   private loadConfig(): ProviderConfig {
@@ -128,6 +141,12 @@ export class TONProvider implements IBlockchainProvider {
   }
 
   async disconnect(): Promise<void> {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = undefined;
+    }
+    this.eventListeners.clear();
+
     if (this.tonConnect) {
       await this.tonConnect.disconnect();
       this.tonConnect = undefined;
@@ -224,8 +243,6 @@ export class TONProvider implements IBlockchainProvider {
     if (!this.tonConnect) {
       throw new Error("Wallet not connected");
     }
-
-    const toAddress = TonAddress.parse(to);
 
     if (!tokenAddress) {
       // 转账TON
@@ -480,6 +497,11 @@ export class TONProvider implements IBlockchainProvider {
       this.eventListeners.get(key)?.delete(callback);
       if (this.eventListeners.get(key)?.size === 0) {
         this.eventListeners.delete(key);
+      }
+
+      if (this.eventListeners.size === 0 && this.pollingInterval) {
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = undefined;
       }
     };
   }
