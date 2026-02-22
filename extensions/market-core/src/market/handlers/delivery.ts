@@ -53,6 +53,9 @@ export function createDeliveryIssueHandler(
       });
 
       const credentialsStore = createDeliveryCredentialsStore(config.credentials);
+      if (payload?.type === "api" && !credentialsStore) {
+        throw new Error("E_INVALID_ARGUMENT: credentials store required for api delivery");
+      }
       const payloadRef =
         credentialsStore && payload
           ? await credentialsStore.putDeliveryPayload(deliveryId, payload)
@@ -70,10 +73,19 @@ export function createDeliveryIssueHandler(
         payloadRef,
       };
 
-      store.saveDelivery(delivery);
-      order.status = "delivery_ready";
-      order.updatedAt = issuedAt;
-      store.saveOrder(order);
+      try {
+        await store.runInTransaction(() => {
+          store.saveDelivery(delivery);
+          order.status = "delivery_ready";
+          order.updatedAt = issuedAt;
+          store.saveOrder(order);
+        });
+      } catch (err) {
+        if (payloadRef && credentialsStore) {
+          await credentialsStore.removeDeliveryPayload(payloadRef);
+        }
+        throw err;
+      }
 
       await recordAuditWithAnchor({
         store,
@@ -88,7 +100,7 @@ export function createDeliveryIssueHandler(
           payloadRef: payloadRef?.ref,
         },
       });
-      respond(true, { deliveryId, deliveryHash, status: delivery.status, payload });
+      respond(true, { deliveryId, deliveryHash, status: delivery.status });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }
@@ -126,7 +138,6 @@ export function createDeliveryRevokeHandler(
         reason: revokeReason,
       });
       delivery.revokeHash = revokeHash;
-      store.saveDelivery(delivery);
 
       const order = store.getOrder(delivery.orderId);
       const offer = order ? store.getOffer(order.offerId) : undefined;
@@ -141,22 +152,26 @@ export function createDeliveryRevokeHandler(
         reason: revokeReason,
       });
 
-      if (!revokeResult.ok) {
-        const job = createRevocationJob({
-          config,
-          delivery,
-          order: order ?? undefined,
-          offer,
-          reason: revokeReason,
-          error: revokeResult.error,
-        });
-        store.saveRevocation(job);
-        recordAudit(store, "revocation_retry", job.jobId, job.payloadHash, undefined, {
-          deliveryId: delivery.deliveryId,
-          attempts: job.attempts,
-          nextAttemptAt: job.nextAttemptAt,
-        });
-      }
+      // Wrap saveDelivery + saveRevocation in a transaction for atomicity
+      await store.runInTransaction(() => {
+        store.saveDelivery(delivery);
+        if (!revokeResult.ok) {
+          const job = createRevocationJob({
+            config,
+            delivery,
+            order: order ?? undefined,
+            offer,
+            reason: revokeReason,
+            error: revokeResult.error,
+          });
+          store.saveRevocation(job);
+          recordAudit(store, "revocation_retry", job.jobId, job.payloadHash, undefined, {
+            deliveryId: delivery.deliveryId,
+            attempts: job.attempts,
+            nextAttemptAt: job.nextAttemptAt,
+          });
+        }
+      });
 
       await recordAuditWithAnchor({
         store,
@@ -185,7 +200,7 @@ export function createDeliveryCompleteHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
 ): GatewayRequestHandler {
-  return (opts: GatewayRequestHandlerOptions) => {
+  return async (opts: GatewayRequestHandlerOptions) => {
     const { params, respond } = opts;
     try {
       assertAccess(opts, config, "write");
@@ -197,19 +212,23 @@ export function createDeliveryCompleteHandler(
       assertDeliveryTransition(delivery.status, "delivery_completed");
 
       delivery.status = "delivery_completed";
-      store.saveDelivery(delivery);
 
       const order = store.getOrder(delivery.orderId);
       const offer = order ? store.getOffer(order.offerId) : undefined;
       if (offer && actorId) {
         assertActorMatch(config, actorId, offer.sellerId, "offer.sellerId");
       }
-      if (order) {
-        assertOrderTransition(order.status, "delivery_completed");
-        order.status = "delivery_completed";
-        order.updatedAt = nowIso();
-        store.saveOrder(order);
-      }
+
+      // Wrap saveDelivery + saveOrder in a transaction for atomicity
+      await store.runInTransaction(() => {
+        store.saveDelivery(delivery);
+        if (order) {
+          assertOrderTransition(order.status, "delivery_completed");
+          order.status = "delivery_completed";
+          order.updatedAt = nowIso();
+          store.saveOrder(order);
+        }
+      });
 
       recordAudit(
         store,

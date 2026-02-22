@@ -176,12 +176,19 @@ export function createLeaseIssueHandler(
       };
 
       // Atomic: order + consent + delivery + lease must persist together
-      await store.runInTransaction(() => {
-        store.saveOrder(order);
-        store.saveConsent(consent);
-        store.saveDelivery(delivery);
-        store.saveLease(lease);
-      });
+      try {
+        await store.runInTransaction(() => {
+          store.saveOrder(order);
+          store.saveConsent(consent);
+          store.saveDelivery(delivery);
+          store.saveLease(lease);
+        });
+      } catch (err) {
+        if (payloadRef && credentialsStore) {
+          await credentialsStore.removeDeliveryPayload(payloadRef);
+        }
+        throw err;
+      }
 
       await recordAuditWithAnchor({
         store,

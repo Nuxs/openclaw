@@ -1,6 +1,11 @@
 /**
  * Dispute resolution handlers.
  * Core logic for opening, submitting evidence, and resolving disputes.
+ *
+ * NOTE: Dispute status naming convention
+ * web3-core uses unprefixed statuses: "open", "evidence_submitted", "resolved", "rejected", "expired"
+ * market-core uses prefixed statuses: "dispute_opened", "dispute_evidence_submitted", "dispute_resolved", "dispute_rejected"
+ * This is by design — the two domains maintain independent state models.
  */
 
 import { createHash, randomBytes } from "node:crypto";

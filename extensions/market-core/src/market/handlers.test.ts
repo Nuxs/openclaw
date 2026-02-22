@@ -17,6 +17,7 @@ import {
   createLeaseRevokeHandler,
   createOfferCreateHandler,
   createOfferPublishHandler,
+  createMarketStatusSummaryHandler,
   createResourceListHandler,
   createResourcePublishHandler,
   createResourceUnpublishHandler,
@@ -883,6 +884,139 @@ describe("market-core handlers", () => {
       } as any);
       expect(listModel.result()?.ok).toBe(true);
       expect((listModel.result()?.payload.resources as unknown[]).length).toBe(1);
+    });
+  });
+
+  it("summarizes market status with ops counters for file/sqlite", async () => {
+    await withStoreModes(tempDir, async ({ store, config }) => {
+      const handler = createMarketStatusSummaryHandler(store, config);
+      const now = new Date().toISOString();
+      const past = new Date(Date.now() - 60_000).toISOString();
+      const future = new Date(Date.now() + 60_000).toISOString();
+
+      const offer = createOffer({ offerId: "offer-status", status: "offer_published" });
+      const order = createOrder({
+        orderId: "order-status",
+        offerId: offer.offerId,
+        status: "delivery_ready",
+      });
+      store.saveOffer(offer);
+      store.saveOrder(order);
+
+      store.saveResource({
+        resourceId: "resource-status",
+        kind: "model",
+        status: "resource_published",
+        providerActorId: offer.sellerId,
+        offerId: offer.offerId,
+        offerHash: offer.offerHash,
+        label: "Status Resource",
+        price: { unit: "token", amount: "10", currency: "USD" },
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveDelivery({
+        deliveryId: "delivery-status",
+        orderId: order.orderId,
+        deliveryType: "api",
+        status: "delivery_ready",
+        deliveryHash: "delivery-hash",
+        issuedAt: now,
+      });
+
+      store.saveSettlement({
+        settlementId: "settlement-status",
+        orderId: order.orderId,
+        status: "settlement_locked",
+        amount: "10",
+      });
+
+      store.saveLease({
+        leaseId: "lease-expired",
+        resourceId: "resource-status",
+        kind: "model",
+        providerActorId: offer.sellerId,
+        consumerActorId: "consumer-1",
+        orderId: order.orderId,
+        status: "lease_active",
+        issuedAt: now,
+        expiresAt: past,
+      });
+      store.saveLease({
+        leaseId: "lease-orphan",
+        resourceId: "resource-status",
+        kind: "model",
+        providerActorId: offer.sellerId,
+        consumerActorId: "consumer-2",
+        orderId: "missing-order",
+        status: "lease_active",
+        issuedAt: now,
+        expiresAt: future,
+      });
+
+      store.saveDispute({
+        disputeId: "dispute-open",
+        orderId: order.orderId,
+        initiatorActorId: "buyer-1",
+        respondentActorId: offer.sellerId,
+        arbitratorType: "platform",
+        reason: "dispute",
+        status: "dispute_opened",
+        evidence: [],
+        disputeHash: "hash-open",
+        openedAt: now,
+        updatedAt: now,
+      });
+      store.saveDispute({
+        disputeId: "dispute-resolved",
+        orderId: order.orderId,
+        initiatorActorId: "buyer-1",
+        respondentActorId: offer.sellerId,
+        arbitratorType: "platform",
+        reason: "resolved",
+        status: "dispute_resolved",
+        resolution: "refund",
+        evidence: [],
+        disputeHash: "hash-resolved",
+        openedAt: now,
+        resolvedAt: now,
+        updatedAt: now,
+      });
+
+      store.saveRevocation({
+        jobId: "revocation-1",
+        deliveryId: "delivery-status",
+        payloadHash: "payload-hash",
+        attempts: 0,
+        status: "pending",
+        nextAttemptAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.appendAuditEvent({
+        id: "audit-1",
+        kind: "delivery_revoked",
+        refId: "delivery-status",
+        timestamp: now,
+        details: { anchorError: "anchor failed" },
+      });
+
+      const { respond, result } = createResponder();
+      await handler({ params: {}, respond } as any);
+
+      expect(result()?.ok).toBe(true);
+      const payload = result()?.payload as Record<string, any>;
+      expect(payload.leases.total).toBe(2);
+      expect(payload.repair.candidates).toBe(2);
+      expect(payload.repair.expiredActive).toBe(1);
+      expect(payload.repair.orphaned).toBe(1);
+      expect(payload.disputes.open).toBe(1);
+      expect(payload.disputes.resolved).toBe(1);
+      expect(payload.revocations.pending).toBe(1);
+      expect(payload.audit.anchorPending).toBe(1);
     });
   });
 });

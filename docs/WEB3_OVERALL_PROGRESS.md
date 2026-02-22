@@ -106,6 +106,21 @@
 
 ---
 
+## ✅ Week 3 整改补充（运维/可观测性）
+
+### 完成内容
+
+- **状态汇总补齐**：补充 `web3.status.summary` 与 `web3.market.status.summary` 的队列/告警/争议/租约/修复候选统计
+- **后台任务可观测**：对外输出 pending/failed 队列与修复候选数，便于运维验收
+- **监控快照增强**：`metrics.snapshot` 覆盖争议统计，统一监控视图
+
+### 验收与测试
+
+- **新增覆盖**：`web3.status.summary` 的队列/争议/告警统计
+- **双模式验证**：`web3.market.status.summary` 在 file/sqlite 模式下统一输出
+
+---
+
 ## 📈 整体成果统计
 
 ### 代码交付

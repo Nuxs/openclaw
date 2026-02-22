@@ -573,10 +573,35 @@ export type Web3StatusSummary = {
   auditLastAt: string | null;
   archiveProvider: string | null;
   archiveLastCid: string | null;
+  archivePending: number;
   anchorNetwork: string | null;
   anchorLastTx: string | null;
   pendingAnchors: number;
   anchoringEnabled: boolean;
+  resources?: {
+    providers: number;
+    total: number;
+    byKind: Record<string, number>;
+  };
+  disputes?: {
+    total: number;
+    byStatus: Record<string, number>;
+    open: number;
+    investigating: number;
+    resolved: number;
+    rejected: number;
+    expired: number;
+  };
+  alerts?: {
+    total: number;
+    active: number;
+    byLevel: Record<string, number>;
+  };
+  queues?: {
+    anchors: { pending: number; failed: number };
+    archives: { pending: number; failed: number };
+    settlements: { pending: number; failed: number };
+  };
   brain?: {
     source: "web3/decentralized" | "centralized" | null;
     provider: string | null;
@@ -643,6 +668,15 @@ export type Web3MetricsSnapshot = {
   settlement: { pending: number };
   billing: { enabled: boolean; usageRecords: number; creditsUsed: number };
   resources: { providers: number; total: number; byKind: Record<string, number> };
+  disputes: {
+    total: number;
+    byStatus: Record<string, number>;
+    open: number;
+    investigating: number;
+    resolved: number;
+    rejected: number;
+    expired: number;
+  };
   alerts: Web3Alert[];
 };
 
@@ -657,6 +691,34 @@ export type MarketStatusSummary = {
   orders: Record<string, number>;
   deliveries: Record<string, number>;
   settlements: Record<string, number>;
+  leases: {
+    total: number;
+    byStatus: Record<string, number>;
+    active: number;
+    expired: number;
+    revoked: number;
+  };
+  disputes: {
+    total: number;
+    byStatus: Record<string, number>;
+    open: number;
+    resolved: number;
+    rejected: number;
+  };
+  revocations: {
+    total: number;
+    pending: number;
+    failed: number;
+  };
+  audit: {
+    events: number;
+    anchorPending: number;
+  };
+  repair: {
+    candidates: number;
+    expiredActive: number;
+    orphaned: number;
+  };
   totals: {
     offers: number;
     orders: number;

@@ -1,5 +1,7 @@
 import { ErrorCode, ERROR_CODE_DESCRIPTIONS, type ErrorResponse } from "./errors/codes.js";
 
+const VALID_ERROR_CODES: ReadonlySet<string> = new Set(Object.values(ErrorCode));
+
 /**
  * Redact sensitive information from error messages to prevent information leakage.
  * Removes: file paths, URLs with tokens/endpoints, environment variables
@@ -7,8 +9,8 @@ import { ErrorCode, ERROR_CODE_DESCRIPTIONS, type ErrorResponse } from "./errors
 function redactSensitiveInfo(message: string): string {
   let redacted = message;
 
-  // Redact absolute file paths (Unix and Windows)
-  redacted = redacted.replace(/\/[a-zA-Z0-9_\-./]+/g, "[PATH]");
+  // Redact absolute file paths with at least two segments (Unix and Windows)
+  redacted = redacted.replace(/\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.\-/]+/g, "[PATH]");
   redacted = redacted.replace(/[A-Z]:\\[a-zA-Z0-9_\-.\\]+/g, "[PATH]");
 
   // Redact URLs with potential sensitive data
@@ -23,6 +25,10 @@ function redactSensitiveInfo(message: string): string {
   // Redact JWT-like tokens
   redacted = redacted.replace(/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, "[TOKEN]");
 
+  // Redact bearer tokens and access tokens (requires tok_ prefix with underscore)
+  redacted = redacted.replace(/\bBearer\s+[^\s]+/gi, "Bearer [REDACTED]");
+  redacted = redacted.replace(/\btok_[\w-]+\b/gi, "tok_***");
+
   return redacted;
 }
 
@@ -34,8 +40,11 @@ export function formatWeb3GatewayError(err: unknown, fallback = ErrorCode.E_INTE
   const redactedMessage = redactSensitiveInfo(safeMessage);
 
   if (redactedMessage.startsWith("E_")) {
-    // Return as ErrorCode if it's already a valid error code
-    return redactedMessage as ErrorCode;
+    // Extract the error code token and validate against known ErrorCode values
+    const match = redactedMessage.match(/^(E_[A-Z_]+)/);
+    if (match && VALID_ERROR_CODES.has(match[1])) {
+      return match[1] as ErrorCode;
+    }
   }
 
   const normalized = redactedMessage.toLowerCase();

@@ -54,12 +54,36 @@ export const RESOURCE_PRICE_UNITS: Record<
 /**
  * Redact sensitive information from error messages to prevent information leakage.
  * Removes: file paths, URLs with tokens/endpoints, environment variables
+ *
+ * NOTE: Dispute status naming convention
+ * market-core uses prefixed statuses: "dispute_opened", "dispute_evidence_submitted", "dispute_resolved", "dispute_rejected"
+ * web3-core uses unprefixed statuses: "open", "evidence_submitted", "resolved", "rejected", "expired"
+ * This is by design — the two domains maintain independent state models.
  */
+const REDACTED = "[REDACTED]";
+const SENSITIVE_KEYS = new Set([
+  "accesstoken",
+  "refreshtoken",
+  "token",
+  "apikey",
+  "secret",
+  "password",
+  "privatekey",
+  "endpoint",
+  "providerendpoint",
+  "downloadurl",
+  "rpcurl",
+  "dbpath",
+  "storepath",
+  "payload",
+  "payloadref",
+]);
+
 function redactSensitiveInfo(message: string): string {
   let redacted = message;
 
-  // Redact absolute file paths (Unix and Windows)
-  redacted = redacted.replace(/\/[a-zA-Z0-9_\-./]+/g, "[PATH]");
+  // Redact absolute file paths with at least two segments (Unix and Windows)
+  redacted = redacted.replace(/\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.\-/]+/g, "[PATH]");
   redacted = redacted.replace(/[A-Z]:\\[a-zA-Z0-9_\-.\\]+/g, "[PATH]");
 
   // Redact URLs with potential sensitive data
@@ -74,15 +98,57 @@ function redactSensitiveInfo(message: string): string {
   // Redact JWT-like tokens
   redacted = redacted.replace(/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, "[TOKEN]");
 
+  // Redact bearer tokens and access tokens (requires tok_ prefix with underscore)
+  redacted = redacted.replace(/\bBearer\s+[^\s]+/gi, "Bearer [REDACTED]");
+  redacted = redacted.replace(/\btok_[\w-]+\b/gi, "tok_***");
+
   return redacted;
 }
+
+function redactAuditValue(value: unknown): unknown {
+  if (value == null) return value;
+  if (typeof value === "string") return redactSensitiveInfo(value);
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map((entry) => redactAuditValue(entry));
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(record)) {
+      const lowered = key.toLowerCase();
+      if (SENSITIVE_KEYS.has(lowered)) {
+        out[key] = REDACTED;
+        continue;
+      }
+      out[key] = redactAuditValue(raw);
+    }
+    return out;
+  }
+  return String(value);
+}
+
+export function redactAuditDetails(
+  details?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!details) return undefined;
+  const redacted = redactAuditValue(details);
+  if (redacted && typeof redacted === "object") {
+    return redacted as Record<string, unknown>;
+  }
+  return { value: redacted };
+}
+
+const VALID_ERROR_CODES: ReadonlySet<string> = new Set(Object.values(ErrorCode));
 
 export function formatGatewayError(err: unknown, fallback = ErrorCode.E_INTERNAL): ErrorCode {
   const message = err instanceof Error ? err.message : String(err);
   const redactedMessage = redactSensitiveInfo(message);
 
   if (redactedMessage.startsWith("E_")) {
-    return redactedMessage as ErrorCode;
+    // Extract the error code token and validate against known ErrorCode values
+    const match = redactedMessage.match(/^(E_[A-Z_]+)/);
+    if (match && VALID_ERROR_CODES.has(match[1])) {
+      return match[1] as ErrorCode;
+    }
   }
 
   const normalized = redactedMessage.toLowerCase();
@@ -231,6 +297,7 @@ export function recordAudit(
   actor?: string,
   details?: Record<string, unknown>,
 ) {
+  const safeDetails = redactAuditDetails(details);
   const event: AuditEvent = {
     id: randomUUID(),
     kind,
@@ -238,7 +305,7 @@ export function recordAudit(
     hash,
     actor,
     timestamp: nowIso(),
-    details,
+    details: safeDetails,
   };
   store.appendAuditEvent(event);
 }
@@ -265,7 +332,7 @@ export async function recordAuditWithAnchor(input: {
   try {
     anchorResult = await tryAnchor(input.config, input.anchorId, input.hash);
   } catch (err) {
-    anchorError = String(err);
+    anchorError = redactSensitiveInfo(String(err));
   }
 
   const mergedDetails: Record<string, unknown> = {

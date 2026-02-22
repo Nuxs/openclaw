@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { AnyAgentTool } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
+import { ErrorCode, ERROR_CODE_DESCRIPTIONS } from "../errors/codes.js";
 import { getConsumerLeaseAccess } from "./leases.js";
 
 const Web3SearchSchema = Type.Object(
@@ -31,6 +33,10 @@ type AgentToolResult = {
   details?: unknown;
 };
 
+type ProviderEndpointResolution =
+  | { lease: NonNullable<ReturnType<typeof getConsumerLeaseAccess>>; endpoint: string }
+  | { error: ErrorCode; reason: string };
+
 function jsonResult(payload: unknown): AgentToolResult {
   const safePayload = redactUnknown(payload);
   return {
@@ -39,59 +45,45 @@ function jsonResult(payload: unknown): AgentToolResult {
   };
 }
 
-const REDACTED = "[REDACTED]";
-const REDACTED_ENDPOINT = "[REDACTED_ENDPOINT]";
-
-const SENSITIVE_KEYS = new Set([
-  "accesstoken",
-  "refreshtoken",
-  "token",
-  "apikey",
-  "secret",
-  "password",
-  "privatekey",
-  "endpoint",
-  "providerendpoint",
-  "downloadurl",
-  "rpcurl",
-  "dbpath",
-  "storepath",
-]);
-
-function redactString(input: string): string {
-  const tokenRedacted = input.replace(/\btok[\w-]+\b/gi, "tok_***");
-  const bearerRedacted = tokenRedacted.replace(/\bBearer\s+[^\s]+/gi, "Bearer [REDACTED]");
-  const urlRedacted = bearerRedacted.replace(/https?:\/\/[^\s)\]]+/gi, REDACTED_ENDPOINT);
-  return urlRedacted.replace(/\/(Users|home)\/[A-Za-z0-9._-]+\//g, "~/");
+function errorResult(code: ErrorCode, details?: Record<string, unknown>): AgentToolResult {
+  const message = ERROR_CODE_DESCRIPTIONS[code] ?? "An internal error occurred.";
+  return jsonResult({
+    error: code,
+    message,
+    details: details && Object.keys(details).length > 0 ? details : undefined,
+  });
 }
 
-function redactUnknown(value: unknown): unknown {
-  if (value == null) {
-    return value;
+function errorFromStatus(status: number, details?: Record<string, unknown>): AgentToolResult {
+  switch (status) {
+    case 400:
+      return errorResult(ErrorCode.E_INVALID_ARGUMENT, details);
+    case 401:
+      return errorResult(ErrorCode.E_AUTH_REQUIRED, details);
+    case 403:
+      return errorResult(ErrorCode.E_FORBIDDEN, details);
+    case 404:
+      return errorResult(ErrorCode.E_NOT_FOUND, details);
+    case 409:
+      return errorResult(ErrorCode.E_CONFLICT, details);
+    case 410:
+      return errorResult(ErrorCode.E_EXPIRED, details);
+    case 429:
+      return errorResult(ErrorCode.E_QUOTA_EXCEEDED, details);
+    case 503:
+      return errorResult(ErrorCode.E_UNAVAILABLE, details);
+    case 504:
+      return errorResult(ErrorCode.E_TIMEOUT, details);
+    default:
+      return errorResult(ErrorCode.E_INTERNAL, details);
   }
-  if (typeof value === "string") {
-    return redactString(value);
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => redactUnknown(entry));
-  }
-  if (typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-      const lowered = key.toLowerCase();
-      if (SENSITIVE_KEYS.has(lowered)) {
-        out[key] = REDACTED;
-        continue;
-      }
-      out[key] = redactUnknown(raw);
-    }
-    return out;
-  }
-  return String(value);
 }
+
+function errorFromException(err: unknown, details?: Record<string, unknown>): AgentToolResult {
+  return jsonResult(formatWeb3GatewayErrorResponse(err, ErrorCode.E_INTERNAL, details));
+}
+
+import { redactUnknown } from "../utils/redact.js";
 
 function normalizeBaseUrl(endpoint: string): string {
   return endpoint.trim().replace(/\/+$/, "");
@@ -110,22 +102,24 @@ export function createWeb3SearchTool(config: Web3PluginConfig): AnyAgentTool | n
     execute: async (_toolCallId, params: Web3SearchParams) => {
       try {
         if (!config.resources.enabled || !config.resources.consumer.enabled) {
-          return jsonResult({ error: "resources consumer disabled" });
+          return errorResult(ErrorCode.E_FORBIDDEN, { reason: "resources consumer disabled" });
         }
         const resourceId = params.resourceId?.trim();
         const query = params.q?.trim();
         if (!resourceId || !query) {
-          return jsonResult({ error: "resourceId and q are required" });
+          return errorResult(ErrorCode.E_INVALID_ARGUMENT, { fields: ["resourceId", "q"] });
         }
 
         const lease = getConsumerLeaseAccess(resourceId);
         if (!lease) {
-          return jsonResult({ error: "no active lease for resource" });
+          return errorResult(ErrorCode.E_NOT_FOUND, { reason: "no active lease for resource" });
         }
 
         const endpoint = lease.providerEndpoint?.trim() || config.brain.endpoint?.trim();
         if (!endpoint) {
-          return jsonResult({ error: "provider endpoint not configured" });
+          return errorResult(ErrorCode.E_INVALID_ARGUMENT, {
+            reason: "provider endpoint not configured",
+          });
         }
 
         const url = new URL(`${normalizeBaseUrl(endpoint)}/web3/resources/search/query`);
@@ -146,17 +140,13 @@ export function createWeb3SearchTool(config: Web3PluginConfig): AnyAgentTool | n
         });
 
         if (!response.ok) {
-          const text = await response.text();
-          return jsonResult({
-            error: `provider_error_${response.status}`,
-            message: text || response.statusText,
-          });
+          return errorFromStatus(response.status, { status: response.status });
         }
 
         const payload = (await response.json()) as { results?: unknown };
         return jsonResult(payload);
       } catch (err) {
-        return jsonResult({ error: err instanceof Error ? err.message : String(err) });
+        return errorFromException(err);
       }
     },
   } as AnyAgentTool;
@@ -209,12 +199,19 @@ type Web3StorageListParams = {
   limit?: number;
 };
 
-function resolveProviderEndpoint(config: Web3PluginConfig, resourceId: string) {
+function resolveProviderEndpoint(
+  config: Web3PluginConfig,
+  resourceId: string,
+): ProviderEndpointResolution {
   const lease = getConsumerLeaseAccess(resourceId);
-  if (!lease) return { error: "no active lease for resource" } as const;
+  if (!lease) {
+    return { error: ErrorCode.E_NOT_FOUND, reason: "no active lease for resource" };
+  }
   const endpoint = lease.providerEndpoint?.trim() || config.brain.endpoint?.trim();
-  if (!endpoint) return { error: "provider endpoint not configured" } as const;
-  return { lease, endpoint: normalizeBaseUrl(endpoint) } as const;
+  if (!endpoint) {
+    return { error: ErrorCode.E_INVALID_ARGUMENT, reason: "provider endpoint not configured" };
+  }
+  return { lease, endpoint: normalizeBaseUrl(endpoint) };
 }
 
 export function createWeb3StoragePutTool(config: Web3PluginConfig): AnyAgentTool | null {
@@ -232,12 +229,14 @@ export function createWeb3StoragePutTool(config: Web3PluginConfig): AnyAgentTool
         const resourceId = params.resourceId?.trim();
         const path = params.path?.trim();
         if (!resourceId || !path || !params.bytesBase64) {
-          return jsonResult({ error: "resourceId, path, bytesBase64 are required" });
+          return errorResult(ErrorCode.E_INVALID_ARGUMENT, {
+            fields: ["resourceId", "path", "bytesBase64"],
+          });
         }
 
         const resolved = resolveProviderEndpoint(config, resourceId);
         if ("error" in resolved) {
-          return jsonResult({ error: resolved.error });
+          return errorResult(resolved.error, { reason: resolved.reason });
         }
 
         const url = new URL(`${resolved.endpoint}/web3/resources/storage/put`);
@@ -256,17 +255,13 @@ export function createWeb3StoragePutTool(config: Web3PluginConfig): AnyAgentTool
         });
 
         if (!response.ok) {
-          const text = await response.text();
-          return jsonResult({
-            error: `provider_error_${response.status}`,
-            message: text || response.statusText,
-          });
+          return errorFromStatus(response.status, { status: response.status });
         }
 
         const payload = (await response.json()) as unknown;
         return jsonResult(payload);
       } catch (err) {
-        return jsonResult({ error: err instanceof Error ? err.message : String(err) });
+        return errorFromException(err);
       }
     },
   } as AnyAgentTool;
@@ -287,12 +282,12 @@ export function createWeb3StorageGetTool(config: Web3PluginConfig): AnyAgentTool
         const resourceId = params.resourceId?.trim();
         const path = params.path?.trim();
         if (!resourceId || !path) {
-          return jsonResult({ error: "resourceId and path are required" });
+          return errorResult(ErrorCode.E_INVALID_ARGUMENT, { fields: ["resourceId", "path"] });
         }
 
         const resolved = resolveProviderEndpoint(config, resourceId);
         if ("error" in resolved) {
-          return jsonResult({ error: resolved.error });
+          return errorResult(resolved.error, { reason: resolved.reason });
         }
 
         const url = new URL(`${resolved.endpoint}/web3/resources/storage/get`);
@@ -306,17 +301,13 @@ export function createWeb3StorageGetTool(config: Web3PluginConfig): AnyAgentTool
         });
 
         if (!response.ok) {
-          const text = await response.text();
-          return jsonResult({
-            error: `provider_error_${response.status}`,
-            message: text || response.statusText,
-          });
+          return errorFromStatus(response.status, { status: response.status });
         }
 
         const payload = (await response.json()) as unknown;
         return jsonResult(payload);
       } catch (err) {
-        return jsonResult({ error: err instanceof Error ? err.message : String(err) });
+        return errorFromException(err);
       }
     },
   } as AnyAgentTool;
@@ -336,12 +327,12 @@ export function createWeb3StorageListTool(config: Web3PluginConfig): AnyAgentToo
       try {
         const resourceId = params.resourceId?.trim();
         if (!resourceId) {
-          return jsonResult({ error: "resourceId is required" });
+          return errorResult(ErrorCode.E_INVALID_ARGUMENT, { fields: ["resourceId"] });
         }
 
         const resolved = resolveProviderEndpoint(config, resourceId);
         if ("error" in resolved) {
-          return jsonResult({ error: resolved.error });
+          return errorResult(resolved.error, { reason: resolved.reason });
         }
 
         const url = new URL(`${resolved.endpoint}/web3/resources/storage/list`);
@@ -356,17 +347,13 @@ export function createWeb3StorageListTool(config: Web3PluginConfig): AnyAgentToo
         });
 
         if (!response.ok) {
-          const text = await response.text();
-          return jsonResult({
-            error: `provider_error_${response.status}`,
-            message: text || response.statusText,
-          });
+          return errorFromStatus(response.status, { status: response.status });
         }
 
         const payload = (await response.json()) as unknown;
         return jsonResult(payload);
       } catch (err) {
-        return jsonResult({ error: err instanceof Error ? err.message : String(err) });
+        return errorFromException(err);
       }
     },
   } as AnyAgentTool;

@@ -67,6 +67,7 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
   const pendingArchives = store.getPendingArchives();
   const pendingSettlements = store.getPendingSettlements();
   const usageRecords = store.listUsageRecords();
+  const disputes = store.getDisputes();
 
   const auditByKind = auditEvents.reduce(
     (acc, event) => {
@@ -115,6 +116,26 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
     },
   ];
 
+  // NOTE: web3-core dispute statuses are unprefixed ("open", "evidence_submitted", "resolved", "rejected", "expired").
+  // market-core uses prefixed statuses ("dispute_opened", "dispute_evidence_submitted", etc.).
+  // This is by design — the two domains maintain independent state models.
+  const disputeByStatus = disputes.reduce(
+    (acc, entry) => {
+      acc[entry.status] = (acc[entry.status] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  const disputeOpen = disputes.filter(
+    (entry) => entry.status === "open" || entry.status === "evidence_submitted",
+  ).length;
+  const disputeInvestigating = disputes.filter(
+    (entry) => entry.status === "evidence_submitted",
+  ).length;
+  const disputeResolved = disputes.filter((entry) => entry.status === "resolved").length;
+  const disputeRejected = disputes.filter((entry) => entry.status === "rejected").length;
+  const disputeExpired = disputes.filter((entry) => entry.status === "expired").length;
+
   return {
     audit: {
       total: auditEvents.length,
@@ -140,6 +161,15 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
       providers: resourceEntries.length,
       total: resourceTotal,
       byKind: resourceByKind,
+    },
+    disputes: {
+      total: disputes.length,
+      byStatus: disputeByStatus,
+      open: disputeOpen,
+      investigating: disputeInvestigating,
+      resolved: disputeResolved,
+      rejected: disputeRejected,
+      expired: disputeExpired,
     },
     alerts,
   };

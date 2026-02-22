@@ -47,12 +47,6 @@ import {
 import { createSiweChallengeHandler, createSiweVerifyHandler } from "./identity/gateway.js";
 import { createBrowserIngestHandler } from "./ingest/browser-handler.js";
 import {
-  createMarketDisputeGetHandler,
-  createMarketDisputeListHandler,
-  createMarketDisputeOpenHandler,
-  createMarketDisputeRejectHandler,
-  createMarketDisputeResolveHandler,
-  createMarketDisputeSubmitEvidenceHandler,
   createMarketLedgerListHandler,
   createMarketLedgerSummaryHandler,
   createMarketLeaseExpireSweepHandler,
@@ -87,6 +81,7 @@ import {
   createMonitorMetricsHandler,
   createHealthCheckHandler,
 } from "./monitor/handlers.js";
+import { AlertLevel, AlertStatus } from "./monitor/types.js";
 import {
   createResourceModelChatHandler,
   createResourceSearchQueryHandler,
@@ -553,6 +548,29 @@ export function resolveBillingSummary(
   return { status, credits: remaining } as const;
 }
 
+function countByStatus<T extends { status?: string }>(items: T[]): Record<string, number> {
+  return items.reduce(
+    (acc, item) => {
+      const status = typeof item.status === "string" ? item.status : "unknown";
+      acc[status] = (acc[status] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+}
+
+function filterExpiredIndexEntries<T extends { expiresAt?: string }>(
+  entries: T[],
+  now = Date.now(),
+): T[] {
+  return entries.filter((entry) => {
+    if (!entry.expiresAt) return true;
+    const expiresAt = Date.parse(entry.expiresAt);
+    if (Number.isNaN(expiresAt)) return true;
+    return expiresAt > now;
+  });
+}
+
 /** @internal exported for testing */
 export function createWeb3StatusSummaryHandler(
   store: Web3StateStore,
@@ -560,7 +578,24 @@ export function createWeb3StatusSummaryHandler(
 ): GatewayRequestHandler {
   return ({ respond }: GatewayRequestHandlerOptions) => {
     const events = store.readAuditEvents(50);
-    const pending = store.getPendingTxs();
+    const pendingAnchors = store.getPendingTxs();
+    const pendingArchives = store.getPendingArchives();
+    const pendingSettlements = store.getPendingSettlements();
+
+    // TODO(perf): getDisputes() and getAlerts() load all records — add pagination/limit when data grows large
+    let disputes: ReturnType<typeof store.getDisputes> = [];
+    try {
+      disputes = store.getDisputes();
+    } catch {
+      // Graceful degradation if disputes data is corrupted
+    }
+
+    let alerts: ReturnType<typeof store.getAlerts> = [];
+    try {
+      alerts = store.getAlerts(500);
+    } catch {
+      // Graceful degradation if alerts data is corrupted
+    }
     const lastEvent = events.at(-1);
     const lastArchived = [...events]
       .reverse()
@@ -573,6 +608,39 @@ export function createWeb3StatusSummaryHandler(
       const ts = Date.parse(event.timestamp);
       return !Number.isNaN(ts) && ts >= cutoffMs;
     }).length;
+
+    const resourceEntries = filterExpiredIndexEntries(store.getResourceIndex());
+    const resourceByKind: Record<string, number> = {};
+    let resourceTotal = 0;
+    for (const entry of resourceEntries) {
+      for (const resource of entry.resources ?? []) {
+        resourceTotal += 1;
+        resourceByKind[resource.kind] = (resourceByKind[resource.kind] ?? 0) + 1;
+      }
+    }
+
+    const disputeByStatus = countByStatus(disputes);
+    const disputeOpen = disputes.filter(
+      (entry) => entry.status === "open" || entry.status === "evidence_submitted",
+    ).length;
+    const disputeInvestigating = disputes.filter(
+      (entry) => entry.status === "evidence_submitted",
+    ).length;
+    const disputeResolved = disputes.filter((entry) => entry.status === "resolved").length;
+    const disputeRejected = disputes.filter((entry) => entry.status === "rejected").length;
+    const disputeExpired = disputes.filter((entry) => entry.status === "expired").length;
+
+    const alertsByLevel: Record<AlertLevel, number> = {
+      [AlertLevel.P0]: 0,
+      [AlertLevel.P1]: 0,
+      [AlertLevel.P2]: 0,
+    };
+    for (const alert of alerts) {
+      if (alert.level in alertsByLevel) {
+        alertsByLevel[alert.level as AlertLevel] += 1;
+      }
+    }
+    const activeAlerts = alerts.filter((alert) => alert.status === AlertStatus.ACTIVE).length;
 
     const brainEnabled = config.brain.enabled;
     const brainSource = brainEnabled ? "web3/decentralized" : "centralized";
@@ -589,10 +657,44 @@ export function createWeb3StatusSummaryHandler(
         lastArchived?.archivePointer?.cid ??
         lastArchived?.archivePointer?.uri ??
         null,
+      archivePending: pendingArchives.length,
       anchorNetwork: anchorReceipt?.network ?? config.chain.network ?? null,
       anchorLastTx: anchorReceipt?.tx ?? lastAnchored?.chainRef?.tx ?? null,
-      pendingAnchors: pending.length,
+      pendingAnchors: pendingAnchors.length,
       anchoringEnabled: Boolean(config.chain.privateKey),
+      resources: {
+        providers: resourceEntries.length,
+        total: resourceTotal,
+        byKind: resourceByKind,
+      },
+      disputes: {
+        total: disputes.length,
+        byStatus: disputeByStatus,
+        open: disputeOpen,
+        investigating: disputeInvestigating,
+        resolved: disputeResolved,
+        rejected: disputeRejected,
+        expired: disputeExpired,
+      },
+      alerts: {
+        total: alerts.length,
+        active: activeAlerts,
+        byLevel: alertsByLevel,
+      },
+      queues: {
+        anchors: {
+          pending: pendingAnchors.length,
+          failed: pendingAnchors.filter((entry) => Boolean(entry.lastError)).length,
+        },
+        archives: {
+          pending: pendingArchives.length,
+          failed: pendingArchives.filter((entry) => Boolean(entry.lastError)).length,
+        },
+        settlements: {
+          pending: pendingSettlements.length,
+          failed: pendingSettlements.filter((entry) => Boolean(entry.lastError)).length,
+        },
+      },
       brain: {
         source: brainSource,
         provider: brainEnabled ? config.brain.providerId : null,
@@ -604,7 +706,7 @@ export function createWeb3StatusSummaryHandler(
         credits: billingSummary.credits,
       },
       settlement: {
-        pending: store.getPendingSettlements().length,
+        pending: pendingSettlements.length,
       },
     });
   };

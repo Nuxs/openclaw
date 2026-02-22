@@ -1,6 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { AnyAgentTool } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
+import { ErrorCode } from "../errors/codes.js";
 
 type AgentToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -60,61 +62,7 @@ function jsonResult(payload: unknown): AgentToolResult {
   };
 }
 
-const REDACTED = "[REDACTED]";
-const REDACTED_ENDPOINT = "[REDACTED_ENDPOINT]";
-
-const SENSITIVE_KEYS = new Set([
-  "accesstoken",
-  "refreshtoken",
-  "token",
-  "apikey",
-  "secret",
-  "password",
-  "privatekey",
-  "endpoint",
-  "providerendpoint",
-  "downloadurl",
-  "rpcurl",
-  "dbpath",
-  "storepath",
-]);
-
-function redactString(input: string): string {
-  // Remove obvious bearer tokens.
-  const bearerRedacted = input.replace(/\bBearer\s+[^\s]+/gi, "Bearer [REDACTED]");
-  // Remove obvious URLs (endpoints may contain sensitive infrastructure).
-  const urlRedacted = bearerRedacted.replace(/https?:\/\/[^\s)\]]+/gi, REDACTED_ENDPOINT);
-  // Remove macOS home paths.
-  return urlRedacted.replace(/\/(Users|home)\/[A-Za-z0-9._-]+\//g, "~/");
-}
-
-function redactUnknown(value: unknown): unknown {
-  if (value == null) {
-    return value;
-  }
-  if (typeof value === "string") {
-    return redactString(value);
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => redactUnknown(entry));
-  }
-  if (typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-      const lowered = key.toLowerCase();
-      if (SENSITIVE_KEYS.has(lowered)) {
-        out[key] = REDACTED;
-        continue;
-      }
-      out[key] = redactUnknown(raw);
-    }
-    return out;
-  }
-  return String(value);
-}
+import { redactUnknown } from "../utils/redact.js";
 
 async function callGatewayMethod(config: Web3PluginConfig, method: string, params?: unknown) {
   const callGateway = await loadCallGateway();
@@ -123,11 +71,19 @@ async function callGatewayMethod(config: Web3PluginConfig, method: string, param
     params,
     timeoutMs: config.brain.timeoutMs,
   });
-  return normalizeGatewayResult(response);
+  const normalized = normalizeGatewayResult(response);
+  if (!normalized.ok) {
+    return { ok: false, error: formatWeb3GatewayErrorResponse(normalized.error) };
+  }
+  return normalized;
 }
 
 function safeResult(payload: unknown): AgentToolResult {
   return jsonResult(redactUnknown(payload));
+}
+
+function errorResult(err: unknown, details?: Record<string, unknown>): AgentToolResult {
+  return safeResult(formatWeb3GatewayErrorResponse(err, ErrorCode.E_INTERNAL, details));
 }
 
 const IndexListSchema = Type.Object(
@@ -158,10 +114,7 @@ export function createWeb3MarketIndexListTool(config: Web3PluginConfig): AnyAgen
         const result = await callGatewayMethod(config, "web3.index.list", { limit });
         return safeResult(result);
       } catch (err) {
-        return safeResult({
-          ok: false,
-          error: redactString(err instanceof Error ? err.message : String(err)),
-        });
+        return errorResult(err);
       }
     },
   } as AnyAgentTool;
@@ -203,7 +156,7 @@ export function createWeb3MarketLeaseTool(config: Web3PluginConfig): AnyAgentToo
       try {
         const resourceId = params.resourceId?.trim();
         if (!resourceId) {
-          return safeResult({ ok: false, error: "resourceId is required" });
+          return errorResult("resourceId is required", { fields: ["resourceId"] });
         }
         const result = await callGatewayMethod(config, "web3.resources.lease", {
           ...params,
@@ -211,10 +164,7 @@ export function createWeb3MarketLeaseTool(config: Web3PluginConfig): AnyAgentToo
         });
         return safeResult(result);
       } catch (err) {
-        return safeResult({
-          ok: false,
-          error: redactString(err instanceof Error ? err.message : String(err)),
-        });
+        return errorResult(err);
       }
     },
   } as AnyAgentTool;
@@ -242,15 +192,12 @@ export function createWeb3MarketRevokeLeaseTool(config: Web3PluginConfig): AnyAg
       try {
         const leaseId = params.leaseId?.trim();
         if (!leaseId) {
-          return safeResult({ ok: false, error: "leaseId is required" });
+          return errorResult("leaseId is required", { fields: ["leaseId"] });
         }
         const result = await callGatewayMethod(config, "web3.resources.revokeLease", { leaseId });
         return safeResult(result);
       } catch (err) {
-        return safeResult({
-          ok: false,
-          error: redactString(err instanceof Error ? err.message : String(err)),
-        });
+        return errorResult(err);
       }
     },
   } as AnyAgentTool;
@@ -286,15 +233,12 @@ export function createWeb3MarketPublishTool(config: Web3PluginConfig): AnyAgentT
       try {
         const resource = params.resource;
         if (!resource || typeof resource !== "object") {
-          return safeResult({ ok: false, error: "resource is required" });
+          return errorResult("resource is required", { fields: ["resource"] });
         }
         const result = await callGatewayMethod(config, "web3.resources.publish", resource);
         return safeResult(result);
       } catch (err) {
-        return safeResult({
-          ok: false,
-          error: redactString(err instanceof Error ? err.message : String(err)),
-        });
+        return errorResult(err);
       }
     },
   } as AnyAgentTool;
@@ -322,15 +266,12 @@ export function createWeb3MarketUnpublishTool(config: Web3PluginConfig): AnyAgen
       try {
         const resourceId = params.resourceId?.trim();
         if (!resourceId) {
-          return safeResult({ ok: false, error: "resourceId is required" });
+          return errorResult("resourceId is required", { fields: ["resourceId"] });
         }
         const result = await callGatewayMethod(config, "web3.resources.unpublish", { resourceId });
         return safeResult(result);
       } catch (err) {
-        return safeResult({
-          ok: false,
-          error: redactString(err instanceof Error ? err.message : String(err)),
-        });
+        return errorResult(err);
       }
     },
   } as AnyAgentTool;
@@ -374,10 +315,7 @@ export function createWeb3MarketLedgerListTool(config: Web3PluginConfig): AnyAge
         });
         return safeResult(result);
       } catch (err) {
-        return safeResult({
-          ok: false,
-          error: redactString(err instanceof Error ? err.message : String(err)),
-        });
+        return errorResult(err);
       }
     },
   } as AnyAgentTool;
@@ -399,10 +337,7 @@ export function createWeb3MarketLedgerSummaryTool(config: Web3PluginConfig): Any
         const result = await callGatewayMethod(config, "web3.market.ledger.summary", {});
         return safeResult(result);
       } catch (err) {
-        return safeResult({
-          ok: false,
-          error: redactString(err instanceof Error ? err.message : String(err)),
-        });
+        return errorResult(err);
       }
     },
   } as AnyAgentTool;

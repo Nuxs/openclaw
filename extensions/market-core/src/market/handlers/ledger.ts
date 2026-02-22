@@ -25,7 +25,7 @@ export function createLedgerAppendHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
 ): GatewayRequestHandler {
-  return (opts: GatewayRequestHandlerOptions) => {
+  return async (opts: GatewayRequestHandlerOptions) => {
     const { params, respond } = opts;
     try {
       assertAccess(opts, config, "write");
@@ -114,14 +114,16 @@ export function createLedgerAppendHandler(
         runId,
         entryHash,
       };
-      store.appendLedger(entry);
-      recordAudit(store, "ledger_appended", entry.ledgerId, entryHash, actorId, {
-        leaseId,
-        resourceId,
-        unit,
-        quantity,
-        cost,
-        currency,
+      await store.runInTransaction(() => {
+        store.appendLedger(entry);
+        recordAudit(store, "ledger_appended", entry.ledgerId, entryHash, actorId, {
+          leaseId,
+          resourceId,
+          unit,
+          quantity,
+          cost,
+          currency,
+        });
       });
       respond(true, { ledgerId: entry.ledgerId, entryHash });
     } catch (err) {

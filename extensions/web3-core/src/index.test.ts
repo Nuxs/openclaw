@@ -8,6 +8,7 @@ import {
   resolveBillingSummary,
   resolveBrainAvailability,
 } from "./index.js";
+import { AlertCategory, AlertLevel, AlertStatus } from "./monitor/types.js";
 import { Web3StateStore } from "./state/store.js";
 
 let tempDir: string;
@@ -46,7 +47,17 @@ describe("web3.status.summary handler", () => {
     expect(payload).toHaveProperty("brain");
     expect(payload).toHaveProperty("billing");
     expect(payload).toHaveProperty("settlement");
+    expect(payload).toHaveProperty("archivePending");
+    expect(payload).toHaveProperty("resources");
+    expect(payload).toHaveProperty("disputes");
+    expect(payload).toHaveProperty("alerts");
+    expect(payload).toHaveProperty("queues");
     expect((payload.settlement as any).pending).toBe(0);
+    expect((payload.archivePending as any) ?? 0).toBe(0);
+    expect((payload.resources as any).total).toBe(0);
+    expect((payload.disputes as any).total).toBe(0);
+    expect((payload.alerts as any).total).toBe(0);
+    expect((payload.queues as any).anchors.pending).toBe(0);
   });
 
   it("reports settlement.pending count from store", () => {
@@ -66,6 +77,118 @@ describe("web3.status.summary handler", () => {
 
     const { payload } = invoke(store, config);
     expect((payload.settlement as any).pending).toBe(2);
+  });
+
+  it("summarizes queues, resources, disputes, and alerts", () => {
+    const store = makeStore();
+    const config = resolveConfig();
+    const now = new Date().toISOString();
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    store.saveResourceIndex([
+      {
+        providerId: "provider-1",
+        resources: [{ resourceId: "res-1", kind: "model", label: "m1" }],
+        updatedAt: now,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      {
+        providerId: "provider-2",
+        resources: [{ resourceId: "res-2", kind: "search" }],
+        updatedAt: now,
+        expiresAt: past,
+      },
+    ]);
+
+    store.upsertPendingTx({
+      anchorId: "anchor-1",
+      payloadHash: "hash-1",
+      createdAt: now,
+      attempts: 1,
+      lastError: "anchor failed",
+    });
+    store.upsertPendingArchive({
+      event: {
+        id: "audit-1",
+        kind: "tool_call",
+        timestamp: now,
+        sessionIdHash: "session-1",
+        seq: 1,
+        payloadHash: "payload-1",
+      },
+      createdAt: now,
+      attempts: 1,
+      lastError: "archive failed",
+    });
+    store.upsertPendingSettlement({
+      sessionIdHash: "session-1",
+      createdAt: now,
+      attempts: 1,
+      lastError: "settlement failed",
+    });
+
+    store.upsertDispute({
+      disputeId: "dispute-1",
+      orderId: "order-1",
+      resourceId: "resource-1",
+      providerId: "provider-1",
+      consumerId: "consumer-1",
+      reason: "missing data",
+      status: "open",
+      evidences: [],
+      openedAt: now,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: now,
+    });
+    store.upsertDispute({
+      disputeId: "dispute-2",
+      orderId: "order-2",
+      resourceId: "resource-2",
+      providerId: "provider-2",
+      consumerId: "consumer-2",
+      reason: "timeout",
+      status: "resolved",
+      evidences: [],
+      openedAt: now,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: now,
+      resolution: {
+        ruling: "provider_wins",
+        reason: "resolved",
+        resolvedAt: now,
+        resolvedBy: "system",
+      },
+    });
+
+    store.appendAlert({
+      id: "alert-1",
+      level: AlertLevel.P0,
+      category: AlertCategory.SECURITY,
+      status: AlertStatus.ACTIVE,
+      ruleName: "rule-1",
+      message: "critical",
+      timestamp: now,
+    });
+    store.appendAlert({
+      id: "alert-2",
+      level: AlertLevel.P1,
+      category: AlertCategory.BILLING,
+      status: AlertStatus.RESOLVED,
+      ruleName: "rule-2",
+      message: "resolved",
+      timestamp: now,
+    });
+
+    const { payload } = invoke(store, config);
+    expect((payload.resources as any).providers).toBe(1);
+    expect((payload.resources as any).total).toBe(1);
+    expect((payload.queues as any).anchors.failed).toBe(1);
+    expect((payload.queues as any).archives.pending).toBe(1);
+    expect((payload.queues as any).settlements.failed).toBe(1);
+    expect((payload.disputes as any).open).toBe(1);
+    expect((payload.disputes as any).resolved).toBe(1);
+    expect((payload.alerts as any).total).toBe(2);
+    expect((payload.alerts as any).active).toBe(1);
   });
 
   it("reports billing status as unbound when billing disabled", () => {

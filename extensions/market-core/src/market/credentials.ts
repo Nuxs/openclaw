@@ -120,6 +120,13 @@ export class DeliveryCredentialsStore {
     const parsed = JSON.parse(raw) as EncryptedPayload;
     return decrypt(parsed, this.encryptionKey);
   }
+
+  async removeDeliveryPayload(ref: DeliveryPayloadRef): Promise<void> {
+    const target = this.deliveryPath(ref.ref);
+    await withFileLock(target, this.lockOptions, async () => {
+      await fs.rm(target, { force: true });
+    });
+  }
 }
 
 export function createDeliveryCredentialsStore(
