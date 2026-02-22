@@ -3,7 +3,8 @@
 # ============================================================================
 # helm install openclaw ./private/helm/openclaw -f private/helm/openclaw/values-prod.yaml
 
-replicaCount: 2
+# 生产环境建议先单副本：RWO PVC 更稳，也避免多实例共享 state 的一致性风险
+replicaCount: 1
 
 image:
   tag: latest

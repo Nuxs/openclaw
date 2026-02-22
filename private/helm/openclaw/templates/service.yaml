@@ -1,17 +1,19 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: { { include "openclaw.fullname" . } }
-  labels: { { - include "openclaw.labels" . | nindent 4 } }
+  name: {{ include "openclaw.fullname" . }}
+  labels:
+    {{- include "openclaw.labels" . | nindent 4 }}
 spec:
-  type: { { .Values.service.type } }
+  type: {{ .Values.service.type }}
   ports:
-    - port: { { .Values.service.port } }
+    - port: {{ .Values.service.port }}
       targetPort: http
       protocol: TCP
       name: http
-    - port: { { .Values.service.bridgePort } }
+    - port: {{ .Values.service.bridgePort }}
       targetPort: bridge
       protocol: TCP
       name: bridge
-  selector: { { - include "openclaw.selectorLabels" . | nindent 4 } }
+  selector:
+    {{- include "openclaw.selectorLabels" . | nindent 4 }}

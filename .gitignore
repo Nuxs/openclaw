@@ -75,6 +75,7 @@ apps/ios/*.mobileprovision
 # Local untracked files
 .local/
 docs/.local/
+.openclaw/
 IDENTITY.md
 USER.md
 .tgz
@@ -105,3 +106,5 @@ private/env/*.env.local
 private/assets/*.ico
 private/assets/*.svg
 private/assets/*.png
+private/env/prod.env
+private/env/prod.env
