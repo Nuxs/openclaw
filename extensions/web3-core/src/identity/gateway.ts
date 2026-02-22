@@ -7,6 +7,7 @@ import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "opencl
 import { SiweMessage } from "siwe";
 import { getAddress } from "viem";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import type { Web3StateStore } from "../state/store.js";
 import type { SiweChallenge } from "./types.js";
 
@@ -27,13 +28,13 @@ export function createSiweChallengeHandler(
 ): GatewayRequestHandler {
   return async ({ params, respond }: GatewayRequestHandlerOptions) => {
     if (!config.identity.allowSiwe) {
-      respond(false, { error: "SIWE is disabled" });
+      respond(false, formatWeb3GatewayErrorResponse("SIWE is disabled"));
       return;
     }
 
     const addressRaw = (params as Record<string, unknown>)?.address as string | undefined;
     if (!addressRaw) {
-      respond(false, { error: "address is required" });
+      respond(false, formatWeb3GatewayErrorResponse("address is required"));
       return;
     }
 
@@ -41,7 +42,7 @@ export function createSiweChallengeHandler(
     try {
       address = getAddress(addressRaw);
     } catch {
-      respond(false, { error: "invalid address" });
+      respond(false, formatWeb3GatewayErrorResponse("invalid address"));
       return;
     }
 
@@ -86,13 +87,13 @@ export function createSiweVerifyHandler(
 ): GatewayRequestHandler {
   return async ({ params, respond }: GatewayRequestHandlerOptions) => {
     if (!config.identity.allowSiwe) {
-      respond(false, { error: "SIWE is disabled" });
+      respond(false, formatWeb3GatewayErrorResponse("SIWE is disabled"));
       return;
     }
 
     const { message, signature } = (params ?? {}) as { message?: string; signature?: string };
     if (!message || !signature) {
-      respond(false, { error: "message and signature are required" });
+      respond(false, formatWeb3GatewayErrorResponse("message and signature are required"));
       return;
     }
 
@@ -100,13 +101,13 @@ export function createSiweVerifyHandler(
     try {
       siweMessage = new SiweMessage(message);
     } catch {
-      respond(false, { error: "invalid SIWE message" });
+      respond(false, formatWeb3GatewayErrorResponse("invalid SIWE message"));
       return;
     }
 
     const challenge = store.getSiweChallenge(siweMessage.nonce);
     if (!challenge) {
-      respond(false, { error: "challenge not found or expired" });
+      respond(false, formatWeb3GatewayErrorResponse("challenge not found or expired"));
       return;
     }
 
@@ -114,7 +115,7 @@ export function createSiweVerifyHandler(
     const expiresAt = Date.parse(challenge.expiresAt);
     if (Number.isNaN(expiresAt) || expiresAt <= now) {
       store.deleteSiweChallenge(challenge.nonce);
-      respond(false, { error: "challenge expired" });
+      respond(false, formatWeb3GatewayErrorResponse("challenge expired"));
       return;
     }
 
@@ -130,7 +131,10 @@ export function createSiweVerifyHandler(
     );
 
     if (!verifyResult.success) {
-      respond(false, { error: verifyResult.error?.type ?? "SIWE verification failed" });
+      respond(
+        false,
+        formatWeb3GatewayErrorResponse(verifyResult.error?.type ?? "SIWE verification failed"),
+      );
       return;
     }
 
@@ -138,23 +142,23 @@ export function createSiweVerifyHandler(
     try {
       messageAddress = getAddress(siweMessage.address);
     } catch {
-      respond(false, { error: "invalid SIWE message address" });
+      respond(false, formatWeb3GatewayErrorResponse("invalid SIWE message address"));
       return;
     }
 
     if (messageAddress !== challenge.address) {
-      respond(false, { error: "SIWE address mismatch" });
+      respond(false, formatWeb3GatewayErrorResponse("SIWE address mismatch"));
       return;
     }
 
     if (challenge.uri && siweMessage.uri !== challenge.uri) {
-      respond(false, { error: "SIWE uri mismatch" });
+      respond(false, formatWeb3GatewayErrorResponse("SIWE uri mismatch"));
       return;
     }
 
     const requiredChainId = config.identity.requiredChainId;
     if (requiredChainId !== undefined && siweMessage.chainId !== requiredChainId) {
-      respond(false, { error: "SIWE chainId mismatch" });
+      respond(false, formatWeb3GatewayErrorResponse("SIWE chainId mismatch"));
       return;
     }
 

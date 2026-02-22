@@ -26,7 +26,7 @@ import {
   assertAccess,
   assertActorMatch,
   createRevocationJob,
-  formatGatewayError,
+  formatGatewayErrorResponse,
   hashAccessToken,
   nowIso,
   randomBytes,
@@ -176,7 +176,7 @@ export function createLeaseIssueHandler(
       };
 
       // Atomic: order + consent + delivery + lease must persist together
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveConsent(consent);
         store.saveDelivery(delivery);
@@ -208,7 +208,7 @@ export function createLeaseIssueHandler(
         accessToken,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -258,7 +258,7 @@ export function createLeaseRevokeHandler(
       const consent = lease.consentId ? store.getConsent(lease.consentId) : undefined;
 
       // Atomic: lease + delivery revocation must persist together
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveLease(lease);
         if (
           delivery &&
@@ -313,7 +313,7 @@ export function createLeaseRevokeHandler(
       });
       respond(true, { leaseId, status: lease.status, revokedAt });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -345,7 +345,7 @@ export function createLeaseGetHandler(
       }
       respond(true, { lease });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -377,7 +377,7 @@ export function createLeaseListHandler(
       });
       respond(true, { leases });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -427,7 +427,7 @@ export function createLeaseExpireSweepHandler(
 
       respond(true, { processed, expired, skipped, errors });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }

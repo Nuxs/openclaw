@@ -99,7 +99,7 @@ export async function validateLeaseAccess(params: {
     });
     const normalized = normalizeGatewayResult(response);
     if (!normalized.ok) {
-      return { ok: false, error: normalized.error ?? "lease lookup failed" };
+      return { ok: false, error: "lease lookup failed" };
     }
     const payload = normalized.result as { lease?: LeaseSnapshot | null } | undefined;
     const lease = payload?.lease ?? null;
@@ -126,7 +126,7 @@ export async function validateLeaseAccess(params: {
     });
     const resourceNormalized = normalizeGatewayResult(resourceResponse);
     if (!resourceNormalized.ok) {
-      return { ok: false, error: resourceNormalized.error ?? "resource lookup failed" };
+      return { ok: false, error: "resource lookup failed" };
     }
     const resourcePayload = resourceNormalized.result as
       | { resource?: { status?: string } | null }
@@ -141,8 +141,8 @@ export async function validateLeaseAccess(params: {
       return { ok: false, error: "consumer not allowed" };
     }
     return { ok: true, lease };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  } catch {
+    return { ok: false, error: "lease access failed" };
   }
 }
 

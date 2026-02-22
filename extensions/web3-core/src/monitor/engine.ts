@@ -5,7 +5,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-// import type { Web3Config } from "../config.js";
+import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import { AlertNotifier } from "./notifications.js";
 import { ALERT_RULES, formatAlertMessage, getEnabledRules } from "./rules.js";
@@ -32,7 +32,7 @@ export class AlertEngine {
 
   constructor(
     private readonly store: Web3StateStore,
-    private readonly config: Web3Config,
+    private readonly config: Web3PluginConfig,
   ) {
     this.notifier = new AlertNotifier(config);
   }

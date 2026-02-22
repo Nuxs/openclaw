@@ -4,8 +4,8 @@
  * User-facing commands for alert monitoring.
  */
 
-// import type { CommandHandler } from "openclaw/plugin-sdk";
-// import type { Web3Config } from "../config.js";
+import type { PluginCommandHandler } from "openclaw/plugin-sdk";
+import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 import { AlertEngine } from "./engine.js";
 import { AlertLevel, AlertStatus } from "./types.js";
@@ -13,7 +13,10 @@ import { AlertLevel, AlertStatus } from "./types.js";
 /**
  * /alerts - Show recent alerts
  */
-export function createAlertsCommand(store: Web3StateStore, config: Web3Config): CommandHandler {
+export function createAlertsCommand(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+): PluginCommandHandler {
   const engine = new AlertEngine(store, config);
 
   return async () => {
@@ -23,7 +26,6 @@ export function createAlertsCommand(store: Web3StateStore, config: Web3Config): 
 
       let output = "📊 **Web3 Alerts Status**\n\n";
 
-      // Summary
       output += "**Summary**\n";
       output += `- Total alerts: ${metrics.totalAlerts}\n`;
       output += `- Active alerts: ${metrics.activeAlerts}\n`;
@@ -32,7 +34,6 @@ export function createAlertsCommand(store: Web3StateStore, config: Web3Config): 
       output += `- P2 (Warning): ${metrics.alertsByLevel[AlertLevel.P2]}\n`;
       output += "\n";
 
-      // Critical alerts (if any)
       if (criticalAlerts.length > 0) {
         output += "🚨 **Critical Alerts (P0)**\n\n";
         for (const alert of criticalAlerts) {
@@ -45,7 +46,6 @@ export function createAlertsCommand(store: Web3StateStore, config: Web3Config): 
         output += "✅ No critical alerts\n\n";
       }
 
-      // Recent alerts
       if (metrics.recentAlerts.length > 0) {
         output += "**Recent Alerts** (last 5)\n\n";
         for (const alert of metrics.recentAlerts.slice(0, 5)) {
@@ -62,9 +62,11 @@ export function createAlertsCommand(store: Web3StateStore, config: Web3Config): 
         output += "No recent alerts\n";
       }
 
-      return output;
+      return { text: output };
     } catch (error) {
-      return `❌ Failed to get alerts: ${error instanceof Error ? error.message : "Unknown error"}`;
+      return {
+        text: `❌ Failed to get alerts: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
     }
   };
 }
@@ -74,21 +76,23 @@ export function createAlertsCommand(store: Web3StateStore, config: Web3Config): 
  */
 export function createAlertAcknowledgeCommand(
   store: Web3StateStore,
-  config: Web3Config,
-): CommandHandler {
+  config: Web3PluginConfig,
+): PluginCommandHandler {
   const engine = new AlertEngine(store, config);
 
-  return async (args?: string) => {
-    const alertId = args?.trim();
+  return async (ctx) => {
+    const alertId = ctx.args?.trim();
     if (!alertId) {
-      return "❌ Usage: /alert_ack <alertId>";
+      return { text: "❌ Usage: /alert_ack <alertId>" };
     }
 
     try {
       await engine.acknowledgeAlert(alertId);
-      return `✅ Alert ${alertId} acknowledged`;
+      return { text: `✅ Alert ${alertId} acknowledged` };
     } catch (error) {
-      return `❌ Failed to acknowledge alert: ${error instanceof Error ? error.message : "Unknown error"}`;
+      return {
+        text: `❌ Failed to acknowledge alert: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
     }
   };
 }
@@ -98,14 +102,14 @@ export function createAlertAcknowledgeCommand(
  */
 export function createAlertResolveCommand(
   store: Web3StateStore,
-  config: Web3Config,
-): CommandHandler {
+  config: Web3PluginConfig,
+): PluginCommandHandler {
   const engine = new AlertEngine(store, config);
 
-  return async (args?: string) => {
-    const parts = args?.trim().split(/\s+/);
+  return async (ctx) => {
+    const parts = ctx.args?.trim().split(/\s+/);
     if (!parts || parts.length === 0) {
-      return "❌ Usage: /alert_resolve <alertId> [note]";
+      return { text: "❌ Usage: /alert_resolve <alertId> [note]" };
     }
 
     const alertId = parts[0];
@@ -113,9 +117,11 @@ export function createAlertResolveCommand(
 
     try {
       await engine.resolveAlert(alertId, undefined, note || undefined);
-      return `✅ Alert ${alertId} resolved` + (note ? ` with note: "${note}"` : "");
+      return { text: `✅ Alert ${alertId} resolved` + (note ? ` with note: "${note}"` : "") };
     } catch (error) {
-      return `❌ Failed to resolve alert: ${error instanceof Error ? error.message : "Unknown error"}`;
+      return {
+        text: `❌ Failed to resolve alert: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
     }
   };
 }
@@ -123,7 +129,10 @@ export function createAlertResolveCommand(
 /**
  * /health - Check Web3 service health
  */
-export function createHealthCommand(store: Web3StateStore, config: Web3Config): CommandHandler {
+export function createHealthCommand(
+  store: Web3StateStore,
+  _config: Web3PluginConfig,
+): PluginCommandHandler {
   return async () => {
     try {
       const alerts = store.getAlerts();
@@ -132,8 +141,7 @@ export function createHealthCommand(store: Web3StateStore, config: Web3Config): 
       );
 
       const recentEvents = store.readAuditEvents(10);
-      const lastActivity =
-        recentEvents.length > 0 ? new Date(recentEvents[0]?.timestamp ?? "") : null;
+      const lastActivity = recentEvents.length > 0 ? (recentEvents[0]?.timestamp ?? null) : null;
 
       let output = "🏥 **Web3 Service Health**\n\n";
 
@@ -143,13 +151,15 @@ export function createHealthCommand(store: Web3StateStore, config: Web3Config): 
         output += `⚠️ **Status**: Degraded (${criticalAlerts.length} critical alerts)\n`;
       }
 
-      output += `- Last activity: ${lastActivity ? lastActivity.toLocaleString() : "No recent activity"}\n`;
+      output += `- Last activity: ${lastActivity ? new Date(lastActivity).toLocaleString() : "No recent activity"}\n`;
       output += `- Active alerts: ${alerts.filter((a) => a.status === AlertStatus.ACTIVE).length}\n`;
       output += `- Audit events: ${recentEvents.length} recent\n`;
 
-      return output;
+      return { text: output };
     } catch (error) {
-      return `❌ Failed to check health: ${error instanceof Error ? error.message : "Unknown error"}`;
+      return {
+        text: `❌ Failed to check health: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
     }
   };
 }

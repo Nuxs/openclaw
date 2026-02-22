@@ -11,7 +11,7 @@
  */
 
 import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
-import { resolveConfig } from "./config.js";
+import { resolveConfig, type MarketPluginConfig } from "./config.js";
 import { createMarketFacade } from "./facade.js";
 import {
   createConsentGrantHandler,
@@ -61,6 +61,21 @@ import { MarketStateStore } from "./state/store.js";
 export type { MarketFacade } from "./facade.js";
 export { createMarketFacade } from "./facade.js";
 
+function enforceSqliteStore(
+  config: MarketPluginConfig,
+  logger: { warn: (message: string) => void },
+): MarketPluginConfig {
+  if (config.store.mode === "sqlite") return config;
+  logger.warn("market-core store mode 'file' is not supported for external use; forcing sqlite");
+  return {
+    ...config,
+    store: {
+      ...config.store,
+      mode: "sqlite",
+    },
+  };
+}
+
 const plugin: OpenClawPluginDefinition = {
   id: "market-core",
   name: "Market Core",
@@ -69,7 +84,8 @@ const plugin: OpenClawPluginDefinition = {
   version: "2026.2.21",
 
   register(api) {
-    const config = resolveConfig(api.pluginConfig);
+    let config = resolveConfig(api.pluginConfig);
+    config = enforceSqliteStore(config, api.logger);
     const stateDir = api.runtime.state.resolveStateDir();
     const store = new MarketStateStore(stateDir, config);
 

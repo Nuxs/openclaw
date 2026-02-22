@@ -30,7 +30,7 @@ type MarketStatusState = {
   marketLastSuccess: number | null;
 };
 
-export async function loadMarketStatus(state: MarketStatusState) {
+export async function loadMarketStatus(state: MarketStatusState & { hello?: unknown }) {
   if (!state.client || !state.connected) {
     return;
   }
@@ -39,6 +39,30 @@ export async function loadMarketStatus(state: MarketStatusState) {
   }
   state.marketLoading = true;
   state.marketError = null;
+
+  // If the gateway hasn't registered these methods, fail fast with an actionable message.
+  // This typically means the running gateway hasn't loaded `web3-core` (or it's outdated),
+  // so the UI would otherwise just show "unknown method".
+  const hello = state.hello as { features?: { methods?: unknown } } | undefined;
+  const methods = Array.isArray(hello?.features?.methods) ? hello?.features?.methods : null;
+  const requiredMethods = [
+    "web3.market.status.summary",
+    "web3.market.metrics.snapshot",
+    "web3.index.list",
+    "web3.index.stats",
+    "web3.monitor.snapshot",
+  ];
+  if (methods) {
+    const missing = requiredMethods.filter((m) => !methods.includes(m));
+    if (missing.length > 0) {
+      state.marketError =
+        `市场 API 未就绪：网关未加载/未更新 web3 市场插件。\n` +
+        `缺少方法：${missing.join(", ")}\n` +
+        `建议：确认配置启用 web3-core/market-core，然后重启网关（macOS 请通过 OpenClaw Mac app 重启）。`;
+      state.marketLoading = false;
+      return;
+    }
+  }
 
   try {
     const [

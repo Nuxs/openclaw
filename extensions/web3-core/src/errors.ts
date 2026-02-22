@@ -1,4 +1,4 @@
-import { ErrorCode, type ErrorResponse } from "./errors/codes.js";
+import { ErrorCode, ERROR_CODE_DESCRIPTIONS, type ErrorResponse } from "./errors/codes.js";
 
 /**
  * Redact sensitive information from error messages to prevent information leakage.
@@ -91,4 +91,17 @@ export function formatWeb3GatewayError(err: unknown, fallback = ErrorCode.E_INTE
     return ErrorCode.E_UNAVAILABLE;
   }
   return fallback;
+}
+
+export function formatWeb3GatewayErrorResponse(
+  err: unknown,
+  fallback = ErrorCode.E_INTERNAL,
+  details?: Record<string, unknown>,
+): ErrorResponse {
+  const code = formatWeb3GatewayError(err, fallback);
+  const message = ERROR_CODE_DESCRIPTIONS[code] ?? "An internal error occurred.";
+  if (details && Object.keys(details).length > 0) {
+    return { error: code, message, details };
+  }
+  return { error: code, message };
 }

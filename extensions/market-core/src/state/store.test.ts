@@ -67,7 +67,7 @@ describe("MarketStateStore.runInTransaction", () => {
         updatedAt: now,
       };
 
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOffer(offer);
         store.saveResource(resource);
       });
@@ -103,12 +103,12 @@ describe("MarketStateStore.runInTransaction", () => {
       updatedAt: now,
     };
 
-    expect(() => {
+    await expect(
       store.runInTransaction(() => {
         store.saveOffer(offer);
         throw new Error("simulated failure mid-transaction");
-      });
-    }).toThrow("simulated failure mid-transaction");
+      }),
+    ).rejects.toThrow("simulated failure mid-transaction");
 
     // Offer should NOT be persisted due to rollback
     expect(store.getOffer("offer-rollback")).toBeUndefined();
@@ -145,21 +145,21 @@ describe("MarketStateStore.runInTransaction", () => {
       grantedAt: now,
     };
 
-    expect(() => {
+    await expect(
       store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveConsent(consent);
         // Crash before saving delivery/lease
         throw new Error("crash mid-4-step");
-      });
-    }).toThrow("crash mid-4-step");
+      }),
+    ).rejects.toThrow("crash mid-4-step");
 
     expect(store.getOrder("order-rb")).toBeUndefined();
     expect(store.getConsent("consent-rb")).toBeUndefined();
   });
 
-  it("file mode: fn still executes (no true rollback)", async () => {
-    const modeDir = path.join(tempDir, "file-no-rollback");
+  it("file mode rolls back writes on error", async () => {
+    const modeDir = path.join(tempDir, "file-rollback");
     await fs.mkdir(modeDir, { recursive: true });
     const config = resolveConfig({
       store: { mode: "file" },
@@ -184,15 +184,14 @@ describe("MarketStateStore.runInTransaction", () => {
       updatedAt: now,
     };
 
-    expect(() => {
+    await expect(
       store.runInTransaction(() => {
         store.saveOffer(offer);
         throw new Error("file mode crash");
-      });
-    }).toThrow("file mode crash");
+      }),
+    ).rejects.toThrow("file mode crash");
 
-    // File mode has no rollback — the write persists
-    expect(store.getOffer("offer-file")).toBeTruthy();
+    expect(store.getOffer("offer-file")).toBeUndefined();
   });
 
   it("nested transaction fn succeeds without error propagation", async () => {
@@ -214,7 +213,7 @@ describe("MarketStateStore.runInTransaction", () => {
         updatedAt: now,
       };
 
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOffer(offer);
       });
 

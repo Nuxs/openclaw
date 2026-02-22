@@ -21,7 +21,7 @@ import {
   RESOURCE_PRICE_UNITS,
   assertAccess,
   assertActorMatch,
-  formatGatewayError,
+  formatGatewayErrorResponse,
   nowIso,
   parsePriceAmount,
   randomUUID,
@@ -176,7 +176,7 @@ export function createResourcePublishHandler(
       };
 
       // Atomic: offer + resource must persist together
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOffer(offer);
         store.saveResource(resource);
       });
@@ -207,7 +207,7 @@ export function createResourcePublishHandler(
 
       respond(true, { resourceId, offerId, offerHash, status: resource.status });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -216,7 +216,7 @@ export function createResourceUnpublishHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
 ): GatewayRequestHandler {
-  return (opts: GatewayRequestHandlerOptions) => {
+  return async (opts: GatewayRequestHandlerOptions) => {
     const { params, respond } = opts;
     try {
       assertAccess(opts, config, "write");
@@ -238,7 +238,7 @@ export function createResourceUnpublishHandler(
 
       const offer = store.getOffer(resource.offerId);
       // Atomic: resource + offer status must update together
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveResource(resource);
         if (offer && offer.status !== "offer_closed") {
           assertOfferTransition(offer.status, "offer_closed");
@@ -257,7 +257,7 @@ export function createResourceUnpublishHandler(
       );
       respond(true, { resourceId, status: resource.status });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -275,7 +275,7 @@ export function createResourceGetHandler(
       const resource = store.getResource(resourceId) ?? null;
       respond(true, { resource });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -301,7 +301,7 @@ export function createResourceListHandler(
       const resources = store.listResources({ kind, status, providerActorId, tag, limit });
       respond(true, { resources });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }

@@ -38,6 +38,7 @@ import {
   createDisputeResolveHandler,
   createDisputeSubmitEvidenceHandler,
 } from "./disputes/handlers.js";
+import { formatWeb3GatewayErrorResponse } from "./errors.js";
 import {
   createBindWalletCommand,
   createUnbindWalletCommand,
@@ -479,7 +480,7 @@ function createBillingStatusHandler(
   return ({ params, respond }: GatewayRequestHandlerOptions) => {
     const { sessionIdHash } = (params ?? {}) as { sessionIdHash?: string };
     if (!sessionIdHash) {
-      respond(false, { error: "sessionIdHash is required" });
+      respond(false, formatWeb3GatewayErrorResponse("sessionIdHash is required"));
       return;
     }
     const usage = store.getUsage(sessionIdHash);

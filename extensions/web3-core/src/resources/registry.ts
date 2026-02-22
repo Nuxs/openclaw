@@ -5,6 +5,7 @@ import type {
 } from "openclaw/plugin-sdk";
 import type { SessionEntry } from "../../../../src/config/sessions/types.ts";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { clearConsumerLeaseById, saveConsumerLeaseAccess } from "./leases.js";
 
 type GatewayCallResult = {
@@ -217,12 +218,12 @@ function createMarketProxyHandler(
       });
       const normalized = normalizeGatewayResult(response);
       if (!normalized.ok) {
-        respond(false, { error: normalized.error });
+        respond(false, formatWeb3GatewayErrorResponse(normalized.error));
         return;
       }
       respond(true, normalized.result ?? {});
     } catch (err) {
-      respond(false, { error: err instanceof Error ? err.message : String(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -248,7 +249,7 @@ export function createResourceLeaseHandler(config: Web3PluginConfig): GatewayReq
       const input = (params ?? {}) as Record<string, unknown>;
       const resourceId = typeof input.resourceId === "string" ? input.resourceId.trim() : "";
       if (!resourceId) {
-        respond(false, { error: "resourceId is required" });
+        respond(false, formatWeb3GatewayErrorResponse("resourceId is required"));
         return;
       }
 
@@ -260,7 +261,7 @@ export function createResourceLeaseHandler(config: Web3PluginConfig): GatewayReq
       });
       const normalized = normalizeGatewayResult(response);
       if (!normalized.ok) {
-        respond(false, { error: normalized.error });
+        respond(false, formatWeb3GatewayErrorResponse(normalized.error));
         return;
       }
 
@@ -306,7 +307,7 @@ export function createResourceLeaseHandler(config: Web3PluginConfig): GatewayReq
         stored: Boolean(leaseId && accessToken && expiresAt),
       });
     } catch (err) {
-      respond(false, { error: err instanceof Error ? err.message : String(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -326,7 +327,7 @@ export function createResourceRevokeLeaseHandler(config: Web3PluginConfig): Gate
       });
       const normalized = normalizeGatewayResult(response);
       if (!normalized.ok) {
-        respond(false, { error: normalized.error });
+        respond(false, formatWeb3GatewayErrorResponse(normalized.error));
         return;
       }
 
@@ -335,7 +336,7 @@ export function createResourceRevokeLeaseHandler(config: Web3PluginConfig): Gate
       }
       respond(true, normalized.result ?? {});
     } catch (err) {
-      respond(false, { error: err instanceof Error ? err.message : String(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -346,7 +347,7 @@ export function createResourceStatusHandler(config: Web3PluginConfig): GatewayRe
       requireResourcesEnabled(config);
       const input = (params ?? {}) as { resourceId?: string; leaseId?: string };
       if (!input.resourceId && !input.leaseId) {
-        respond(false, { error: "resourceId or leaseId is required" });
+        respond(false, formatWeb3GatewayErrorResponse("resourceId or leaseId is required"));
         return;
       }
       const method = input.leaseId ? "market.lease.get" : "market.resource.get";
@@ -358,12 +359,12 @@ export function createResourceStatusHandler(config: Web3PluginConfig): GatewayRe
       });
       const normalized = normalizeGatewayResult(response);
       if (!normalized.ok) {
-        respond(false, { error: normalized.error });
+        respond(false, formatWeb3GatewayErrorResponse(normalized.error));
         return;
       }
       respond(true, normalized.result ?? {});
     } catch (err) {
-      respond(false, { error: err instanceof Error ? err.message : String(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }

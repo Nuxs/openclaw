@@ -4,7 +4,7 @@
  * Handles alert notifications via various channels (webhook, email, etc.)
  */
 
-// import type { Web3Config } from "../config.js";
+import type { Web3PluginConfig } from "../config.js";
 import type { AlertEvent } from "./types.js";
 
 /**
@@ -46,7 +46,7 @@ export type NotificationResult = {
  * Alert notification manager
  */
 export class AlertNotifier {
-  constructor(private readonly config: Web3Config) {}
+  constructor(private readonly config: Web3PluginConfig) {}
 
   /**
    * Send alert notification to all enabled channels

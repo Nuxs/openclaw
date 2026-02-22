@@ -62,10 +62,12 @@ export class BlockchainFactory implements IBlockchainFactory {
    */
   private registerBuiltInProviders(): void {
     // TON Mainnet
-    this.register("ton-mainnet", new TONProvider({ testnet: false }));
+    const tonMainnetConfig = this.getConfig("ton-mainnet");
+    this.register("ton-mainnet", new TONProvider({ testnet: false, config: tonMainnetConfig }));
 
     // TON Testnet
-    this.register("ton-testnet", new TONProvider({ testnet: true }));
+    const tonTestnetConfig = this.getConfig("ton-testnet");
+    this.register("ton-testnet", new TONProvider({ testnet: true, config: tonTestnetConfig }));
 
     // 其他链暂时注册为占位符
     // Solana

@@ -8,7 +8,8 @@ import {
   getProvider,
   getSupportedChains,
   type IBlockchainProvider,
-} from "@openclaw/blockchain-adapter";
+  type TxLog,
+} from "../src/index.js";
 
 // ============================================================================
 // 示例1: 初始化并连接TON钱包
@@ -177,7 +178,7 @@ async function example7_subscribeSettlementEvents(provider: IBlockchainProvider)
   const unsubscribeLock = await provider.subscribeEvents(
     SETTLEMENT_CONTRACT,
     "SettlementLocked",
-    (event) => {
+    (event: TxLog) => {
       console.log("🔒 New settlement locked:", event);
     },
   );
@@ -186,7 +187,7 @@ async function example7_subscribeSettlementEvents(provider: IBlockchainProvider)
   const unsubscribeRelease = await provider.subscribeEvents(
     SETTLEMENT_CONTRACT,
     "SettlementReleased",
-    (event) => {
+    (event: TxLog) => {
       console.log("💰 Settlement released:", event);
     },
   );

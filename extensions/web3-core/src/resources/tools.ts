@@ -32,10 +32,65 @@ type AgentToolResult = {
 };
 
 function jsonResult(payload: unknown): AgentToolResult {
+  const safePayload = redactUnknown(payload);
   return {
-    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-    details: payload,
+    content: [{ type: "text", text: JSON.stringify(safePayload, null, 2) }],
+    details: safePayload,
   };
+}
+
+const REDACTED = "[REDACTED]";
+const REDACTED_ENDPOINT = "[REDACTED_ENDPOINT]";
+
+const SENSITIVE_KEYS = new Set([
+  "accesstoken",
+  "refreshtoken",
+  "token",
+  "apikey",
+  "secret",
+  "password",
+  "privatekey",
+  "endpoint",
+  "providerendpoint",
+  "downloadurl",
+  "rpcurl",
+  "dbpath",
+  "storepath",
+]);
+
+function redactString(input: string): string {
+  const tokenRedacted = input.replace(/\btok[\w-]+\b/gi, "tok_***");
+  const bearerRedacted = tokenRedacted.replace(/\bBearer\s+[^\s]+/gi, "Bearer [REDACTED]");
+  const urlRedacted = bearerRedacted.replace(/https?:\/\/[^\s)\]]+/gi, REDACTED_ENDPOINT);
+  return urlRedacted.replace(/\/(Users|home)\/[A-Za-z0-9._-]+\//g, "~/");
+}
+
+function redactUnknown(value: unknown): unknown {
+  if (value == null) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return redactString(value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactUnknown(entry));
+  }
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const lowered = key.toLowerCase();
+      if (SENSITIVE_KEYS.has(lowered)) {
+        out[key] = REDACTED;
+        continue;
+      }
+      out[key] = redactUnknown(raw);
+    }
+    return out;
+  }
+  return String(value);
 }
 
 function normalizeBaseUrl(endpoint: string): string {

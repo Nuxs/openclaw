@@ -38,7 +38,7 @@ describe("web3-core resource registry handlers", () => {
 
     await handler({ params: {}, respond } as any);
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("disabled");
+    expect(result()?.payload.error).toBe("E_FORBIDDEN");
   });
 
   it("rejects publish when advertiseToMarket disabled", async () => {
@@ -51,7 +51,7 @@ describe("web3-core resource registry handlers", () => {
 
     await handler({ params: {}, respond } as any);
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("disabled");
+    expect(result()?.payload.error).toBe("E_FORBIDDEN");
   });
 
   it("proxies publish to market.resource.publish on success", async () => {
@@ -107,7 +107,7 @@ describe("web3-core resource registry handlers", () => {
 
     await handler({ params: { resourceId: "res-1" }, respond } as any);
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("disabled");
+    expect(result()?.payload.error).toBe("E_FORBIDDEN");
   });
 
   it("rejects lease when resourceId missing", async () => {
@@ -120,7 +120,7 @@ describe("web3-core resource registry handlers", () => {
 
     await handler({ params: {}, respond } as any);
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("resourceId");
+    expect(result()?.payload.error).toBe("E_INVALID_ARGUMENT");
   });
 
   it("caches consumer lease access on successful lease issue", async () => {
@@ -208,7 +208,14 @@ describe("web3-core resource registry handlers", () => {
     } as any);
 
     expect(result()?.ok).toBe(true);
-    const store = loadSessionStore(storePath, { skipCache: true });
+
+    const deadline = Date.now() + 1000;
+    let store = loadSessionStore(storePath, { skipCache: true });
+    while (Date.now() < deadline && !store[sessionKey]?.settlement?.orderId) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      store = loadSessionStore(storePath, { skipCache: true });
+    }
+
     expect(store[sessionKey]?.settlement?.orderId).toBe("ord-2");
     expect(store[sessionKey]?.settlement?.payer).toBe("0xcons");
   });
@@ -259,7 +266,7 @@ describe("web3-core resource registry handlers", () => {
 
     await handler({ params: {}, respond } as any);
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("required");
+    expect(result()?.payload.error).toBe("E_INVALID_ARGUMENT");
   });
 
   it("proxies status with leaseId to market.lease.get", async () => {
@@ -310,6 +317,6 @@ describe("web3-core resource registry handlers", () => {
 
     await handler({ params: { actorId: "0xprov" }, respond } as any);
     expect(result()?.ok).toBe(false);
-    expect(result()?.payload.error).toContain("internal error");
+    expect(result()?.payload.error).toBe("E_INTERNAL");
   });
 });

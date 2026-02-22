@@ -157,6 +157,10 @@ export type ResourceSearchOffer = {
   backend: "searxng" | "custom";
   backendConfig: Record<string, unknown>;
   price: ResourcePrice;
+  policy?: {
+    maxConcurrent?: number;
+    maxQueryChars?: number;
+  };
 };
 
 export type ResourceStorageOffer = {
@@ -168,6 +172,7 @@ export type ResourceStorageOffer = {
   policy: {
     maxBytes: number;
     allowMime?: string[];
+    maxConcurrent?: number;
   };
 };
 

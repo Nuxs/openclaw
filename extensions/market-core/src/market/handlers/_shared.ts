@@ -5,7 +5,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "../../config.js";
-import { ErrorCode } from "../../errors/codes.js";
+import { ErrorCode, ERROR_CODE_DESCRIPTIONS, type ErrorResponse } from "../../errors/codes.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { EvmAnchorAdapter, type AnchorResult } from "../chain.js";
 import { createDeliveryCredentialsStore } from "../credentials.js";
@@ -135,6 +135,19 @@ export function formatGatewayError(err: unknown, fallback = ErrorCode.E_INTERNAL
     return ErrorCode.E_UNAVAILABLE;
   }
   return fallback;
+}
+
+export function formatGatewayErrorResponse(
+  err: unknown,
+  fallback = ErrorCode.E_INTERNAL,
+  details?: Record<string, unknown>,
+): ErrorResponse {
+  const code = formatGatewayError(err, fallback);
+  const message = ERROR_CODE_DESCRIPTIONS[code] ?? "An internal error occurred.";
+  if (details && Object.keys(details).length > 0) {
+    return { error: code, message, details };
+  }
+  return { error: code, message };
 }
 
 // ---- Token/price helpers ----

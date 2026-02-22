@@ -19,7 +19,13 @@ import type {
   OrderBook,
   OrderBookEntry,
 } from "../pricing-types.js";
-import { assertAccess, formatGatewayError, requireActorId, nowIso, randomUUID } from "./_shared.js";
+import {
+  assertAccess,
+  formatGatewayErrorResponse,
+  requireActorId,
+  nowIso,
+  randomUUID,
+} from "./_shared.js";
 
 // 本地辅助函数
 function requireString(value: unknown, name: string): string {
@@ -78,7 +84,7 @@ export function createPricingModelHandler(
         message: "定价模型已保存",
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -110,7 +116,7 @@ export function getPricingModelHandler(
 
       respond(true, { offerId, pricingModel });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -191,7 +197,7 @@ export function calculatePriceHandler(
 
       respond(true, { offerId, ...priceCalculation });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -220,7 +226,7 @@ export function getPriceHistoryHandler(
         history,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -272,7 +278,7 @@ export function getMarketStatisticsHandler(
 
       respond(true, statistics);
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -328,7 +334,7 @@ export function createOrderBookEntryHandler(
         matches: matches.length,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -374,7 +380,7 @@ export function getOrderBookHandler(
 
       respond(true, orderBook);
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
