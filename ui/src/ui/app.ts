@@ -58,6 +58,7 @@ import type { ChatProgressState } from "./controllers/chat.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+import { enableWeb3Market } from "./controllers/market-status.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
@@ -246,6 +247,9 @@ export class OpenClawApp extends LitElement {
 
   @state() marketLoading = false;
   @state() marketError: string | null = null;
+  @state() marketEnableBusy = false;
+  @state() marketEnableError: string | null = null;
+  @state() marketEnableNotice: string | null = null;
   @state() marketStatus: import("./types.js").MarketStatusSummary | null = null;
   @state() marketMetrics: import("./types.js").MarketMetricsSnapshot | null = null;
   @state() marketIndexEntries: import("./types.js").Web3IndexEntry[] = [];
@@ -486,6 +490,10 @@ export class OpenClawApp extends LitElement {
 
   async loadMarket() {
     await loadMarketInternal(this as unknown as Parameters<typeof loadMarketInternal>[0]);
+  }
+
+  async handleMarketEnable() {
+    await enableWeb3Market(this as unknown as Parameters<typeof enableWeb3Market>[0]);
   }
 
   async loadCron() {

@@ -1,5 +1,6 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type {
+  ConfigSnapshot,
   MarketDispute,
   MarketLedgerEntry,
   MarketLedgerSummary,
@@ -11,12 +12,16 @@ import type {
   Web3IndexStats,
   Web3MonitorSnapshot,
 } from "../types.ts";
+import { cloneConfigObject, serializeConfigForm, setPathValue } from "./config/form-utils.ts";
 
 type MarketStatusState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
   marketLoading: boolean;
   marketError: string | null;
+  marketEnableBusy: boolean;
+  marketEnableError: string | null;
+  marketEnableNotice: string | null;
   marketStatus: MarketStatusSummary | null;
   marketMetrics: MarketMetricsSnapshot | null;
   marketIndexEntries: Web3IndexEntry[];
@@ -191,4 +196,126 @@ function normalizePayload<T>(input: unknown): T | null {
     return null;
   }
   return payload as T;
+}
+
+function getPathValue(root: Record<string, unknown>, path: Array<string | number>): unknown {
+  let current: unknown = root;
+  for (const key of path) {
+    if (!current || typeof current !== "object") {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[String(key)];
+  }
+  return current;
+}
+
+function normalizeAllowList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === "string");
+  }
+  return [];
+}
+
+export async function enableWeb3Market(state: MarketStatusState & { hello?: unknown }) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  if (state.marketEnableBusy) {
+    return;
+  }
+  state.marketEnableBusy = true;
+  state.marketEnableError = null;
+  state.marketEnableNotice = null;
+
+  try {
+    const snapshot = await state.client.request<ConfigSnapshot>("config.get", {});
+    const baseHash = snapshot.hash;
+    if (!baseHash) {
+      state.marketEnableError = "Config hash missing; reload and retry.";
+      return;
+    }
+    const configBase = snapshot.config ?? {};
+    const next = cloneConfigObject(configBase);
+
+    const allow = normalizeAllowList(getPathValue(next, ["plugins", "allow"]));
+    const allowSet = new Set(allow);
+    allowSet.add("web3-core");
+    allowSet.add("market-core");
+
+    setPathValue(next, ["plugins", "enabled"], true);
+    setPathValue(next, ["plugins", "allow"], Array.from(allowSet));
+    setPathValue(next, ["plugins", "entries", "web3-core", "enabled"], true);
+    setPathValue(next, ["plugins", "entries", "market-core", "enabled"], true);
+
+    setPathValue(next, ["plugins", "entries", "web3-core", "config", "resources", "enabled"], true);
+    setPathValue(
+      next,
+      ["plugins", "entries", "web3-core", "config", "resources", "advertiseToMarket"],
+      true,
+    );
+    setPathValue(
+      next,
+      ["plugins", "entries", "web3-core", "config", "resources", "consumer", "enabled"],
+      true,
+    );
+    const listenEnabled = getPathValue(next, [
+      "plugins",
+      "entries",
+      "web3-core",
+      "config",
+      "resources",
+      "provider",
+      "listen",
+      "enabled",
+    ]);
+    if (listenEnabled === undefined || listenEnabled === null) {
+      setPathValue(
+        next,
+        ["plugins", "entries", "web3-core", "config", "resources", "provider", "listen", "enabled"],
+        true,
+      );
+    }
+    const listenBind = getPathValue(next, [
+      "plugins",
+      "entries",
+      "web3-core",
+      "config",
+      "resources",
+      "provider",
+      "listen",
+      "bind",
+    ]);
+    if (listenBind === undefined || listenBind === null) {
+      setPathValue(
+        next,
+        ["plugins", "entries", "web3-core", "config", "resources", "provider", "listen", "bind"],
+        "loopback",
+      );
+    }
+    const listenPort = getPathValue(next, [
+      "plugins",
+      "entries",
+      "web3-core",
+      "config",
+      "resources",
+      "provider",
+      "listen",
+      "port",
+    ]);
+    if (listenPort === undefined || listenPort === null || listenPort === 0) {
+      setPathValue(
+        next,
+        ["plugins", "entries", "web3-core", "config", "resources", "provider", "listen", "port"],
+        18790,
+      );
+    }
+
+    const raw = serializeConfigForm(next);
+    await state.client.request("config.apply", { raw, baseHash });
+    state.marketEnableNotice = "已提交启用配置，请补齐 provider offers 后重启 Gateway。";
+  } catch (err) {
+    state.marketEnableError = String(err);
+  } finally {
+    state.marketEnableBusy = false;
+  }
 }

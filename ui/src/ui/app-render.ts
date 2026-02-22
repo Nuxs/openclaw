@@ -54,6 +54,7 @@ import {
 } from "./controllers/skills.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
+import { pathForTab } from "./navigation.ts";
 import { renderAgents } from "./views/agents.ts";
 import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
@@ -265,9 +266,14 @@ export function renderApp(state: AppViewState) {
                 disputes: state.marketDisputes,
                 resourceKind: state.marketResourceKind,
                 filters: state.marketFilters,
+                enableBusy: state.marketEnableBusy,
+                enableError: state.marketEnableError,
+                enableNotice: state.marketEnableNotice,
+                configPath: pathForTab("config", state.basePath),
                 onResourceKindChange: (next) => (state.marketResourceKind = next),
                 onFiltersChange: (next) => (state.marketFilters = next),
                 onRefresh: () => state.loadMarket(),
+                onEnable: () => state.handleMarketEnable(),
               })
             : nothing
         }

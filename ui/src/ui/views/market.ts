@@ -33,9 +33,14 @@ type MarketProps = {
   disputes: MarketDispute[];
   resourceKind: MarketResourceKind | "all";
   filters: MarketFilters;
+  enableBusy: boolean;
+  enableError: string | null;
+  enableNotice: string | null;
+  configPath: string;
   onResourceKindChange: (next: MarketResourceKind | "all") => void;
   onFiltersChange: (next: MarketFilters) => void;
   onRefresh: () => void;
+  onEnable: () => void;
 };
 
 const RESOURCE_KINDS: Array<{ key: MarketProps["resourceKind"]; label: string }> = [
@@ -200,6 +205,34 @@ export function renderMarket(props: MarketProps) {
         ${
           props.error
             ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
+            : nothing
+        }
+        ${
+          props.enableError
+            ? html`<div class="callout danger" style="margin-top: 12px;">${props.enableError}</div>`
+            : nothing
+        }
+        ${
+          props.enableNotice
+            ? html`<div class="callout info" style="margin-top: 12px;">${props.enableNotice}</div>`
+            : nothing
+        }
+        ${
+          props.error && props.error.includes("市场 API 未就绪")
+            ? html`
+              <div class="callout info" style="margin-top: 12px;">
+                <div style="font-weight: 600;">一键启用 Web3 市场</div>
+                <div style="margin-top: 6px;">
+                  这会启用 web3-core / market-core，并开启资源能力（不包含模型 offer）。
+                </div>
+                <div class="row" style="margin-top: 10px; gap: 8px;">
+                  <button class="btn btn--sm" ?disabled=${props.enableBusy} @click=${props.onEnable}>
+                    ${props.enableBusy ? "处理中…" : "一键启用"}
+                  </button>
+                  <a class="btn btn--sm" href=${props.configPath}>打开配置页</a>
+                </div>
+              </div>
+            `
             : nothing
         }
         <div class="muted" style="margin-top: 10px;">Last update: ${lastSuccessLabel}</div>
