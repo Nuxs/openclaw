@@ -11,8 +11,8 @@ title: "Web3 Market (概览)"
 
 Web3 Market 模式把 OpenClaw 变成一个“互助式市场”的管家入口：
 
-- **你（用户）只做少量决策**：发布什么、价格/规则、要不要租用别人。
-- **复杂执行都由 AI 管家代办**：签发租约、保存一次性 token、调用资源、记账、进入结算队列、生成可审计记录。
+- **你（用户）只做少量决策**：发布什么、价格/规则、要不要租用别人、以及（可选）用哪条链支付（TON/EVM）。
+- **复杂执行都由 AI 管家代办**：签发租约、代管一次性 token（不回显）、调用资源、记账、进入结算队列、生成可审计记录。
 
 它强调两个底层原则：
 
@@ -36,8 +36,8 @@ Web3 Market 模式把 OpenClaw 变成一个“互助式市场”的管家入口�
 ### 买资源（省钱或补能力）
 
 1. **发现并选择资源**：你只看到摘要信息（能力、价格、SLA 等），不需要也不应该看到 endpoint。
-2. **发起租用并使用**：AI 管家拿到租约并代管 token，自动把调用路由到正确的 Provider。
-3. **查看账单与结算**：在 UI/CLI 里查看 credits、账本与 escrow 状态。
+2. **选择支付链并租用**：你可以选择在 TON 或 EVM 支付（或在信任域走后付策略）；AI 管家签发租约并代管一次性 token（不回显）。
+3. **发起使用并查看对账**：AI 管家自动路由到正确的 Provider；你在 UI/CLI 里查看 credits、账本与 escrow 状态，以及可分享的脱敏对账摘要。
 
 ## 你会在 UI/CLI 里看到什么
 
@@ -52,6 +52,8 @@ Web3 Market 模式把 OpenClaw 变成一个“互助式市场”的管家入口�
 
 本文档只保留用户向的“极简心智模型”。关于默认网络、默认存储、结算参数与状态机等实现细节，见开发者文档：[/reference/web3-market-dev](/reference/web3-market-dev)。
 
+关于 TON+EVM 双栈并行（用户选链支付、后台统一对账口径）的总规划，见：`docs/WEB3_DUAL_STACK_STRATEGY.md`。
+
 ## 相关文档
 
 - `web3-core` 插件：[/plugins/web3-core](/plugins/web3-core)
@@ -59,4 +61,6 @@ Web3 Market 模式把 OpenClaw 变成一个“互助式市场”的管家入口�
 - `market-core` 插件：[/plugins/market-core](/plugins/market-core)
 - Web3 Market 开发者文档：[/reference/web3-market-dev](/reference/web3-market-dev)
 - Web3 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
+- 双栈总规划（TON+EVM）：`docs/WEB3_DUAL_STACK_STRATEGY.md`
+- 双栈支付与结算参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
 - 插件系统：[/tools/plugin](/tools/plugin)

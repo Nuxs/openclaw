@@ -48,6 +48,13 @@ interface MetricsSnapshot {
     avgLeasePrice: string;
   };
 
+  // 支付与结算指标（双栈）
+  payments: {
+    receiptsByChain: Record<string, number>; // { ton: n, evm: n }
+    pendingSettlements: number;
+    lastReceiptAt?: string;
+  };
+
   // 争议指标
   disputes: {
     totalOpen: number;
@@ -249,6 +256,7 @@ extensions/web3-ui/
 │   │   ├── Dashboard.tsx
 │   │   ├── Resources.tsx
 │   │   ├── Disputes.tsx
+│   │   ├── Payments.tsx
 │   │   └── Metrics.tsx
 │   ├── api/
 │   │   └── client.ts
@@ -492,6 +500,7 @@ export function useRealtimeMetrics() {
 - [ ] Dashboard总览页
 - [ ] Resources管理页
 - [ ] Disputes管理页
+- [ ] Payments支付与对账页（TON/EVM 回执展示，统一口径）
 - [ ] Metrics监控页
 - [ ] 实时数据更新
 - [ ] 响应式设计
@@ -539,11 +548,11 @@ export function useRealtimeMetrics() {
 
 ## 场景2: Consumer租用资源（2分钟）
 
-1. 切换到Consumer账户
+1. 切换到 Consumer 账户
 2. 搜索存储资源
-3. 租用资源
-4. 获取访问token
-5. 使用资源API
+3. 选择支付链（TON/EVM）并租用资源
+4. AI 管家签发租约并代管一次性 token（不回显）
+5. 使用资源 API（调用过程不暴露 endpoint/token）
 
 ## 场景3: 争议解决（3分钟）
 
