@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, sign } from "node:crypto";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
-import { formatWeb3GatewayError } from "../errors.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import type { IndexedResource, ResourceIndexEntry } from "../state/store.js";
 import { Web3StateStore } from "../state/store.js";
 import { verifyIndexEntries } from "./signature-verification.js";
@@ -181,7 +181,7 @@ export function createResourceIndexReportHandler(
       store.upsertResourceIndex(entry);
       respond(true, { providerId, updatedAt: entry.updatedAt, expiresAt: entry.expiresAt });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -231,7 +231,7 @@ export function createResourceIndexListHandler(
         total: redacted.reduce((sum, entry) => sum + entry.resources.length, 0),
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -265,7 +265,7 @@ export function createResourceIndexHeartbeatHandler(
         lastHeartbeatAt: refreshed.lastHeartbeatAt,
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }
@@ -293,7 +293,7 @@ export function createResourceIndexStatsHandler(
         byKind,
       });
     } catch (err) {
-      respond(false, { error: formatWeb3GatewayError(err) });
+      respond(false, formatWeb3GatewayErrorResponse(err));
     }
   };
 }

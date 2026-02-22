@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { resolveConfig } from "../config.js";
 import { clearConsumerLeaseAccess, saveConsumerLeaseAccess } from "./leases.js";
 import {
@@ -25,6 +25,10 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
 describe("web3 consumer tools", () => {
   beforeEach(() => {
     clearConsumerLeaseAccess("res-tool-1");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe("createWeb3SearchTool", () => {
@@ -87,6 +91,38 @@ describe("web3 consumer tools", () => {
       })) as { content: Array<{ text: string }> };
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.error).toContain("endpoint");
+    });
+
+    it("redacts provider errors and tokens", async () => {
+      saveConsumerLeaseAccess({
+        leaseId: "lease-redact",
+        resourceId: "res-tool-1",
+        accessToken: "tok_secret_123",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        providerEndpoint: "https://provider.example.com",
+      });
+      const config = makeConfig();
+      const tool = createWeb3SearchTool(config)!;
+
+      const mockFetchResponse = new Response(
+        "Bearer tok_secret_123 https://provider.example.com /Users/test/secrets",
+        {
+          status: 502,
+          headers: { "content-type": "text/plain" },
+        },
+      );
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
+
+      const result = (await tool.execute("tc-1", {
+        resourceId: "res-tool-1",
+        q: "test",
+      })) as { content: Array<{ text: string }> };
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.message).toContain("tok_***");
+      expect(parsed.message).toContain("[REDACTED_ENDPOINT]");
+      expect(parsed.message).not.toContain("tok_secret_123");
+      expect(parsed.message).not.toContain("provider.example.com");
+      expect(parsed.message).not.toContain("/Users/test");
     });
   });
 

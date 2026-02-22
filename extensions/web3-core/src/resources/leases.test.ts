@@ -274,6 +274,50 @@ describe("leases - validateLeaseAccess", () => {
     if (!result.ok) expect(result.error).toContain("not allowed");
   });
 
+  it("redacts lease lookup gateway errors", async () => {
+    callGatewayMock.mockResolvedValue({ ok: false, error: "leak: token=secret" });
+
+    const { validateLeaseAccess } = await import("./leases.js");
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: { auth: { allowedConsumers: [] } },
+      },
+    });
+
+    const result = await validateLeaseAccess({
+      leaseId: "lease-1",
+      token: "tok_valid",
+      config,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("lease lookup failed");
+  });
+
+  it("redacts resource lookup gateway errors", async () => {
+    callGatewayMock
+      .mockResolvedValueOnce(activeLease())
+      .mockResolvedValueOnce({ ok: false, error: "leak: /tmp/secret" });
+
+    const { validateLeaseAccess } = await import("./leases.js");
+    const config = resolveConfig({
+      resources: {
+        enabled: true,
+        provider: { auth: { allowedConsumers: [] } },
+      },
+    });
+
+    const result = await validateLeaseAccess({
+      leaseId: "lease-1",
+      token: "tok_valid",
+      config,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("resource lookup failed");
+  });
+
   it("handles gateway call failure gracefully", async () => {
     callGatewayMock.mockRejectedValue(new Error("gateway timeout"));
 
@@ -292,6 +336,6 @@ describe("leases - validateLeaseAccess", () => {
     });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("gateway timeout");
+    if (!result.ok) expect(result.error).toContain("lease access failed");
   });
 });
