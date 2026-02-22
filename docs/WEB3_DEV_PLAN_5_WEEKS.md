@@ -1,7 +1,9 @@
 # OpenClaw Web3 扩展开发计划
 
 **计划周期**: 5周（2026-02-21 ~ 2026-03-27）  
-**目标**: 完成Phase 1所有验收标准，发布Beta版本
+**目标**: 完成 Phase 1 所有验收标准，发布 Beta 版本
+
+> 说明：本文是“执行计划/任务拆解”；实际完成状态与统一口径以 `docs/WEB3_OVERALL_PROGRESS.md` 为准。双栈（TON+EVM）统一口径以 `docs/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md` 为准。
 
 ---
 
@@ -29,9 +31,9 @@ Week 5  ████████████████████  Demo + 文
 
 - [ ] 移除`web3.index.list`的endpoint字段
 - [ ] 统一错误处理，不泄露文件路径
-- [ ] 实现日志脱敏函数`redactSensitiveFields()`
+- [ ] 实现日志/输出脱敏（复用 `extensions/web3-core/src/utils/redact.ts`）
 
-**输出**：
+**输出（示意）**：
 
 ```typescript
 // web3-core/src/resources/indexer.ts
@@ -43,22 +45,22 @@ function listResources() {
       type: r.type,
       provider: r.provider,
       signature: r.signature,
-      // ✅ endpoint已移除
+      // ✅ endpoint 默认不返回/已脱敏
     })),
   };
 }
 
-// web3-core/src/utils/sanitize.ts
+// web3-core/src/utils/redact.ts
+// - redactString(): 处理 Bearer/tok_*/URL/JWT/路径 等敏感模式
+// - redactUnknown(): 递归脱敏未知结构（按敏感键/字符串规则）
+
+// errors.ts
 function sanitizeError(err: unknown): ErrorResponse {
-  logger.error("Internal error", { err });
+  // 统一错误码 + 人类可读消息；不得泄露路径/endpoint/token
   return {
     error: ErrorCode.E_INTERNAL,
-    message: "Operation failed", // 不泄露细节
+    message: "Operation failed",
   };
-}
-
-function redactSensitiveFields(obj: any): any {
-  // 脱敏: endpoint, accessToken, privateKey, etc.
 }
 ```
 

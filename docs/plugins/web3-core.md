@@ -24,6 +24,7 @@ Security note:
 
 - Provider endpoints are sensitive assets. Do not treat them as public API surface.
 - `web3.index.*` is an internal discovery surface and **must not expose provider endpoints by default**. If endpoint-like values exist for local debugging, they must be redacted in outputs and never appear in logs, errors, status output, or tool results.
+- Dual-stack (TON + EVM) planning and reconciliation output formats are defined in `docs/WEB3_DUAL_STACK_STRATEGY.md` and `docs/reference/web3-dual-stack-payments-and-settlement.md`.
 
 Quick mental model:
 

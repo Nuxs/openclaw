@@ -11,7 +11,8 @@ title: "Web3 Market Dev (web3-core + market-core)"
 
 本文档定义 OpenClaw 作为“链上用户最方便的管家入口”时，Web3 Market 的**默认体验**与**可实现规范**。
 
-- **默认生态（1-2 个）**：EVM/Base + IPFS（Pinata + `w3s.link`）作为默认体验；开发环境可用 Sepolia。
+- **默认生态（1-2 个）**：默认以 **EVM/Base + IPFS（Pinata + `w3s.link`）** 作为“可落地 MVP”体验；开发环境可用 Sepolia。
+- **双栈口径（TON+EVM）**：用户可以选择在 **TON 或 EVM** 支付；系统内部订单/账本/争议/结算口径统一（参见 `docs/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`）。
 - **默认结算策略**：开放市场默认 **预付锁定（escrow）**；信任域可选 **会话后付**。
 - **实现约束**：不侵入 OpenClaw 核心逻辑，仅通过插件 hooks / gateway methods / services 扩展；链/存储不可用时必须可降级。
 
@@ -36,11 +37,15 @@ graph TD
 
 ## 默认生态选择（基于代码现状）
 
-### 链：EVM / Base
+### 链：EVM（默认） + TON（双栈支付入口）
 
-- `web3-core` 默认网络：`base`
-- `market-core` 默认网络：`base`
-- 支持网络枚举：`base | optimism | arbitrum | ethereum | sepolia`
+- **EVM（默认）**：
+  - `web3-core` 默认网络：`base`
+  - `market-core` 默认网络：`base`
+  - 支持网络枚举：`base | optimism | arbitrum | ethereum | sepolia`
+- **TON（双栈支付入口）**：
+  - 用于“前台分发/轻量支付/回执”，并通过统一口径映射到同一订单/对账摘要。
+  - 统一对象模型与输出格式见：`docs/reference/web3-dual-stack-payments-and-settlement.md`。
 
 ### 存储：IPFS 默认，Filecoin/web3.storage 可选
 
@@ -155,3 +160,5 @@ graph TD
 - `market-core` 插件：[/plugins/market-core](/plugins/market-core)
 - Web3 Market 概览：[/concepts/web3-market](/concepts/web3-market)
 - Web3 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
+- 双栈总规划（TON+EVM）：`docs/WEB3_DUAL_STACK_STRATEGY.md`
+- 双栈支付与结算参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)

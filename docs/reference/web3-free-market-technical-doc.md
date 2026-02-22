@@ -33,7 +33,7 @@ OpenClaw Web3 扩展旨在构建一个**真正的自由市场**，让 AI 算力�
 - 📊 **信息透明**: 实时市场行情、历史数据、用户评价
 - ⚡ **自由竞争**: 多维度评分、质量竞争
 - 🚪 **低门槛**: 3 分钟上架，1 分钟使用
-- 🔗 **去中心化**: 链上身份、不可篡改
+- 🔗 **去中心化（最小披露）**: 链上身份/回执/锚定不可篡改，但 endpoint/token/调用明细永不上链、永不对外输出
 
 ### 1.2 核心价值主张
 
@@ -46,28 +46,41 @@ OpenClaw Web3 扩展旨在构建一个**真正的自由市场**，让 AI 算力�
 | **费用** | 高额中介费(20-30%) | 低手续费(2-5%)    |
 | **审查** | 平台可随意下架     | 无法审查          |
 
-### 1.3 技术栈
+### 1.3 技术栈（按当前仓库现实 + 统一口径）
+
+- **权威实现口径**：`web3-core` + `market-core` 作为 OpenClaw Gateway 内的插件；状态默认落盘（SQLite/file）；链上锚定与归档为可选能力。
+- **双栈口径**：TON+EVM 的支付/回执/对账输出以 `docs/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md` 为准。
+- **自由市场短板补强**：自由市场的核心短板与补强路线见 `docs/WEB3_DUAL_STACK_STRATEGY.md`（第 10 节）。
+- **资源共享契约**：租约/账本/Provider routes 的安全约束以 `docs/reference/web3-resource-market-api.md` 为准。
 
 ```
-前端: React + TypeScript + TailwindCSS
-后端: Node.js + Express + PostgreSQL
-区块链: Ethereum (或 Base/Arbitrum)
-存储: IPFS (资源元数据)
-缓存: Redis
-监控: Prometheus + Grafana
+运行时: OpenClaw Gateway（内置 pi agent）+ 插件系统
+市场内核: extensions/market-core（Offer/Order/Settlement + Resource/Lease/Ledger + Dispute）
+编排入口: extensions/web3-core（web3.* 单入口、审计/归档/锚定、工具脱敏）
+链: EVM（默认 Base）+ TON（双栈支付入口）
+存储: IPFS/Arweave/Filecoin（可选），本地状态: SQLite/file
+监控/UI: Week3-5 规划（metrics + web3-ui）
 ```
 
 ---
 
-## 2. 核心理念
+## 2. 核心理念（与 OpenClaw 核心思想对齐）
+
+OpenClaw 的核心思想（贯穿自由市场与双栈策略）：
+
+- **用户极简决策**：用户只决定“买/卖什么、预算/规则、可选的支付链”。
+- **AI 管家代办复杂执行**：租约签发、一次性 token 代管（不回显）、消费路由、权威记账、争议、结算与可分享对账摘要。
+- **最小披露与可审计可仲裁**：链上仅 hash/承诺/汇总/回执；对外输出默认脱敏且可复制粘贴传播。
 
 ### 2.1 真正的自由市场需要什么？
 
 #### ✅ 1. 价格自由 (Free Pricing)
 
-**问题**: 当前设计使用固定定价，这是**计划经济**而非自由市场。
+**现状**: 基础定价已经支持“Provider 自由定价”（资源发布时定义 price/unit/policy），这使市场具备了最小的价格发现基础。
 
-**解决方案**: **动态定价机制**
+**短板**: 缺少“可运营的动态定价/市场行情/撮合排序/风险溢价”闭环，导致自由市场的效率与抗作弊能力不足。
+
+**解决方案**: **动态定价机制（增量能力）**
 
 ```typescript
 interface DynamicPricing {

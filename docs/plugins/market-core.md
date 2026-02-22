@@ -25,6 +25,8 @@
 - **交易与结算市场**：Offer/Order/Consent/Delivery/Settlement（面向“买卖与托管”）。
 - **资源共享市场**：Resource/Lease/Ledger（面向“出租能力并由 Provider 权威记账”）。
 
+并且在产品口径上遵循“**支付双入口，结算单出口**”：用户可以选择在 TON 或 EVM 支付，但订单/账本/争议/结算与对账摘要保持统一（见 `docs/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`）。
+
 - **Offer**: 资产发布与定价信息，包含 `assetId`、`assetType`、`usageScope` 与 `offerHash`。
 - **Order**: 订单状态机与支付托管状态。
 - **Consent**: 由买方签名的用途同意，确保用途约束一致。

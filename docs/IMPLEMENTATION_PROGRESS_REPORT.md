@@ -2,9 +2,9 @@
 
 # Implementation Progress Report
 
-**报告日期**: 2026-02-21  
+**报告日期**: 2026-02-21（历史快照）  
 **对照文档**: Phase 1执行计划 (`web3-market-plan-phase1-execution.md`)  
-**总体状态**: MVP核心已完成，P0剩余项待补齐（能力 schema 与争议锚定）
+**总体状态**: 本文为 2026-02-21 的阶段性快照；最新统一进度口径请以 `docs/WEB3_OVERALL_PROGRESS.md` 为准；双栈（TON+EVM）统一口径见 `docs/WEB3_DUAL_STACK_STRATEGY.md`。
 
 ---
 

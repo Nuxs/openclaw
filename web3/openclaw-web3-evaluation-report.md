@@ -140,7 +140,7 @@ Consumer
     - providerEndpoint 来自：入参 providerEndpoint（带外提供）或 config.brain.endpoint
   ↓
 [4] Consumer 工具访问 Provider HTTP
-    - Header: Authorization: Bearer <accessToken>
+    - Header: Authorization: Bearer tok_***
     - Header: X-OpenClaw-Lease: <leaseId>
     - Provider 侧会二次校验：lease 是否 active、是否过期、token hash 匹配、resource 是否仍 published
 ```
@@ -157,7 +157,7 @@ Consumer
 
 **评分**: ⭐⭐⭐⭐☆（4/5）
 
-- 强项：令牌从不在工具输出中回显，Provider 端校验完整；租约/资源状态一致性检查到位。
+- 强项：令牌从不在工具输出中回显（`accessToken` 仅签发瞬间出现一次），Provider 端校验完整；租约/资源状态一致性检查到位。
 - 短板：Provider endpoint 仍需要带外配置或同网关默认值；“真正的跨节点发现”尚未形成。
 
 ---

@@ -181,3 +181,5 @@ Provider 权威记账规则：
 - Web3 Market dev guide: [/reference/web3-market-dev](/reference/web3-market-dev)
 - Web3 Core dev guide: [/plugins/web3-core-dev](/plugins/web3-core-dev)
 - Market Core plugin: [/plugins/market-core](/plugins/market-core)
+- Dual-stack strategy (TON+EVM): `docs/WEB3_DUAL_STACK_STRATEGY.md`
+- Dual-stack payments reference: [/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
