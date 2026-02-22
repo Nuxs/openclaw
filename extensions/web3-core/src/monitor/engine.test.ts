@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-// import { DEFAULT_WEB3_CONFIG } from "../config.js";
+import { resolveConfig } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
 import { AlertEngine } from "./engine.js";
 import { ALERT_RULES } from "./rules.js";
@@ -16,7 +16,7 @@ describe("AlertEngine", () => {
   let tempDir: string;
   let store: Web3StateStore;
   let engine: AlertEngine;
-  const config = DEFAULT_WEB3_CONFIG;
+  const config = resolveConfig();
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "web3-monitor-test-"));
