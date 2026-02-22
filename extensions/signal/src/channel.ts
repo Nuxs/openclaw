@@ -17,6 +17,7 @@ import {
   PAIRING_APPROVED_MESSAGE,
   resolveChannelMediaMaxBytes,
   resolveDefaultSignalAccountId,
+  resolveRuntimeGroupPolicy,
   resolveSignalAccount,
   setAccountEnabledInConfigSection,
   signalOnboardingAdapter,
@@ -103,6 +104,8 @@ export const signalPlugin: ChannelPlugin<ResolvedSignalAccount> = {
         .filter(Boolean)
         .map((entry) => (entry === "*" ? "*" : normalizeE164(entry.replace(/^signal:/i, ""))))
         .filter(Boolean),
+    resolveDefaultTo: ({ cfg, accountId }) =>
+      resolveSignalAccount({ cfg, accountId }).config.defaultTo?.trim() || undefined,
   },
   security: {
     resolveDmPolicy: ({ cfg, accountId, account }) => {
@@ -122,7 +125,13 @@ export const signalPlugin: ChannelPlugin<ResolvedSignalAccount> = {
     },
     collectWarnings: ({ account, cfg }) => {
       const defaultGroupPolicy = cfg.channels?.defaults?.groupPolicy;
-      const groupPolicy = account.config.groupPolicy ?? defaultGroupPolicy ?? "allowlist";
+      const { groupPolicy } = resolveRuntimeGroupPolicy({
+        providerConfigPresent: cfg.channels?.signal !== undefined,
+        groupPolicy: account.config.groupPolicy,
+        defaultGroupPolicy,
+        configuredFallbackPolicy: "allowlist",
+        missingProviderFallbackPolicy: "allowlist",
+      });
       if (groupPolicy !== "open") {
         return [];
       }

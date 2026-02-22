@@ -19,6 +19,7 @@ import {
   resolveDefaultSlackAccountId,
   resolveSlackAccount,
   resolveSlackReplyToMode,
+  resolveRuntimeGroupPolicy,
   resolveSlackGroupRequireMention,
   resolveSlackGroupToolPolicy,
   buildSlackThreadingToolContext,
@@ -130,6 +131,8 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
         .map((entry) => String(entry).trim())
         .filter(Boolean)
         .map((entry) => entry.toLowerCase()),
+    resolveDefaultTo: ({ cfg, accountId }) =>
+      resolveSlackAccount({ cfg, accountId }).config.defaultTo?.trim() || undefined,
   },
   security: {
     resolveDmPolicy: ({ cfg, accountId, account }) => {
@@ -149,7 +152,13 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
     collectWarnings: ({ account, cfg }) => {
       const warnings: string[] = [];
       const defaultGroupPolicy = cfg.channels?.defaults?.groupPolicy;
-      const groupPolicy = account.config.groupPolicy ?? defaultGroupPolicy ?? "open";
+      const { groupPolicy } = resolveRuntimeGroupPolicy({
+        providerConfigPresent: cfg.channels?.slack !== undefined,
+        groupPolicy: account.config.groupPolicy,
+        defaultGroupPolicy,
+        configuredFallbackPolicy: "open",
+        missingProviderFallbackPolicy: "allowlist",
+      });
       const channelAllowlistConfigured =
         Boolean(account.config.channels) && Object.keys(account.config.channels ?? {}).length > 0;
 

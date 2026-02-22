@@ -19,6 +19,7 @@ import {
   readStringParam,
   resolveDefaultWhatsAppAccountId,
   resolveWhatsAppOutboundTarget,
+  resolveRuntimeGroupPolicy,
   resolveWhatsAppAccount,
   resolveWhatsAppGroupRequireMention,
   resolveWhatsAppGroupToolPolicy,
@@ -118,6 +119,12 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> = {
         .filter((entry): entry is string => Boolean(entry))
         .map((entry) => (entry === "*" ? entry : normalizeWhatsAppTarget(entry)))
         .filter((entry): entry is string => Boolean(entry)),
+    resolveDefaultTo: ({ cfg, accountId }) => {
+      const root = cfg.channels?.whatsapp;
+      const normalized = normalizeAccountId(accountId);
+      const account = root?.accounts?.[normalized];
+      return (account?.defaultTo ?? root?.defaultTo)?.trim() || undefined;
+    },
   },
   security: {
     resolveDmPolicy: ({ cfg, accountId, account }) => {
@@ -137,7 +144,13 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> = {
     },
     collectWarnings: ({ account, cfg }) => {
       const defaultGroupPolicy = cfg.channels?.defaults?.groupPolicy;
-      const groupPolicy = account.groupPolicy ?? defaultGroupPolicy ?? "allowlist";
+      const { groupPolicy } = resolveRuntimeGroupPolicy({
+        providerConfigPresent: cfg.channels?.whatsapp !== undefined,
+        groupPolicy: account.groupPolicy,
+        defaultGroupPolicy,
+        configuredFallbackPolicy: "allowlist",
+        missingProviderFallbackPolicy: "allowlist",
+      });
       if (groupPolicy !== "open") {
         return [];
       }

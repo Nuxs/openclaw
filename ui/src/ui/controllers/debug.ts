@@ -1,13 +1,15 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
-import type { HealthSnapshot, StatusSummary } from "../types.ts";
+import type { HealthSummary, ModelCatalogEntry, StatusSummary } from "../types.ts";
+import { loadHealthState } from "./health.ts";
+import { loadModels } from "./models.ts";
 
 export type DebugState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
   debugLoading: boolean;
   debugStatus: StatusSummary | null;
-  debugHealth: HealthSnapshot | null;
-  debugModels: unknown[];
+  debugHealth: HealthSummary | null;
+  debugModels: ModelCatalogEntry[];
   debugHeartbeat: unknown;
   debugWeb3Audit: unknown;
   debugWeb3AuditError: string | null;
@@ -15,6 +17,10 @@ export type DebugState = {
   debugCallParams: string;
   debugCallResult: string | null;
   debugCallError: string | null;
+  /** Shared health state fields (written by {@link loadHealthState}). */
+  healthLoading: boolean;
+  healthResult: HealthSummary | null;
+  healthError: string | null;
 };
 
 export async function loadDebug(state: DebugState) {
@@ -26,16 +32,16 @@ export async function loadDebug(state: DebugState) {
   }
   state.debugLoading = true;
   try {
-    const [status, health, models, heartbeat] = await Promise.all([
+    const [status, , models, heartbeat] = await Promise.all([
       state.client.request("status", {}),
-      state.client.request("health", {}),
-      state.client.request("models.list", {}),
+      loadHealthState(state),
+      loadModels(state.client),
       state.client.request("last-heartbeat", {}),
     ]);
     state.debugStatus = status as StatusSummary;
-    state.debugHealth = health as HealthSnapshot;
-    const modelPayload = models as { models?: unknown[] } | undefined;
-    state.debugModels = Array.isArray(modelPayload?.models) ? modelPayload?.models : [];
+    // Sync debugHealth from the shared healthResult for backward compat.
+    state.debugHealth = state.healthResult;
+    state.debugModels = models;
     state.debugHeartbeat = heartbeat;
 
     try {

@@ -22,6 +22,7 @@ import {
   resolveDefaultDiscordAccountId,
   resolveDiscordGroupRequireMention,
   resolveDiscordGroupToolPolicy,
+  resolveRuntimeGroupPolicy,
   setAccountEnabledInConfigSection,
   type ChannelMessageActionAdapter,
   type ChannelPlugin,
@@ -110,6 +111,8 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
         .map((entry) => String(entry).trim())
         .filter(Boolean)
         .map((entry) => entry.toLowerCase()),
+    resolveDefaultTo: ({ cfg, accountId }) =>
+      resolveDiscordAccount({ cfg, accountId }).config.defaultTo?.trim() || undefined,
   },
   security: {
     resolveDmPolicy: ({ cfg, accountId, account }) => {
@@ -129,7 +132,13 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
     collectWarnings: ({ account, cfg }) => {
       const warnings: string[] = [];
       const defaultGroupPolicy = cfg.channels?.defaults?.groupPolicy;
-      const groupPolicy = account.config.groupPolicy ?? defaultGroupPolicy ?? "open";
+      const { groupPolicy } = resolveRuntimeGroupPolicy({
+        providerConfigPresent: cfg.channels?.discord !== undefined,
+        groupPolicy: account.config.groupPolicy,
+        defaultGroupPolicy,
+        configuredFallbackPolicy: "open",
+        missingProviderFallbackPolicy: "allowlist",
+      });
       const guildEntries = account.config.guilds ?? {};
       const guildsConfigured = Object.keys(guildEntries).length > 0;
       const channelAllowlistConfigured = guildsConfigured;

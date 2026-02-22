@@ -63,7 +63,7 @@ import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
-import type { ResolvedTheme, ThemeMode } from "./theme.ts";
+import { VALID_THEMES, type ResolvedTheme, type ThemeMode } from "./theme.ts";
 import type {
   AgentsListResult,
   AgentsFilesListResult,
@@ -73,9 +73,10 @@ import type {
   CronJob,
   CronRunLogEntry,
   CronStatus,
-  HealthSnapshot,
+  HealthSummary,
   LogEntry,
   LogLevel,
+  ModelCatalogEntry,
   PresenceEntry,
   ChannelsStatusSnapshot,
   SessionsListResult,
@@ -121,8 +122,9 @@ export class OpenClawApp extends LitElement {
   @state() tab: Tab = "chat";
   @state() onboarding = resolveOnboardingMode();
   @state() connected = false;
-  @state() theme: ThemeMode = this.settings.theme ?? "system";
+  @state() theme: ThemeMode = this.settings.theme ?? "dark";
   @state() themeResolved: ResolvedTheme = "dark";
+  @state() themeOrder: ThemeMode[] = this.buildThemeOrder(this.theme);
   @state() hello: GatewayHelloOk | null = null;
   @state() lastError: string | null = null;
   @state() eventLog: EventLogEntry[] = [];
@@ -233,6 +235,7 @@ export class OpenClawApp extends LitElement {
   @state() agentSkillsError: string | null = null;
   @state() agentSkillsReport: SkillStatusReport | null = null;
   @state() agentSkillsAgentId: string | null = null;
+  @state() agentsSidebarFilter = "";
 
   @state() sessionsLoading = false;
   @state() sessionsResult: SessionsListResult | null = null;
@@ -351,6 +354,23 @@ export class OpenClawApp extends LitElement {
 
   @state() updateAvailable: import("./types.js").UpdateAvailable | null = null;
 
+  // Overview dashboard state
+  @state() attentionItems: import("./types.js").AttentionItem[] = [];
+  @state() paletteOpen = false;
+  paletteQuery = "";
+  paletteActiveIndex = 0;
+  @state() streamMode = (() => {
+    try {
+      const stored = localStorage.getItem("openclaw:stream-mode");
+      // Default to true (redacted) unless explicitly disabled
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  })();
+  @state() overviewLogLines: string[] = [];
+  @state() overviewLogCursor = 0;
+
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;
   @state() skillsError: string | null = null;
@@ -359,10 +379,14 @@ export class OpenClawApp extends LitElement {
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
 
+  @state() healthLoading = false;
+  @state() healthResult: HealthSummary | null = null;
+  @state() healthError: string | null = null;
+
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
-  @state() debugHealth: HealthSnapshot | null = null;
-  @state() debugModels: unknown[] = [];
+  @state() debugHealth: HealthSummary | null = null;
+  @state() debugModels: ModelCatalogEntry[] = [];
   @state() debugHeartbeat: unknown = null;
   @state() debugWeb3Audit: unknown = null;
   @state() debugWeb3AuditError: string | null = null;
@@ -403,8 +427,6 @@ export class OpenClawApp extends LitElement {
   basePath = "";
   private popStateHandler = () =>
     onPopStateInternal(this as unknown as Parameters<typeof onPopStateInternal>[0]);
-  private themeMedia: MediaQueryList | null = null;
-  private themeMediaHandler: ((event: MediaQueryListEvent) => void) | null = null;
   private topbarObserver: ResizeObserver | null = null;
 
   createRenderRoot() {
@@ -482,6 +504,19 @@ export class OpenClawApp extends LitElement {
 
   setTheme(next: ThemeMode, context?: Parameters<typeof setThemeInternal>[2]) {
     setThemeInternal(this as unknown as Parameters<typeof setThemeInternal>[0], next, context);
+    this.themeOrder = this.buildThemeOrder(next);
+  }
+
+  buildThemeOrder(active: ThemeMode): ThemeMode[] {
+    const all = [...VALID_THEMES];
+    const rest = all.filter((id) => id !== active);
+    return [active, ...rest];
+  }
+
+  handleThemeToggleCollapse() {
+    setTimeout(() => {
+      this.themeOrder = this.buildThemeOrder(this.theme);
+    }, 80);
   }
 
   async loadOverview() {

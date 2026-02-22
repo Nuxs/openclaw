@@ -9,18 +9,19 @@ import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
-import type { ThemeMode } from "./theme.ts";
+import type { ResolvedTheme, ThemeMode } from "./theme.ts";
 import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  AttentionItem,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   ConfigUiHints,
   CronJob,
   CronRunLogEntry,
   CronStatus,
-  HealthSnapshot,
+  HealthSummary,
   LogEntry,
   LogLevel,
   MarketDispute,
@@ -32,6 +33,7 @@ import type {
   MarketResource,
   MarketResourceKind,
   MarketStatusSummary,
+  ModelCatalogEntry,
   Web3IndexEntry,
   Web3IndexStats,
   Web3MonitorSnapshot,
@@ -56,7 +58,8 @@ export type AppViewState = {
   basePath: string;
   connected: boolean;
   theme: ThemeMode;
-  themeResolved: "light" | "dark";
+  themeResolved: ResolvedTheme;
+  themeOrder: ThemeMode[];
   hello: GatewayHelloOk | null;
   lastError: string | null;
   eventLog: EventLogEntry[];
@@ -157,6 +160,7 @@ export type AppViewState = {
   agentSkillsError: string | null;
   agentSkillsReport: SkillStatusReport | null;
   agentSkillsAgentId: string | null;
+  agentsSidebarFilter: string;
   sessionsLoading: boolean;
   sessionsResult: SessionsListResult | null;
   sessionsError: string | null;
@@ -233,10 +237,13 @@ export type AppViewState = {
   skillEdits: Record<string, string>;
   skillMessages: Record<string, SkillMessage>;
   skillsBusyKey: string | null;
+  healthLoading: boolean;
+  healthResult: HealthSummary | null;
+  healthError: string | null;
   debugLoading: boolean;
   debugStatus: StatusSummary | null;
-  debugHealth: HealthSnapshot | null;
-  debugModels: unknown[];
+  debugHealth: HealthSummary | null;
+  debugModels: ModelCatalogEntry[];
   debugHeartbeat: unknown;
   debugWeb3Audit: unknown;
   debugWeb3AuditError: string | null;
@@ -258,6 +265,12 @@ export type AppViewState = {
   logsMaxBytes: number;
   logsAtBottom: boolean;
   updateAvailable: import("./types.js").UpdateAvailable | null;
+  // Overview dashboard state
+  attentionItems: AttentionItem[];
+  paletteOpen: boolean;
+  streamMode: boolean;
+  overviewLogLines: string[];
+  overviewLogCursor: number;
   client: GatewayBrowserClient | null;
   refreshSessionsAfterChat: Set<string>;
   connect: () => void;
