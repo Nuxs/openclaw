@@ -35,6 +35,11 @@ extensions/web3-core/
 │   │   ├── commands.ts       # /credits, /pay_status
 │   │   └── guard.ts          # before_tool_call 配额检查
 │   │
+│   ├── resources/            # 资源发布/租用/Provider 路由
+│   ├── market/               # market.* 代理与工具
+│   ├── monitor/              # 监控与告警
+│   ├── metrics/              # 指标快照
+│   │
 │   ├── storage/              # 去中心化存储
 │   │   ├── ipfs/             # IPFS 实现 (Pinata)
 │   │   ├── arweave/          # Arweave 实现
@@ -171,14 +176,18 @@ web3/
 
 ### Gateway API (RPC 方法)
 
-| 方法                   | 参数                       | 返回                          | 描述           |
-| ---------------------- | -------------------------- | ----------------------------- | -------------- |
-| `web3.siwe.challenge`  | `{ address, chainId }`     | `{ message, nonce }`          | 生成 SIWE 挑战 |
-| `web3.siwe.verify`     | `{ message, signature }`   | `{ ok, address }`             | 验证 SIWE 签名 |
-| `web3.audit.query`     | `{ limit? }`               | `{ events }`                  | 查询审计日志   |
-| `web3.billing.status`  | `{ sessionIdHash }`        | `{ usage }`                   | 查询计费状态   |
-| `web3.billing.summary` | `{ sessionKey, senderId }` | `{ usage }`                   | 计费汇总       |
-| `web3.status.summary`  | -                          | `{ auditStats, anchorStats }` | Web3 整体状态  |
+| 方法                   | 参数                       | 返回                          | 描述                       |
+| ---------------------- | -------------------------- | ----------------------------- | -------------------------- |
+| `web3.siwe.challenge`  | `{ address, chainId }`     | `{ message, nonce }`          | 生成 SIWE 挑战             |
+| `web3.siwe.verify`     | `{ message, signature }`   | `{ ok, address }`             | 验证 SIWE 签名             |
+| `web3.audit.query`     | `{ limit? }`               | `{ events }`                  | 查询审计日志               |
+| `web3.billing.status`  | `{ sessionIdHash }`        | `{ usage }`                   | 查询计费状态               |
+| `web3.billing.summary` | `{ sessionKey, senderId }` | `{ usage }`                   | 计费汇总                   |
+| `web3.status.summary`  | -                          | `{ auditStats, anchorStats }` | Web3 整体状态              |
+| `web3.resources.*`     | 各方法参数                 | 各方法返回                    | 资源发布/租用/状态         |
+| `web3.market.*`        | 各方法参数                 | 各方法返回                    | 市场代理（资源/租约/争议） |
+| `web3.index.*`         | 各方法参数                 | 各方法返回                    | 资源索引上报/查询          |
+| `web3.monitor.*`       | 各方法参数                 | 各方法返回                    | 监控与告警                 |
 
 ### 后台服务 (Background Service)
 

@@ -53,7 +53,7 @@ node --import tsx demo.ts
 
 ## 版本
 
-- Version: `2026.2.16`（见 `package.json`）
+- Version: `2026.2.21`（见 `package.json`）
 
 ## 许可证
 

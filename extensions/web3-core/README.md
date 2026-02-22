@@ -29,7 +29,6 @@ cd extensions/web3-core
 node --import tsx demo.ts
 
 # 3. 查看文档
-cat QUICKSTART.md
 cat ARCHITECTURE.md
 ```
 
@@ -52,6 +51,10 @@ cat ARCHITECTURE.md
 - `web3.billing.status` - 计费状态
 - `web3.billing.summary` - 计费汇总
 - `web3.status.summary` - Web3 整体状态
+- `web3.resources.*` - 资源发布/租用/状态
+- `web3.market.*` - 市场代理（资源/租约/账本/争议/监控）
+- `web3.index.*` - 资源索引上报/查询
+- `web3.monitor.*` - 监控与告警
 
 ### Hooks
 
@@ -113,7 +116,6 @@ web3-core/
 
 ## 📚 文档
 
-- [快速开始指南](./QUICKSTART.md) - 5 分钟上手
 - [架构文档](./ARCHITECTURE.md) - 完整技术设计
 - [配置 Schema](./openclaw.plugin.json) - 配置项说明
 - [演示脚本](./demo.ts) - 功能演示
@@ -156,5 +158,5 @@ MIT © OpenClaw Team
 
 ---
 
-**文档**: [QUICKSTART.md](./QUICKSTART.md) | [ARCHITECTURE.md](./ARCHITECTURE.md)  
+**文档**: [ARCHITECTURE.md](./ARCHITECTURE.md)  
 **仓库**: https://github.com/openclaw/openclaw

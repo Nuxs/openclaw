@@ -579,7 +579,6 @@ describe("Multi-chain Integration", () => {
 - [TON官方文档](https://docs.ton.org)
 - [TonConnect SDK](https://github.com/ton-connect/sdk)
 - [Jetton标准](https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md)
-- [Web3 Roadmap](/data/workspace/openclaw/WEB3-ROADMAP.md)
 
 ---
 

@@ -85,11 +85,13 @@ function redactSensitiveFields(obj: any): any {
 // web3-core/src/errors.ts
 export enum ErrorCode {
   E_INVALID_ARGUMENT = "E_INVALID_ARGUMENT",
-  E_UNAUTHORIZED = "E_UNAUTHORIZED",
+  E_AUTH_REQUIRED = "E_AUTH_REQUIRED",
   E_FORBIDDEN = "E_FORBIDDEN",
   E_NOT_FOUND = "E_NOT_FOUND",
   E_CONFLICT = "E_CONFLICT",
   E_QUOTA_EXCEEDED = "E_QUOTA_EXCEEDED",
+  E_EXPIRED = "E_EXPIRED",
+  E_REVOKED = "E_REVOKED",
   E_INTERNAL = "E_INTERNAL",
   E_UNAVAILABLE = "E_UNAVAILABLE",
   E_TIMEOUT = "E_TIMEOUT",
@@ -107,7 +109,7 @@ interface ErrorResponse {
 
 - `web3-core/src/index.ts`
 - `market-core/src/facade.ts`
-- `web3-core/src/capabilities/descriptors.ts`
+- `web3-core/src/capabilities/catalog.ts`
 
 **验收标准**：
 
@@ -127,7 +129,7 @@ interface ErrorResponse {
 **输出**：
 
 ```typescript
-// web3-core/src/capabilities/descriptors.ts
+// web3-core/src/capabilities/catalog.ts
 paramsSchema: {
   resourceId: {
     type: "string",
@@ -315,8 +317,8 @@ describe("Market Full Flow", () => {
     // ...
 
     // 4. 结算
-    await web3.market.settlement.lock({ leaseId });
-    await web3.market.settlement.release({ leaseId });
+    await market.settlement.lock({ leaseId });
+    await market.settlement.release({ leaseId });
 
     // 验证ledger记录
     const ledger = await web3.market.ledger.list({});
@@ -790,7 +792,7 @@ pricePerCall: number;
 **返回**:
 \`\`\`typescript
 {
-success: true;
+ok: true;
 resourceId: string;
 cid?: string; // IPFS CID
 }
@@ -798,8 +800,10 @@ cid?: string; // IPFS CID
 
 **错误码**:
 
+- `E_AUTH_REQUIRED`: 缺少身份/会话
+- `E_FORBIDDEN`: 权限不足
 - `E_INVALID_ARGUMENT`: 参数缺失或无效
-- `E_CONFLICT`: 资源ID已存在
+- `E_CONFLICT`: 资源ID已存在或状态冲突
 - `E_INTERNAL`: 内部错误
 
 **示例**:
@@ -945,13 +949,13 @@ npm publish --tag beta
 
 ### 每日参考文档
 
-- [Web3 Core Dev Guide](/docs/plugins/web3-core-dev.md)
-- [Implementation Progress Report](/docs/IMPLEMENTATION_PROGRESS_REPORT.md)
-- [Architecture Evolution](/extensions/ARCHITECTURE_EVOLUTION.md)
+- [Web3 Core Dev Guide](/plugins/web3-core-dev)
+- [Implementation Progress Report](/IMPLEMENTATION_PROGRESS_REPORT)
+- [Web3 Core Plugin](/plugins/web3-core)
 
 ### 代码规范
 
-- [OpenClaw Plugin Guide](/docs/tools/plugin.md)
+- [OpenClaw Plugin Guide](/tools/plugin)
 - [TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html)
 
 ### 测试策略

@@ -9,7 +9,7 @@
 - **成功**：
   - `{ "ok": true, ... }`
 - **失败**：
-  - `{ "ok": false, "error": "<stable_error_code>: <human_message>", "details"?: { ... } }`
+  - `{ "ok": false, "error": "<stable_error_code>", "message": "<human_message>", "details"?: { ... } }`
 
 ### 1.1 稳定错误码（建议）
 
@@ -20,10 +20,12 @@
 - **`E_CONFLICT`**：状态机冲突（非法状态迁移）
 - **`E_EXPIRED`**：租约过期
 - **`E_REVOKED`**：租约已撤销
-- **`E_RATE_LIMITED`**：频率限制
+- **`E_QUOTA_EXCEEDED`**：额度/限流超限
 - **`E_INTERNAL`**：内部异常（不得泄露敏感信息）
+- **`E_UNAVAILABLE`**：依赖服务不可用
+- **`E_TIMEOUT`**：请求超时
 
-> `error` 字段必须稳定可机器解析；human_message 用于 CLI/UI。
+> `error` 字段必须稳定可机器解析；`message` 用于 CLI/UI（人类可读）。
 
 ---
 

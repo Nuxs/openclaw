@@ -10,7 +10,7 @@
 
 - **用户层**：只需看板 + 自然语言指令
 - **AI 管家**：理解意图、编排 API、自动化处理
-- **API 层**：提供完整功能（47 个方法）
+- **API 层**：以 `web3.*` / `web3.market.*` 已注册方法为准
 
 ---
 
@@ -31,16 +31,16 @@ AI 管家处理流程：
    - basePrice: 10
    - unit: "per_hour"
 3. 调用 API：
-   market.resource.publish({
-     name: "GPU 算力",
-     resourceType: "compute_gpu",
-     basePrice: 10.0,
-     unit: "per_hour",
-     pricingModel: {
-       strategy: "dynamic",
-       constraints: { min: 8, max: 15 }
-     }
-   })
+  web3.market.resource.publish({
+    name: "GPU 算力",
+    resourceType: "compute_gpu",
+    basePrice: 10.0,
+    unit: "per_hour",
+    pricingModel: {
+      strategy: "dynamic",
+      constraints: { min: 8, max: 15 }
+    }
+  })
 4. 返回用户：
    "✅ 已发布 GPU 服务，当前市场价 $12，建议定价 $11"
 ```
@@ -54,54 +54,43 @@ AI 管家处理流程：
 AI 管家处理流程：
 1. 识别意图：查询资源状态
 2. 调用 API：
-   market.resource.list({ status: "available" })
-   market.order.list({ status: "active" })
+   web3.market.resource.list({ status: "available" })
+   web3.market.lease.list({ status: "active" })
 3. 计算剩余：
    总库存 - 已使用 = 剩余
 4. 返回用户：
    "GPU-A100 剩余 80 小时可用时间
-    有 2 个订单正在运行，预计明天 10:00 结束"
+    有 2 个活跃租约，预计明天 10:00 结束"
 ```
 
-#### 场景 3：设置策略
+#### 场景 3：查询收入
 
 ```
 用户输入：
-"有新订单自动接单，但价格不能低于 $8"
+"今天赚了多少？"
 
 AI 管家处理流程：
-1. 识别意图：配置自动化规则
+1. 识别意图：查询收益
 2. 调用 API：
-   market.automation.setRule({
-     trigger: "new_order",
-     action: "auto_accept",
-     conditions: {
-       minPrice: 8.0
-     }
-   })
-3. 启用智能定价：
-   market.pricing.setModel({
-     strategy: "dynamic",
-     constraints: { min: 8, max: 999 }
-   })
+   web3.market.ledger.summary({ since: "2026-02-22", until: "2026-02-22" })
+3. 计算汇总：
+   合计收益 + 计费单位
 4. 返回用户：
-   "✅ 已设置：自动接单，最低价格 $8"
+   "✅ 今日收入 120 USDC，累计 3,400 tokens"
 ```
 
 ---
 
 ## 常见用户指令 → API 映射表
 
-| 用户指令         | AI 意图  | 调用的 API                    | 参数                    |
-| ---------------- | -------- | ----------------------------- | ----------------------- |
-| "卖掉我的 GPU"   | 发布资源 | `market.resource.publish`     | resourceType, basePrice |
-| "改成 $15"       | 调整价格 | `market.pricing.setModel`     | basePrice: 15           |
-| "现在什么价格？" | 查询定价 | `market.query`                | type: "currentPrice"    |
-| "今天赚了多少？" | 查询收入 | `market.settlement.query`     | dateRange: "today"      |
-| "有人买吗？"     | 查询订单 | `market.order.list`           | status: "active"        |
-| "取消所有订单"   | 批量取消 | `market.order.cancel`         | cancelAll: true         |
-| "自动接单"       | 设置规则 | `market.automation.setRule`   | action: "auto_accept"   |
-| "库存还剩多少？" | 查询库存 | `market.resource.list` + 计算 | -                       |
+| 用户指令         | AI 意图  | 调用的 API                     | 参数                           |
+| ---------------- | -------- | ------------------------------ | ------------------------------ |
+| "卖掉我的 GPU"   | 发布资源 | `web3.market.resource.publish` | resourceType, basePrice        |
+| "库存还剩多少？" | 查询库存 | `web3.market.resource.list`    | status: "available"            |
+| "有人在用吗？"   | 查询租约 | `web3.market.lease.list`       | status: "active"               |
+| "今天赚了多少？" | 查询收入 | `web3.market.ledger.summary`   | since/until                    |
+| "我要撤销租约"   | 取消租约 | `web3.market.lease.revoke`     | leaseId, reason?               |
+| "我要开争议"     | 发起争议 | `web3.market.dispute.open`     | orderId, reason, resourceId 等 |
 
 ---
 
@@ -124,8 +113,8 @@ export class MarketAssistant {
         return this.handleSell(intent.params);
       case "query_inventory":
         return this.handleInventoryQuery();
-      case "set_automation":
-        return this.handleAutomation(intent.params);
+      case "summarize_revenue":
+        return this.handleRevenueSummary(intent.params);
       default:
         return "抱歉，我不理解您的指令";
     }
@@ -133,7 +122,7 @@ export class MarketAssistant {
 
   private async handleSell(params: any) {
     // 调用市场 API
-    const result = await this.openclaw.callGatewayMethod("market.resource.publish", {
+    const result = await this.openclaw.callGatewayMethod("web3.market.resource.publish", {
       name: params.resourceName,
       resourceType: this.inferResourceType(params.resourceName),
       basePrice: params.price,
@@ -146,36 +135,34 @@ export class MarketAssistant {
       },
     });
 
-    // 查询市场行情
-    const marketPrice = await this.openclaw.callGatewayMethod("market.query", {
-      type: "marketStats",
-      resourceType: result.resourceType,
-    });
-
-    // 生成友好回复
-    return `✅ 已发布 ${params.resourceName} 服务
-当前市场价：$${marketPrice.avgPrice}/小时
-您的定价：$${params.price}/小时
-建议：${this.generatePricingSuggestion(params.price, marketPrice)}`;
+    return `✅ 已发布 ${params.resourceName} 服务（资源ID: ${result.resourceId}）`;
   }
 
   private async handleInventoryQuery() {
     // 查询资源列表
-    const resources = await this.openclaw.callGatewayMethod("market.resource.list", {
+    const resources = await this.openclaw.callGatewayMethod("web3.market.resource.list", {
       status: "available",
     });
 
-    // 查询活跃订单
-    const orders = await this.openclaw.callGatewayMethod("market.order.list", { status: "active" });
+    // 查询活跃租约
+    const leases = await this.openclaw.callGatewayMethod("web3.market.lease.list", {
+      status: "active",
+    });
 
     // 计算剩余库存
-    const inventory = this.calculateInventory(resources, orders);
+    const inventory = this.calculateInventory(resources, leases);
 
     return `📦 当前库存：
 ${inventory.map((i) => `• ${i.name}: 剩余 ${i.remaining} ${i.unit}`).join("\n")}
 
-🔥 活跃订单：${orders.length} 个
-${orders.map((o) => `• ${o.resourceName} → @${o.buyerId} ($${o.price}/${o.unit})`).join("\n")}`;
+🔥 活跃租约：${leases.length} 个`;
+  }
+
+  private async handleRevenueSummary(params: { since?: string; until?: string }) {
+    const summary = await this.openclaw.callGatewayMethod("web3.market.ledger.summary", params);
+    const totalCost = summary?.totalCost ?? "0";
+    const currency = summary?.currency ?? "";
+    return `✅ 收入汇总：${totalCost} ${currency}`.trim();
   }
 }
 ```
@@ -208,47 +195,38 @@ export const marketFunctions = [
       required: ["resourceName", "basePrice"],
     },
     handler: async (params) => {
-      return await openclaw.callGatewayMethod("market.resource.publish", params);
+      return await openclaw.callGatewayMethod("web3.market.resource.publish", params);
     },
   },
 
   {
     name: "query_inventory",
-    description: "查询当前库存和订单状态",
+    description: "查询当前库存和租约状态",
     parameters: {
       type: "object",
       properties: {},
     },
     handler: async () => {
-      const resources = await openclaw.callGatewayMethod("market.resource.list", {});
-      const orders = await openclaw.callGatewayMethod("market.order.list", { status: "active" });
-      return { resources, orders };
+      const resources = await openclaw.callGatewayMethod("web3.market.resource.list", {});
+      const leases = await openclaw.callGatewayMethod("web3.market.lease.list", {
+        status: "active",
+      });
+      return { resources, leases };
     },
   },
 
   {
-    name: "set_auto_accept",
-    description: "设置自动接单规则",
+    name: "summarize_revenue",
+    description: "汇总指定时间段收入",
     parameters: {
       type: "object",
       properties: {
-        minPrice: {
-          type: "number",
-          description: "最低可接受价格",
-        },
-        maxConcurrent: {
-          type: "number",
-          description: "最大并发订单数",
-        },
+        since: { type: "string", description: "起始时间 (ISO8601)" },
+        until: { type: "string", description: "结束时间 (ISO8601)" },
       },
-      required: ["minPrice"],
     },
     handler: async (params) => {
-      return await openclaw.callGatewayMethod("market.automation.setRule", {
-        trigger: "new_order",
-        action: "auto_accept",
-        conditions: params,
-      });
+      return await openclaw.callGatewayMethod("web3.market.ledger.summary", params);
     },
   },
 ];
@@ -258,7 +236,7 @@ const response = await llm.chat({
   messages: [
     {
       role: "user",
-      content: "帮我把 GPU 卖掉，价格 $10/小时，自动接单但不能低于 $8",
+      content: "帮我把 GPU 卖掉，价格 $10/小时，并统计今天收入",
     },
   ],
   functions: marketFunctions,

@@ -288,6 +288,19 @@ const plugin: OpenClawPluginDefinition = {
     );
     api.registerGatewayMethod("web3.market.dispute.get", createDisputeGetHandler(store, config));
     api.registerGatewayMethod("web3.market.dispute.list", createDisputeListHandler(store, config));
+    api.registerGatewayMethod("web3.market.dispute.open", createDisputeOpenHandler(store, config));
+    api.registerGatewayMethod(
+      "web3.market.dispute.submitEvidence",
+      createDisputeSubmitEvidenceHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.dispute.resolve",
+      createDisputeResolveHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.dispute.reject",
+      createDisputeRejectHandler(store, config),
+    );
     api.registerGatewayMethod("web3.dispute.open", createDisputeOpenHandler(store, config));
     api.registerGatewayMethod(
       "web3.dispute.submitEvidence",

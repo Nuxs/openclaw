@@ -5,7 +5,7 @@
 Market Core follows the **OpenClaw-first** product strategy:
 
 1. **Internal Engine**: This plugin is an internal capability engine, NOT a standalone service
-2. **Single Entry Point**: All external access goes through `web3-core`'s `web3.market.*` gateway
+2. **Single Entry Point**: All external access goes through `web3-core`'s `web3.*` / `web3.market.*` gateways
 3. **User Experience**: Users only interact with unified commands like `/pay_status`, `/credits`
 4. **Complexity Containment**: Internal complexity is hidden behind stable facades
 
@@ -17,7 +17,7 @@ Market Core follows the **OpenClaw-first** product strategy:
 └─────────────────┬───────────────────────────────────────────┘
                   │
                   ├─ Commands: /pay_status, /credits, etc.
-                  ├─ Gateway: web3.market.* (single namespace)
+                  ├─ Gateway: web3.* / web3.market.* (single entry)
                   │
 ┌─────────────────▼───────────────────────────────────────────┐
 │                     web3-core                                │
@@ -44,9 +44,9 @@ Market Core follows the **OpenClaw-first** product strategy:
 
 ### Gateway Registration
 
-- ❌ **market-core does NOT register `market.*` gateways**
-- ✅ **web3-core registers `web3.market.*` gateways**
-- ✅ **market-core exports Facade API for web3-core**
+- ✅ **market-core registers internal `market.*` gateways** (access-controlled)
+- ✅ **web3-core registers `web3.*` / `web3.market.*` gateways**
+- ✅ **market-core exports Facade API for web3-core** (optional in-process access)
 
 ### Why This Design?
 
@@ -60,8 +60,8 @@ Market Core follows the **OpenClaw-first** product strategy:
 ```
 market-core/
 ├── src/
-│   ├── facade.ts              # ONLY external interface (used by web3-core)
-│   ├── index.ts               # Plugin definition (no gateway registration)
+│   ├── facade.ts              # Optional in-process interface
+│   ├── index.ts               # Plugin definition + market.* gateway registration
 │   ├── config.ts              # Configuration schema
 │   ├── market/
 │   │   ├── handlers.ts        # Internal request handlers
@@ -80,16 +80,15 @@ market-core/
 ```typescript
 // In market-core/src/index.ts
 register(api) {
-  const facade = createMarketFacade(store, config);
-  api.runtime.plugins._marketCoreFacade = facade;
+  api.registerGatewayMethod("market.resource.publish", handler);
+  // ... other market.* methods
 }
 
 // In web3-core/src/market/handlers.ts
 export function createMarketResourcePublishHandler(config) {
   return async ({ params, respond }) => {
-    const marketFacade = api.runtime.plugins._marketCoreFacade;
-    const result = await marketFacade.publishResource(params);
-    respond(result.success, result);
+    const result = await callGateway({ method: "market.resource.publish", params });
+    respond(result.ok, result.result ?? {});
   };
 }
 ```
@@ -193,6 +192,6 @@ pnpm test:e2e
 ## 📖 References
 
 - [OpenClaw VISION.md](../../VISION.md) - Plugin philosophy
-- [Product Review](../PRODUCT_REVIEW_2026_UPDATED.md) - Architecture decisions
+- [Web3 Market Assessment](../../skills/web3-market/references/web3-market-assessment-2026-02-19.md) - Architecture decisions
 - [Market Facade API](./src/facade.ts) - External interface
 - [Web3 Core Gateway](../web3-core/src/index.ts) - Public API
