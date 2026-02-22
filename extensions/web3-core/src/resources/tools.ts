@@ -3,6 +3,7 @@ import type { AnyAgentTool } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode, ERROR_CODE_DESCRIPTIONS } from "../errors/codes.js";
+import { redactUnknown } from "../utils/redact.js";
 import { getConsumerLeaseAccess } from "./leases.js";
 
 const Web3SearchSchema = Type.Object(
@@ -82,8 +83,6 @@ function errorFromStatus(status: number, details?: Record<string, unknown>): Age
 function errorFromException(err: unknown, details?: Record<string, unknown>): AgentToolResult {
   return jsonResult(formatWeb3GatewayErrorResponse(err, ErrorCode.E_INTERNAL, details));
 }
-
-import { redactUnknown } from "../utils/redact.js";
 
 function normalizeBaseUrl(endpoint: string): string {
   return endpoint.trim().replace(/\/+$/, "");

@@ -218,12 +218,14 @@ export function createDeliveryCompleteHandler(
       if (offer && actorId) {
         assertActorMatch(config, actorId, offer.sellerId, "offer.sellerId");
       }
+      if (order) {
+        assertOrderTransition(order.status, "delivery_completed");
+      }
 
       // Wrap saveDelivery + saveOrder in a transaction for atomicity
       await store.runInTransaction(() => {
         store.saveDelivery(delivery);
         if (order) {
-          assertOrderTransition(order.status, "delivery_completed");
           order.status = "delivery_completed";
           order.updatedAt = nowIso();
           store.saveOrder(order);

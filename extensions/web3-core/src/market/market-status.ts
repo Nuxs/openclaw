@@ -46,7 +46,7 @@ function normalizeGatewayResult(payload: unknown): {
   return { ok: true, result: payload };
 }
 
-import { redactUnknown } from "../utils/redact.js";
+import { redactString, redactUnknown } from "../utils/redact.js";
 
 type ResourceSummary = {
   total: number;

@@ -3,6 +3,7 @@ import type { AnyAgentTool } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode } from "../errors/codes.js";
+import { redactUnknown } from "../utils/redact.js";
 
 type AgentToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -61,8 +62,6 @@ function jsonResult(payload: unknown): AgentToolResult {
     details: payload,
   };
 }
-
-import { redactUnknown } from "../utils/redact.js";
 
 async function callGatewayMethod(config: Web3PluginConfig, method: string, params?: unknown) {
   const callGateway = await loadCallGateway();
