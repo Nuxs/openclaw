@@ -9,7 +9,7 @@ import { normalizeBuyerId, requireString } from "../validators.js";
 import {
   assertAccess,
   assertActorMatch,
-  formatGatewayError,
+  formatGatewayErrorResponse,
   nowIso,
   randomUUID,
   recordAudit,
@@ -70,7 +70,7 @@ export function createSettlementLockHandler(
         lockTxHash: txHash,
       };
       // Atomic: order + settlement must persist together
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveSettlement(settlement);
       });
@@ -81,7 +81,7 @@ export function createSettlementLockHandler(
 
       respond(true, { orderId, status: order.status, txHash, settlementId });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -134,7 +134,7 @@ export function createSettlementReleaseHandler(
         settlementHash,
       };
       // Atomic: order + settlement must persist together
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveSettlement(settlement);
       });
@@ -150,7 +150,7 @@ export function createSettlementReleaseHandler(
       });
       respond(true, { orderId, status: order.status, txHash, settlementId, settlementHash });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -213,7 +213,7 @@ export function createSettlementRefundHandler(
         settlementHash,
       };
       // Atomic: order + settlement must persist together
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveSettlement(settlement);
       });
@@ -229,7 +229,7 @@ export function createSettlementRefundHandler(
       });
       respond(true, { orderId, status: order.status, txHash, settlementId });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -284,7 +284,7 @@ export function createSettlementStatusHandler(
         refundedAt: settlement.refundedAt ?? null,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
