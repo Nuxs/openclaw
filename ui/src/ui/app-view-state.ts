@@ -185,6 +185,10 @@ export type AppViewState = {
   marketLastSuccess: number | null;
   marketResourceKind: MarketResourceKind | "all";
   marketFilters: MarketFilters;
+  marketEnableBusy: boolean;
+  marketEnableError: string | null;
+  marketEnableNotice: string | null;
+  handleMarketEnable(): void;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;

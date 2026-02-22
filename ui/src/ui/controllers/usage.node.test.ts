@@ -7,9 +7,12 @@ function createState(request: RequestFn, overrides: Partial<UsageState> = {}): U
   return {
     client: { request } as unknown as UsageState["client"],
     connected: true,
+    sessionKey: "test-session-key",
     usageLoading: false,
     usageResult: null,
     usageCostSummary: null,
+    usageBillingSummary: null,
+    usageBillingError: null,
     usageError: null,
     usageStartDate: "2026-02-16",
     usageEndDate: "2026-02-16",

@@ -1,13 +1,13 @@
 import type { PluginCommandHandler, PluginCommandResult } from "openclaw/plugin-sdk";
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
-import { resolveChannelConfigWrites } from "../../../src/channels/plugins/config-writes.js";
-import { normalizeChannelId } from "../../../src/channels/registry.js";
-import { getConfigValueAtPath, setConfigValueAtPath } from "../../../src/config/config-paths.js";
+import { resolveChannelConfigWrites } from "../../../../src/channels/plugins/config-writes.js";
+import { normalizeChannelId } from "../../../../src/channels/registry.js";
+import { getConfigValueAtPath, setConfigValueAtPath } from "../../../../src/config/config-paths.js";
 import {
   readConfigFileSnapshot,
   validateConfigObjectWithPlugins,
   writeConfigFile,
-} from "../../../src/config/config.js";
+} from "../../../../src/config/config.js";
 import type { Web3PluginConfig } from "../config.js";
 import {
   buildWeb3MarketStatusSummary,
