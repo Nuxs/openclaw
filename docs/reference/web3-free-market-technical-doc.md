@@ -49,8 +49,8 @@ OpenClaw Web3 扩展旨在构建一个**真正的自由市场**，让 AI 算力�
 ### 1.3 技术栈（按当前仓库现实 + 统一口径）
 
 - **权威实现口径**：`web3-core` + `market-core` 作为 OpenClaw Gateway 内的插件；状态默认落盘（SQLite/file）；链上锚定与归档为可选能力。
-- **双栈口径**：TON+EVM 的支付/回执/对账输出以 `docs/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md` 为准。
-- **自由市场短板补强**：自由市场的核心短板与补强路线见 `docs/WEB3_DUAL_STACK_STRATEGY.md`（第 10 节）。
+- **双栈口径**：TON+EVM 的支付/回执/对账输出以 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md` 为准。
+- **自由市场短板补强**：自由市场的核心短板与补强路线见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md`（第 10 节）。
 - **资源共享契约**：租约/账本/Provider routes 的安全约束以 `docs/reference/web3-resource-market-api.md` 为准。
 
 ```

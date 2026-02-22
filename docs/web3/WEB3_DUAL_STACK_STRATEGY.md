@@ -3,6 +3,10 @@
 > **状态**：Draft（随实现推进更新）  
 > **更新日期**：2026-02-22  
 > **适用范围**：Web3 Market（资源/能力市场 + AI 管家编排）
+>
+> **定位（权威口径）**：双栈策略与验收标准的统一口径文档。  
+> **用途**：定义支付/回执/汇率/对账摘要的统一口径与验收清单。  
+> **关联**：进度口径见 `docs/web3/WEB3_OVERALL_PROGRESS.md`；Week3-5 路线图见 `docs/web3/WEB3_WEEK3_5_ROADMAP.md`；执行计划见 `docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`。
 
 ---
 
@@ -180,7 +184,7 @@ Provider HTTP 路由的鉴权必须同时验证：
 - Web3 Market 概览：`docs/concepts/web3-market.md`
 - Web3 Market Dev：`docs/reference/web3-market-dev.md`
 - Web3 Resource Market API：`docs/reference/web3-resource-market-api.md`
-- 双栈总规划：`docs/WEB3_DUAL_STACK_STRATEGY.md`
+- 双栈总规划：`docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
 - 双栈支付与结算参考：`docs/reference/web3-dual-stack-payments-and-settlement.md`
 - TON-first 多链适配层：`extensions/blockchain-adapter/README.md`
 

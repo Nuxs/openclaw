@@ -81,7 +81,7 @@ FXQuote 的最小结构：
 - `expiresAt`: 过期时间
 - `roundingRule`: 取整规则（例如 `"round-half-up"` / `"ceil"` / `"floor"`，默认 `"round-half-up"`）
 
-> 候选报价来源与选型 tradeoff 见 `docs/WEB3_DUAL_STACK_STRATEGY.md` §3.3。MVP 阶段建议 CEX API + 手动 fallback。
+> 候选报价来源与选型 tradeoff 见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` §3.3。MVP 阶段建议 CEX API + 手动 fallback。
 
 ---
 

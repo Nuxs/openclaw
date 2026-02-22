@@ -36,7 +36,7 @@
 
 双栈统一口径见：
 
-- `docs/WEB3_DUAL_STACK_STRATEGY.md`
+- `docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
 - `docs/reference/web3-dual-stack-payments-and-settlement.md`
 
 纳入原则：**支付双入口、结算单出口**；链上仅最小披露（hash/承诺/汇总/回执），并保持 endpoint/token 零泄露。
@@ -468,7 +468,7 @@ const solBalance = await solanaProvider.getBalance(solWallet.address);
 > 说明：以下示例用于展示未来接入点；当前 `web3-core`/`market-core` 的主线关键路径仍以 EVM 能力为主，尚未直接依赖 `blockchain-adapter`。
 > 双栈（TON+EVM）接入的统一口径与阶段规划，见：
 >
-> - `docs/WEB3_DUAL_STACK_STRATEGY.md`
+> - `docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
 > - `docs/reference/web3-dual-stack-payments-and-settlement.md`
 
 ### 在 `market-core` 中使用（示意）

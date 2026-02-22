@@ -13,7 +13,7 @@
 
 - **`web3-core`** 负责横切能力：钱包身份（SIWE）、审计事件（本地 JSONL + 可选去中心化归档 + 可选链上锚定）、计费与配额、资源共享的 Provider/Consumer 编排、以及一套“安全可分享”的状态/工具输出（强制脱敏）。
 - **`market-core`** 提供市场内核：资源发布/下架、租约签发/撤销/过期清理、账本追加与汇总、纠纷与透明度接口、以及可选的 EVM 合约托管结算（Escrow）。
-- **双栈路线（TON+EVM，统一口径）**：已补齐“支付双入口、结算单出口、最小披露与零泄露”的规划口径（见 `docs/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`）；当前代码关键路径仍以 EVM 为主，TON 侧链能力位于 `extensions/blockchain-adapter`（尚未纳入主线编排/结算关键路径）。
+- **双栈路线（TON+EVM，统一口径）**：已补齐“支付双入口、结算单出口、最小披露与零泄露”的规划口径（见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`）；当前代码关键路径仍以 EVM 为主，TON 侧链能力位于 `extensions/blockchain-adapter`（尚未纳入主线编排/结算关键路径）。
 
 **关键判断**：
 
@@ -276,7 +276,7 @@ Consumer
 
 - **资源发现“最小可用”**：补齐“从索引到接入”的闭环（在不泄露 endpoint 的前提下，引入可授权的 endpoint 分发机制）。
 - **默认配置/向导**：把 Web3 相关开关、凭证、Provider listen、索引上报做成一条“可复制的最短路径”。
-- **双栈口径落地（TON+EVM）**：按 `docs/WEB3_DUAL_STACK_STRATEGY.md` 先补齐“支付回执 + 对账摘要”的统一输出，再逐步接入 TON 侧链能力（`extensions/blockchain-adapter`）。
+- **双栈口径落地（TON+EVM）**：按 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 先补齐“支付回执 + 对账摘要”的统一输出，再逐步接入 TON 侧链能力（`extensions/blockchain-adapter`）。
 - **可观测性增强**：围绕 pending（archive/anchor/settlement）提供统计、告警、快速定位。
 
 ### 中期（1-3 个月）：形成网络效应

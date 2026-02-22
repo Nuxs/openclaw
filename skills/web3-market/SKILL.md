@@ -35,6 +35,15 @@ Read these files as needed:
 - `skills/web3-market/references/web3-market-tools-commands-evolution.md`
 - `skills/web3-market/references/web3-market-assessment-2026-02-19.md`
 
+## Docs (planning & progress)
+
+> These docs have moved under `docs/web3/` and are the shared planning/progress references.
+
+- `docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
+- `docs/web3/WEB3_OVERALL_PROGRESS.md`
+- `docs/web3/WEB3_WEEK3_5_ROADMAP.md`
+- `docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`
+
 ## Non-negotiables
 
 - Never leak `accessToken`, provider endpoints, or real file paths (errors/logs/status/tool results)
