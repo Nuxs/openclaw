@@ -20,7 +20,7 @@ import {
 } from "../validators.js";
 import {
   assertAccess,
-  formatGatewayError,
+  formatGatewayErrorResponse,
   nowIso,
   randomUUID,
   recordAuditWithAnchor,
@@ -143,7 +143,7 @@ export function createDisputeOpenHandler(
         disputeHash: dispute.disputeHash,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -235,7 +235,7 @@ export function createDisputeEvidenceHandler(
         disputeHash: dispute.disputeHash,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -308,7 +308,7 @@ export function createDisputeResolveHandler(
         dispute.updatedAt = dispute.resolvedAt;
         dispute.disputeHash = createDisputeHash(dispute);
 
-        store.runInTransaction(() => {
+        await store.runInTransaction(() => {
           store.saveOrder(order);
           store.saveSettlement(settlement);
           store.saveDispute(dispute);
@@ -365,7 +365,7 @@ export function createDisputeResolveHandler(
       dispute.updatedAt = dispute.resolvedAt;
       dispute.disputeHash = createDisputeHash(dispute);
 
-      store.runInTransaction(() => {
+      await store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveSettlement(settlement);
         store.saveDispute(dispute);
@@ -388,7 +388,7 @@ export function createDisputeResolveHandler(
         settlementId,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -442,7 +442,7 @@ export function createDisputeRejectHandler(
         status: dispute.status,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -469,7 +469,7 @@ export function createDisputeGetHandler(
       if (!dispute) throw new Error("dispute not found");
       respond(true, { dispute });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -500,7 +500,7 @@ export function createDisputeListHandler(
 
       respond(true, { disputes });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }

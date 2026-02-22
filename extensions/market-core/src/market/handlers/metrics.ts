@@ -1,7 +1,7 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
-import { assertAccess, formatGatewayError } from "./_shared.js";
+import { assertAccess, formatGatewayErrorResponse } from "./_shared.js";
 
 type AlertSeverity = "p0" | "p1";
 
@@ -138,7 +138,7 @@ export function createMarketMetricsSnapshotHandler(
         alerts,
       });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }

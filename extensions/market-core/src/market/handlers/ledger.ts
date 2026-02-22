@@ -14,7 +14,7 @@ import {
 } from "../validators.js";
 import {
   assertAccess,
-  formatGatewayError,
+  formatGatewayErrorResponse,
   nowIso,
   randomUUID,
   recordAudit,
@@ -125,7 +125,7 @@ export function createLedgerAppendHandler(
       });
       respond(true, { ledgerId: entry.ledgerId, entryHash });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -160,7 +160,7 @@ export function createLedgerListHandler(
       } as MarketLedgerFilter);
       respond(true, { entries });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
@@ -193,7 +193,7 @@ export function createLedgerSummaryHandler(
       } as MarketLedgerFilter);
       respond(true, { summary });
     } catch (err) {
-      respond(false, { error: formatGatewayError(err) });
+      respond(false, formatGatewayErrorResponse(err));
     }
   };
 }
