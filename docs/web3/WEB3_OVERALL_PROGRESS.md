@@ -38,8 +38,9 @@
 ### 2.4 双栈支付类型定义（2026-02-23 走查新增）
 
 - **ChainNetwork 扩展**：`market-core/config.ts` 的 `ChainNetwork` 类型已增加 `"ton-mainnet" | "ton-testnet"`，与 `blockchain-adapter` 的 TON Provider 对齐。
-- **5 个双栈统一类型**：`market-core/types.ts` 已定义 `PaymentChain` / `PaymentMode` / `PaymentIntent` / `PaymentReceipt` / `FXQuote` / `PayoutPreference` / `ReconciliationSummary`（纯类型，文档先行）。
-- **web3-core reconciliation handler**：`market/handlers.ts` 已有本地 `ReconciliationPaymentReceipt` / `ReconciliationSummary` 实现，支持 `chain: "ton" | "evm"` 参数（后续将改为从 market-core 导入共享类型）。
+- **7 个双栈统一类型**：`market-core/types.ts` 已定义 `PaymentChain` / `PaymentMode` / `PaymentIntent` / `PaymentReceipt` / `FXQuote` / `PayoutPreference` / `ReconciliationSummary`，并从 `market-core/index.ts` re-export 供跨插件消费。
+- **类型共享对齐**：`web3-core/market/handlers.ts` 已移除本地 `ReconciliationPaymentReceipt` / `ReconciliationSummary` / `ReconciliationDisputeSummary`，改为从 `@openclaw/market-core` 导入共享类型（通过 tsconfig paths 解析）。
+- **ReconciliationSummary 超集**：market-core 的 `ReconciliationSummary` 已扩展为超集，包含 settlement 的 `lockedAt/releasedAt/refundedAt`、archiveReceipt 的 `updatedAt`、anchorReceipt 的 `block/updatedAt`。
 
 ### 2.5 能力自描述 Catalog（2026-02-23 走查补全）
 
@@ -51,15 +52,21 @@
 - **market-core 新增测试**：bridge handler（13 tests）、token-economy handler（13 tests）、transparency handler（9 tests）、repair handler（4 tests）。
 - **web3-core 新增测试**：`market/handlers.test.ts`（reconciliation summary，5 tests）、`capabilities/catalog.test.ts`（completeness/structure/findWeb3Capability，10 tests）。
 
+### 2.7 TON 双栈运行时基础设施（2026-02-23 新增）
+
+- **TON Escrow Adapter**：`market-core/src/market/escrow-ton.ts` — `TonEscrowAdapter` 类，与 EVM `EscrowAdapter` 同接口（lock/release/refund），通过 `blockchain-adapter` 的 TON Provider 与 settlement.fc 合约交互。
+- **统一 Escrow 工厂**：`market-core/src/market/escrow-factory.ts` — `createEscrowAdapter()` 根据 `chain.network` 自动选择 EVM 或 TON 适配器，定义 `IEscrowAdapter` 统一接口。
+- **Agent Wallet TON 支持**：`agent-wallet/src/config.ts` 新增 `"ton-mainnet" | "ton-testnet"` 网络 + `isEVMNetwork()`/`isTONNetwork()` 判断；`ton-handlers.ts` 实现 TON 侧 create/balance/send handler；`index.ts` 根据链配置自动分发到 EVM 或 TON handler。
+
 ---
 
 ## 3. 已定义但仍属规划（需要明确里程碑）
 
-- **双栈支付运行时落地**：类型已定义，reconciliation handler 已实现本地逻辑；结算流程的 TON 链路实际打通需等 `blockchain-adapter` TON escrow 完善 + `agent-wallet` 接入。
+- **TON 端到端打通**：TypeScript 基础设施已就绪（escrow adapter + agent-wallet TON handlers），但端到端测试需要：(1) TON settlement.fc 合约编译部署到 testnet；(2) `@ton/crypto` 集成用于 TON 原生钱包地址派生；(3) BOC 消息编码支持（op + query_id + order_id）通过 IProviderTON 扩展接口暴露。
 - **"可分享对账摘要"完整闭环**：输出格式已有口径，但需要持续把所有对外输出点收敛为"可复制粘贴传播"的脱敏摘要。
 - **个人数据/私有知识纳入市场**：需要补齐 consent/脱敏/可撤销/合规回放的强约束规范（见本轮新增 skill references）。
 - **任务市场协议（Phase 3）**：`TaskOrder`/`TaskBid`/`TaskResult`/`TaskReceipt` 类型设计完成，代码实现推迟到开源冷启动之后。
-- **Agent Wallet 接入**：`extensions/agent-wallet` 骨架存在但未接入 `web3.wallet.*` 统一入口和 capabilities catalog，推迟到 Phase 2。
+- **Agent Wallet 统一入口**：`web3.wallet.*` 聚合入口 + capabilities catalog 注册仍待 Phase 2。
 
 ---
 

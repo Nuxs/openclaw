@@ -71,6 +71,14 @@
 - ⏳ 文档自检：内部链接按 Mintlify 规则统一为根相对路径；示例全面脱敏（持续进行）。
 - ⏳ 运行 `scripts/sync-codebuddy.sh`，确保 skill 更新对 IDE 可见。
 
+### Week 5 追加交付（2026-02-23 TON 双栈落地）
+
+- ✅ 类型对齐：web3-core 移除本地重复类型定义，改为从 `@openclaw/market-core` 导入共享类型（via tsconfig paths）
+- ✅ TON Escrow Adapter：`escrow-ton.ts`（TonEscrowAdapter: lock/release/refund via blockchain-adapter TON Provider）
+- ✅ 统一 Escrow 工厂：`escrow-factory.ts`（IEscrowAdapter 接口 + createEscrowAdapter 按 chain.network 分发）
+- ✅ Agent Wallet TON 支持：config 扩展 ton-mainnet/ton-testnet + ton-handlers（create/balance/send）+ register() 自动分发
+- ⏳ 端到端闭环待完成：settlement.fc 合约部署、`@ton/crypto` 地址派生、BOC 编码、IProviderTON 扩展
+
 ---
 
 ## 相关文档

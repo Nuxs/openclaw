@@ -45,13 +45,21 @@
 - **验收证据**：
   - ✅ 双栈统一类型定义可编译通过
   - ✅ reconciliation handler 测试覆盖 EVM + TON 分支
-  - ⏳ TON escrow 端到端打通需等 `blockchain-adapter` + `agent-wallet` 完善
+  - ✅ TON escrow adapter + 统一 escrow 工厂 + agent-wallet TON 支持已实现
+  - ⏳ 端到端测试需 settlement.fc 合约部署 + `@ton/crypto` 集成
 
 ### Week 5 追加验收（2026-02-23 走查）
 
 - ✅ Catalog 覆盖率 67/67 gateway methods + 12/12 tools（100%）
 - ✅ 新增测试：market-core 4 个模块（bridge/token-economy/transparency/repair）+ web3-core 2 个模块（reconciliation/catalog）
 - ✅ 走查差距报告已产出（`docs/web3/WEB3_GAP_AUDIT_REPORT.md`），9 大维度逐项验证
+
+### Week 5 追加验收（2026-02-23 TON 双栈落地）
+
+- ✅ 类型对齐：web3-core 移除本地重复类型，改为从 market-core 导入共享类型（tsconfig paths）
+- ✅ TON Escrow Adapter：`market-core/src/market/escrow-ton.ts`（lock/release/refund via TON Provider）
+- ✅ 统一 Escrow 工厂：`market-core/src/market/escrow-factory.ts`（IEscrowAdapter + chain dispatch）
+- ✅ Agent Wallet TON 支持：config 扩展 + ton-handlers + register() 链分发
 
 ---
 
