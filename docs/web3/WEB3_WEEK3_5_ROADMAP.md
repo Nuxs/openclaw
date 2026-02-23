@@ -14,9 +14,11 @@
   - `web3.*` vs `market.*` 对外/内部边界写清楚
   - token/endpoint/路径脱敏规则写成“不可妥协”
   - 修复断链与不一致（以代码为准）
-- **看板可信**：UI Market Tab 能稳定展示：插件启用状态、资源/租约/账本概要、争议概要、索引概要。
+- **看板可信**：UI Web3 Tab + Market Tab 能稳定展示：身份/计费/审计/市场概览、插件启用状态、资源/租约/账本概要、争议概要、索引概要。
 - **验收证据**：
+  - Web3 Tab 截图（脱敏）
   - Market Tab 截图（脱敏）
+  - `/web3` 输出可复制粘贴
   - `web3_market_status profile=fast|deep` 输出可复制粘贴
 
 ---
@@ -47,5 +49,6 @@
 
 - 总进度口径：`docs/web3/WEB3_OVERALL_PROGRESS.md`
 - 5 周执行计划：`docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`
+- AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 双栈策略：[/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)
 - 双栈支付参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)

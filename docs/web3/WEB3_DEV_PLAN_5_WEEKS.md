@@ -20,6 +20,7 @@
 - 对齐关键安全口径：token 规则、`validateLeaseAccess` 的强一致拒绝、索引输出脱敏与验签。
 - 交付：
   - 更新后的核心文档：`/reference/web3-resource-market-api`、`/plugins/web3-core`、`/plugins/market-core`、`/reference/web3-market-dev`
+  - UI/命令入口补齐：Web3 Tab + `/web3` 一页式入口（脱敏输出）
   - 规划文档补齐：`docs/web3/WEB3_OVERALL_PROGRESS.md`、`WEB3_WEEK3_5_ROADMAP.md`、`WEB3_DEV_PLAN_5_WEEKS.md`
 
 ---
@@ -62,4 +63,5 @@
 
 - 总进度口径：`docs/web3/WEB3_OVERALL_PROGRESS.md`
 - Week3-5 路线图：`docs/web3/WEB3_WEEK3_5_ROADMAP.md`
+- AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 双栈策略：[/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)

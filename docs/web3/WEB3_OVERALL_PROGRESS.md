@@ -22,7 +22,8 @@
 
 - **Web3 插件**：`web3-core`（对外 `web3.*` 编排、审计/归档/锚定/配额等）。
 - **Market 插件**：`market-core`（内部权威：资源共享 Resource/Lease/Ledger + 交易结算 Offer/Order/Settlement/Consent/Delivery + Dispute 等）。
-- **UI 看板**：UI 内已有 Market 视图，并通过 Gateway RPC 拉取 `web3.market.*` / `web3.index.*` / `web3.monitor.snapshot` / `web3.dispute.*` 等数据展示健康状态与概览。
+- **UI 看板**：UI 内已有 Web3 Tab（身份/计费/审计/市场一屏概览）与 Market 视图，并通过 Gateway RPC 拉取 `web3.status.summary` / `web3.billing.summary` / `web3.market.status.summary` / `web3.index.*` / `web3.monitor.snapshot` / `web3.dispute.*` 等数据展示健康状态与概览。
+- **一页式入口**：`/web3` 命令输出一页式仪表盘，可作为排障与快速分享入口。
 
 ### 2.2 资源共享（B-2：Resource/Lease/Ledger）
 
@@ -53,4 +54,5 @@
 
 - Web3 Market Dev：[/reference/web3-market-dev](/reference/web3-market-dev)
 - 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
+- AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 插件文档：[/plugins/web3-core](/plugins/web3-core)、[/plugins/market-core](/plugins/market-core)

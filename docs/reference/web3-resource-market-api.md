@@ -46,6 +46,16 @@ title: "Web3 Resource Market API"
 - `E_RATE_LIMITED`
 - `E_INTERNAL`
 
+## API 稳定性分级（对外口径）
+
+`web3.capabilities.*` 的 descriptor 会标注 `stability`：
+
+- `stable`：可用于生产依赖
+- `experimental`：可能变动，仅建议测试或灰度
+- `internal`：内部调试用，不作为对外契约
+
+UI/Agent 必须以 `stability` 作为能力提示与调用策略的一部分。
+
 ## Gateway RPC（market-core，资源与租约）
 
 以下方法由 `market-core` 暴露，属于资源共享市场的权威状态面，仅供 `web3-core` 与受信运维使用（对外入口统一为 `web3.*`）。

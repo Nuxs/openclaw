@@ -16,6 +16,7 @@ hooks, and gateway methods for UI and integrations.
 It also acts as the orchestration layer for Web3 Market mode:
 
 - It helps the UI and the agent get **identity, audit, archive, and usage summaries**.
+- It powers the **Web3 dashboard** (UI Web3 tab + `/web3` command) for a one-page health view.
 - It can integrate with `market-core` for **settlement status** (escrow lock/release/refund).
 - For agent-owned signing/sending, pair it with the [`agent-wallet` plugin](/plugins/agent-wallet).
 - When resource sharing is enabled, it can expose **provider routes** (model/search/storage) and
@@ -112,6 +113,7 @@ Notes:
 - **`/credits`**: Show usage credits and quota.
 - **`/pay_status`**: Query settlement status from market state (orderId or settlementId).
 - **`/audit_status`**: Show recent audit anchoring events.
+- **`/web3`**: One-page Web3 dashboard (identity, billing, audit, market health).
 - **`/web3-market`**: Web3 Market status and enable guidance.
   - `status [deep]`: probes market endpoints (default `fast`; use `deep` for lists)
   - `start`: prints the `/config set ...` steps to enable Web3 Market (does not write config)
@@ -140,6 +142,11 @@ Billing hooks:
 - `web3.billing.status` (params: `sessionIdHash`)
 - `web3.billing.summary` (params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`)
 - `web3.status.summary` (no params)
+
+Notes:
+
+- `web3.capabilities.*` descriptors include `stability: stable | experimental | internal` for UI/agent gating.
+- `web3.status.summary` includes an optional `identity` summary (bindings + SIWE flag) for dashboard rendering.
 
 ## Agent tools (LLM)
 

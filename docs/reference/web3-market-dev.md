@@ -72,7 +72,7 @@ graph TD
 - `web3.billing.summary`（params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`）
 - `web3.status.summary`（no params）
 
-> `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口：能力描述应包含字段级 `paramsSchema`、常见稳定错误码集合（以 `docs/reference/web3-resource-market-api.md` 的口径为准）与最小示例，且不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
+> `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口：能力描述应包含字段级 `paramsSchema`、`stability`（stable/experimental/internal）、常见稳定错误码集合（以 `docs/reference/web3-resource-market-api.md` 的口径为准）与最小示例，且不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
 
 ### `market-core`（已存在，内部权威层）
 
@@ -151,6 +151,7 @@ graph TD
 ## UI 与产品集成要求（最小可用）
 
 - 必须展示：钱包绑定状态、审计/锚定状态、归档 CID、credits/配额、订单/结算状态。
+- 必须提供一页式入口：`/web3` 命令 + UI Web3 Tab（身份/计费/审计/市场健康度 + 下一步动作）。
 - 遇到链/存储不可用：必须继续允许 OpenClaw 正常工作，只在 UI 上提示“未锚定/未归档/未结算”。
 
 ## 相关文档
@@ -160,5 +161,6 @@ graph TD
 - `market-core` 插件：[/plugins/market-core](/plugins/market-core)
 - Web3 Market 概览：[/concepts/web3-market](/concepts/web3-market)
 - Web3 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
+- AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 双栈总规划（TON+EVM）：`docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
 - 双栈支付与结算参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
