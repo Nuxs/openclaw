@@ -264,7 +264,7 @@ If you keep endpoint-like values for local debugging, ensure they are redacted i
 
 **Implementation notes (current code)**
 
-- Errors are currently returned as short message strings (e.g. `name is required`, `capability not found`) rather than stable `E_*` codes; treat these strings as unstable until Gate-ERR-01 is fully satisfied.
+- Errors are returned as stable `E_*` codes via `formatWeb3GatewayErrorResponse(...)`, with safe, shareable messages (no endpoint/token/real path leakage).
 
 #### `web3.siwe.challenge`
 

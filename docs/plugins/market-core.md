@@ -25,7 +25,7 @@
 - **交易与结算市场**：Offer/Order/Consent/Delivery/Settlement（面向“买卖与托管”）。
 - **资源共享市场**：Resource/Lease/Ledger（面向“出租能力并由 Provider 权威记账”）。
 
-并且在产品口径上遵循“**支付双入口，结算单出口**”：用户可以选择在 TON 或 EVM 支付，但订单/账本/争议/结算与对账摘要保持统一（见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`）。
+并且在产品口径上遵循“**支付双入口，结算单出口**”：统一口径已定义（见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`），但当前可落地路径仍以 **EVM** 为主；TON 支付入口与统一回执/编排仍处于规划阶段。
 
 - **Offer**: 资产发布与定价信息，包含 `assetId`、`assetType`、`usageScope` 与 `offerHash`。
 - **Order**: 订单状态机与支付托管状态。
@@ -122,7 +122,7 @@
   "chain": {
     "network": "base",
     "rpcUrl": "https://mainnet.base.org",
-    "privateKey": "0xYOUR_PRIVATE_KEY",
+    "privateKey": "${MARKET_CHAIN_PRIVATE_KEY}",
     "escrowContractAddress": "0xESCROW_CONTRACT"
   },
   "settlement": {
@@ -168,6 +168,11 @@
   }
 }
 ```
+
+Notes:
+
+- `settlement.mode="contract"` will broadcast on-chain escrow transactions (`lock`/`release`/`refund`) using `chain.privateKey`. It also requires `chain.escrowContractAddress` and `settlement.tokenAddress`.
+- `settlement.mode="anchor_only"` will not broadcast escrow contract transactions (anchor/hash-only behavior).
 
 ### 运维与合规要点
 

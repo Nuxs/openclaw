@@ -17,6 +17,7 @@ It also acts as the orchestration layer for Web3 Market mode:
 
 - It helps the UI and the agent get **identity, audit, archive, and usage summaries**.
 - It can integrate with `market-core` for **settlement status** (escrow lock/release/refund).
+- For agent-owned signing/sending, pair it with the [`agent-wallet` plugin](/plugins/agent-wallet).
 - When resource sharing is enabled, it can expose **provider routes** (model/search/storage) and
   **consumer tools**, while keeping sensitive data out of logs and docs.
 
@@ -63,12 +64,12 @@ Set config under `plugins.entries.web3-core.config`.
           chain: {
             network: "base", // base | optimism | arbitrum | ethereum | sepolia
             rpcUrl: "https://mainnet.base.org",
-            privateKey: "0xYOUR_SIGNER_PRIVATE_KEY",
+            privateKey: "${WEB3_CHAIN_PRIVATE_KEY}",
           },
           storage: {
             provider: "ipfs", // ipfs | arweave | filecoin
             gateway: "https://w3s.link",
-            pinataJwt: "PINATA_JWT",
+            pinataJwt: "${PINATA_JWT}",
           },
           privacy: {
             onChainData: "hash_only", // hash_only | hash_and_meta | encrypted_content
