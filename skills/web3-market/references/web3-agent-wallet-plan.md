@@ -10,14 +10,16 @@
 
 ## 一、现状评估
 
+> **实现状态（对齐）**：主仓已存在 `extensions/agent-wallet`（独立插件原型），但尚未通过 `web3.wallet.*` 聚合入口对外稳定暴露，也未纳入 `web3.capabilities.*` catalog；本文同时覆盖“已落地事实”与后续 Phase 0/1 规划（以实际 PR 为准）。
+
 ### 1.1 现有架构盘点
 
-| 模块                   | 定位          | 现状                                                        | 评价      |
-| ---------------------- | ------------- | ----------------------------------------------------------- | --------- |
-| **market-core**        | 唯一结算引擎  | Offer/Order/Settlement/Consent/Delivery/Lease/Ledger 全链路 | ✅ 工业级 |
-| **web3-core**          | 对外 API 网关 | `web3.market.*` → `market.*` 代理                           | ✅ 完整   |
-| **blockchain-adapter** | 底层链交互    | EVM/TON Provider，签名 + 广播                               | ⚠️ 游离   |
-| **用户钱包**           | 用户资产      | 用户通过 SIWE 绑定自己的地址                                | ✅ 成熟   |
+| 模块                   | 定位          | 现状                                                        | 评价                                                       |
+| ---------------------- | ------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| **market-core**        | 唯一结算引擎  | Offer/Order/Settlement/Consent/Delivery/Lease/Ledger 全链路 | ✅ 工业级                                                  |
+| **web3-core**          | 对外 API 网关 | `web3.market.*` → `market.*` 代理                           | ✅ 完整                                                    |
+| **blockchain-adapter** | 底层链交互    | EVM/TON Provider，签名 + 广播                               | ⚠️ 已被复用（EVM escrow/agent-wallet），但主线入口仍未收敛 |
+| **用户钱包**           | 用户资产      | 用户通过 SIWE 绑定自己的地址                                | ✅ 成熟                                                    |
 
 ### 1.2 架构断点
 
@@ -131,20 +133,23 @@ AI: "帮我买 ETH" → 用用户的地址签名 → 链上交易
 
 - `market-core` 有 Settlement 状态机
 - `blockchain-adapter` 有签名 + 广播能力
-- 两者未连接
+- **两者已连接（EVM escrow 合约调用已通过 `@openclaw/blockchain-adapter` 广播交易）**；但 signer 仍来自 `market-core` 的 `chain.privateKey`（非 agent-wallet），且尚未形成 `web3.*` 统一入口
 
 **行动**：
 
-| 序号 | 任务                                        | 文件                                                        |
-| ---- | ------------------------------------------- | ----------------------------------------------------------- |
-| 1    | 在 market-core 引入 blockchain-adapter 依赖 | `extensions/market-core/package.json`                       |
-| 2    | 修改 settlement handler 支持链上托管模式    | `extensions/market-core/src/market/handlers/settlements.ts` |
-| 3    | 添加链上结算触发器                          | `extensions/market-core/src/market/handlers/settlements.ts` |
+| 序号 | 任务                                                                                     | 文件                                                        |
+| ---- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 序号 | 任务（对齐现状后）                                                                       | 文件                                                        |
+| ---- | --------------------------------------------------------------------------------         | ----------------------------------------------------------- |
+| 1    | 确认 `market-core` 已通过 `blockchain-adapter` 走通 EVM escrow 交易广播（事实对齐）      | `extensions/market-core/src/market/escrow.ts`               |
+| 2    | 确认 `settlement.mode=contract` 旧配置兼容性与错误脱敏（Gate-SEC-01 / Gate-ERR-01）      | `extensions/market-core/src/market/handlers/settlement.ts`  |
+| 3    | 明确并文档化 signer 来源与安全边界（目前为 `chain.privateKey`，后续再切到 agent-wallet） | `extensions/market-core/src/config.ts`                      |
 
 **验收标准**：
 
 - `market.settlement.lock` 可触发链上交易
 - 交易 hash 写入 settlement 记录
+- 旧配置仍可运行（`settlement.mode=contract` 行为不变，signer 来源需在配置/文档中明确）
 
 ### 4.2 阶段 1：Agent Wallet 原型（2 周）
 
@@ -161,7 +166,7 @@ extensions/agent-wallet/
 │   ├── store.ts           # 密钥存储
 │   └── integration.ts     # 与 market-core 对接
 ├── package.json
-└── README.md
+└── README.md            # （可选）当前主仓未提供，后续可补插件级说明文档
 ```
 
 **核心接口**：
@@ -195,12 +200,22 @@ export interface AgentWalletAPI {
 
 **实现要点**：
 
-| 功能     | 实现方式                                               |
-| -------- | ------------------------------------------------------ |
-| 私钥生成 | `viem` 的 `generateMnemonic` + `privateKeyFromAccount` |
-| 私钥存储 | 加密文件（首次），TEE（后续）                          |
-| 签名     | 调用 blockchain-adapter 的 EVMProvider                 |
-| 充值     | 用户向 AI 钱包地址充值（先支持）                       |
+| 功能     | 实现方式                                                                                                        |
+| -------- | --------------------------------------------------------------------------------------------------------------- |
+| 私钥生成 | `generatePrivateKey()` 为默认；可选 `generateMnemonic`，但不得用短口令直接当 key                                |
+| 私钥存储 | AES-256-GCM 加密文件，包含 `version/alg/kdf/nonce/salt/ciphertext`；密钥需 32 bytes（base64/hex），不得写入日志 |
+| 签名     | 调用 blockchain-adapter 的 EVM Provider                                                                         |
+| 充值     | 用户向 AI 钱包地址充值（先支持）                                                                                |
+
+**入口与能力对齐（建议）**：
+
+- UI/面板优先走 `web3.wallet.*` 代理入口，避免直接依赖 `agent-wallet.*`
+- `web3.capabilities.*` 中把 `web3.wallet.*` 标为 Experimental，并注明前置条件（启用 agent-wallet 插件）
+
+**安全与运维约束**：
+
+- 任何错误/状态/工具输出不得泄露私钥、密钥、真实路径或 endpoint
+- 失败应返回稳定错误码（参考 `docs/reference/web3-resource-market-api.md`）
 
 ### 4.3 阶段 2：AI 经济闭环（2 周）
 

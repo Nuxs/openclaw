@@ -56,6 +56,13 @@
 - 缺一个**单一故事**：外部用户容易把它理解为“infra SDK”，而非“AI 管家安全花钱/可追溯”。
 - 缺一份**AI 可执行的黄金路径**：目前有契约与约束，但缺“何时确认、何时自动化、如何降级/退款/争议”的脚本。
 
+### 2.3 规划中的变更（待合入，避免口径漂移）
+
+- **agent-wallet 插件**：主仓已存在 `extensions/agent-wallet`（独立插件原型），但目前仍只暴露 `agent-wallet.*`，尚未提供 `web3.wallet.*` 聚合入口。
+- **结算广播路径**：`market-core` 的 escrow（EVM）已通过 `@openclaw/blockchain-adapter` 执行层广播合约交易；Phase 0 要求是把该事实写清，并保证 `settlement.mode=contract` 旧配置行为不变。
+- **能力入口收敛**：/web3 面板与 UI 只依赖 `web3.*` 稳定入口，避免直接调用 `agent-wallet.*`（防止多入口扩散）。
+- **alias 与 stability**：`web3.wallet.*` 仍是规划中的最小代理入口（指向 `agent-wallet.*`），落地后先标记为 Experimental，并注明前置条件（需启用 agent-wallet 插件）。
+
 ---
 
 ## 3. 硬性 Gate（上线门槛）

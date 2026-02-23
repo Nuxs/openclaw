@@ -22,7 +22,7 @@ Use this skill when working on:
 Read these files as needed:
 
 - `skills/web3-market/references/web3-brain-architecture.md`
-- `skills/web3-market/references/web3-agent-wallet-plan.md` ← **AI Agent Wallet（P1 路线图，当前不推进实现）**
+- `skills/web3-market/references/web3-agent-wallet-plan.md` ← **AI Agent Wallet（已合入 `extensions/agent-wallet` 原型，但尚未接入 `web3.*` 统一入口/`web3.capabilities.*`，仍需持续硬化）**
 - `skills/web3-market/references/web3-market-privacy-knowledge.md` ← **个人数据/私有知识：consent/脱敏/合规/撤销规范**
 - `skills/web3-market/references/web3-market-technical-debt.md` ← **技术债清单与一次性清理计划**
 - `skills/web3-market/references/web3-market-plan-overview.md`
