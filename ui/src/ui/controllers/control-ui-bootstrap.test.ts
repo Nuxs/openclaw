@@ -13,9 +13,18 @@ describe("loadControlUiBootstrapConfig", () => {
         assistantName: "Ops",
         assistantAvatar: "O",
         assistantAgentId: "main",
+        productName: "MyClaw",
+        productTitle: "MyClaw",
       }),
     });
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    document.body.innerHTML = `
+      <div class="sidebar-brand">
+        <img class="sidebar-brand__logo" alt="OpenClaw" />
+        <span class="sidebar-brand__title">OpenClaw</span>
+      </div>
+    `;
 
     const state = {
       basePath: "/openclaw",
@@ -33,6 +42,12 @@ describe("loadControlUiBootstrapConfig", () => {
     expect(state.assistantName).toBe("Ops");
     expect(state.assistantAvatar).toBe("O");
     expect(state.assistantAgentId).toBe("main");
+    expect(document.documentElement.dataset.openclawProductName).toBe("MyClaw");
+    expect(document.documentElement.dataset.openclawProductTitle).toBe("MyClaw");
+    expect(document.title).toBe("MyClaw Control");
+
+    expect(document.querySelector(".sidebar-brand__title")?.textContent).toBe("MyClaw");
+    expect(document.querySelector(".sidebar-brand__logo")?.alt).toBe("MyClaw");
 
     vi.unstubAllGlobals();
   });

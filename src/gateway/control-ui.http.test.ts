@@ -27,6 +27,8 @@ describe("handleControlUiHttpRequest", () => {
       assistantName: string;
       assistantAvatar: string;
       assistantAgentId: string;
+      productName?: string;
+      productTitle?: string;
     };
   }
 
@@ -123,6 +125,8 @@ describe("handleControlUiHttpRequest", () => {
         expect(parsed.assistantName).toBe("</script><script>alert(1)//");
         expect(parsed.assistantAvatar).toBe("/avatar/main");
         expect(parsed.assistantAgentId).toBe("main");
+        expect(parsed.productName).toBe("OpenClaw");
+        expect(parsed.productTitle).toBe("OpenClaw");
       },
     });
   });
@@ -149,6 +153,8 @@ describe("handleControlUiHttpRequest", () => {
         expect(parsed.assistantName).toBe("Ops");
         expect(parsed.assistantAvatar).toBe("/openclaw/avatar/main");
         expect(parsed.assistantAgentId).toBe("main");
+        expect(parsed.productName).toBe("OpenClaw");
+        expect(parsed.productTitle).toBe("OpenClaw");
       },
     });
   });

@@ -19,6 +19,7 @@ cd "$REPO_ROOT"
 
 STRATEGY="merge"
 CHECK_ONLY=false
+PREDICT_ONLY=false
 TARGET_REF="upstream/main"
 UPSTREAM_URL="https://github.com/openclaw/openclaw.git"
 
@@ -27,10 +28,11 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --rebase)    STRATEGY="rebase"; shift ;;
     --check)     CHECK_ONLY=true; shift ;;
+    --predict-conflicts|--conflicts) PREDICT_ONLY=true; shift ;;
     --tag)       TARGET_REF="$2"; shift 2 ;;
     --upstream)  UPSTREAM_URL="$2"; shift 2 ;;
     -h|--help)
-      echo "用法: $0 [--rebase] [--check] [--tag <ref>] [--upstream <url>]"
+      echo "用法: $0 [--rebase] [--check] [--predict-conflicts] [--tag <ref>] [--upstream <url>]"
       exit 0
       ;;
     *) echo "未知参数: $1"; exit 1 ;;
@@ -74,6 +76,18 @@ if [[ "$BEHIND" == "0" ]]; then
   echo ""
   echo "✅ 已经是最新的！"
   exit 0
+fi
+
+if $PREDICT_ONLY; then
+  echo ""
+  echo "🔎 预测冲突文件（不修改工作区）..."
+  if [[ -x "private/scripts/predict-conflicts.sh" ]]; then
+    bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --no-fetch
+    exit 0
+  fi
+  echo "❌ 缺少脚本: private/scripts/predict-conflicts.sh"
+  echo "   请先拉取/生成该脚本后重试。"
+  exit 1
 fi
 
 if $CHECK_ONLY; then
@@ -137,7 +151,34 @@ else
     if [[ -n "$REMAINING" ]]; then
       echo ""
       echo "⚠️  以下文件仍有冲突，需要手动解决:"
-      echo "$REMAINING" | sed 's/^/   /'
+
+      if [[ -x "private/scripts/list-brand-targets.sh" ]]; then
+        tmp_conflicts="$(mktemp)"
+        tmp_brand="$(mktemp)"
+
+        printf '%s\n' "$REMAINING" | sed '/^$/d' | sort -u >"$tmp_conflicts"
+        private/scripts/list-brand-targets.sh | sort -u >"$tmp_brand"
+
+        BRAND_REMAINING=$(comm -12 "$tmp_conflicts" "$tmp_brand" || true)
+        OTHER_REMAINING=$(comm -23 "$tmp_conflicts" "$tmp_brand" || true)
+
+        rm -f "$tmp_conflicts" "$tmp_brand"
+
+        if [[ -n "${BRAND_REMAINING// }" ]]; then
+          echo ""
+          echo "   [品牌相关]"
+          printf '%s\n' "$BRAND_REMAINING" | sed '/^$/d' | sed 's/^/   - /'
+        fi
+
+        if [[ -n "${OTHER_REMAINING// }" ]]; then
+          echo ""
+          echo "   [非品牌]"
+          printf '%s\n' "$OTHER_REMAINING" | sed '/^$/d' | sed 's/^/   - /'
+        fi
+      else
+        echo "$REMAINING" | sed 's/^/   /'
+      fi
+
       echo ""
       echo "解决步骤:"
       echo "  1. 编辑冲突文件"

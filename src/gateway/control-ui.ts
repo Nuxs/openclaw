@@ -19,6 +19,52 @@ import {
 
 const ROOT_PREFIX = "/";
 
+const DEFAULT_CONTROL_UI_PRODUCT_NAME = "OpenClaw";
+
+function readControlUiBrandJson(): { productName?: string; productTitle?: string } {
+  const brandPath = path.resolve(process.cwd(), "private/brand.json");
+  try {
+    const raw = fs.readFileSync(brandPath, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) {
+      return {};
+    }
+
+    const maybeName = "name" in parsed ? (parsed as { name?: unknown }).name : undefined;
+    const maybeUi = "ui" in parsed ? (parsed as { ui?: unknown }).ui : undefined;
+    const maybeTitle =
+      typeof maybeUi === "object" && maybeUi !== null && "title" in maybeUi
+        ? (maybeUi as { title?: unknown }).title
+        : undefined;
+
+    const productName = typeof maybeName === "string" ? maybeName.trim() : "";
+    const productTitle = typeof maybeTitle === "string" ? maybeTitle.trim() : "";
+
+    return {
+      productName: productName || undefined,
+      productTitle: productTitle || undefined,
+    };
+  } catch (error) {
+    // `private/brand.json` is optional. Ignore missing/unreadable/invalid files.
+    if (isExpectedSafePathError(error)) {
+      return {};
+    }
+    const code =
+      typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    if (code === "ENOENT" || code === "ENOTDIR") {
+      return {};
+    }
+    return {};
+  }
+}
+
+function resolveControlUiBrand(): { productName: string; productTitle: string } {
+  const brand = readControlUiBrandJson();
+  const productName = brand.productName ?? DEFAULT_CONTROL_UI_PRODUCT_NAME;
+  const productTitle = brand.productTitle ?? productName;
+  return { productName, productTitle };
+}
+
 export type ControlUiRequestOptions = {
   basePath?: string;
   config?: OpenClawConfig;
@@ -333,6 +379,7 @@ export function handleControlUiHttpRequest(
       agentId: identity.agentId,
       basePath,
     });
+    const brand = resolveControlUiBrand();
     if (req.method === "HEAD") {
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -345,6 +392,8 @@ export function handleControlUiHttpRequest(
       assistantName: identity.name,
       assistantAvatar: avatarValue ?? identity.avatar,
       assistantAgentId: identity.agentId,
+      productName: brand.productName,
+      productTitle: brand.productTitle,
     } satisfies ControlUiBootstrapConfig);
     return true;
   }
