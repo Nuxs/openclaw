@@ -3,35 +3,29 @@
  * 基于TON SDK和TonConnect实现
  */
 
-import {
-  Address as TonAddress,
-  TonClient,
-  WalletContractV4,
-  internal,
-  beginCell,
-  Cell,
-  toNano,
-  fromNano,
-} from "@ton/ton";
+import { Address as TonAddress, TonClient, beginCell, Cell, toNano } from "@ton/ton";
 import { TonConnect } from "@tonconnect/sdk";
 import type {
-  IBlockchainProvider,
+  IProvider,
   ChainId,
   TxHash,
   Address,
-  ContractAddress,
   Wallet,
   ConnectionConfig,
-  Transaction,
   TxReceipt,
-  TxLog,
-  Proof,
   TokenInfo,
   EventCallback,
   Unsubscribe,
-  SettlementInfo,
-  ProviderConfig,
 } from "../../types/provider.js";
+
+/**
+ * TON Provider 配置
+ */
+export interface TONProviderConfig {
+  chainId?: string;
+  rpcUrl?: string;
+  explorerUrl?: string;
+}
 
 // ============================================================================
 // TON Provider Configuration
@@ -41,12 +35,13 @@ interface TONProviderOptions {
   testnet?: boolean;
   rpcUrl?: string;
   apiKey?: string;
-  config?: ProviderConfig;
+  config?: TONProviderConfig;
 }
 
-export class TONProvider implements IBlockchainProvider {
+export class TONProvider implements IProvider {
   // ==================== 基础属性 ====================
 
+  readonly chainType: "ton" = "ton";
   readonly chainId: ChainId;
   readonly chainName: string = "TON Network";
   readonly nativeToken: TokenInfo = {
@@ -55,10 +50,22 @@ export class TONProvider implements IBlockchainProvider {
     decimals: 9,
   };
 
+  get isConnected(): boolean {
+    return this.connectedWallet !== undefined;
+  }
+
+  get wallet(): Wallet | undefined {
+    return this.connectedWallet;
+  }
+
+  async getChainId(): Promise<number> {
+    return this.chainId === "ton-mainnet" ? -239 : -3; // TON 使用负数 chainId
+  }
+
   private client: TonClient;
   private tonConnect?: TonConnect;
   private connectedWallet?: Wallet;
-  private config: ProviderConfig;
+  private config: TONProviderConfig;
   private eventListeners = new Map<string, Set<EventCallback>>();
   private pollingInterval?: NodeJS.Timeout;
 
@@ -95,18 +102,13 @@ export class TONProvider implements IBlockchainProvider {
       : this.loadConfig();
   }
 
-  private loadConfig(): ProviderConfig {
+  private loadConfig(): TONProviderConfig {
     // TODO: 从配置文件加载
     return {
-      chainId: this.chainId,
+      chainId: this.chainId as string,
       rpcUrl: this.client.parameters.endpoint,
       explorerUrl:
         this.chainId === "ton-testnet" ? "https://testnet.tonscan.org" : "https://tonscan.org",
-      contracts: {
-        settlement: "EQD...", // 待部署
-        marketplace: "EQD...",
-        token: "EQD...", // $OCT Token
-      },
     };
   }
 
@@ -134,7 +136,7 @@ export class TONProvider implements IBlockchainProvider {
     this.connectedWallet = {
       address: walletInfo.account.address,
       publicKey: walletInfo.account.publicKey,
-      chainId: this.chainId,
+      chainId: Number(this.chainId),
     };
 
     return this.connectedWallet;
@@ -186,135 +188,37 @@ export class TONProvider implements IBlockchainProvider {
     return result.boc;
   }
 
-  async verifySignature(message: string, signature: string, address: Address): Promise<boolean> {
-    try {
-      // TON签名验证
-      const cell = Cell.fromBase64(signature);
-      const slice = cell.beginParse();
-
-      // TODO: 实现完整的签名验证逻辑
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
   // ==================== 代币操作 ====================
 
-  async getBalance(address: Address, tokenAddress?: ContractAddress): Promise<bigint> {
+  async getBalance(address: Address): Promise<bigint> {
     const tonAddress = TonAddress.parse(address);
-
-    if (!tokenAddress) {
-      // 查询TON余额
-      const balance = await this.client.getBalance(tonAddress);
-      return balance;
-    } else {
-      // 查询Jetton (SPL Token)余额
-      return await this.getJettonBalance(address, tokenAddress);
-    }
-  }
-
-  private async getJettonBalance(
-    ownerAddress: Address,
-    jettonMasterAddress: ContractAddress,
-  ): Promise<bigint> {
-    // 获取用户的Jetton钱包地址
-    const masterAddress = TonAddress.parse(jettonMasterAddress);
-    const ownerAddr = TonAddress.parse(ownerAddress);
-
-    // 调用get_wallet_address方法
-    const result = await this.client.runMethod(masterAddress, "get_wallet_address", [
-      {
-        type: "slice",
-        cell: beginCell().storeAddress(ownerAddr).endCell(),
-      },
-    ]);
-
-    const jettonWalletAddress = result.stack.readAddress();
-
-    // 查询Jetton钱包余额
-    const balanceResult = await this.client.runMethod(jettonWalletAddress, "get_wallet_data", []);
-
-    const balance = balanceResult.stack.readBigNumber();
+    // 查询TON余额
+    const balance = await this.client.getBalance(tonAddress);
     return balance;
   }
 
-  async transfer(to: Address, amount: bigint, tokenAddress?: ContractAddress): Promise<TxHash> {
+  async transfer(to: Address, amount: bigint): Promise<TxHash> {
     if (!this.tonConnect) {
       throw new Error("Wallet not connected");
     }
 
-    if (!tokenAddress) {
-      // 转账TON
-      const result = await this.tonConnect.sendTransaction({
-        validUntil: Math.floor(Date.now() / 1000) + 600,
-        messages: [
-          {
-            address: to,
-            amount: amount.toString(),
-          },
-        ],
-      });
-
-      return result.boc; // 返回交易哈希
-    } else {
-      // 转账Jetton
-      return await this.transferJetton(to, amount, tokenAddress);
-    }
-  }
-
-  private async transferJetton(
-    to: Address,
-    amount: bigint,
-    jettonMasterAddress: ContractAddress,
-  ): Promise<TxHash> {
-    if (!this.tonConnect) {
-      throw new Error("Wallet not connected");
-    }
-
-    const fromAddress = await this.getAddress();
-    const toAddress = TonAddress.parse(to);
-
-    // 构建Jetton转账消息
-    const jettonTransferBody = beginCell()
-      .storeUint(0xf8a7ea5, 32) // Jetton transfer opcode
-      .storeUint(0, 64) // query_id
-      .storeCoins(amount)
-      .storeAddress(toAddress)
-      .storeAddress(TonAddress.parse(fromAddress)) // response_destination
-      .storeBit(0) // no custom payload
-      .storeCoins(toNano("0.05")) // forward_ton_amount
-      .storeBit(0) // no forward_payload
-      .endCell();
-
-    // 获取用户的Jetton钱包地址
-    const masterAddress = TonAddress.parse(jettonMasterAddress);
-    const result = await this.client.runMethod(masterAddress, "get_wallet_address", [
-      {
-        type: "slice",
-        cell: beginCell().storeAddress(TonAddress.parse(fromAddress)).endCell(),
-      },
-    ]);
-    const jettonWalletAddress = result.stack.readAddress();
-
-    // 发送交易
-    const txResult = await this.tonConnect.sendTransaction({
+    // 转账TON
+    const result = await this.tonConnect.sendTransaction({
       validUntil: Math.floor(Date.now() / 1000) + 600,
       messages: [
         {
-          address: jettonWalletAddress.toString(),
-          amount: toNano("0.1").toString(), // Gas费
-          payload: jettonTransferBody.toBoc().toString("base64"),
+          address: to,
+          amount: amount.toString(),
         },
       ],
     });
 
-    return txResult.boc;
+    return result.boc;
   }
 
   // ==================== 智能合约交互 ====================
 
-  async deployContract(bytecode: string, args: any[]): Promise<ContractAddress> {
+  async deployContract(bytecode: string, args: any[]): Promise<string> {
     if (!this.tonConnect) {
       throw new Error("Wallet not connected");
     }
@@ -323,7 +227,7 @@ export class TONProvider implements IBlockchainProvider {
     throw new Error("Not implemented");
   }
 
-  async callContract(address: ContractAddress, method: string, args: any[]): Promise<any> {
+  async callContract(address: string, method: string, args: any[]): Promise<any> {
     const contractAddress = TonAddress.parse(address);
 
     // 调用get方法
@@ -332,150 +236,16 @@ export class TONProvider implements IBlockchainProvider {
     return result.stack;
   }
 
-  async estimateGas(tx: Transaction): Promise<bigint> {
+  async estimateGas(tx: { to: string; value?: bigint; data?: string }): Promise<bigint> {
     // TON的Gas费用相对固定
     // 普通转账约0.01 TON，合约调用约0.05-0.1 TON
     return toNano("0.05");
   }
 
-  // ==================== 结算相关 ====================
-
-  async lockSettlement(
-    orderId: string,
-    amount: bigint,
-    tokenAddress?: ContractAddress,
-  ): Promise<TxHash> {
-    if (!this.tonConnect) {
-      throw new Error("Wallet not connected");
-    }
-
-    const settlementAddress = TonAddress.parse(this.config.contracts.settlement);
-
-    // 构建锁定消息
-    const lockBody = beginCell()
-      .storeUint(1, 32) // op: lock_settlement
-      .storeUint(0, 64) // query_id
-      .storeStringTail(orderId)
-      .storeCoins(amount)
-      .endCell();
-
-    const result = await this.tonConnect.sendTransaction({
-      validUntil: Math.floor(Date.now() / 1000) + 600,
-      messages: [
-        {
-          address: this.config.contracts.settlement,
-          amount: amount.toString(),
-          payload: lockBody.toBoc().toString("base64"),
-        },
-      ],
-    });
-
-    return result.boc;
-  }
-
-  async releaseSettlement(orderId: string, actualAmount: bigint, proof: Proof): Promise<TxHash> {
-    if (!this.tonConnect) {
-      throw new Error("Wallet not connected");
-    }
-
-    // 构建释放消息
-    const releaseBody = beginCell()
-      .storeUint(2, 32) // op: release_settlement
-      .storeUint(0, 64) // query_id
-      .storeStringTail(orderId)
-      .storeCoins(actualAmount)
-      .storeStringTail(proof.signature)
-      .endCell();
-
-    const result = await this.tonConnect.sendTransaction({
-      validUntil: Math.floor(Date.now() / 1000) + 600,
-      messages: [
-        {
-          address: this.config.contracts.settlement,
-          amount: toNano("0.05").toString(), // Gas费
-          payload: releaseBody.toBoc().toString("base64"),
-        },
-      ],
-    });
-
-    return result.boc;
-  }
-
-  async refundSettlement(orderId: string, reason?: string): Promise<TxHash> {
-    if (!this.tonConnect) {
-      throw new Error("Wallet not connected");
-    }
-
-    // 构建退款消息
-    const refundBody = beginCell()
-      .storeUint(3, 32) // op: refund_settlement
-      .storeUint(0, 64) // query_id
-      .storeStringTail(orderId)
-      .storeStringTail(reason || "")
-      .endCell();
-
-    const result = await this.tonConnect.sendTransaction({
-      validUntil: Math.floor(Date.now() / 1000) + 600,
-      messages: [
-        {
-          address: this.config.contracts.settlement,
-          amount: toNano("0.05").toString(),
-          payload: refundBody.toBoc().toString("base64"),
-        },
-      ],
-    });
-
-    return result.boc;
-  }
-
-  async getSettlementStatus(orderId: string): Promise<SettlementInfo> {
-    const settlementAddress = TonAddress.parse(this.config.contracts.settlement);
-
-    // 查询结算状态
-    const result = await this.client.runMethod(settlementAddress, "get_settlement", [
-      {
-        type: "slice",
-        cell: beginCell().storeStringTail(orderId).endCell(),
-      },
-    ]);
-
-    // 解析返回值
-    const status = result.stack.readNumber();
-    const lockedAmount = result.stack.readBigNumber();
-    const payer = result.stack.readAddress().toString();
-    const payee = result.stack.readAddressOpt()?.toString();
-    const lockedAt = result.stack.readNumber();
-
-    return {
-      orderId,
-      status: this.parseSettlementStatus(status),
-      lockedAmount,
-      payer,
-      payee,
-      tokenAddress: this.config.contracts.token!,
-      lockedAt,
-    };
-  }
-
-  private parseSettlementStatus(status: number): "locked" | "released" | "refunded" | "disputed" {
-    switch (status) {
-      case 1:
-        return "locked";
-      case 2:
-        return "released";
-      case 3:
-        return "refunded";
-      case 4:
-        return "disputed";
-      default:
-        throw new Error(`Unknown settlement status: ${status}`);
-    }
-  }
-
   // ==================== 事件监听 ====================
 
   async subscribeEvents(
-    contract: ContractAddress,
+    contract: string,
     eventName: string,
     callback: EventCallback,
   ): Promise<Unsubscribe> {
@@ -566,5 +336,9 @@ export class TONProvider implements IBlockchainProvider {
 
   getExplorerUrl(txHash: TxHash): string {
     return `${this.config.explorerUrl}/tx/${txHash}`;
+  }
+
+  getChainType(): "ton" | "evm" {
+    return "ton";
   }
 }

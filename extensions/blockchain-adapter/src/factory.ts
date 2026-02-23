@@ -3,27 +3,40 @@
  * 统一管理和切换不同区块链的Provider
  */
 
+import { EVM_CHAINS, getChainInfo } from "./config/chains.js";
+import { EVMProvider, type EVMProviderConfig } from "./providers/evm";
 import { TONProvider } from "./providers/ton";
-import type {
-  IBlockchainProvider,
-  IBlockchainFactory,
-  ChainId,
-  ProviderConfig,
-} from "./types/provider";
+import type { ChainInfo, TonChainId } from "./types/chain.js";
+import type { IProvider, ChainType, ChainId } from "./types/provider.js";
 
-// ============================================================================
-// 工厂类
-// ============================================================================
+/**
+ * 旧版链ID映射到新版（兼容性）
+ */
+const CHAIN_MAPPING: Record<string, { chainType: ChainType; chainId: ChainId }> = {
+  "ton-mainnet": { chainType: "ton", chainId: "-239" as TonChainId },
+  "ton-testnet": { chainType: "ton", chainId: "-3" as TonChainId },
+  ethereum: { chainType: "evm", chainId: 1 },
+  sepolia: { chainType: "evm", chainId: 11155111 },
+  "base-mainnet": { chainType: "evm", chainId: 8453 },
+  "base-sepolia": { chainType: "evm", chainId: 84532 },
+  polygon: { chainType: "evm", chainId: 137 },
+  "polygon-amoy": { chainType: "evm", chainId: 80002 },
+  optimism: { chainType: "evm", chainId: 10 },
+  arbitrum: { chainType: "evm", chainId: 42161 },
+  bsc: { chainType: "evm", chainId: 56 },
+  "bsc-testnet": { chainType: "evm", chainId: 97 },
+};
 
-export class BlockchainFactory implements IBlockchainFactory {
+/**
+ * 工厂类
+ */
+export class BlockchainFactory {
   private static instance: BlockchainFactory;
-  private providers = new Map<ChainId, IBlockchainProvider>();
-  private configs = new Map<ChainId, ProviderConfig>();
+  private providers = new Map<ChainId, IProvider>();
+  private configs = new Map<ChainId, ChainInfo>();
   private defaultChainId?: ChainId;
 
-  private constructor() {
-    // 私有构造函数，强制使用单例
-  }
+  private constructor() {}
 
   /**
    * 获取工厂实例 (单例模式)
@@ -36,56 +49,50 @@ export class BlockchainFactory implements IBlockchainFactory {
   }
 
   /**
-   * 初始化工厂 (注册所有支持的链)
-   * @param configs 链配置列表
-   * @param defaultChain 默认链ID
+   * 初始化工厂
    */
-  static init(configs?: ProviderConfig[], defaultChain?: ChainId): void {
+  static init(): void {
     const factory = BlockchainFactory.getInstance();
-
-    // 加载配置
-    if (configs) {
-      configs.forEach((config) => {
-        factory.configs.set(config.chainId, config);
-      });
-    }
-
-    // 设置默认链
-    factory.defaultChainId = defaultChain || "ton-mainnet";
-
-    // 注册内置Provider
     factory.registerBuiltInProviders();
   }
 
   /**
-   * 注册内置的Provider
+   * 注册内置Provider
    */
   private registerBuiltInProviders(): void {
-    // TON Mainnet
-    const tonMainnetConfig = this.getConfig("ton-mainnet");
-    this.register("ton-mainnet", new TONProvider({ testnet: false, config: tonMainnetConfig }));
+    // TON
+    this.register("ton-mainnet", new TONProvider({ testnet: false }));
+    this.register("ton-testnet", new TONProvider({ testnet: true }));
 
-    // TON Testnet
-    const tonTestnetConfig = this.getConfig("ton-testnet");
-    this.register("ton-testnet", new TONProvider({ testnet: true, config: tonTestnetConfig }));
+    // EVM - 从配置表加载
+    const evmChains = [
+      { id: "ethereum", chainId: 1 },
+      { id: "sepolia", chainId: 11155111 },
+      { id: "base-mainnet", chainId: 8453 },
+      { id: "base-sepolia", chainId: 84532 },
+      { id: "polygon", chainId: 137 },
+      { id: "polygon-amoy", chainId: 80002 },
+      { id: "optimism", chainId: 10 },
+      { id: "arbitrum", chainId: 42161 },
+      { id: "bsc", chainId: 56 },
+      { id: "bsc-testnet", chainId: 97 },
+    ];
 
-    // 其他链暂时注册为占位符
-    // Solana
-    // this.register('solana-mainnet', new SolanaProvider());
+    for (const { id, chainId } of evmChains) {
+      const chainInfo = EVM_CHAINS[chainId as keyof typeof EVM_CHAINS];
+      if (chainInfo) {
+        this.register(id, new EVMProvider({ chainId: chainId as any, chainInfo }));
+      }
+    }
 
-    // Sui
-    // this.register('sui-mainnet', new SuiProvider());
-
-    // Base (EVM)
-    // this.register('base-mainnet', new BaseProvider());
+    // 设置默认链
+    this.defaultChainId = "ton-mainnet";
   }
 
   /**
    * 注册Provider
-   * @param chainId 链ID
-   * @param provider Provider实例
    */
-  register(chainId: ChainId, provider: IBlockchainProvider): void {
+  register(chainId: ChainId, provider: IProvider): void {
     if (this.providers.has(chainId)) {
       console.warn(`Provider for ${chainId} already registered, overwriting...`);
     }
@@ -94,18 +101,8 @@ export class BlockchainFactory implements IBlockchainFactory {
 
   /**
    * 获取Provider
-   * @param chainId 链ID (可选，不传则返回默认链)
-   * @returns Provider实例
-   * @throws 如果链不支持
-   *
-   * @example
-   * // 获取默认链 (TON)
-   * const provider = factory.getProvider();
-   *
-   * // 获取指定链
-   * const solanaProvider = factory.getProvider('solana-mainnet');
    */
-  getProvider(chainId?: ChainId): IBlockchainProvider {
+  getProvider(chainId?: ChainId): IProvider {
     const targetChainId = chainId || this.defaultChainId;
 
     if (!targetChainId) {
@@ -127,13 +124,12 @@ export class BlockchainFactory implements IBlockchainFactory {
   /**
    * 获取默认Provider
    */
-  getDefaultProvider(): IBlockchainProvider {
+  getDefaultProvider(): IProvider {
     return this.getProvider();
   }
 
   /**
    * 列出所有支持的链
-   * @returns 链ID列表
    */
   getSupportedChains(): ChainId[] {
     return Array.from(this.providers.keys());
@@ -141,8 +137,6 @@ export class BlockchainFactory implements IBlockchainFactory {
 
   /**
    * 检查是否支持某条链
-   * @param chainId 链ID
-   * @returns 是否支持
    */
   isSupported(chainId: ChainId): boolean {
     return this.providers.has(chainId);
@@ -150,7 +144,6 @@ export class BlockchainFactory implements IBlockchainFactory {
 
   /**
    * 设置默认链
-   * @param chainId 链ID
    */
   setDefaultChain(chainId: ChainId): void {
     if (!this.isSupported(chainId)) {
@@ -167,49 +160,52 @@ export class BlockchainFactory implements IBlockchainFactory {
   }
 
   /**
-   * 获取链配置
-   * @param chainId 链ID
-   * @returns 配置对象
+   * 根据链类型获取Provider
    */
-  getConfig(chainId: ChainId): ProviderConfig | undefined {
-    return this.configs.get(chainId);
+  getProviderByType(chainType: ChainType, chainId?: number): IProvider {
+    // 查找匹配的链
+    for (const [id, provider] of this.providers) {
+      if (provider.chainType === chainType) {
+        if (chainId === undefined || provider.chainId === chainId) {
+          return provider;
+        }
+      }
+    }
+    throw new Error(`No provider found for chain type: ${chainType}`);
   }
 
   /**
-   * 更新链配置
-   * @param chainId 链ID
-   * @param config 新配置
+   * 获取EVM Provider (便捷方法)
    */
-  updateConfig(chainId: ChainId, config: Partial<ProviderConfig>): void {
-    const existingConfig = this.configs.get(chainId);
-    if (existingConfig) {
-      this.configs.set(chainId, { ...existingConfig, ...config });
-    } else {
-      throw new Error(`Config for chain "${chainId}" not found`);
-    }
+  getEVMProvider(chainId?: number): IProvider {
+    return this.getProviderByType("evm", chainId);
+  }
+
+  /**
+   * 获取TON Provider (便捷方法)
+   */
+  getTONProvider(): IProvider {
+    return this.getProviderByType("ton");
   }
 }
 
 // ============================================================================
-// 便捷导出 (单例模式)
+// 便捷导出
 // ============================================================================
 
-/**
- * 全局工厂实例
- */
 export const factory = BlockchainFactory.getInstance();
 
 /**
  * 初始化工厂
  */
-export function initBlockchainFactory(configs?: ProviderConfig[], defaultChain?: ChainId): void {
-  BlockchainFactory.init(configs, defaultChain);
+export function initBlockchainFactory(): void {
+  BlockchainFactory.init();
 }
 
 /**
  * 获取Provider
  */
-export function getProvider(chainId?: ChainId): IBlockchainProvider {
+export function getProvider(chainId?: ChainId): IProvider {
   return factory.getProvider(chainId);
 }
 
@@ -227,145 +223,18 @@ export function isChainSupported(chainId: ChainId): boolean {
   return factory.isSupported(chainId);
 }
 
-// ============================================================================
-// 辅助函数
-// ============================================================================
-
 /**
- * 创建多链Provider代理
- * 自动根据chainId切换Provider
- *
- * @example
- * const provider = createMultiChainProxy();
- *
- * // 自动切换到TON
- * await provider.getBalance(tonAddress, 'ton-mainnet');
- *
- * // 自动切换到Solana
- * await provider.getBalance(solAddress, 'solana-mainnet');
+ * 获取EVM Provider
  */
-export function createMultiChainProxy(): MultiChainProvider {
-  return new Proxy({} as any, {
-    get(target, prop: string) {
-      return async (...args: any[]) => {
-        // 从最后一个参数提取chainId
-        const lastArg = args[args.length - 1];
-        let chainId: ChainId | undefined;
-
-        if (typeof lastArg === "string" && factory.isSupported(lastArg as ChainId)) {
-          chainId = args.pop() as ChainId;
-        }
-
-        const provider = factory.getProvider(chainId);
-
-        // 调用对应方法
-        if (typeof (provider as any)[prop] === "function") {
-          return await (provider as any)[prop](...args);
-        }
-
-        return (provider as any)[prop];
-      };
-    },
-  });
+export function getEVMProvider(chainId?: number): IProvider {
+  return factory.getEVMProvider(chainId);
 }
 
 /**
- * 多链Provider接口
- * 所有方法支持最后一个参数传入chainId
+ * 获取TON Provider
  */
-export interface MultiChainProvider extends IBlockchainProvider {
-  // 所有方法的签名与IBlockchainProvider相同
-  // 但可以在最后添加chainId参数来切换链
+export function getTONProvider(): IProvider {
+  return factory.getTONProvider();
 }
-
-// ============================================================================
-// 配置加载器
-// ============================================================================
-
-/**
- * 从JSON文件加载配置
- * @param configPath 配置文件路径
- */
-export async function loadConfigFromFile(configPath: string): Promise<void> {
-  try {
-    const fs = await import("fs/promises");
-    const configData = await fs.readFile(configPath, "utf-8");
-    const config = JSON.parse(configData);
-
-    const configs: ProviderConfig[] = Object.entries(config.chains || {}).map(
-      ([chainId, chainConfig]: [string, any]) => ({
-        chainId: chainId as ChainId,
-        rpcUrl: chainConfig.rpcUrl,
-        explorerUrl: chainConfig.explorerUrl,
-        contracts: chainConfig.contracts,
-        testnet: chainConfig.testnet,
-      }),
-    );
-
-    BlockchainFactory.init(configs, config.defaultChain);
-  } catch (error) {
-    console.error("Failed to load config from file:", error);
-    // 使用默认配置
-    BlockchainFactory.init();
-  }
-}
-
-/**
- * 从环境变量加载配置
- */
-export function loadConfigFromEnv(): void {
-  const configs: ProviderConfig[] = [];
-
-  // TON Mainnet
-  if (process.env.TON_MAINNET_RPC) {
-    configs.push({
-      chainId: "ton-mainnet",
-      rpcUrl: process.env.TON_MAINNET_RPC,
-      explorerUrl: "https://tonscan.org",
-      contracts: {
-        settlement: process.env.TON_MAINNET_SETTLEMENT!,
-        marketplace: process.env.TON_MAINNET_MARKETPLACE,
-        token: process.env.TON_MAINNET_TOKEN,
-      },
-    });
-  }
-
-  // TON Testnet
-  if (process.env.TON_TESTNET_RPC) {
-    configs.push({
-      chainId: "ton-testnet",
-      rpcUrl: process.env.TON_TESTNET_RPC,
-      explorerUrl: "https://testnet.tonscan.org",
-      contracts: {
-        settlement: process.env.TON_TESTNET_SETTLEMENT!,
-        marketplace: process.env.TON_TESTNET_MARKETPLACE,
-        token: process.env.TON_TESTNET_TOKEN,
-      },
-      testnet: true,
-    });
-  }
-
-  // Solana
-  if (process.env.SOLANA_MAINNET_RPC) {
-    configs.push({
-      chainId: "solana-mainnet",
-      rpcUrl: process.env.SOLANA_MAINNET_RPC,
-      explorerUrl: "https://explorer.solana.com",
-      contracts: {
-        settlement: process.env.SOLANA_MAINNET_SETTLEMENT!,
-        marketplace: process.env.SOLANA_MAINNET_MARKETPLACE,
-        token: process.env.SOLANA_MAINNET_TOKEN,
-      },
-    });
-  }
-
-  const defaultChain = (process.env.DEFAULT_CHAIN as ChainId) || "ton-mainnet";
-
-  BlockchainFactory.init(configs.length > 0 ? configs : undefined, defaultChain);
-}
-
-// ============================================================================
-// 默认导出
-// ============================================================================
 
 export default BlockchainFactory;
