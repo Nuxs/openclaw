@@ -38,14 +38,16 @@ import {
 } from "./app-scroll.ts";
 import {
   applySettings as applySettingsInternal,
-  loadCron as loadCronInternal,
-  loadMarket as loadMarketInternal,
-  loadOverview as loadOverviewInternal,
-  loadWeb3 as loadWeb3Internal,
   setTab as setTabInternal,
   setTheme as setThemeInternal,
   onPopState as onPopStateInternal,
 } from "./app-settings.ts";
+import {
+  loadCronData as loadCronInternal,
+  loadMarket as loadMarketInternal,
+  loadOverview as loadOverviewInternal,
+  loadWeb3 as loadWeb3Internal,
+} from "./app-tab-loaders.ts";
 import {
   resetToolStream as resetToolStreamInternal,
   type ToolStreamEntry,

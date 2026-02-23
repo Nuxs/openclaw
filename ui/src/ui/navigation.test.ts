@@ -13,7 +13,7 @@ import {
 } from "./navigation.ts";
 
 /** All valid tab identifiers derived from TAB_GROUPS */
-const ALL_TABS: Tab[] = TAB_GROUPS.flatMap((group) => group.tabs) as Tab[];
+const ALL_TABS: Tab[] = TAB_GROUPS.flatMap((group) => group.tabs);
 
 describe("iconForTab", () => {
   it("returns a non-empty string for every tab", () => {
@@ -29,7 +29,7 @@ describe("iconForTab", () => {
     const cases = [
       { tab: "chat", icon: "messageSquare" },
       { tab: "overview", icon: "barChart" },
-      { tab: "web3", icon: "radio" },
+      { tab: "web3", icon: "globe" },
       { tab: "channels", icon: "link" },
       { tab: "instances", icon: "radio" },
       { tab: "sessions", icon: "fileText" },

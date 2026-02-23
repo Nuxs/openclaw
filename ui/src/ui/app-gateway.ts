@@ -4,12 +4,8 @@ import {
 } from "../../../src/gateway/events.js";
 import { CHAT_SESSIONS_ACTIVE_MINUTES, flushChatQueueForEvent } from "./app-chat.ts";
 import type { EventLogEntry } from "./app-events.ts";
-import {
-  applySettings,
-  loadCron,
-  refreshActiveTab,
-  setLastActiveSessionKey,
-} from "./app-settings.ts";
+import { applySettings, refreshActiveTab, setLastActiveSessionKey } from "./app-settings.ts";
+import { loadCronData } from "./app-tab-loaders.ts";
 import { handleAgentEvent, resetToolStream, type AgentEventPayload } from "./app-tool-stream.ts";
 import type { OpenClawApp } from "./app.ts";
 import { loadAgents } from "./controllers/agents.ts";
@@ -262,7 +258,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   }
 
   if (evt.event === "cron" && host.tab === "cron") {
-    void loadCron(host as unknown as Parameters<typeof loadCron>[0]);
+    void loadCronData(host as unknown as Parameters<typeof loadCronData>[0]);
   }
 
   if (evt.event === "device.pair.requested" || evt.event === "device.pair.resolved") {

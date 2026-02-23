@@ -1,16 +1,20 @@
 import { t } from "../i18n/index.ts";
 import type { IconName } from "./icons.js";
+import {
+  TAB_GROUPS_FROM_REGISTRY,
+  TAB_PATHS_FROM_REGISTRY,
+  PATH_TO_TAB_FROM_REGISTRY,
+  TAB_ICONS,
+} from "./tab-registry.ts";
 
-export const TAB_GROUPS = [
-  { label: "chat", tabs: ["chat"] },
-  {
-    label: "control",
-    tabs: ["overview", "web3", "market", "channels", "instances", "sessions", "usage", "cron"],
-  },
-  { label: "agent", tabs: ["agents", "skills", "nodes"] },
-  { label: "settings", tabs: ["config", "debug", "logs"] },
-] as const;
+// ---------------------------------------------------------------------------
+// Public API — signatures preserved for backward compatibility
+// ---------------------------------------------------------------------------
 
+/** Sidebar/bottom-tabs group structure, derived from TAB_REGISTRY. */
+export const TAB_GROUPS = TAB_GROUPS_FROM_REGISTRY as { label: string; tabs: Tab[] }[];
+
+/** String literal union of all valid tab ids. */
 export type Tab =
   | "agents"
   | "overview"
@@ -28,25 +32,11 @@ export type Tab =
   | "debug"
   | "logs";
 
-const TAB_PATHS: Record<Tab, string> = {
-  agents: "/agents",
-  overview: "/overview",
-  web3: "/web3",
-  market: "/market",
-  channels: "/channels",
-  instances: "/instances",
-  sessions: "/sessions",
-  usage: "/usage",
-  cron: "/cron",
-  skills: "/skills",
-  nodes: "/nodes",
-  chat: "/chat",
-  config: "/config",
-  debug: "/debug",
-  logs: "/logs",
-};
+/** Derived from registry; kept private — consumers use pathForTab(). */
+const TAB_PATHS: Record<Tab, string> = TAB_PATHS_FROM_REGISTRY as Record<Tab, string>;
 
-const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
+/** Reverse mapping: path → Tab id. */
+const PATH_TO_TAB = PATH_TO_TAB_FROM_REGISTRY as Map<string, Tab>;
 
 export function normalizeBasePath(basePath: string): string {
   if (!basePath) {
@@ -127,41 +117,9 @@ export function inferBasePathFromPathname(pathname: string): string {
   return `/${segments.join("/")}`;
 }
 
+/** Icon for a tab, derived from TAB_REGISTRY. */
 export function iconForTab(tab: Tab): IconName {
-  switch (tab) {
-    case "agents":
-      return "folder";
-    case "chat":
-      return "messageSquare";
-    case "overview":
-      return "barChart";
-    case "web3":
-      return "globe";
-    case "market":
-      return "radio";
-    case "channels":
-      return "link";
-    case "instances":
-      return "radio";
-    case "sessions":
-      return "fileText";
-    case "usage":
-      return "barChart";
-    case "cron":
-      return "loader";
-    case "skills":
-      return "zap";
-    case "nodes":
-      return "monitor";
-    case "config":
-      return "settings";
-    case "debug":
-      return "bug";
-    case "logs":
-      return "scrollText";
-    default:
-      return "folder";
-  }
+  return TAB_ICONS[tab] ?? "folder";
 }
 
 export function titleForTab(tab: Tab) {

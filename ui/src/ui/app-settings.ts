@@ -1,32 +1,3 @@
-import { refreshChat } from "./app-chat.ts";
-import {
-  startLogsPolling,
-  stopLogsPolling,
-  startDebugPolling,
-  stopDebugPolling,
-} from "./app-polling.ts";
-import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
-import type { OpenClawApp } from "./app.ts";
-import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
-import { loadAgentSkills } from "./controllers/agent-skills.ts";
-import { loadAgents } from "./controllers/agents.ts";
-import { loadChannels } from "./controllers/channels.ts";
-import { loadConfig, loadConfigSchema } from "./controllers/config.ts";
-import { loadCronJobs, loadCronStatus } from "./controllers/cron.ts";
-import { loadDebug } from "./controllers/debug.ts";
-import { loadDevices } from "./controllers/devices.ts";
-import { loadExecApprovals } from "./controllers/exec-approvals.ts";
-import { loadLogs } from "./controllers/logs.ts";
-import { loadMarketStatus } from "./controllers/market-status.ts";
-import { loadWeb3MarketSummary } from "./controllers/market-summary.ts";
-import { loadNodes } from "./controllers/nodes.ts";
-import { loadPresence } from "./controllers/presence.ts";
-import { loadSessions } from "./controllers/sessions.ts";
-import { loadSkills } from "./controllers/skills.ts";
-import { loadUsage } from "./controllers/usage.ts";
-import { loadWeb3BillingSummary } from "./controllers/web3-billing.ts";
-import { loadWeb3Dashboard } from "./controllers/web3-dashboard.ts";
-import { loadWeb3Status } from "./controllers/web3-status.ts";
 import {
   inferBasePathFromPathname,
   normalizeBasePath,
@@ -36,9 +7,10 @@ import {
   type Tab,
 } from "./navigation.ts";
 import { saveSettings, type UiSettings } from "./storage.ts";
+import { TAB_BY_ID } from "./tab-registry.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
-import type { AgentsListResult, AttentionItem } from "./types.ts";
+import type { AgentsListResult } from "./types.ts";
 
 type SettingsHost = {
   settings: UiSettings;
@@ -148,21 +120,13 @@ export function applySettingsFromUrl(host: SettingsHost) {
 }
 
 export function setTab(host: SettingsHost, next: Tab) {
-  if (host.tab !== next) {
+  const prev = host.tab;
+  if (prev !== next) {
+    const prevDef = TAB_BY_ID.get(prev);
+    prevDef?.onLeave?.(host);
     host.tab = next;
-  }
-  if (next === "chat") {
-    host.chatHasAutoScrolled = false;
-  }
-  if (next === "logs") {
-    startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);
-  } else {
-    stopLogsPolling(host as unknown as Parameters<typeof stopLogsPolling>[0]);
-  }
-  if (next === "debug") {
-    startDebugPolling(host as unknown as Parameters<typeof startDebugPolling>[0]);
-  } else {
-    stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
+    const nextDef = TAB_BY_ID.get(next);
+    nextDef?.onEnter?.(host);
   }
   void refreshActiveTab(host);
   syncUrlWithTab(host, next, false);
@@ -183,77 +147,9 @@ export function setTheme(host: SettingsHost, next: ThemeMode, context?: ThemeTra
 }
 
 export async function refreshActiveTab(host: SettingsHost) {
-  if (host.tab === "overview") {
-    await loadOverview(host);
-  }
-  if (host.tab === "market") {
-    await loadMarket(host);
-  }
-  if (host.tab === "web3") {
-    await loadWeb3(host);
-  }
-  if (host.tab === "channels") {
-    await loadChannelsTab(host);
-  }
-  if (host.tab === "instances") {
-    await loadPresence(host as unknown as OpenClawApp);
-  }
-  if (host.tab === "sessions") {
-    await loadSessions(host as unknown as OpenClawApp);
-  }
-  if (host.tab === "cron") {
-    await loadCron(host);
-  }
-  if (host.tab === "skills") {
-    await loadSkills(host as unknown as OpenClawApp);
-  }
-  if (host.tab === "agents") {
-    await loadAgents(host as unknown as OpenClawApp);
-    await loadConfig(host as unknown as OpenClawApp);
-    const agentIds = host.agentsList?.agents?.map((entry) => entry.id) ?? [];
-    if (agentIds.length > 0) {
-      void loadAgentIdentities(host as unknown as OpenClawApp, agentIds);
-    }
-    const agentId =
-      host.agentsSelectedId ?? host.agentsList?.defaultId ?? host.agentsList?.agents?.[0]?.id;
-    if (agentId) {
-      void loadAgentIdentity(host as unknown as OpenClawApp, agentId);
-      if (host.agentsPanel === "skills") {
-        void loadAgentSkills(host as unknown as OpenClawApp, agentId);
-      }
-      if (host.agentsPanel === "channels") {
-        void loadChannels(host as unknown as OpenClawApp, false);
-      }
-      if (host.agentsPanel === "cron") {
-        void loadCron(host);
-      }
-    }
-  }
-  if (host.tab === "nodes") {
-    await loadNodes(host as unknown as OpenClawApp);
-    await loadDevices(host as unknown as OpenClawApp);
-    await loadConfig(host as unknown as OpenClawApp);
-    await loadExecApprovals(host as unknown as OpenClawApp);
-  }
-  if (host.tab === "chat") {
-    await refreshChat(host as unknown as Parameters<typeof refreshChat>[0]);
-    scheduleChatScroll(
-      host as unknown as Parameters<typeof scheduleChatScroll>[0],
-      !host.chatHasAutoScrolled,
-    );
-  }
-  if (host.tab === "config") {
-    await loadConfigSchema(host as unknown as OpenClawApp);
-    await loadConfig(host as unknown as OpenClawApp);
-  }
-  if (host.tab === "debug") {
-    await loadDebug(host as unknown as OpenClawApp);
-    host.eventLog = host.eventLogBuffer;
-  }
-  if (host.tab === "logs") {
-    host.logsAtBottom = true;
-    await loadLogs(host as unknown as OpenClawApp, { reset: true });
-    scheduleLogsScroll(host as unknown as Parameters<typeof scheduleLogsScroll>[0], true);
+  const tabDef = TAB_BY_ID.get(host.tab);
+  if (tabDef?.load) {
+    await tabDef.load(host);
   }
 }
 
@@ -316,21 +212,13 @@ export function onPopState(host: SettingsHost) {
 }
 
 export function setTabFromRoute(host: SettingsHost, next: Tab) {
-  if (host.tab !== next) {
+  const prev = host.tab;
+  if (prev !== next) {
+    const prevDef = TAB_BY_ID.get(prev);
+    prevDef?.onLeave?.(host);
     host.tab = next;
-  }
-  if (next === "chat") {
-    host.chatHasAutoScrolled = false;
-  }
-  if (next === "logs") {
-    startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);
-  } else {
-    stopLogsPolling(host as unknown as Parameters<typeof stopLogsPolling>[0]);
-  }
-  if (next === "debug") {
-    startDebugPolling(host as unknown as Parameters<typeof startDebugPolling>[0]);
-  } else {
-    stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
+    const nextDef = TAB_BY_ID.get(next);
+    nextDef?.onEnter?.(host);
   }
   if (host.connected) {
     void refreshActiveTab(host);
@@ -373,163 +261,4 @@ export function syncUrlWithSessionKey(host: SettingsHost, sessionKey: string, re
   } else {
     window.history.pushState({}, "", url.toString());
   }
-}
-
-export async function loadOverview(host: SettingsHost) {
-  const app = host as unknown as OpenClawApp;
-  await Promise.allSettled([
-    loadChannels(app, false),
-    loadPresence(app),
-    loadSessions(app),
-    loadCronStatus(app),
-    loadCronJobs(app),
-    loadDebug(app),
-    loadSkills(app),
-    loadUsage(app),
-    loadOverviewLogs(app),
-    loadWeb3Status(app),
-  ]);
-  buildAttentionItems(app);
-}
-
-async function loadOverviewLogs(host: OpenClawApp) {
-  if (!host.client || !host.connected) {
-    return;
-  }
-  try {
-    const res = await host.client.request("logs.tail", {
-      cursor: host.overviewLogCursor || undefined,
-      limit: 100,
-      maxBytes: 50_000,
-    });
-    const payload = res as {
-      cursor?: number;
-      lines?: unknown;
-    };
-    const lines = Array.isArray(payload.lines)
-      ? payload.lines.filter((line): line is string => typeof line === "string")
-      : [];
-    host.overviewLogLines = [...host.overviewLogLines, ...lines].slice(-500);
-    if (typeof payload.cursor === "number") {
-      host.overviewLogCursor = payload.cursor;
-    }
-  } catch {
-    /* non-critical */
-  }
-}
-
-function buildAttentionItems(host: OpenClawApp) {
-  const items: AttentionItem[] = [];
-
-  if (host.lastError) {
-    items.push({
-      severity: "error",
-      icon: "x",
-      title: "Gateway Error",
-      description: host.lastError,
-    });
-  }
-
-  const hello = host.hello;
-  const auth = (hello as { auth?: { scopes?: string[] } } | null)?.auth;
-  if (auth?.scopes && !auth.scopes.includes("operator.read")) {
-    items.push({
-      severity: "warning",
-      icon: "key",
-      title: "Missing operator.read scope",
-      description:
-        "This connection does not have the operator.read scope. Some features may be unavailable.",
-      href: "https://docs.openclaw.ai/web/dashboard",
-      external: true,
-    });
-  }
-
-  const skills = host.skillsReport?.skills ?? [];
-  const missingDeps = skills.filter((s) => !s.disabled && Object.keys(s.missing).length > 0);
-  if (missingDeps.length > 0) {
-    const names = missingDeps.slice(0, 3).map((s) => s.name);
-    const more = missingDeps.length > 3 ? ` +${missingDeps.length - 3} more` : "";
-    items.push({
-      severity: "warning",
-      icon: "zap",
-      title: "Skills with missing dependencies",
-      description: `${names.join(", ")}${more}`,
-    });
-  }
-
-  const blocked = skills.filter((s) => s.blockedByAllowlist);
-  if (blocked.length > 0) {
-    items.push({
-      severity: "warning",
-      icon: "shield",
-      title: `${blocked.length} skill${blocked.length > 1 ? "s" : ""} blocked`,
-      description: blocked.map((s) => s.name).join(", "),
-    });
-  }
-
-  const cronJobs = host.cronJobs ?? [];
-  const failedCron = cronJobs.filter((j) => j.state?.lastStatus === "error");
-  if (failedCron.length > 0) {
-    items.push({
-      severity: "error",
-      icon: "clock",
-      title: `${failedCron.length} cron job${failedCron.length > 1 ? "s" : ""} failed`,
-      description: failedCron.map((j) => j.name).join(", "),
-    });
-  }
-
-  const now = Date.now();
-  const overdue = cronJobs.filter(
-    (j) => j.enabled && j.state?.nextRunAtMs != null && now - j.state.nextRunAtMs > 300_000,
-  );
-  if (overdue.length > 0) {
-    items.push({
-      severity: "warning",
-      icon: "clock",
-      title: `${overdue.length} overdue job${overdue.length > 1 ? "s" : ""}`,
-      description: overdue.map((j) => j.name).join(", "),
-    });
-  }
-
-  host.attentionItems = items;
-}
-
-export async function loadMarket(host: SettingsHost) {
-  await loadMarketStatus(host as unknown as OpenClawApp);
-}
-
-export async function loadWeb3(host: SettingsHost) {
-  const app = host as unknown as OpenClawApp;
-  app.web3Loading = true;
-  let anySuccess = false;
-  const results = await Promise.allSettled([
-    loadWeb3Dashboard(app),
-    loadWeb3BillingSummary(app),
-    loadWeb3MarketSummary(app),
-  ]);
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      anySuccess = true;
-    }
-  }
-  if (anySuccess) {
-    app.web3LastSuccess = Date.now();
-  }
-  app.web3Loading = false;
-}
-
-export async function loadChannelsTab(host: SettingsHost) {
-  await Promise.all([
-    loadChannels(host as unknown as OpenClawApp, true),
-    loadConfigSchema(host as unknown as OpenClawApp),
-    loadConfig(host as unknown as OpenClawApp),
-  ]);
-}
-
-export async function loadCron(host: SettingsHost) {
-  await Promise.all([
-    loadChannels(host as unknown as OpenClawApp, false),
-    loadCronStatus(host as unknown as OpenClawApp),
-    loadCronJobs(host as unknown as OpenClawApp),
-  ]);
 }
