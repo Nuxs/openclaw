@@ -44,9 +44,15 @@ import {
   createUnbindWalletCommand,
   createWhoamiCommand,
 } from "./identity/commands.js";
+import { createEnsResolveHandler, createEnsReverseHandler } from "./identity/ens.js";
 import { createSiweChallengeHandler, createSiweVerifyHandler } from "./identity/gateway.js";
 import { createBrowserIngestHandler } from "./ingest/browser-handler.js";
 import {
+  createMarketBridgeListHandler,
+  createMarketBridgeRequestHandler,
+  createMarketBridgeRoutesHandler,
+  createMarketBridgeStatusHandler,
+  createMarketBridgeUpdateHandler,
   createMarketLedgerListHandler,
   createMarketLedgerSummaryHandler,
   createMarketLeaseExpireSweepHandler,
@@ -55,6 +61,13 @@ import {
   createMarketLeaseListHandler,
   createMarketLeaseRevokeHandler,
   createMarketMetricsSnapshotHandler,
+  createMarketReconciliationSummaryHandler,
+  createMarketReputationSummaryHandler,
+  createMarketTokenEconomyBurnHandler,
+  createMarketTokenEconomyConfigureHandler,
+  createMarketTokenEconomyGovernanceUpdateHandler,
+  createMarketTokenEconomyMintHandler,
+  createMarketTokenEconomySummaryHandler,
   createMarketResourceGetHandler,
   createMarketResourceListHandler,
   createMarketResourcePublishHandler,
@@ -90,8 +103,10 @@ import {
   createResourceStoragePutHandler,
 } from "./resources/http.js";
 import {
+  createResourceIndexGossipHandler,
   createResourceIndexHeartbeatHandler,
   createResourceIndexListHandler,
+  createResourceIndexPeersListHandler,
   createResourceIndexReportHandler,
   createResourceIndexStatsHandler,
 } from "./resources/indexer.js";
@@ -240,6 +255,8 @@ const plugin: OpenClawPluginDefinition = {
     );
     api.registerGatewayMethod("web3.siwe.challenge", createSiweChallengeHandler(store, config));
     api.registerGatewayMethod("web3.siwe.verify", createSiweVerifyHandler(store, config));
+    api.registerGatewayMethod("web3.identity.resolveEns", createEnsResolveHandler(store, config));
+    api.registerGatewayMethod("web3.identity.reverseEns", createEnsReverseHandler(store, config));
     api.registerGatewayMethod("web3.audit.query", createAuditQueryHandler(store));
     api.registerGatewayMethod("web3.billing.status", createBillingStatusHandler(store, config));
     api.registerGatewayMethod("web3.billing.summary", createBillingSummaryHandler(store, config));
@@ -279,8 +296,44 @@ const plugin: OpenClawPluginDefinition = {
       createMarketLedgerSummaryHandler(config),
     );
     api.registerGatewayMethod(
+      "web3.market.reputation.summary",
+      createMarketReputationSummaryHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.tokenEconomy.summary",
+      createMarketTokenEconomySummaryHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.tokenEconomy.configure",
+      createMarketTokenEconomyConfigureHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.tokenEconomy.mint",
+      createMarketTokenEconomyMintHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.tokenEconomy.burn",
+      createMarketTokenEconomyBurnHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.tokenEconomy.governance.update",
+      createMarketTokenEconomyGovernanceUpdateHandler(config),
+    );
+    api.registerGatewayMethod("web3.market.bridge.routes", createMarketBridgeRoutesHandler(config));
+    api.registerGatewayMethod(
+      "web3.market.bridge.request",
+      createMarketBridgeRequestHandler(config),
+    );
+    api.registerGatewayMethod("web3.market.bridge.update", createMarketBridgeUpdateHandler(config));
+    api.registerGatewayMethod("web3.market.bridge.status", createMarketBridgeStatusHandler(config));
+    api.registerGatewayMethod("web3.market.bridge.list", createMarketBridgeListHandler(config));
+    api.registerGatewayMethod(
       "web3.market.metrics.snapshot",
       createMarketMetricsSnapshotHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.reconciliation.summary",
+      createMarketReconciliationSummaryHandler(store, config),
     );
     api.registerGatewayMethod(
       "web3.market.status.summary",
@@ -313,6 +366,11 @@ const plugin: OpenClawPluginDefinition = {
 
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
+    api.registerGatewayMethod("web3.index.gossip", createResourceIndexGossipHandler(store, config));
+    api.registerGatewayMethod(
+      "web3.index.peers.list",
+      createResourceIndexPeersListHandler(store, config),
+    );
     api.registerGatewayMethod(
       "web3.index.heartbeat",
       createResourceIndexHeartbeatHandler(store, config),

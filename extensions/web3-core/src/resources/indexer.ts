@@ -2,7 +2,7 @@ import { createHash, createPrivateKey, sign } from "node:crypto";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
-import type { IndexedResource, ResourceIndexEntry } from "../state/store.js";
+import type { IndexedResource, P2pPeerRecord, ResourceIndexEntry } from "../state/store.js";
 import { Web3StateStore } from "../state/store.js";
 import { verifyIndexEntries } from "./signature-verification.js";
 
@@ -26,6 +26,29 @@ function parseLimit(input: unknown): number | undefined {
   if (typeof input !== "number" || Number.isNaN(input)) return undefined;
   if (input <= 0) return undefined;
   return Math.min(Math.floor(input), MAX_LIMIT);
+}
+
+const PEER_TRANSPORTS = ["gossip", "dht", "pubsub", "mdns", "static"] as const;
+
+type PeerTransport = (typeof PEER_TRANSPORTS)[number];
+
+function normalizePeerTransport(value: unknown): PeerTransport {
+  return PEER_TRANSPORTS.includes(value as PeerTransport) ? (value as PeerTransport) : "gossip";
+}
+
+function parsePeer(input: Record<string, unknown>, nowIso: string): P2pPeerRecord {
+  const peerId = requireString(input.peerId, "peerId");
+  const transport = normalizePeerTransport(input.transport);
+  const address = typeof input.address === "string" ? input.address.trim() : undefined;
+  const source = typeof input.source === "string" ? input.source.trim() : undefined;
+  const lastSeenAtRaw = typeof input.lastSeenAt === "string" ? input.lastSeenAt.trim() : "";
+  const lastSeenAt =
+    lastSeenAtRaw && !Number.isNaN(Date.parse(lastSeenAtRaw)) ? lastSeenAtRaw : nowIso;
+  return { peerId, transport, address, source, lastSeenAt };
+}
+
+function redactPeer(peer: P2pPeerRecord): P2pPeerRecord {
+  return { ...peer, address: undefined };
 }
 
 function stableStringify(value: unknown): string {
@@ -291,6 +314,75 @@ export function createResourceIndexStatsHandler(
         providers: entries.length,
         resources: totalResources,
         byKind,
+      });
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
+}
+
+export function createResourceIndexGossipHandler(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      requireResourcesEnabled(config);
+      const input = (params ?? {}) as Record<string, unknown>;
+      const entriesInput = Array.isArray(input.entries)
+        ? (input.entries as ResourceIndexEntry[])
+        : [];
+      if (entriesInput.length === 0) {
+        throw new Error("entries is required");
+      }
+
+      const now = Date.now();
+      const verified = verifyIndexEntries(entriesInput, {
+        skipVerification: process.env.NODE_ENV === "test",
+      });
+      const fresh = filterExpired(verified, now);
+
+      for (const entry of fresh) {
+        store.upsertResourceIndex(entry);
+      }
+
+      const peersInput = Array.isArray(input.peers)
+        ? (input.peers as Record<string, unknown>[])
+        : [];
+      if (peersInput.length > 0) {
+        const nowIso = new Date().toISOString();
+        for (const peer of peersInput) {
+          const record = parsePeer(peer, nowIso);
+          store.upsertP2pPeer(record);
+        }
+      }
+
+      respond(true, {
+        received: entriesInput.length,
+        accepted: fresh.length,
+        rejected: entriesInput.length - fresh.length,
+        peersUpdated: peersInput.length,
+      });
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
+}
+
+export function createResourceIndexPeersListHandler(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      requireResourcesEnabled(config);
+      const input = (params ?? {}) as Record<string, unknown>;
+      const limit = parseLimit(input.limit);
+      const peers = store.getP2pPeers();
+      const trimmed = typeof limit === "number" ? peers.slice(0, limit) : peers;
+      respond(true, {
+        peers: trimmed.map(redactPeer),
+        total: peers.length,
       });
     } catch (err) {
       respond(false, formatWeb3GatewayErrorResponse(err));

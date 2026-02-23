@@ -1,6 +1,8 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
+import type { Web3StateStore } from "../state/store.js";
+import { redactUnknown } from "../utils/redact.js";
 
 type GatewayCallResult = {
   ok?: boolean;
@@ -151,6 +153,68 @@ export function createMarketLedgerSummaryHandler(config: Web3PluginConfig): Gate
   return createMarketProxyHandler(config, "market.ledger.summary", { requireResources: false });
 }
 
+export function createMarketReputationSummaryHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.reputation.summary", { requireResources: false });
+}
+
+export function createMarketTokenEconomySummaryHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.tokenEconomy.summary", {
+    requireResources: false,
+  });
+}
+
+export function createMarketTokenEconomyConfigureHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.tokenEconomy.configure", {
+    requireResources: false,
+  });
+}
+
+export function createMarketTokenEconomyMintHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.tokenEconomy.mint", { requireResources: false });
+}
+
+export function createMarketTokenEconomyBurnHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.tokenEconomy.burn", { requireResources: false });
+}
+
+export function createMarketTokenEconomyGovernanceUpdateHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.tokenEconomy.governance.update", {
+    requireResources: false,
+  });
+}
+
+export function createMarketBridgeRoutesHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.bridge.routes", { requireResources: false });
+}
+
+export function createMarketBridgeRequestHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.bridge.request", { requireResources: false });
+}
+
+export function createMarketBridgeUpdateHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.bridge.update", { requireResources: false });
+}
+
+export function createMarketBridgeStatusHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.bridge.status", { requireResources: false });
+}
+
+export function createMarketBridgeListHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.bridge.list", { requireResources: false });
+}
+
 export function createMarketStatusSummaryHandler(config: Web3PluginConfig): GatewayRequestHandler {
   return createMarketProxyHandler(config, "market.status.summary", { requireResources: false });
 }
@@ -159,6 +223,257 @@ export function createMarketMetricsSnapshotHandler(
   config: Web3PluginConfig,
 ): GatewayRequestHandler {
   return createMarketProxyHandler(config, "market.metrics.snapshot", { requireResources: false });
+}
+
+type ReconciliationPaymentReceipt = {
+  chain: "ton" | "evm";
+  network?: string;
+  txHash?: string;
+  amount?: string;
+  tokenAddress?: string;
+  confirmedAt?: string;
+  mode: "live" | "simulated";
+};
+
+type ReconciliationDisputeSummary = {
+  total: number;
+  byStatus: Record<string, number>;
+};
+
+type ReconciliationSummary = {
+  orderId: string;
+  settlementId: string;
+  leaseId?: string;
+  paymentReceipt?: ReconciliationPaymentReceipt;
+  settlement: {
+    status?: string;
+    amount?: string;
+    tokenAddress?: string;
+    lockedAt?: string;
+    releasedAt?: string;
+    refundedAt?: string;
+  };
+  ledgerSummary?: unknown;
+  disputes?: ReconciliationDisputeSummary;
+  archiveReceipt?: { cid?: string; uri?: string; updatedAt?: string };
+  anchorReceipt?: { tx?: string; network?: string; block?: number; updatedAt?: string };
+};
+
+type ReconciliationInput = {
+  orderId?: string;
+  settlementId?: string;
+  leaseId?: string;
+  chain?: string;
+  network?: string;
+  includeLedger?: boolean;
+  includeDisputes?: boolean;
+};
+
+function countByStatus(items: Array<{ status?: string }>): Record<string, number> {
+  return items.reduce<Record<string, number>>((acc, entry) => {
+    const key = entry.status ?? "unknown";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
+function resolvePaymentReceipt(params: {
+  chain: "ton" | "evm";
+  network?: string;
+  amount?: string;
+  tokenAddress?: string;
+  lockTxHash?: string;
+  lockedAt?: string;
+  releaseTxHash?: string;
+  releasedAt?: string;
+  refundTxHash?: string;
+  refundedAt?: string;
+}): ReconciliationPaymentReceipt | undefined {
+  const {
+    chain,
+    network,
+    amount,
+    tokenAddress,
+    lockTxHash,
+    lockedAt,
+    releaseTxHash,
+    releasedAt,
+    refundTxHash,
+    refundedAt,
+  } = params;
+  const txHash = lockTxHash ?? releaseTxHash ?? refundTxHash;
+  const confirmedAt = lockedAt ?? releasedAt ?? refundedAt;
+  if (!txHash && !amount) return undefined;
+  return {
+    chain,
+    network,
+    txHash,
+    amount,
+    tokenAddress,
+    confirmedAt,
+    mode: txHash ? "live" : "simulated",
+  };
+}
+
+export function createMarketReconciliationSummaryHandler(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      const input = (params ?? {}) as ReconciliationInput;
+      const orderId = typeof input.orderId === "string" ? input.orderId.trim() : undefined;
+      const settlementId =
+        typeof input.settlementId === "string" ? input.settlementId.trim() : undefined;
+      const leaseId = typeof input.leaseId === "string" ? input.leaseId.trim() : undefined;
+      const includeLedger = input.includeLedger !== false && Boolean(leaseId);
+      const includeDisputes = input.includeDisputes !== false;
+      const chain = input.chain === "ton" ? "ton" : "evm";
+      const network = typeof input.network === "string" ? input.network : config.chain.network;
+
+      if (!orderId && !settlementId) {
+        throw new Error("orderId or settlementId is required");
+      }
+
+      const callGateway = await loadCallGateway();
+      const settlementResponse = await callGateway({
+        method: "market.settlement.status",
+        params: orderId ? { orderId } : { settlementId },
+        timeoutMs: config.brain.timeoutMs,
+      });
+      const settlementResult = normalizeGatewayResult(settlementResponse);
+      if (!settlementResult.ok) {
+        throw new Error(settlementResult.error ?? "market.settlement.status failed");
+      }
+
+      const settlementPayload = (settlementResult.result ?? {}) as Record<string, unknown>;
+      const resolvedOrderId =
+        typeof settlementPayload.orderId === "string" ? settlementPayload.orderId : orderId;
+      const resolvedSettlementId =
+        typeof settlementPayload.settlementId === "string"
+          ? settlementPayload.settlementId
+          : settlementId;
+
+      if (!resolvedOrderId || !resolvedSettlementId) {
+        throw new Error("settlement response missing orderId or settlementId");
+      }
+
+      let disputeSummary: ReconciliationDisputeSummary | undefined;
+      if (includeDisputes) {
+        const disputeResponse = await callGateway({
+          method: "market.dispute.list",
+          params: { orderId: resolvedOrderId, limit: 200 },
+          timeoutMs: config.brain.timeoutMs,
+        });
+        const disputeResult = normalizeGatewayResult(disputeResponse);
+        if (disputeResult.ok) {
+          const payload = (disputeResult.result ?? {}) as { disputes?: Array<{ status?: string }> };
+          const disputes = Array.isArray(payload.disputes) ? payload.disputes : [];
+          disputeSummary = {
+            total: disputes.length,
+            byStatus: countByStatus(disputes),
+          };
+        }
+      }
+
+      let ledgerSummary: unknown;
+      if (includeLedger && leaseId) {
+        const ledgerResponse = await callGateway({
+          method: "market.ledger.summary",
+          params: { leaseId },
+          timeoutMs: config.brain.timeoutMs,
+        });
+        const ledgerResult = normalizeGatewayResult(ledgerResponse);
+        if (ledgerResult.ok) {
+          const payload = (ledgerResult.result ?? {}) as { summary?: unknown };
+          ledgerSummary = redactUnknown(payload.summary ?? payload);
+        }
+      }
+
+      const paymentReceipt = resolvePaymentReceipt({
+        chain,
+        network,
+        amount: typeof settlementPayload.amount === "string" ? settlementPayload.amount : undefined,
+        tokenAddress:
+          typeof settlementPayload.tokenAddress === "string"
+            ? settlementPayload.tokenAddress
+            : undefined,
+        lockTxHash:
+          typeof settlementPayload.lockTxHash === "string"
+            ? settlementPayload.lockTxHash
+            : undefined,
+        lockedAt:
+          typeof settlementPayload.lockedAt === "string" ? settlementPayload.lockedAt : undefined,
+        releaseTxHash:
+          typeof settlementPayload.releaseTxHash === "string"
+            ? settlementPayload.releaseTxHash
+            : undefined,
+        releasedAt:
+          typeof settlementPayload.releasedAt === "string"
+            ? settlementPayload.releasedAt
+            : undefined,
+        refundTxHash:
+          typeof settlementPayload.refundTxHash === "string"
+            ? settlementPayload.refundTxHash
+            : undefined,
+        refundedAt:
+          typeof settlementPayload.refundedAt === "string"
+            ? settlementPayload.refundedAt
+            : undefined,
+      });
+
+      const archiveReceipt = store.getArchiveReceipt();
+      const anchorReceipt = store.getLastAnchorReceipt();
+
+      const summary: ReconciliationSummary = {
+        orderId: resolvedOrderId,
+        settlementId: resolvedSettlementId,
+        leaseId,
+        paymentReceipt,
+        settlement: {
+          status:
+            typeof settlementPayload.status === "string" ? settlementPayload.status : undefined,
+          amount:
+            typeof settlementPayload.amount === "string" ? settlementPayload.amount : undefined,
+          tokenAddress:
+            typeof settlementPayload.tokenAddress === "string"
+              ? settlementPayload.tokenAddress
+              : undefined,
+          lockedAt:
+            typeof settlementPayload.lockedAt === "string" ? settlementPayload.lockedAt : undefined,
+          releasedAt:
+            typeof settlementPayload.releasedAt === "string"
+              ? settlementPayload.releasedAt
+              : undefined,
+          refundedAt:
+            typeof settlementPayload.refundedAt === "string"
+              ? settlementPayload.refundedAt
+              : undefined,
+        },
+        ledgerSummary,
+        disputes: disputeSummary,
+        archiveReceipt: archiveReceipt
+          ? {
+              cid: archiveReceipt.cid,
+              uri: archiveReceipt.uri,
+              updatedAt: archiveReceipt.updatedAt,
+            }
+          : undefined,
+        anchorReceipt: anchorReceipt
+          ? {
+              tx: anchorReceipt.tx,
+              network: anchorReceipt.network,
+              block: anchorReceipt.block,
+              updatedAt: anchorReceipt.updatedAt,
+            }
+          : undefined,
+      };
+
+      respond(true, summary);
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
 }
 
 export function createMarketDisputeGetHandler(config: Web3PluginConfig): GatewayRequestHandler {
