@@ -4,7 +4,7 @@
 > **更新日期**：2026-02-23  
 > **适用范围**：Web3 Market（资源/能力市场 + AI 管家编排）
 
-本文档用于解决一个问题：当我们说“Web3 Market 已做到哪里”，**到底哪些是已实现、可演示、可验收的事实**，哪些仍是规划。
+本文档用于解决一个问题：当我们说"Web3 Market 已做到哪里"，**到底哪些是已实现、可演示、可验收的事实**，哪些仍是规划。
 
 ---
 
@@ -12,7 +12,7 @@
 
 - **对外单入口**：用户/看板/Agent 只依赖 `web3.*`；`market.*` 作为内部权威状态面。
 - **默认可分享输出**：任何可外发面（文档示例/日志/状态输出/工具返回）默认脱敏，不包含明文 token、Provider endpoint、真实路径。
-- **以代码为准**：本页只写“已能在代码里验证”的能力；规划内容必须标注为“计划”。
+- **以代码为准**：本页只写"已能在代码里验证"的能力；规划内容必须标注为"计划"。
 
 ---
 
@@ -35,13 +35,31 @@
 
 - `market.dispute.*` 与 `web3.dispute.*` 已存在，可用于列出/查询/处理争议对象（证据应以 hash/引用形式存放，避免敏感信息外泄）。
 
+### 2.4 双栈支付类型定义（2026-02-23 走查新增）
+
+- **ChainNetwork 扩展**：`market-core/config.ts` 的 `ChainNetwork` 类型已增加 `"ton-mainnet" | "ton-testnet"`，与 `blockchain-adapter` 的 TON Provider 对齐。
+- **5 个双栈统一类型**：`market-core/types.ts` 已定义 `PaymentChain` / `PaymentMode` / `PaymentIntent` / `PaymentReceipt` / `FXQuote` / `PayoutPreference` / `ReconciliationSummary`（纯类型，文档先行）。
+- **web3-core reconciliation handler**：`market/handlers.ts` 已有本地 `ReconciliationPaymentReceipt` / `ReconciliationSummary` 实现，支持 `chain: "ton" | "evm"` 参数（后续将改为从 market-core 导入共享类型）。
+
+### 2.5 能力自描述 Catalog（2026-02-23 走查补全）
+
+- **覆盖率 100%**：67 个注册 gateway method + 12 个 tool 全部有 catalog descriptor（ENS 方法 `web3.identity.resolveEns` / `web3.identity.reverseEns` 已补齐）。
+- **幽灵条目 0**：catalog 中不存在未注册的 method。
+
+### 2.6 测试覆盖（2026-02-23 走查新增）
+
+- **market-core 新增测试**：bridge handler（13 tests）、token-economy handler（13 tests）、transparency handler（9 tests）、repair handler（4 tests）。
+- **web3-core 新增测试**：`market/handlers.test.ts`（reconciliation summary，5 tests）、`capabilities/catalog.test.ts`（completeness/structure/findWeb3Capability，10 tests）。
+
 ---
 
 ## 3. 已定义但仍属规划（需要明确里程碑）
 
-- **双栈支付入口（TON + EVM）**：统一口径在 [/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY) 与 [/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)；具体落地以 Roadmap 与验收脚本为准。
-- **“可分享对账摘要”完整闭环**：输出格式已有口径，但需要持续把所有对外输出点收敛为“可复制粘贴传播”的脱敏摘要。
+- **双栈支付运行时落地**：类型已定义，reconciliation handler 已实现本地逻辑；结算流程的 TON 链路实际打通需等 `blockchain-adapter` TON escrow 完善 + `agent-wallet` 接入。
+- **"可分享对账摘要"完整闭环**：输出格式已有口径，但需要持续把所有对外输出点收敛为"可复制粘贴传播"的脱敏摘要。
 - **个人数据/私有知识纳入市场**：需要补齐 consent/脱敏/可撤销/合规回放的强约束规范（见本轮新增 skill references）。
+- **任务市场协议（Phase 3）**：`TaskOrder`/`TaskBid`/`TaskResult`/`TaskReceipt` 类型设计完成，代码实现推迟到开源冷启动之后。
+- **Agent Wallet 接入**：`extensions/agent-wallet` 骨架存在但未接入 `web3.wallet.*` 统一入口和 capabilities catalog，推迟到 Phase 2。
 
 ---
 
@@ -49,6 +67,7 @@
 
 - 路线图：`docs/web3/WEB3_WEEK3_5_ROADMAP.md`
 - 5 周执行计划：`docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`
+- 走查差距报告：`docs/web3/WEB3_GAP_AUDIT_REPORT.md`
 
 相关入口：
 
