@@ -779,6 +779,96 @@ export type MarketMetricsSnapshot = {
   alerts: MarketAlert[];
 };
 
+export type MarketReputationSummary = {
+  providerActorId?: string;
+  resourceId?: string;
+  score: number;
+  signals: string[];
+  leases: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  disputes: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  ledger: {
+    totalCost: string;
+    currency: string;
+  };
+};
+
+export type TokenEconomyState = {
+  status: "token_draft" | "token_active" | "token_paused";
+  policy: {
+    symbol: string;
+    name?: string;
+    decimals?: number;
+    chain?: string;
+    tokenAddress?: string;
+    emission?: {
+      rate: string;
+      period: "day" | "week" | "month";
+      cap?: string;
+    };
+    burn?: {
+      burnRateBps?: number;
+    };
+    governance?: {
+      quorumBps?: number;
+      votingPeriodDays?: number;
+      proposalThreshold?: string;
+    };
+  };
+  totals: {
+    minted: string;
+    burned: string;
+    totalSupply: string;
+    circulating: string;
+  };
+  updatedAt: string;
+};
+
+export type CrossChainAsset = {
+  assetId: string;
+  symbol: string;
+  decimals: number;
+  chains: string[];
+};
+
+export type BridgeRoute = {
+  routeId: string;
+  fromChain: string;
+  toChain: string;
+  assetSymbol: string;
+  minAmount?: string;
+  maxAmount?: string;
+  feeBps?: number;
+  estimatedSeconds?: number;
+  provider?: string;
+};
+
+export type BridgeTransfer = {
+  bridgeId: string;
+  orderId?: string;
+  settlementId?: string;
+  routeId: string;
+  fromChain: string;
+  toChain: string;
+  assetSymbol: string;
+  amount: string;
+  status: "bridge_requested" | "bridge_in_flight" | "bridge_completed" | "bridge_failed";
+  txHash?: string;
+  failureReason?: string;
+  requestedAt: string;
+  updatedAt: string;
+};
+
+export type BridgeRoutesSnapshot = {
+  assets: CrossChainAsset[];
+  routes: BridgeRoute[];
+};
+
 export type MarketResourceKind = "model" | "search" | "storage";
 export type MarketResourceStatus = "resource_draft" | "resource_published" | "resource_unpublished";
 export type MarketLeaseStatus = "lease_active" | "lease_revoked" | "lease_expired";

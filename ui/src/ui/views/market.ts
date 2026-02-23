@@ -1,6 +1,8 @@
 import { html, nothing } from "lit";
 import { clampText, formatRelativeTimestamp } from "../format.ts";
 import type {
+  BridgeRoutesSnapshot,
+  BridgeTransfer,
   MarketAlert,
   MarketDispute,
   MarketFilters,
@@ -8,13 +10,21 @@ import type {
   MarketLedgerSummary,
   MarketLease,
   MarketMetricsSnapshot,
+  MarketReputationSummary,
   MarketResource,
   MarketResourceKind,
   MarketStatusSummary,
+  TokenEconomyState,
   Web3IndexEntry,
   Web3IndexStats,
   Web3MonitorSnapshot,
 } from "../types.ts";
+import {
+  renderBridgeRoutesCard,
+  renderBridgeTransfersCard,
+  renderReputationCard,
+  renderTokenEconomyCard,
+} from "./market-cards.ts";
 import { renderIndexOverview, renderMonitorOverview } from "./market-sections.ts";
 
 type MarketProps = {
@@ -31,6 +41,10 @@ type MarketProps = {
   ledger: MarketLedgerSummary | null;
   ledgerEntries: MarketLedgerEntry[];
   disputes: MarketDispute[];
+  reputation: MarketReputationSummary | null;
+  tokenEconomy: TokenEconomyState | null;
+  bridgeRoutes: BridgeRoutesSnapshot | null;
+  bridgeTransfers: BridgeTransfer[];
   resourceKind: MarketResourceKind | "all";
   filters: MarketFilters;
   enableBusy: boolean;
@@ -302,6 +316,16 @@ export function renderMarket(props: MarketProps) {
         <div class="card-sub">Triggered rules that need attention.</div>
         ${renderAlerts(activeAlerts, metrics?.alerts ?? [])}
       </div>
+    </section>
+
+    <section class="grid grid-cols-2" style="margin-top: 18px;">
+      ${renderReputationCard(props.reputation, props.loading)}
+      ${renderTokenEconomyCard(props.tokenEconomy, props.loading)}
+    </section>
+
+    <section class="grid grid-cols-2" style="margin-top: 18px;">
+      ${renderBridgeRoutesCard(props.bridgeRoutes, props.loading)}
+      ${renderBridgeTransfersCard(props.bridgeTransfers, props.loading)}
     </section>
 
     <section class="grid grid-cols-2" style="margin-top: 18px;">
@@ -891,7 +915,13 @@ function resolveStatusTone(status: string): string {
   if (lower.includes("failed") || lower.includes("rejected") || lower.includes("revoked")) {
     return "pill--danger";
   }
-  if (lower.includes("pending") || lower.includes("open") || lower.includes("evidence")) {
+  if (
+    lower.includes("pending") ||
+    lower.includes("open") ||
+    lower.includes("evidence") ||
+    lower.includes("requested") ||
+    lower.includes("in_flight")
+  ) {
     return "pill--warn";
   }
   return "pill--ok";

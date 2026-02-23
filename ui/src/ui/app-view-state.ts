@@ -15,6 +15,8 @@ import type {
   AgentsFilesListResult,
   AgentIdentityResult,
   AttentionItem,
+  BridgeRoutesSnapshot,
+  BridgeTransfer,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   ConfigUiHints,
@@ -30,10 +32,12 @@ import type {
   MarketLedgerSummary,
   MarketLease,
   MarketMetricsSnapshot,
+  MarketReputationSummary,
   MarketResource,
   MarketResourceKind,
   MarketStatusSummary,
   ModelCatalogEntry,
+  TokenEconomyState,
   Web3IndexEntry,
   Web3IndexStats,
   Web3MonitorSnapshot,
@@ -182,6 +186,10 @@ export type AppViewState = {
   marketLedgerSummary: MarketLedgerSummary | null;
   marketLedgerEntries: MarketLedgerEntry[];
   marketDisputes: MarketDispute[];
+  marketReputation: MarketReputationSummary | null;
+  marketTokenEconomy: TokenEconomyState | null;
+  marketBridgeRoutes: BridgeRoutesSnapshot | null;
+  marketBridgeTransfers: BridgeTransfer[];
   marketLastSuccess: number | null;
   marketResourceKind: MarketResourceKind | "all";
   marketFilters: MarketFilters;

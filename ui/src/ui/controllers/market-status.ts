@@ -1,13 +1,17 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type {
+  BridgeRoutesSnapshot,
+  BridgeTransfer,
   ConfigSnapshot,
   MarketDispute,
   MarketLedgerEntry,
   MarketLedgerSummary,
   MarketLease,
   MarketMetricsSnapshot,
+  MarketReputationSummary,
   MarketResource,
   MarketStatusSummary,
+  TokenEconomyState,
   Web3IndexEntry,
   Web3IndexStats,
   Web3MonitorSnapshot,
@@ -32,6 +36,10 @@ type MarketStatusState = {
   marketLedgerSummary: MarketLedgerSummary | null;
   marketLedgerEntries: MarketLedgerEntry[];
   marketDisputes: MarketDispute[];
+  marketReputation: MarketReputationSummary | null;
+  marketTokenEconomy: TokenEconomyState | null;
+  marketBridgeRoutes: BridgeRoutesSnapshot | null;
+  marketBridgeTransfers: BridgeTransfer[];
   marketLastSuccess: number | null;
 };
 
@@ -81,6 +89,10 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       ledgerRes,
       ledgerEntriesRes,
       disputesRes,
+      reputationRes,
+      tokenEconomyRes,
+      bridgeRoutesRes,
+      bridgeListRes,
     ] = await Promise.allSettled([
       state.client.request("web3.market.status.summary", {}),
       state.client.request("web3.market.metrics.snapshot", {}),
@@ -92,6 +104,10 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       state.client.request("web3.market.ledger.summary", {}),
       state.client.request("web3.market.ledger.list", { limit: 50 }),
       state.client.request("web3.dispute.list", { limit: 50 }),
+      state.client.request("web3.market.reputation.summary", {}),
+      state.client.request("web3.market.tokenEconomy.summary", {}),
+      state.client.request("web3.market.bridge.routes", {}),
+      state.client.request("web3.market.bridge.list", { limit: 20 }),
     ]);
 
     const errors: string[] = [];
@@ -172,6 +188,34 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       anySuccess = true;
     } else {
       errors.push(String(disputesRes.reason ?? "Failed to load market disputes"));
+    }
+
+    if (reputationRes.status === "fulfilled") {
+      state.marketReputation = normalizePayload<MarketReputationSummary>(reputationRes.value);
+      anySuccess = true;
+    } else {
+      state.marketReputation = null;
+    }
+
+    if (tokenEconomyRes.status === "fulfilled") {
+      state.marketTokenEconomy = normalizePayload<TokenEconomyState>(tokenEconomyRes.value);
+      anySuccess = true;
+    } else {
+      state.marketTokenEconomy = null;
+    }
+
+    if (bridgeRoutesRes.status === "fulfilled") {
+      state.marketBridgeRoutes = normalizePayload<BridgeRoutesSnapshot>(bridgeRoutesRes.value);
+      anySuccess = true;
+    } else {
+      state.marketBridgeRoutes = null;
+    }
+
+    if (bridgeListRes.status === "fulfilled") {
+      state.marketBridgeTransfers = normalizePayload<BridgeTransfer[]>(bridgeListRes.value) ?? [];
+      anySuccess = true;
+    } else {
+      state.marketBridgeTransfers = [];
     }
 
     if (errors.length > 0) {
