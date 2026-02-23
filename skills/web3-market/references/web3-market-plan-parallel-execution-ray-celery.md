@@ -4,6 +4,15 @@
 - **目标**: 多台设备并行执行（Mac mini / 个人设备 / NPU / TPU）
 - **范围**: LLM 推理 + 搜索 + 存储（混合负载）
 
+### **实现口径提示**
+
+- 本文为并联执行方案参考，不代表已实现功能。
+- 当前可用入口与契约以以下文档为准：
+  - `/plugins/web3-core-dev`
+  - `/plugins/market-core`
+  - `/reference/web3-resource-market-api`
+- 实际能力输出以 `web3.capabilities.*` 为准。
+
 ---
 
 ## 1) 总体架构（Ray 主线 + Celery 补充）

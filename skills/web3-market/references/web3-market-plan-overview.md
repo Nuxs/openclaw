@@ -40,6 +40,15 @@ OpenClaw Web3 Market 让你的 **AI 管家**可以安全地**发现、租用与�
   - `web3-market-resource-implementation-checklist.md`
 - 快速进入：先读 `web3-brain-architecture.md`，再读资源共享 API 与安全文档。
 
+### **实现口径提示**
+
+- 本文为规划/愿景参考，不代表已实现功能。
+- 当前可用入口与约束以以下文档为准：
+  - `/plugins/web3-core-dev`
+  - `/plugins/market-core`
+  - `/reference/web3-resource-market-api`
+- 实际能力输出以 `web3.capabilities.*` 为准。
+
 ### **新版权威规划（以本节为准）**
 
 #### **目标与边界**
@@ -653,13 +662,13 @@ sequenceDiagram
 
 #### **数据接口清单（现有可用）**
 
-| 页面       | 关键数据                      | 现有接口（Gateway/Command）                                                                   | 备注                                                                                    |
-| ---------- | ----------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 概览页     | Web3 状态、结算队列、审计近况 | `web3.status.summary`, `market.status.summary`, `market.ledger.summary`                       | 可补充 `web3.billing.summary` 显示 credits 概览                                         |
-| 资源管理   | 资源列表、资源详情、发布状态  | `market.resource.list`, `market.resource.get`, `web3.resources.list`, `web3.resources.status` | 发布/下线使用 `market.resource.publish/unpublish` 或 `web3.resources.publish/unpublish` |
-| 租约与结算 | 租约列表、租约详情、结算状态  | `market.lease.list`, `market.lease.get`, `market.settlement.status`                           | 租约操作使用 `market.lease.issue/revoke`                                                |
-| 账本与审计 | 账本流水、汇总、审计查询      | `market.ledger.list`, `market.ledger.summary`, `market.audit.query`, `web3.audit.query`       | 可增加 `market.transparency.summary/trace` 作为追踪入口                                 |
-| 告警与监控 | 监控指标、告警规则            | `web3.status.summary`, `market.status.summary`                                                | 目前缺少告警规则/历史接口，需要补齐                                                     |
+| 页面       | 关键数据                      | 现有接口（Gateway/Command）                                                                                                            | 备注                                                                                         |
+| ---------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 概览页     | Web3 状态、结算队列、审计近况 | `web3.status.summary`, `web3.market.status.summary`, `web3.market.ledger.summary`, `web3.monitor.snapshot`                             | 可补充 `web3.billing.summary` 显示 credits 概览                                              |
+| 资源管理   | 资源列表、资源详情、发布状态  | `web3.market.resource.list`, `web3.market.resource.get`, `web3.resources.list`, `web3.resources.status`, `web3.index.list`             | 发布/下线使用 `web3.market.resource.publish/unpublish` 或 `web3.resources.publish/unpublish` |
+| 租约与结算 | 租约列表、租约详情、结算状态  | `web3.market.lease.list`, `web3.market.lease.get`, `web3.market.lease.issue`, `web3.market.lease.revoke`, `web3.market.ledger.summary` | 结算状态可补充 `web3.billing.summary`                                                        |
+| 账本与审计 | 账本流水、汇总、审计查询      | `web3.market.ledger.list`, `web3.market.ledger.summary`, `web3.audit.query`, `web3.market.dispute.list`, `web3.market.dispute.get`     | 可增加 `web3.market.reconciliation.summary` 作为追踪入口                                     |
+| 告警与监控 | 监控指标、告警规则            | `web3.monitor.snapshot`, `web3.monitor.alerts.list`, `web3.monitor.alerts.get`, `web3.status.summary`                                  | 目前缺少告警规则/历史接口，需要补齐                                                          |
 
 #### **Phase 1 需补齐的数据接口（建议优先级）**
 

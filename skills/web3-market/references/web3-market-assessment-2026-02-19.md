@@ -1,5 +1,9 @@
 ### OpenClaw + Web3 分布式助理网络评审报告（仅评审）
 
+> **历史快照（已过期）**：本文为 2026-02-20 的评审快照，可能与当前实现存在偏差。
+> 已对齐口径请以以下权威文档核对：`web3-brain-architecture.md`、`web3-market-resource-api.md`、`web3-market-resource-security.md`。
+> 若本文与实现冲突，以实现与上述文档为准。
+
 - **评估日期**: 2026-02-20
 - **文档类型**: 技术架构与实现进度评审（对照当前实现如实更新）
 - **评估者**: AI Assistant

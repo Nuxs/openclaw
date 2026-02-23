@@ -175,6 +175,7 @@ Provider 权威记账规则：
 
 ## 相关文档
 
+- Web3 Market output redaction checklist: [/reference/web3-market-output-redaction](/reference/web3-market-output-redaction)
 - Web3 Market overview: [/concepts/web3-market](/concepts/web3-market)
 - Web3 Market dev guide: [/reference/web3-market-dev](/reference/web3-market-dev)
 - Web3 Core dev guide: [/plugins/web3-core-dev](/plugins/web3-core-dev)

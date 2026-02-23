@@ -159,6 +159,42 @@ describe("web3-core resource registry handlers", () => {
     clearConsumerLeaseAccess("res-lease-test");
   });
 
+  it("does not expose token or endpoint in lease response", async () => {
+    callGatewayMock.mockResolvedValue({
+      ok: true,
+      result: {
+        leaseId: "lease-secret",
+        accessToken: "tok_secret",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        orderId: "ord-3",
+        consentId: "con-3",
+        deliveryId: "del-3",
+      },
+    });
+
+    const config = resolveConfig({
+      resources: { enabled: true, consumer: { enabled: true } },
+    });
+    const { createResourceLeaseHandler } = await import("./registry.js");
+    const handler = createResourceLeaseHandler(config);
+    const { respond, result } = createResponder();
+
+    await handler({
+      params: {
+        resourceId: "res-secret",
+        consumerActorId: "0xcons",
+        ttlMs: 60000,
+        providerEndpoint: "https://secret.example",
+      },
+      respond,
+    } as any);
+
+    const payload = result()?.payload ?? {};
+    expect(result()?.ok).toBe(true);
+    expect(payload).not.toHaveProperty("accessToken");
+    expect(payload).not.toHaveProperty("providerEndpoint");
+  });
+
   it("records settlement metadata when sessionKey is provided", async () => {
     const tempDir = fs.mkdtempSync(path.join(tmpdir(), "openclaw-web3-session-"));
     const storePath = path.join(tempDir, "sessions.json");
