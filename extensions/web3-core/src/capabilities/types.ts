@@ -18,12 +18,16 @@ export type CapabilityGroup =
   | "dispute"
   | "tools";
 
+export type CapabilityStability = "stable" | "experimental" | "internal";
+
 export type CapabilityDescriptor = {
   name: string;
   summary: string;
   kind: CapabilityKind;
   group: CapabilityGroup;
   availability: CapabilityAvailability;
+  /** API stability grade: stable (production), experimental (may change), internal (do not rely on) */
+  stability?: CapabilityStability;
   permissions?: {
     requiresIdentity?: boolean;
     allowlist?: string[];

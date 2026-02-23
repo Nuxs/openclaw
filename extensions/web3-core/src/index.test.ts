@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveConfig } from "./config.js";
+import { AlertCategory, AlertLevel, AlertStatus } from "./monitor/types.js";
+import { Web3StateStore } from "./state/store.js";
 import {
   createWeb3StatusSummaryHandler,
   resolveBillingSummary,
   resolveBrainAvailability,
-} from "./index.js";
-import { AlertCategory, AlertLevel, AlertStatus } from "./monitor/types.js";
-import { Web3StateStore } from "./state/store.js";
+} from "./status/summary-handler.js";
 
 let tempDir: string;
 
@@ -58,6 +58,8 @@ describe("web3.status.summary handler", () => {
     expect((payload.disputes as any).total).toBe(0);
     expect((payload.alerts as any).total).toBe(0);
     expect((payload.queues as any).anchors.pending).toBe(0);
+    expect(payload).toHaveProperty("identity");
+    expect((payload.identity as any).bindingsCount).toBe(0);
   });
 
   it("reports settlement.pending count from store", () => {
