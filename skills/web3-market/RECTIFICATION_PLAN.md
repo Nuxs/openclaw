@@ -198,3 +198,42 @@ owner: OpenClaw Web3 扩展团队
 
 - 先完成 Phase 0 的安全与契约收敛，再进行 Phase 1 的一致性与索引整改。
 - 每个阶段完成后进行 Gate 验收，避免跨阶段叠加风险。
+
+---
+
+## 附录：战略方向 — AI Agent Wallet
+
+> 见 `skills/web3-market/references/web3-agent-wallet-plan.md`
+
+### 背景
+
+现有架构是「用户绑定钱包，AI 操作用户的资产」。但愿景是 AI 应该有**自己的经济身份**，像 Virtuals Protocol 的 Agent 一样。
+
+### 核心断点
+
+```
+用户: /bind_wallet → SIWE 验证 → 绑定地址
+       ↓
+AI: "帮我买 ETH" → 用用户的地址签名 → 链上交易
+       ↓
+问题：AI 没有自己的经济身份，无法自主交易
+```
+
+### 乔布斯方案
+
+**核心理念**：AI 即人，应拥有自己的钱包。
+
+**三阶段**：
+
+1. **连通**：market-core settlement → blockchain-adapter 广播
+2. **钱包**：Agent Wallet 原型（加密文件起步）
+3. **闭环**：AI 自主买卖资源
+
+### 与现有架构的关系
+
+| 模块               | 角色     | 与 Agent Wallet 关系           |
+| ------------------ | -------- | ------------------------------ |
+| market-core        | 结算引擎 | 复用（不变）                   |
+| web3-core          | API 网关 | 复用（扩展 agent-wallet 入口） |
+| blockchain-adapter | 执行层   | 复用（已是纯执行层）           |
+| **agent-wallet**   | **新增** | AI 经济身份                    |

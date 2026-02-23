@@ -22,6 +22,9 @@ Use this skill when working on:
 Read these files as needed:
 
 - `skills/web3-market/references/web3-brain-architecture.md`
+- `skills/web3-market/references/web3-agent-wallet-plan.md` ← **AI Agent Wallet（P1 路线图，当前不推进实现）**
+- `skills/web3-market/references/web3-market-privacy-knowledge.md` ← **个人数据/私有知识：consent/脱敏/合规/撤销规范**
+- `skills/web3-market/references/web3-market-technical-debt.md` ← **技术债清单与一次性清理计划**
 - `skills/web3-market/references/web3-market-plan-overview.md`
 - `skills/web3-market/references/web3-market-plan-phase1-execution.md`
 - `skills/web3-market/references/web3-market-plan-roadmap-open-source-coldstart.md`
@@ -47,7 +50,7 @@ Read these files as needed:
 ## Non-negotiables
 
 - Never leak `accessToken`, provider endpoints, or real file paths (errors/logs/status/tool results)
-- `market.lease.issue` is the only place a token may be returned (one-time)
+- Plaintext tokens may only be returned in the lease issuance response (`market.lease.issue` and its `web3.market.lease.issue` proxy), and only once
 - `market.ledger.append` must reject consumer-forged entries (provider-only)
 - File + SQLite store modes must behave the same
 - Don’t break existing `/pay_status` behavior
