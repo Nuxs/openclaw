@@ -77,6 +77,7 @@ import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
+import { renderWeb3 } from "./views/web3.ts";
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
@@ -361,6 +362,23 @@ export function renderApp(state: AppViewState) {
                     /* */
                   }
                 },
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "web3"
+            ? renderWeb3({
+                connected: state.connected,
+                loading: state.web3Loading,
+                error: state.web3Error,
+                status: state.web3Status,
+                billing: state.web3BillingSummary,
+                billingError: state.web3BillingError,
+                marketStatus: state.web3MarketStatus,
+                marketError: state.web3MarketError,
+                lastSuccessAt: state.web3LastSuccess,
+                onRefresh: () => state.loadWeb3(),
               })
             : nothing
         }

@@ -615,6 +615,17 @@ export type Web3StatusSummary = {
   settlement?: {
     pending: number;
   };
+  identity?: {
+    siweEnabled: boolean;
+    bindingsCount: number;
+    bindings: Array<{
+      address: string;
+      chainId: number;
+      verifiedAt: string;
+      ensName: string | null;
+    }>;
+    primary: { address: string; ensName: string | null } | null;
+  };
 };
 
 export type Web3IndexResourceKind = "model" | "search" | "storage";

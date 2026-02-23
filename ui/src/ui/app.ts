@@ -41,6 +41,7 @@ import {
   loadCron as loadCronInternal,
   loadMarket as loadMarketInternal,
   loadOverview as loadOverviewInternal,
+  loadWeb3 as loadWeb3Internal,
   setTab as setTabInternal,
   setTheme as setThemeInternal,
   onPopState as onPopStateInternal,
@@ -247,6 +248,14 @@ export class OpenClawApp extends LitElement {
 
   @state() overviewWeb3Status: import("./types.js").Web3StatusSummary | null = null;
   @state() overviewWeb3Error: string | null = null;
+  @state() web3Loading = false;
+  @state() web3Error: string | null = null;
+  @state() web3Status: import("./types.js").Web3StatusSummary | null = null;
+  @state() web3BillingSummary: import("./types.js").Web3BillingSummary | null = null;
+  @state() web3BillingError: string | null = null;
+  @state() web3MarketStatus: import("./types.js").MarketStatusSummary | null = null;
+  @state() web3MarketError: string | null = null;
+  @state() web3LastSuccess: number | null = null;
 
   @state() marketLoading = false;
   @state() marketError: string | null = null;
@@ -529,6 +538,10 @@ export class OpenClawApp extends LitElement {
 
   async loadMarket() {
     await loadMarketInternal(this as unknown as Parameters<typeof loadMarketInternal>[0]);
+  }
+
+  async loadWeb3() {
+    await loadWeb3Internal(this as unknown as Parameters<typeof loadWeb3Internal>[0]);
   }
 
   async handleMarketEnable() {

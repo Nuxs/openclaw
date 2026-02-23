@@ -25,6 +25,7 @@ export const pt_BR: TranslationMap = {
   tabs: {
     agents: "Agentes",
     overview: "Visão Geral",
+    web3: "Web3",
     market: "Mercado",
     channels: "Canais",
     instances: "Instâncias",
@@ -41,6 +42,7 @@ export const pt_BR: TranslationMap = {
   subtitles: {
     agents: "Gerenciar espaços de trabalho, ferramentas e identidades de agentes.",
     overview: "Status do gateway, pontos de entrada e leitura rápida de saúde.",
+    web3: "Identidade, cobrança, auditoria e mercado em um painel.",
     market: "Recursos, contratos, disputas e atividade do livro-razão.",
     channels: "Gerenciar canais e configurações.",
     instances: "Beacons de presença de clientes e nós conectados.",

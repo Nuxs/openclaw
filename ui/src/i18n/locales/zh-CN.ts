@@ -25,6 +25,7 @@ export const zh_CN: TranslationMap = {
   tabs: {
     agents: "代理",
     overview: "概览",
+    web3: "Web3",
     market: "市场",
     channels: "频道",
     instances: "实例",
@@ -41,6 +42,7 @@ export const zh_CN: TranslationMap = {
   subtitles: {
     agents: "管理代理工作区、工具和身份。",
     overview: "网关状态、入口点和快速健康读取。",
+    web3: "一屏查看身份、计费、审计与市场健康度。",
     market: "市场资源、租约、争议与账本活动概览。",
     channels: "管理频道和设置。",
     instances: "来自已连接客户端和节点的在线信号。",

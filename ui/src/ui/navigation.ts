@@ -5,7 +5,7 @@ export const TAB_GROUPS = [
   { label: "chat", tabs: ["chat"] },
   {
     label: "control",
-    tabs: ["overview", "market", "channels", "instances", "sessions", "usage", "cron"],
+    tabs: ["overview", "web3", "market", "channels", "instances", "sessions", "usage", "cron"],
   },
   { label: "agent", tabs: ["agents", "skills", "nodes"] },
   { label: "settings", tabs: ["config", "debug", "logs"] },
@@ -14,6 +14,7 @@ export const TAB_GROUPS = [
 export type Tab =
   | "agents"
   | "overview"
+  | "web3"
   | "market"
   | "channels"
   | "instances"
@@ -30,6 +31,7 @@ export type Tab =
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
   overview: "/overview",
+  web3: "/web3",
   market: "/market",
   channels: "/channels",
   instances: "/instances",
@@ -133,6 +135,8 @@ export function iconForTab(tab: Tab): IconName {
       return "messageSquare";
     case "overview":
       return "barChart";
+    case "web3":
+      return "globe";
     case "market":
       return "radio";
     case "channels":

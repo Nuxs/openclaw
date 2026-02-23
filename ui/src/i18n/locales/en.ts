@@ -25,6 +25,7 @@ export const en: TranslationMap = {
   tabs: {
     agents: "Agents",
     overview: "Overview",
+    web3: "Web3",
     market: "Market",
     channels: "Channels",
     instances: "Instances",
@@ -41,6 +42,7 @@ export const en: TranslationMap = {
   subtitles: {
     agents: "Manage agent workspaces, tools, and identities.",
     overview: "Gateway status, entry points, and a fast health read.",
+    web3: "Identity, billing, audit, and market health in one panel.",
     market: "Market resources, leases, disputes, and ledger activity.",
     channels: "Manage channels and settings.",
     instances: "Presence beacons from connected clients and nodes.",

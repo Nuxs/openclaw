@@ -18,11 +18,14 @@ import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadMarketStatus } from "./controllers/market-status.ts";
+import { loadWeb3MarketSummary } from "./controllers/market-summary.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import { loadUsage } from "./controllers/usage.ts";
+import { loadWeb3BillingSummary } from "./controllers/web3-billing.ts";
+import { loadWeb3Dashboard } from "./controllers/web3-dashboard.ts";
 import { loadWeb3Status } from "./controllers/web3-status.ts";
 import {
   inferBasePathFromPathname,
@@ -185,6 +188,9 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "market") {
     await loadMarket(host);
+  }
+  if (host.tab === "web3") {
+    await loadWeb3(host);
   }
   if (host.tab === "channels") {
     await loadChannelsTab(host);
@@ -490,6 +496,26 @@ function buildAttentionItems(host: OpenClawApp) {
 
 export async function loadMarket(host: SettingsHost) {
   await loadMarketStatus(host as unknown as OpenClawApp);
+}
+
+export async function loadWeb3(host: SettingsHost) {
+  const app = host as unknown as OpenClawApp;
+  app.web3Loading = true;
+  let anySuccess = false;
+  const results = await Promise.allSettled([
+    loadWeb3Dashboard(app),
+    loadWeb3BillingSummary(app),
+    loadWeb3MarketSummary(app),
+  ]);
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      anySuccess = true;
+    }
+  }
+  if (anySuccess) {
+    app.web3LastSuccess = Date.now();
+  }
+  app.web3Loading = false;
 }
 
 export async function loadChannelsTab(host: SettingsHost) {

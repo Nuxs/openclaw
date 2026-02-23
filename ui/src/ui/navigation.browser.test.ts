@@ -23,6 +23,14 @@ describe("control UI routing", () => {
     expect(window.location.pathname).toBe("/sessions");
   });
 
+  it("hydrates the Web3 tab", async () => {
+    const app = mountApp("/web3");
+    await app.updateComplete;
+
+    expect(app.tab).toBe("web3");
+    expect(window.location.pathname).toBe("/web3");
+  });
+
   it("respects /ui base paths", async () => {
     const app = mountApp("/ui/cron");
     await app.updateComplete;

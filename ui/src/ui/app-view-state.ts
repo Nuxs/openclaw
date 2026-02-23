@@ -174,6 +174,14 @@ export type AppViewState = {
   sessionsIncludeUnknown: boolean;
   overviewWeb3Status: import("./types.ts").Web3StatusSummary | null;
   overviewWeb3Error: string | null;
+  web3Loading: boolean;
+  web3Error: string | null;
+  web3Status: import("./types.ts").Web3StatusSummary | null;
+  web3BillingSummary: import("./types.ts").Web3BillingSummary | null;
+  web3BillingError: string | null;
+  web3MarketStatus: import("./types.ts").MarketStatusSummary | null;
+  web3MarketError: string | null;
+  web3LastSuccess: number | null;
   marketLoading: boolean;
   marketError: string | null;
   marketStatus: MarketStatusSummary | null;
@@ -197,6 +205,7 @@ export type AppViewState = {
   marketEnableError: string | null;
   marketEnableNotice: string | null;
   handleMarketEnable(): void;
+  loadWeb3(): Promise<void>;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;

@@ -2,24 +2,24 @@ import type { GatewayBrowserClient } from "../gateway.ts";
 import type { Web3StatusSummary } from "../types.ts";
 import { normalizeGatewayPayload } from "./normalize.ts";
 
-type Web3StatusState = {
+type Web3DashboardState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
-  overviewWeb3Status: Web3StatusSummary | null;
-  overviewWeb3Error: string | null;
+  web3Status: Web3StatusSummary | null;
+  web3Error: string | null;
 };
 
-export async function loadWeb3Status(state: Web3StatusState) {
+export async function loadWeb3Dashboard(state: Web3DashboardState) {
   if (!state.client || !state.connected) {
     return;
   }
 
   try {
     const res = await state.client.request("web3.status.summary", {});
-    state.overviewWeb3Status = normalizeGatewayPayload<Web3StatusSummary>(res);
-    state.overviewWeb3Error = null;
+    state.web3Status = normalizeGatewayPayload<Web3StatusSummary>(res);
+    state.web3Error = null;
   } catch (err) {
-    state.overviewWeb3Status = null;
-    state.overviewWeb3Error = String(err);
+    state.web3Status = null;
+    state.web3Error = String(err);
   }
 }

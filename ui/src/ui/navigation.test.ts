@@ -29,6 +29,7 @@ describe("iconForTab", () => {
     const cases = [
       { tab: "chat", icon: "messageSquare" },
       { tab: "overview", icon: "barChart" },
+      { tab: "web3", icon: "radio" },
       { tab: "channels", icon: "link" },
       { tab: "instances", icon: "radio" },
       { tab: "sessions", icon: "fileText" },
@@ -64,6 +65,7 @@ describe("titleForTab", () => {
     const cases = [
       { tab: "chat", title: "Chat" },
       { tab: "overview", title: "Overview" },
+      { tab: "web3", title: "Web3" },
       { tab: "cron", title: "Cron Jobs" },
     ] as const;
     for (const testCase of cases) {
@@ -120,6 +122,7 @@ describe("pathForTab", () => {
     const cases = [
       { tab: "chat", base: undefined, expected: "/chat" },
       { tab: "overview", base: undefined, expected: "/overview" },
+      { tab: "web3", base: undefined, expected: "/web3" },
       { tab: "chat", base: "/ui", expected: "/ui/chat" },
       { tab: "sessions", base: "/apps/openclaw", expected: "/apps/openclaw/sessions" },
     ] as const;
@@ -137,6 +140,7 @@ describe("tabFromPath", () => {
     const cases = [
       { path: "/chat", base: undefined, expected: "chat" },
       { path: "/overview", base: undefined, expected: "overview" },
+      { path: "/web3", base: undefined, expected: "web3" },
       { path: "/sessions", base: undefined, expected: "sessions" },
       { path: "/", base: undefined, expected: "chat" },
       { path: "/ui/chat", base: "/ui", expected: "chat" },
