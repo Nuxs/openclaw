@@ -240,6 +240,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - "extensions/device-pair/**"
+"extensions: agent-wallet":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/agent-wallet/**"
 "extensions: web3-core":
   - changed-files:
       - any-glob-to-any-file:
