@@ -1,5 +1,11 @@
 # OpenClaw Web3 自由市场技术文档
 
+> 重要提示：本文是“自由市场”方向的**设计/愿景 + 可执行 Gate**混合文档，其中部分 UX/CLI 示例为概念草案，不代表当前实现已完整具备。
+>
+> - 当前可用的权威接口与安全契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
+> - 当前可用的插件与能力清单：[/plugins/web3-core](/plugins/web3-core)、[/plugins/market-core](/plugins/market-core)
+> - 当前可用的市场开发口径（结算/争议等）：[/reference/web3-market-dev](/reference/web3-market-dev)
+
 **版本**: v2.0  
 **最后更新**: 2026-02-20  
 **作者**: OpenClaw Team
@@ -217,46 +223,27 @@ function calculateBalancedScore(provider: Provider): number {
 
 #### ✅ 4. 低门槛 (Low Barrier)
 
-**Provider 上架流程** (3 分钟):
+**Provider 上架流程** (当前实现口径):
+
+当前仓库实现中，Provider 通过在运行 Gateway 的机器上启用 `web3-core`/`market-core` 插件，并由 `web3-core` 暴露 Provider HTTP routes（模型/搜索/存储）对外提供服务；并不依赖单独的 `openclaw-provider` CLI。
+
+Repo dev 示例（仅示意）：
 
 ```bash
-# 1. 安装 CLI
-$ npm install -g openclaw-provider
+openclaw plugins install ./extensions/web3-core
+openclaw plugins install ./extensions/market-core
 
-# 2. 注册(自动创建钱包)
-$ openclaw-provider register
-✓ 钱包地址: 0xABC...
-✓ Provider ID: prov_xyz123
+cd ./extensions/web3-core && pnpm install
+cd ./extensions/market-core && pnpm install
 
-# 3. 配置资源(向导式)
-$ openclaw-provider add-resource
-? 选择资源类型: LLM 推理
-? 选择模型: Llama-3.3-70B
-? 定价策略: 动态定价(基础 $0.008/1K tokens)
-
-✓ 资源已创建!正在启动...
-✓ 已注册到市场,开始接单!
+# 然后：在 plugins.entries.*.config 中完成配置，并重启 Gateway
 ```
 
-**Consumer 使用流程** (1 分钟):
+**Consumer 使用流程** (当前实现口径):
 
-```bash
-# 1. 搜索服务
-$ openclaw market search llama-3-70b --max-price 0.01
+当前实现中，Consumer 通常通过 Agent tools 使用已租用的资源（例如 `web3.search.query`、`web3.storage.*`），或通过 Provider routes 调用（一次性 `accessToken` 由管家代管，不回显）。
 
-找到 23 个 Provider (按综合评分排序)
-
-# 2. 直接调用(自动选最优)
-$ openclaw chat "Explain quantum computing" \
-  --model llama-3-70b \
-  --budget 0.50
-
-使用 Provider: prov_fast ($0.009/1K, 评分 95)
-
-✓ 本次费用: $0.12 (13,441 tokens)
-✓ 满意吗? [Y/n] Y
-✓ 已给 Provider 5 星好评
-```
+详见：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)（Consumer tools + Provider routes + 脱敏规则）。
 
 ---
 
@@ -747,7 +734,7 @@ class DisputeService {
 
 ## 5. 信誉评分系统
 
-详见独立文档: [reputation-scoring-algorithm.md](./reputation-scoring-algorithm.md)
+详见独立文档: [reputation-scoring-algorithm](/reference/reputation-scoring-algorithm)
 
 **核心要点**:
 
@@ -1511,7 +1498,7 @@ openclaw-provider register
 openclaw-provider add-resource
 ```
 
-详见: [Provider 入门指南](./provider-onboarding.md)
+详见: [Web3 Market Dev](/reference/web3-market-dev)
 
 ---
 
@@ -1523,7 +1510,7 @@ openclaw-provider add-resource
 - **动态定价**: 收益最大化，需要经验
 - **拍卖模式**: 适合稀缺资源
 
-详见: [定价策略最佳实践](./pricing-best-practices.md)
+详见: [Dynamic Pricing Implementation Guide](/reference/dynamic-pricing-implementation)
 
 ---
 
@@ -1536,7 +1523,7 @@ openclaw-provider add-resource
 3. **性能**: 优化响应时间
 4. **信任度**: 增加质押、长期运营
 
-详见: [信誉评分算法](./reputation-scoring-algorithm.md)
+详见: [信誉评分算法](/reference/reputation-scoring-algorithm)
 
 ---
 
@@ -1548,7 +1535,7 @@ openclaw-provider add-resource
 2. 提交证据(日志、截图)
 3. 仲裁员裁决(7 天内)
 
-详见: [争议仲裁指南](./dispute-resolution.md)
+详见: [Market Core 插件](/plugins/market-core)（`market.dispute.*`）
 
 ---
 
@@ -1562,7 +1549,7 @@ openclaw-provider add-resource
 - 👍 一般: 5.0%
 - ⚠️ 较差: 7.0%
 
-详见: [费用结构](./fee-structure.md)
+详见: [Web3 Market Dev](/reference/web3-market-dev)（默认结算策略与争议窗口）
 
 ---
 
@@ -1570,10 +1557,10 @@ openclaw-provider add-resource
 
 ### 13.1 相关文档
 
-- [信誉评分算法](./reputation-scoring-algorithm.md)
+- [信誉评分算法](/reference/reputation-scoring-algorithm)
 - [市场仪表盘原型](./OpenClaw_Market_Dashboard_Prototype.pptx)
-- [Web3 核心架构](./web3-core-architecture.md)
-- [智能合约 API](./smart-contract-api.md)
+- [Web3 Core 插件](/plugins/web3-core)
+- [Dual-stack payments reference](/reference/web3-dual-stack-payments-and-settlement)
 
 ### 13.2 外部链接
 

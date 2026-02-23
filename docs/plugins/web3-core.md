@@ -24,7 +24,7 @@ Security note:
 
 - Provider endpoints are sensitive assets. Do not treat them as public API surface.
 - `web3.index.*` is an internal discovery surface and **must not expose provider endpoints by default**. If endpoint-like values exist for local debugging, they must be redacted in outputs and never appear in logs, errors, status output, or tool results.
-- Dual-stack (TON + EVM) planning and reconciliation output formats are defined in `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` and `docs/reference/web3-dual-stack-payments-and-settlement.md`.
+- Dual-stack (TON + EVM) planning and reconciliation output formats are defined in [/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY) and [/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement).
 
 Quick mental model:
 
@@ -162,6 +162,16 @@ Status tool (redacted, safe to paste/share):
 - `web3.market.resource.unpublish`
 - `web3.market.ledger.summary`
 - `web3.market.ledger.list`
+
+扩展市场工具（2026.2 实现）：
+
+- `web3.market.reputation.summary` — 信誉评分与反作弊信号
+- `web3.market.tokenEconomy.summary` — 代币经济状态查询（minted/burned/totalSupply/circulating）
+- `web3.market.bridge.routes` — 跨链桥路由列表
+- `web3.market.bridge.request` — 创建跨链转移请求
+- `web3.market.bridge.update` — 更新跨链转移状态（运营/受信调用）
+- `web3.market.bridge.status` — 查询跨链转移状态
+- `web3.market.bridge.list` — 列出跨链转移记录
 
 ## Example debug flow
 

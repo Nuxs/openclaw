@@ -52,7 +52,7 @@ Web3 Market 模式把 OpenClaw 变成一个“互助式市场”的管家入口�
 
 本文档只保留用户向的“极简心智模型”。关于默认网络、默认存储、结算参数与状态机等实现细节，见开发者文档：[/reference/web3-market-dev](/reference/web3-market-dev)。
 
-关于 TON+EVM 双栈并行（用户选链支付、后台统一对账口径）的总规划，见：[双栈策略总规划](/WEB3_DUAL_STACK_STRATEGY)（仅仓库内部参考）。
+关于 TON+EVM 双栈并行（用户选链支付、后台统一对账口径）的总规划，见：[双栈策略总规划](/web3/WEB3_DUAL_STACK_STRATEGY)。
 
 ## 相关文档
 
@@ -61,6 +61,6 @@ Web3 Market 模式把 OpenClaw 变成一个“互助式市场”的管家入口�
 - `market-core` 插件：[/plugins/market-core](/plugins/market-core)
 - Web3 Market 开发者文档：[/reference/web3-market-dev](/reference/web3-market-dev)
 - Web3 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
-- 双栈总规划（TON+EVM）：[双栈策略总规划](/WEB3_DUAL_STACK_STRATEGY)（仅仓库内部参考）
+- 双栈总规划（TON+EVM）：[双栈策略总规划](/web3/WEB3_DUAL_STACK_STRATEGY)
 - 双栈支付与结算参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
 - 插件系统：[/tools/plugin](/tools/plugin)

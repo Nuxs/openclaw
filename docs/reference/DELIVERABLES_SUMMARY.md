@@ -6,7 +6,7 @@
 
 ### 1. ✅ 信誉评分算法设计
 
-**文档位置**: [`docs/reference/reputation-scoring-algorithm.md`](./reputation-scoring-algorithm.md)
+**文档位置**: [/reference/reputation-scoring-algorithm](/reference/reputation-scoring-algorithm)
 
 **核心内容**:
 
@@ -64,7 +64,7 @@ finalScore = recentScore * 0.7 + historicalScore * 0.3;
 
 ### 3. ✅ 完整技术文档
 
-**文档位置**: [`docs/reference/web3-free-market-technical-doc.md`](./web3-free-market-technical-doc.md) (43KB)
+**文档位置**: [/reference/web3-free-market-technical-doc](/reference/web3-free-market-technical-doc) (43KB)
 
 **章节目录** (共 13 章):
 

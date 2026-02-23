@@ -72,7 +72,7 @@ graph TD
 - `web3.billing.summary`（params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`）
 - `web3.status.summary`（no params）
 
-> `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口：能力描述应包含字段级 `paramsSchema`、常见稳定错误码集合（以 `web3-market-resource-api.md` 为准）与最小示例，且不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
+> `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口：能力描述应包含字段级 `paramsSchema`、常见稳定错误码集合（以 `docs/reference/web3-resource-market-api.md` 的口径为准）与最小示例，且不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
 
 ### `market-core`（已存在，内部权威层）
 
@@ -139,7 +139,7 @@ graph TD
   - 在 `market.settlement.release` 中传入 payees + amounts，实现分次释放。
   - 比例依据：必须来自可验证的 usage（例如 creditsUsed、LLM/tool call 计数、或里程碑事件）。
 
-> 注：`market-core` 当前未内置“dispute”网关方法。MVP 可以先实现“延迟释放 + 人工仲裁/退款”策略，后续再补 `market.dispute.*`。
+> 注：`market-core` 已内置 `market.dispute.*`。MVP 可直接采用“延迟释放 + 争议窗口 + 争议/退款流程”组合策略。
 
 ### 2) 信任域（可选）：会话后付 + cap + 限速
 

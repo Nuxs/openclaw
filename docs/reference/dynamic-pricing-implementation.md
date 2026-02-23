@@ -45,7 +45,7 @@
 
 ### 1. 类型定义
 
-**文件**: `src/market/pricing-types.ts`
+**文件**: `extensions/market-core/src/market/pricing-types.ts`
 
 定义了完整的动态定价类型系统：
 
@@ -58,7 +58,7 @@
 
 ### 2. 定价引擎
 
-**文件**: `src/market/pricing-engine.ts`
+**文件**: `extensions/market-core/src/market/pricing-engine.ts`
 
 核心定价算法实现：
 
@@ -608,9 +608,9 @@ function OrderBookWidget({ offerId }) {
 
 遇到问题？
 
-- 查看 [常见问题](./FAQ.md)
-- 提交 [Issue](https://github.com/Nuxs/openclaw/issues)
-- 加入 [讨论组](https://github.com/Nuxs/openclaw/discussions)
+- 查看 [常见问题](/help/faq)
+- 提交 [Issue](https://github.com/openclaw/openclaw/issues)
+- 加入 [讨论组](https://github.com/openclaw/openclaw/discussions)
 
 ---
 

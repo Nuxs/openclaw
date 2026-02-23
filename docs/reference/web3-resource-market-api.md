@@ -19,7 +19,7 @@ title: "Web3 Resource Market API"
 ## 安全与敏感信息治理（不可妥协）
 
 - **禁止泄露**：`accessToken` 明文、Provider endpoint、真实文件系统路径。
-- **一次性 token**：`market.lease.issue` 是唯一允许返回明文 token 的地方，且只能返回一次。
+- **一次性 token**：只有“租约签发响应”允许返回明文 token（`market.lease.issue` 及其对外单入口 `web3.market.lease.issue`）；该 token 只在签发时返回一次，后续 `get/list` 等接口不得回显明文 token。
 - **权威记账**：`market.ledger.append` 必须拒绝 consumer 伪造，必须由 Provider actor 写入。
 - **强一致拒绝**：Provider HTTP routes 的鉴权必须同时验证：
   - token hash 命中 lease
@@ -167,13 +167,11 @@ Provider 权威记账规则：
 
 真正的调用入口应通过“租约签发”与“网关受控下发”获得，避免把 Provider 网络入口当作可公开传播的 URL。
 
-## 已知缺口提示（实现与文档对齐）
+## 实现现状校对（避免安全口径误导）
 
-当前实现里存在一个需要尽快补齐的安全对齐点：
+当前实现已对齐本文档的“强一致拒绝”Gate：Provider HTTP routes 的鉴权在校验 token 与 lease 后，会读取 resource 并强制要求 `resource.status=resource_published`，因此不会出现“资源已下线但租约未过期仍可继续调用”的窗口。
 
-- `validateLeaseAccess` 在校验 token 与 lease 时，如果未同时校验 resource 是否仍为 published，则可能出现“资源已下线但租约未过期仍可继续调用”的窗口。
-
-本文档以安全模型为准，AI 管家与开发者在实现/部署/验收时应以“强一致拒绝”为 Gate。
+本文档仍以安全模型为准；如后续实现发生变更，请先更新实现与测试，再同步本文档。
 
 ## 相关文档
 
@@ -181,5 +179,5 @@ Provider 权威记账规则：
 - Web3 Market dev guide: [/reference/web3-market-dev](/reference/web3-market-dev)
 - Web3 Core dev guide: [/plugins/web3-core-dev](/plugins/web3-core-dev)
 - Market Core plugin: [/plugins/market-core](/plugins/market-core)
-- Dual-stack strategy (TON+EVM): `docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
+- Dual-stack strategy (TON+EVM): [/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)
 - Dual-stack payments reference: [/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)

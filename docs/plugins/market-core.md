@@ -37,6 +37,10 @@
 - **Ledger**: Provider 权威账本条目，用于结算与审计。
 - **RevocationJob**: 撤回失败后的重试任务。
 - **AuditEvent**: 审计事件流，支持审计链路与透明度汇总。
+- **Reputation**: 基于租约、争议、账本的信誉评分与反作弊信号。
+- **TokenEconomy**: 代币经济状态（minted/burned/totalSupply/circulating）与治理策略。
+- **BridgeRoute**: 跨链桥路由配置（fromChain, toChain, assetSymbol, feeBps, estimatedSeconds）。
+- **BridgeTransfer**: 跨链转移记录（bridgeId, orderId, settlementId, status, amount）。
 
 ### 网关方法（内部 `market.*`）
 
@@ -56,6 +60,12 @@
 - **Lease**: `market.lease.issue` `market.lease.revoke` `market.lease.get` `market.lease.list` `market.lease.expireSweep`
 - **Ledger**: `market.ledger.append` `market.ledger.list` `market.ledger.summary`
 - **Repair**: `market.repair.retry`
+
+扩展能力（2026.2 实现）：
+
+- **Reputation**: `market.reputation.summary` — 基于租约、争议与账本的可解释信誉评分
+- **TokenEconomy**: `market.tokenEconomy.summary` `market.tokenEconomy.mint` `market.tokenEconomy.burn` `market.tokenEconomy.governance.update` — 代币经济与治理策略
+- **Bridge**: `market.bridge.routes` `market.bridge.request` `market.bridge.update` `market.bridge.status` `market.bridge.list` — 跨链桥接入口，支持 TON ↔ EVM 路由
 
 ### 数据链路概览
 
