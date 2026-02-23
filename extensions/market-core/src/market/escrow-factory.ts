@@ -12,7 +12,7 @@ import { EscrowAdapter } from "./escrow.js";
 
 /** Minimal interface shared by both EVM and TON escrow adapters. */
 export interface IEscrowAdapter {
-  lock(orderId: string, payer: string, amount: string): Promise<string>;
+  lock(orderId: string, payer: string, amount: string, payee?: string): Promise<string>;
   release(orderId: string, payees: { address: string; amount: string }[]): Promise<string>;
   refund(orderId: string, payer: string): Promise<string>;
 }

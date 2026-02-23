@@ -1,4 +1,4 @@
-# OpenClaw Web3 Market：TON + EVM 双栈策略（规划文档）
+# OpenClaw Web3 Market：TON + EVM 双栈策略
 
 > **状态**：Draft（随实现推进更新）  
 > **更新日期**：2026-02-22  
@@ -6,7 +6,7 @@
 >
 > **定位（权威口径）**：双栈策略与验收标准的统一口径文档。  
 > **用途**：定义支付/回执/汇率/对账摘要的统一口径与验收清单。  
-> **关联**：进度口径见 `docs/web3/WEB3_OVERALL_PROGRESS.md`；Week3-5 路线图见 `docs/web3/WEB3_WEEK3_5_ROADMAP.md`；执行计划见 `docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`。
+> **关联**：本文档仅保留对外可验证的“双栈策略 + 统一口径”。内部进度/路线图/走查材料统一收敛在 `skills/web3-market/internal/`。
 
 ---
 

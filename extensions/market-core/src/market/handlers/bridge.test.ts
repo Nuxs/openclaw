@@ -315,6 +315,8 @@ describe("bridge.list", () => {
       client: createClient(["operator.read"]),
     } as any);
     expect(r.result()!.ok).toBe(true);
-    expect((r.result()!.payload as Record<string, unknown[]>).transfers.length).toBe(0);
+    const payload = r.result()!.payload as unknown;
+    if (!Array.isArray(payload)) throw new Error("expected payload to be array");
+    expect(payload.length).toBe(0);
   });
 });

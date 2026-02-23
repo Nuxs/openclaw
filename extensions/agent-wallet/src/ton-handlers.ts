@@ -1,20 +1,21 @@
 /**
- * TON-specific agent wallet handlers.
+ * TON-specific agent wallet handlers (headless).
  *
- * These mirror the EVM handlers but use the blockchain-adapter TON provider.
- * Key generation reuses the same secure random seed stored by the existing wallet store;
- * TON address derivation is deferred to the TON provider at connect time.
+ * - Address derivation: `@ton/crypto` (via blockchain-adapter helpers)
+ * - Transaction sending: blockchain-adapter TON provider in headless mode
  */
 
 import {
-  getTONProvider,
+  getProvider,
   initBlockchainFactory,
+  isProviderTON,
   type IProvider,
+  type IProviderTON,
 } from "@openclaw/blockchain-adapter";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
-import { loadOrCreateWallet } from "./wallet.js";
+import { loadOrCreateTonWallet } from "./ton-wallet.js";
 
 let blockchainFactoryReady = false;
 
@@ -38,33 +39,52 @@ function requireString(value: unknown, label: string): string {
   return value.trim();
 }
 
+function parseAmount(value: unknown, label: string): bigint {
+  const raw = requireString(value, label);
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`${label} must be an integer string`);
+  }
+  return BigInt(raw);
+}
+
 function respondError(respond: GatewayRequestHandlerOptions["respond"], err: unknown): void {
   respond(false, formatAgentWalletGatewayErrorResponse(err));
 }
 
-function resolveTonProvider(): IProvider {
+function resolveTonProvider(network: AgentWalletConfig["chain"]["network"]): IProviderTON {
   ensureBlockchainFactory();
-  return getTONProvider();
+  const provider: IProvider = getProvider(network);
+  if (!isProviderTON(provider)) {
+    throw new Error(`Expected TON provider for ${network}, got ${provider.chainType}`);
+  }
+  return provider;
 }
 
-/**
- * TON wallet create handler.
- * Reuses the EVM wallet store (same seed/key); the TON address is derived separately.
- * For now, returns the EVM-derived key info with a note that TON address derivation
- * requires `@ton/crypto` integration (planned for Phase 1 TEE).
- */
+async function ensureTonConnected(
+  config: AgentWalletConfig,
+): Promise<{ provider: IProviderTON; address: string }> {
+  const wallet = await loadOrCreateTonWallet(config);
+  const provider = resolveTonProvider(config.chain.network);
+
+  if (!provider.isConnected) {
+    await provider.connect({
+      tonMnemonic: wallet.mnemonic,
+      tonWorkchain: 0,
+    });
+  }
+
+  return { provider, address: wallet.address };
+}
+
 export function createTonWalletCreateHandler(config: AgentWalletConfig): GatewayRequestHandler {
   return async ({ respond }: GatewayRequestHandlerOptions) => {
     try {
       ensureEnabled(config);
-      const wallet = await loadOrCreateWallet(config);
-      // TON address derivation from the same seed is deferred to Phase 1
-      // For now, expose the EVM-derived identity with chain annotation
+      const wallet = await loadOrCreateTonWallet(config);
       respond(true, {
         address: wallet.address,
         publicKey: wallet.publicKey,
         chain: "ton",
-        note: "TON address derivation pending @ton/crypto integration",
       });
     } catch (err) {
       respondError(respond, err);
@@ -72,19 +92,18 @@ export function createTonWalletCreateHandler(config: AgentWalletConfig): Gateway
   };
 }
 
-/**
- * TON balance handler — queries via the TON provider.
- */
 export function createTonWalletBalanceHandler(config: AgentWalletConfig): GatewayRequestHandler {
   return async ({ params, respond }: GatewayRequestHandlerOptions) => {
     try {
       ensureEnabled(config);
       const input = (params ?? {}) as Record<string, unknown>;
-      const address = requireString(input.address, "address");
-      const provider = resolveTonProvider();
-      const balance = await provider.getBalance(address);
+      const address = input.address ? requireString(input.address, "address") : undefined;
+      const { provider, address: defaultAddress } = await ensureTonConnected(config);
+
+      const target = address ?? defaultAddress;
+      const balance = await provider.getBalance(target);
       respond(true, {
-        address,
+        address: target,
         balance: balance.toString(),
         symbol: "TON",
         chain: "ton",
@@ -95,18 +114,16 @@ export function createTonWalletBalanceHandler(config: AgentWalletConfig): Gatewa
   };
 }
 
-/**
- * TON send handler — transfers TON via the TON provider.
- */
 export function createTonWalletSendHandler(config: AgentWalletConfig): GatewayRequestHandler {
   return async ({ params, respond }: GatewayRequestHandlerOptions) => {
     try {
       ensureEnabled(config);
       const input = (params ?? {}) as Record<string, unknown>;
       const to = requireString(input.to, "to");
-      const amount = requireString(input.amount, "amount");
-      const provider = resolveTonProvider();
-      const txHash = await provider.transfer(to, BigInt(amount));
+      const amount = parseAmount(input.amount, "amount");
+
+      const { provider } = await ensureTonConnected(config);
+      const txHash = await provider.transfer(to, amount);
       respond(true, { txHash, chain: "ton" });
     } catch (err) {
       respondError(respond, err);

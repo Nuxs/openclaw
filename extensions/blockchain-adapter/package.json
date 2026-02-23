@@ -53,7 +53,7 @@
     "build": "tsup",
     "clean": "rm -rf dist",
     "contracts:build": "cd contracts/ton && func -o settlement.fif -SPA settlement.fc",
-    "contracts:deploy": "node scripts/deploy-contracts.js",
+    "contracts:deploy": "node scripts/deploy-contracts.mjs",
     "dev": "tsup --watch",
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "eslint src --ext .ts",

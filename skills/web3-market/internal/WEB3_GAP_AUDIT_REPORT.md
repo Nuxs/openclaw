@@ -33,12 +33,12 @@
 
 ### ChainNetwork 对齐
 
-| 层                                   | TON 支持                                   |
-| ------------------------------------ | ------------------------------------------ |
-| `blockchain-adapter`                 | ✅ `TONProvider` 完整实现（主网/测试网）   |
-| `market-core/config.ts` ChainNetwork | ✅ 已增加 `"ton-mainnet" \| "ton-testnet"` |
-| `web3-core/market/handlers.ts`       | ✅ 硬编码 `"ton" \| "evm"` 二元判断        |
-| `agent-wallet`                       | ❌ 纯 EVM 设计                             |
+| 层                                   | TON 支持                                    |
+| ------------------------------------ | ------------------------------------------- |
+| `blockchain-adapter`                 | ✅ `TONProvider` 完整实现（主网/测试网）    |
+| `market-core/config.ts` ChainNetwork | ✅ 已增加 `"ton-mainnet" \| "ton-testnet"`  |
+| `web3-core/market/handlers.ts`       | ✅ 硬编码 `"ton" \| "evm"` 二元判断         |
+| `agent-wallet`                       | ✅ 支持 TON headless（create/balance/send） |
 
 **行动项**（已完成）：
 
@@ -91,12 +91,12 @@
 
 ## 六、Agent Wallet（web3-agent-wallet-plan.md）
 
-| 阶段              | 规划内容                 | 代码状态                                                            |
-| ----------------- | ------------------------ | ------------------------------------------------------------------- |
-| Phase 1：结算打通 | wallet → settlement 绑定 | ❌ agent-wallet 4 个 method 独立运行，未接入 market-core settlement |
-| Phase 2：钱包原型 | 密钥管理 + 签名 + TEE    | ⚠️ `wallet.ts` + `tee.ts` 存在但骨架化（`tee.ts` 仅 207B）          |
-| Phase 3：经济闭环 | 自动结算 + 计费绑定      | ❌ 未实现                                                           |
-| Phase 4：TEE 隔离 | 硬件 enclave             | ❌ 未实现                                                           |
+| 阶段              | 规划内容                 | 代码状态                                                                                                               |
+| ----------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Phase 1：结算打通 | wallet → settlement 绑定 | ⚠️ agent-wallet 已支持 EVM+TON headless（create/balance/send），但仍未接入 market-core settlement 的角色分工与签名路径 |
+| Phase 2：钱包原型 | 密钥管理 + 签名 + TEE    | ⚠️ 仍处于原型阶段：TON 侧已落地助记词加密存储与派生；TEE 仍为骨架（`tee.ts` 仅 207B）                                  |
+| Phase 3：经济闭环 | 自动结算 + 计费绑定      | ❌ 未实现                                                                                                              |
+| Phase 4：TEE 隔离 | 硬件 enclave             | ❌ 未实现                                                                                                              |
 
 ### `web3.wallet.*` 统一入口
 

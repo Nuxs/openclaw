@@ -25,7 +25,8 @@ export function createMarketRepairRetryHandler(
       assertAccess(opts, config, "write");
       const input = (params ?? {}) as Record<string, unknown>;
       const dryRun = input.dryRun === true;
-      const limit = requireLimit(input, "limit", 200, 1000);
+      // `requireLimit` clamps to a minimum of 1, but repair supports `limit: 0` as a no-op.
+      const limit = input.limit === 0 ? 0 : requireLimit(input, "limit", 200, 1000);
       const maxAttemptsParam = requireOptionalPositiveInt(input, "maxAttempts", {
         min: 1,
         max: 1000,

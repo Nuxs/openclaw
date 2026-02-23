@@ -61,5 +61,4 @@ Use a consistent paste safe format:
 - Web3 Core plugin: [/plugins/web3-core](/plugins/web3-core)
 - Web3 Market dev: [/reference/web3-market-dev](/reference/web3-market-dev)
 - Resource market API: [/reference/web3-resource-market-api](/reference/web3-resource-market-api)
-- Web3 overall progress: [/web3/WEB3_OVERALL_PROGRESS](/web3/WEB3_OVERALL_PROGRESS)
 - Dual stack strategy: [/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)

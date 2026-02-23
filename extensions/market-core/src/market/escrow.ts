@@ -100,7 +100,7 @@ export class EscrowAdapter {
     return provider;
   }
 
-  async lock(orderId: string, payer: string, amount: string): Promise<string> {
+  async lock(orderId: string, payer: string, amount: string, _payee?: string): Promise<string> {
     const provider = await this.loadEvmProvider();
     const data = encodeFunctionData({
       abi: ESCROW_ABI,

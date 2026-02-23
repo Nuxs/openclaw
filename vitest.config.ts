@@ -13,6 +13,27 @@ export default defineConfig({
   resolve: {
     // Keep this ordered: the base `openclaw/plugin-sdk` alias is a prefix match.
     alias: [
+      // Workspace packages that are imported as npm packages, but should resolve to source in tests.
+      {
+        find: "@openclaw/blockchain-adapter/providers/ton",
+        replacement: path.join(
+          repoRoot,
+          "extensions",
+          "blockchain-adapter",
+          "src",
+          "providers",
+          "ton",
+          "index.ts",
+        ),
+      },
+      {
+        find: "@openclaw/blockchain-adapter/factory",
+        replacement: path.join(repoRoot, "extensions", "blockchain-adapter", "src", "factory.ts"),
+      },
+      {
+        find: "@openclaw/blockchain-adapter",
+        replacement: path.join(repoRoot, "extensions", "blockchain-adapter", "src", "index.ts"),
+      },
       {
         find: "openclaw/plugin-sdk/account-id",
         replacement: path.join(repoRoot, "src", "plugin-sdk", "account-id.ts"),

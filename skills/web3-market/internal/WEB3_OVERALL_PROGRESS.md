@@ -58,11 +58,17 @@
 - **统一 Escrow 工厂**：`market-core/src/market/escrow-factory.ts` — `createEscrowAdapter()` 根据 `chain.network` 自动选择 EVM 或 TON 适配器，定义 `IEscrowAdapter` 统一接口。
 - **Agent Wallet TON 支持**：`agent-wallet/src/config.ts` 新增 `"ton-mainnet" | "ton-testnet"` 网络 + `isEVMNetwork()`/`isTONNetwork()` 判断；`ton-handlers.ts` 实现 TON 侧 create/balance/send handler；`index.ts` 根据链配置自动分发到 EVM 或 TON handler。
 
+### 2.8 TON 端到端结算（Headless）（2026-02-24 完成）
+
+- **合约部署**：补齐 `settlement.fc` 的编译/部署链路与可复制命令。
+- **钱包与派生**：集成 `@ton/crypto` 用于助记词派生与地址生成。
+- **BOC/payload 与发送**：补齐 payload 编码（base64 BOC）并支持通过 TON provider 发送。
+- **验收指南**：`docs/web3/TON_E2E_SETTLEMENT.md`
+
 ---
 
 ## 3. 已定义但仍属规划（需要明确里程碑）
 
-- **TON 端到端打通**：TypeScript 基础设施已就绪（escrow adapter + agent-wallet TON handlers），但端到端测试需要：(1) TON settlement.fc 合约编译部署到 testnet；(2) `@ton/crypto` 集成用于 TON 原生钱包地址派生；(3) BOC 消息编码支持（op + query_id + order_id）通过 IProviderTON 扩展接口暴露。
 - **"可分享对账摘要"完整闭环**：输出格式已有口径，但需要持续把所有对外输出点收敛为"可复制粘贴传播"的脱敏摘要。
 - **个人数据/私有知识纳入市场**：需要补齐 consent/脱敏/可撤销/合规回放的强约束规范（见本轮新增 skill references）。
 - **任务市场协议（Phase 3）**：`TaskOrder`/`TaskBid`/`TaskResult`/`TaskReceipt` 类型设计完成，代码实现推迟到开源冷启动之后。
@@ -72,9 +78,9 @@
 
 ## 4. 下一步（与 Week3-5 路线图对齐）
 
-- 路线图：`docs/web3/WEB3_WEEK3_5_ROADMAP.md`
-- 5 周执行计划：`docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`
-- 走查差距报告：`docs/web3/WEB3_GAP_AUDIT_REPORT.md`
+- 路线图：`skills/web3-market/internal/WEB3_WEEK3_5_ROADMAP.md`
+- 5 周执行计划：`skills/web3-market/internal/WEB3_DEV_PLAN_5_WEEKS.md`
+- 走查差距报告：`skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
 
 相关入口：
 

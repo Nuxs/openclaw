@@ -1806,6 +1806,7 @@ assertLeaseTransition(from, to):
 - **`web3-market-resource-testing.md`**：测试计划（unit/integration/e2e/security/load）与 mock 策略。
 - **`web3-market-resource-config-examples.md`**：可直接拷贝的配置示例（provider-only/consumer-only/hybrid）。
 - **`web3-market-resource-implementation-checklist.md`**：按文件可勾验的实施清单（DoD + AC + 测试 Gate）。
+- **`docs/web3/TON_E2E_SETTLEMENT.md`**：TON 结算合约部署 + payload/BOC + headless 钱包/发送的端到端验收指南。
 
 ---
 

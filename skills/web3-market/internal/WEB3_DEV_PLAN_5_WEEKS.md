@@ -21,11 +21,11 @@
 - ✅ 交付：
   - 更新后的核心文档：`/reference/web3-resource-market-api`、`/plugins/web3-core`、`/plugins/market-core`、`/reference/web3-market-dev`
   - UI/命令入口补齐：Web3 Tab + `/web3` 一页式入口（脱敏输出）
-  - 规划文档补齐：`docs/web3/WEB3_OVERALL_PROGRESS.md`、`WEB3_WEEK3_5_ROADMAP.md`、`WEB3_DEV_PLAN_5_WEEKS.md`
+  - 规划文档补齐：`skills/web3-market/internal/WEB3_OVERALL_PROGRESS.md`、`skills/web3-market/internal/WEB3_WEEK3_5_ROADMAP.md`、`skills/web3-market/internal/WEB3_DEV_PLAN_5_WEEKS.md`
 
 ### Week 1 追加交付（2026-02-23 走查）
 
-- ✅ 产出走查差距报告：`docs/web3/WEB3_GAP_AUDIT_REPORT.md`
+- ✅ 产出走查差距报告：`skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
 - ✅ market-core `config.ts` ChainNetwork 增加 `"ton-mainnet" | "ton-testnet"`
 - ✅ market-core `types.ts` 新增 5 个双栈统一类型（PaymentIntent/PaymentReceipt/FXQuote/PayoutPreference/ReconciliationSummary）
 - ✅ catalog/core.ts 补齐 ENS 方法 descriptor（`web3.identity.resolveEns`、`web3.identity.reverseEns`），catalog 覆盖率 100%
@@ -77,14 +77,14 @@
 - ✅ TON Escrow Adapter：`escrow-ton.ts`（TonEscrowAdapter: lock/release/refund via blockchain-adapter TON Provider）
 - ✅ 统一 Escrow 工厂：`escrow-factory.ts`（IEscrowAdapter 接口 + createEscrowAdapter 按 chain.network 分发）
 - ✅ Agent Wallet TON 支持：config 扩展 ton-mainnet/ton-testnet + ton-handlers（create/balance/send）+ register() 自动分发
-- ⏳ 端到端闭环待完成：settlement.fc 合约部署、`@ton/crypto` 地址派生、BOC 编码、IProviderTON 扩展
+- ✅ 端到端闭环已完成：合约部署链路 + `@ton/crypto` 地址派生 + BOC/payload 编码 + IProviderTON/transfer 扩展（见 `docs/web3/TON_E2E_SETTLEMENT.md`）
 
 ---
 
 ## 相关文档
 
-- 总进度口径：`docs/web3/WEB3_OVERALL_PROGRESS.md`
-- Week3-5 路线图：`docs/web3/WEB3_WEEK3_5_ROADMAP.md`
-- 走查差距报告：`docs/web3/WEB3_GAP_AUDIT_REPORT.md`
+- 总进度口径：`skills/web3-market/internal/WEB3_OVERALL_PROGRESS.md`
+- Week3-5 路线图：`skills/web3-market/internal/WEB3_WEEK3_5_ROADMAP.md`
+- 走查差距报告：`skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
 - AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 双栈策略：[/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)

@@ -143,8 +143,13 @@ export interface IProviderEVM extends IProvider {
 export interface IProviderTON extends IProvider {
   readonly chainType: "ton";
 
-  // TON 特定方法...
-  // (暂不展开，保持现有实现)
+  /**
+   * Get the currently-connected TON wallet public key if available.
+   *
+   * - TonConnect: depends on wallet implementation
+   * - Headless: derived from mnemonic
+   */
+  getPublicKey(): Promise<string | undefined>;
 }
 
 /**

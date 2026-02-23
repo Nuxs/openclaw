@@ -2,20 +2,23 @@
  * TON Escrow Adapter
  *
  * Calls the TON settlement contract (contracts/ton/settlement.fc) via
- * blockchain-adapter's TON Provider. Mirrors the EVM EscrowAdapter API
- * so callers can dispatch by chain family.
+ * `@openclaw/blockchain-adapter`.
  *
- * Contract opcodes (settlement.fc):
- *   1 = lock_settlement
- *   2 = release_settlement
- *   3 = refund_settlement
- *   4 = dispute_settlement (opcode defined, routing TBD)
+ * IMPORTANT:
+ * - `settlement.fc` ignores empty message bodies, so we MUST include a payload.
+ * - `lock_settlement` requires a `payee` address in the payload.
  */
 
 import {
-  getTONProvider,
+  encodeTonSettlementLockPayload,
+  encodeTonSettlementReleasePayload,
+  encodeTonSettlementRefundPayload,
+  getProvider,
   initBlockchainFactory,
+  isProviderTON,
+  normalizeTonAddress,
   type IProvider,
+  type IProviderTON,
 } from "@openclaw/blockchain-adapter";
 import type { ChainConfig, SettlementConfig } from "../config.js";
 
@@ -28,14 +31,35 @@ function ensureBlockchainFactory() {
   }
 }
 
+function requireTonMnemonic(chain: ChainConfig): string {
+  if (!chain.tonMnemonic || chain.tonMnemonic.trim().length === 0) {
+    throw new Error("chain.tonMnemonic is required for TON escrow contract calls");
+  }
+  return chain.tonMnemonic;
+}
+
+function requireContractAddress(address: string | undefined): string {
+  if (!address || address.trim().length === 0) {
+    throw new Error("chain.escrowContractAddress is required for TON escrow calls");
+  }
+  return address.trim();
+}
+
+function requirePayee(payee: string | undefined): string {
+  if (!payee || payee.trim().length === 0) {
+    throw new Error("payee is required for TON settlement lock");
+  }
+  return payee.trim();
+}
+
 export class TonEscrowAdapter {
-  private readonly contractAddress?: string;
-  private readonly tokenAddress?: string;
+  private readonly chain: ChainConfig;
+  private readonly contractAddress: string;
   private readonly mode: SettlementConfig["mode"];
 
   constructor(chain: ChainConfig, settlement: SettlementConfig) {
-    this.contractAddress = chain.escrowContractAddress;
-    this.tokenAddress = settlement.tokenAddress;
+    this.chain = chain;
+    this.contractAddress = requireContractAddress(chain.escrowContractAddress);
     this.mode = settlement.mode;
   }
 
@@ -43,53 +67,76 @@ export class TonEscrowAdapter {
     if (this.mode !== "contract") {
       throw new Error("settlement.mode is not set to contract");
     }
-    if (!this.contractAddress) {
-      throw new Error("chain.escrowContractAddress is required for TON escrow calls");
-    }
   }
 
-  private loadTonProvider(): IProvider {
+  private async loadTonProvider(): Promise<IProviderTON> {
     this.ensureContractReady();
     ensureBlockchainFactory();
-    return getTONProvider();
+
+    const provider: IProvider = getProvider(this.chain.network);
+    if (!isProviderTON(provider)) {
+      throw new Error(`Expected TON provider for ${this.chain.network}, got ${provider.chainType}`);
+    }
+
+    if (!provider.isConnected) {
+      await provider.connect({
+        rpcUrl: this.chain.rpcUrl,
+        tonMnemonic: requireTonMnemonic(this.chain),
+        tonWorkchain: this.chain.tonWorkchain,
+      });
+    }
+
+    return provider;
   }
 
-  /**
-   * Lock funds in the TON settlement contract.
-   *
-   * Uses the provider's `transfer` to send TON to the escrow contract address.
-   * The contract's `recv_internal` with op=1 handles lock_settlement.
-   *
-   * NOTE: Full BOC message encoding (op + query_id + order_id) requires
-   * `@ton/ton` beginCell which is available in blockchain-adapter but not
-   * directly exposed via IProvider. For the initial integration, we use a
-   * simple transfer to the contract address. The contract should parse the
-   * message body or use a dedicated internal routing mechanism.
-   */
-  async lock(orderId: string, _payer: string, amount: string): Promise<string> {
-    const provider = this.loadTonProvider();
-    // Transfer the lock amount to the escrow contract
-    return provider.transfer(this.contractAddress!, BigInt(amount));
+  async lock(orderId: string, _payer: string, amount: string, payee?: string): Promise<string> {
+    const provider = await this.loadTonProvider();
+
+    const normalizedPayee = normalizeTonAddress(requirePayee(payee));
+    const lockAmount = BigInt(amount);
+
+    // Keep a small extra balance on the contract for fees (contract uses send_raw_message(..., 1)).
+    const GAS_TOPUP = 50_000_000n; // ~0.05 TON
+
+    const payload = encodeTonSettlementLockPayload({
+      orderHash: orderId,
+      amount: lockAmount,
+      payee: normalizedPayee,
+      queryId: 0n,
+    });
+
+    return provider.transfer(this.contractAddress, lockAmount + GAS_TOPUP, { payload });
   }
 
-  /**
-   * Release locked funds to payees.
-   * Sends a minimal gas amount to trigger release on the contract.
-   */
-  async release(orderId: string, _payees: { address: string; amount: string }[]): Promise<string> {
-    const provider = this.loadTonProvider();
-    // Send minimal gas to trigger release (contract handles payee routing)
-    const GAS_AMOUNT = BigInt(50_000_000); // ~0.05 TON
-    return provider.transfer(this.contractAddress!, GAS_AMOUNT);
+  async release(orderId: string, payees: { address: string; amount: string }[]): Promise<string> {
+    const provider = await this.loadTonProvider();
+
+    if (payees.length !== 1) {
+      throw new Error("TON settlement contract currently supports exactly 1 payee");
+    }
+
+    const actualAmount = BigInt(payees[0].amount);
+    const payload = encodeTonSettlementReleasePayload({
+      orderHash: orderId,
+      actualAmount,
+      // NOTE: settlement.fc currently does not verify this signature; keep zeros.
+      signature: Buffer.alloc(64),
+      queryId: 0n,
+    });
+
+    const GAS_TRIGGER = 50_000_000n; // ~0.05 TON
+    return provider.transfer(this.contractAddress, GAS_TRIGGER, { payload });
   }
 
-  /**
-   * Refund locked funds to the original payer.
-   * Sends a minimal gas amount to trigger refund on the contract.
-   */
   async refund(orderId: string, _payer: string): Promise<string> {
-    const provider = this.loadTonProvider();
-    const GAS_AMOUNT = BigInt(50_000_000); // ~0.05 TON
-    return provider.transfer(this.contractAddress!, GAS_AMOUNT);
+    const provider = await this.loadTonProvider();
+
+    const payload = encodeTonSettlementRefundPayload({
+      orderHash: orderId,
+      queryId: 0n,
+    });
+
+    const GAS_TRIGGER = 50_000_000n; // ~0.05 TON
+    return provider.transfer(this.contractAddress, GAS_TRIGGER, { payload });
   }
 }

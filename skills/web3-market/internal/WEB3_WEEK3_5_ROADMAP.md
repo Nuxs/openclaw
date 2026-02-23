@@ -46,13 +46,13 @@
   - ✅ 双栈统一类型定义可编译通过
   - ✅ reconciliation handler 测试覆盖 EVM + TON 分支
   - ✅ TON escrow adapter + 统一 escrow 工厂 + agent-wallet TON 支持已实现
-  - ⏳ 端到端测试需 settlement.fc 合约部署 + `@ton/crypto` 集成
+  - ✅ 端到端结算闭环（Headless）已打通：合约部署 + `@ton/crypto` 派生 + BOC/payload 编码（验收见 `docs/web3/TON_E2E_SETTLEMENT.md`）
 
 ### Week 5 追加验收（2026-02-23 走查）
 
 - ✅ Catalog 覆盖率 67/67 gateway methods + 12/12 tools（100%）
 - ✅ 新增测试：market-core 4 个模块（bridge/token-economy/transparency/repair）+ web3-core 2 个模块（reconciliation/catalog）
-- ✅ 走查差距报告已产出（`docs/web3/WEB3_GAP_AUDIT_REPORT.md`），9 大维度逐项验证
+- ✅ 走查差距报告已产出（`skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`），9 大维度逐项验证
 
 ### Week 5 追加验收（2026-02-23 TON 双栈落地）
 
@@ -65,9 +65,9 @@
 
 ## 相关文档
 
-- 总进度口径：`docs/web3/WEB3_OVERALL_PROGRESS.md`
-- 5 周执行计划：`docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`
-- 走查差距报告：`docs/web3/WEB3_GAP_AUDIT_REPORT.md`
+- 总进度口径：`skills/web3-market/internal/WEB3_OVERALL_PROGRESS.md`
+- 5 周执行计划：`skills/web3-market/internal/WEB3_DEV_PLAN_5_WEEKS.md`
+- 走查差距报告：`skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
 - AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 双栈策略：[/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)
 - 双栈支付参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)

@@ -62,6 +62,22 @@ export { EVM_CHAINS, getChainInfo, COMMON_TOKENS, getTokenAddress } from "./conf
 export { EVMProvider, type EVMProviderConfig } from "./providers/evm/index.js";
 export { TONProvider, type TONProviderConfig } from "./providers/ton/index.js";
 
+// TON helpers (headless wallet + settlement payload)
+export {
+  createTonMnemonic,
+  deriveTonKeyPairFromMnemonic,
+  deriveTonWalletAddressFromMnemonic,
+  splitTonMnemonic,
+} from "./providers/ton/mnemonic.js";
+export {
+  TON_SETTLEMENT_OP,
+  encodeTonSettlementLockPayload,
+  encodeTonSettlementReleasePayload,
+  encodeTonSettlementRefundPayload,
+  decodeBocBase64ToCell,
+} from "./providers/ton/settlement-payload.js";
+export { normalizeTonAddress } from "./providers/ton/address.js";
+
 // ==================== 工厂导出 ====================
 
 export {

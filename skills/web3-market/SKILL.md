@@ -38,14 +38,22 @@ Read these files as needed:
 - `skills/web3-market/references/web3-market-tools-commands-evolution.md`
 - `skills/web3-market/references/web3-market-assessment-2026-02-19.md`
 
-## Docs (planning & progress)
+## Docs
 
-> These docs have moved under `docs/web3/` and are the shared planning/progress references.
+### External docs (`docs/web3/`)
 
-- `docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
-- `docs/web3/WEB3_OVERALL_PROGRESS.md`
-- `docs/web3/WEB3_WEEK3_5_ROADMAP.md`
-- `docs/web3/WEB3_DEV_PLAN_5_WEEKS.md`
+- `docs/web3/ai-steward-golden-path.md`
+- `docs/web3/TON_E2E_SETTLEMENT.md` ← TON 端到端结算（Headless）验收指南
+- `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` ← 双栈策略与统一口径（对外）
+
+### Internal planning & research (`skills/web3-market/internal/`)
+
+- `skills/web3-market/internal/WEB3_OVERALL_PROGRESS.md`
+- `skills/web3-market/internal/WEB3_WEEK3_5_ROADMAP.md`
+- `skills/web3-market/internal/WEB3_DEV_PLAN_5_WEEKS.md`
+- `skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
+- `skills/web3-market/internal/openclaw-web3-evaluation-report.md`
+- `skills/web3-market/internal/2026年十大优秀公链技术调研报告.md`
 
 ## Non-negotiables
 

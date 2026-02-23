@@ -58,8 +58,13 @@ describe("web3 consumer tools", () => {
         resourceId: "res-tool-1",
         q: "test query",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("no active lease");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        message: string;
+        details?: { reason?: string };
+      };
+      expect(parsed.error).toBe("E_NOT_FOUND");
+      expect(parsed.details?.reason).toContain("no active lease");
     });
 
     it("returns error when resourceId is empty", async () => {
@@ -69,8 +74,12 @@ describe("web3 consumer tools", () => {
         resourceId: "",
         q: "test query",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("required");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { fields?: string[] };
+      };
+      expect(parsed.error).toBe("E_INVALID_ARGUMENT");
+      expect(parsed.details?.fields).toEqual(["resourceId", "q"]);
     });
 
     it("returns error when endpoint not configured", async () => {
@@ -89,8 +98,12 @@ describe("web3 consumer tools", () => {
         resourceId: "res-tool-1",
         q: "test",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("endpoint");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { reason?: string };
+      };
+      expect(parsed.error).toBe("E_INVALID_ARGUMENT");
+      expect(parsed.details?.reason).toContain("endpoint");
     });
 
     it("redacts provider errors and tokens", async () => {
@@ -104,22 +117,23 @@ describe("web3 consumer tools", () => {
       const config = makeConfig();
       const tool = createWeb3SearchTool(config)!;
 
-      const mockFetchResponse = new Response(
-        "Bearer tok_secret_123 https://provider.example.com /Users/test/secrets",
-        {
-          status: 502,
-          headers: { "content-type": "text/plain" },
-        },
+      // Non-OK HTTP responses are intentionally mapped to stable error codes with
+      // generic, redacted messages (we don't reflect upstream bodies).
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockRejectedValue(
+            new Error("Bearer tok_secret_123 https://provider.example.com /Users/test/secrets"),
+          ),
       );
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
 
       const result = (await tool.execute("tc-1", {
         resourceId: "res-tool-1",
         q: "test",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.message).toContain("tok_***");
-      expect(parsed.message).toContain("[REDACTED_ENDPOINT]");
+      const parsed = JSON.parse(result.content[0].text) as { error: string; message: string };
+      expect(parsed.error).toBe("E_INTERNAL");
       expect(parsed.message).not.toContain("tok_secret_123");
       expect(parsed.message).not.toContain("provider.example.com");
       expect(parsed.message).not.toContain("/Users/test");
@@ -149,8 +163,12 @@ describe("web3 consumer tools", () => {
         path: "",
         bytesBase64: "",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("required");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { fields?: string[] };
+      };
+      expect(parsed.error).toBe("E_INVALID_ARGUMENT");
+      expect(parsed.details?.fields).toEqual(["resourceId", "path", "bytesBase64"]);
     });
 
     it("returns error when no active lease", async () => {
@@ -161,8 +179,12 @@ describe("web3 consumer tools", () => {
         path: "test.txt",
         bytesBase64: "aGVsbG8=",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("no active lease");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { reason?: string };
+      };
+      expect(parsed.error).toBe("E_NOT_FOUND");
+      expect(parsed.details?.reason).toContain("no active lease");
     });
   });
 
@@ -188,8 +210,12 @@ describe("web3 consumer tools", () => {
         resourceId: "res-tool-1",
         path: "",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("required");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { fields?: string[] };
+      };
+      expect(parsed.error).toBe("E_INVALID_ARGUMENT");
+      expect(parsed.details?.fields).toEqual(["resourceId", "path"]);
     });
   });
 
@@ -214,8 +240,12 @@ describe("web3 consumer tools", () => {
       const result = (await tool.execute("tc-1", {
         resourceId: "",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("required");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { fields?: string[] };
+      };
+      expect(parsed.error).toBe("E_INVALID_ARGUMENT");
+      expect(parsed.details?.fields).toEqual(["resourceId"]);
     });
 
     it("returns error when no active lease", async () => {
@@ -224,8 +254,12 @@ describe("web3 consumer tools", () => {
       const result = (await tool.execute("tc-1", {
         resourceId: "res-tool-1",
       })) as { content: Array<{ text: string }> };
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain("no active lease");
+      const parsed = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { reason?: string };
+      };
+      expect(parsed.error).toBe("E_NOT_FOUND");
+      expect(parsed.details?.reason).toContain("no active lease");
     });
   });
 });

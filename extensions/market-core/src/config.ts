@@ -14,7 +14,15 @@ export type ChainNetwork =
 export type ChainConfig = {
   network: ChainNetwork;
   rpcUrl?: string;
+
+  /** EVM signer private key (0x-prefixed) */
   privateKey?: string;
+
+  /** TON headless signer mnemonic (space-separated) */
+  tonMnemonic?: string;
+  /** TON workchain (default: 0) */
+  tonWorkchain?: number;
+
   escrowContractAddress?: string;
 };
 
