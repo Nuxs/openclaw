@@ -1,0 +1,23 @@
+{
+  "id": "agent-wallet",
+  "kind": "wallet",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean" },
+      "storePath": { "type": "string" },
+      "encryptionKey": { "type": "string" },
+      "chain": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "network": {
+            "type": "string",
+            "enum": ["ethereum", "base", "optimism", "arbitrum", "sepolia"]
+          }
+        }
+      }
+    }
+  }
+}
