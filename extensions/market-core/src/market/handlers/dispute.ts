@@ -1,7 +1,7 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
-import { EscrowAdapter } from "../escrow.js";
+import { createEscrowAdapter } from "../escrow-factory.js";
 import { hashCanonical } from "../hash.js";
 import { assertDisputeTransition, assertOrderTransition } from "../state-machine.js";
 import type {
@@ -13,7 +13,7 @@ import type {
 } from "../types.js";
 import {
   normalizeBuyerId,
-  requireAddress,
+  requireChainAddress,
   requireEnum,
   requireLimit,
   requireString,
@@ -46,14 +46,14 @@ function requireResolution(value: unknown): DisputeResolution {
   ] as DisputeResolution[]);
 }
 
-function requirePayees(input: Record<string, unknown>): PayeeInput[] {
+function requirePayees(network: string, input: Record<string, unknown>): PayeeInput[] {
   const raw = input.payees;
   if (!Array.isArray(raw) || raw.length === 0) {
     throw new Error("payees is required");
   }
   return raw.map((entry, index) => {
     const candidate = (entry ?? {}) as Record<string, unknown>;
-    const address = requireAddress(candidate.address, `payees[${index}].address`);
+    const address = requireChainAddress(network, candidate.address, `payees[${index}].address`);
     const amount = requireString(candidate.amount, `payees[${index}].amount`);
     return { address, amount };
   });
@@ -276,10 +276,10 @@ export function createDisputeResolveHandler(
 
       let txHash: string | undefined;
       if (resolution === "refund") {
-        const payer = requireAddress(input.payer, "payer");
+        const payer = requireChainAddress(config.chain.network, input.payer, "payer");
         assertOrderTransition(order.status, "settlement_cancelled");
         if (config.settlement.mode === "contract") {
-          const escrow = new EscrowAdapter(config.chain, config.settlement);
+          const escrow = createEscrowAdapter(config.chain, config.settlement);
           txHash = await escrow.refund(order.orderHash, payer);
         }
         order.status = "settlement_cancelled";
@@ -333,10 +333,10 @@ export function createDisputeResolveHandler(
         return;
       }
 
-      const payees = requirePayees(input);
+      const payees = requirePayees(config.chain.network, input);
       assertOrderTransition(order.status, "settlement_completed");
       if (config.settlement.mode === "contract") {
-        const escrow = new EscrowAdapter(config.chain, config.settlement);
+        const escrow = createEscrowAdapter(config.chain, config.settlement);
         txHash = await escrow.release(order.orderHash, payees);
       }
       order.status = "settlement_completed";

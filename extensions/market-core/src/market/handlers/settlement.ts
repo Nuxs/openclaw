@@ -1,11 +1,11 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
-import { EscrowAdapter } from "../escrow.js";
+import { createEscrowAdapter } from "../escrow-factory.js";
 import { hashCanonical } from "../hash.js";
 import { assertOrderTransition } from "../state-machine.js";
 import type { Settlement } from "../types.js";
-import { normalizeBuyerId, requireString } from "../validators.js";
+import { normalizeBuyerId, requireChainAddress, requireString } from "../validators.js";
 import {
   assertAccess,
   assertActorMatch,
@@ -33,6 +33,8 @@ export function createSettlementLockHandler(
       const payer = requireString(input.payer, "payer");
       const order = store.getOrder(orderId);
       if (!order) throw new Error("order not found");
+      const offer = store.getOffer(order.offerId);
+      if (!offer) throw new Error("offer not found");
       if (actorId) {
         assertActorMatch(config, normalizeBuyerId(actorId), normalizeBuyerId(payer), "payer");
         assertActorMatch(
@@ -51,8 +53,8 @@ export function createSettlementLockHandler(
 
       let txHash: string | undefined;
       if (config.settlement.mode === "contract") {
-        const escrow = new EscrowAdapter(config.chain, config.settlement);
-        txHash = await escrow.lock(order.orderHash, payer, amount);
+        const escrow = createEscrowAdapter(config.chain, config.settlement);
+        txHash = await escrow.lock(order.orderHash, payer, amount, offer.sellerId);
       }
 
       order.status = "payment_locked";
@@ -97,8 +99,16 @@ export function createSettlementReleaseHandler(
       const input = (params ?? {}) as Record<string, unknown>;
       const actorId = requireActorId(opts, config, input);
       const orderId = requireString(input.orderId, "orderId");
-      const payees = (input.payees ?? []) as { address: string; amount: string }[];
-      if (payees.length === 0) throw new Error("payees is required");
+      const payeesInput = (input.payees ?? []) as { address: string; amount: string }[];
+      if (payeesInput.length === 0) throw new Error("payees is required");
+      const payees = payeesInput.map((entry, index) => ({
+        address: requireChainAddress(
+          config.chain.network,
+          entry.address,
+          `payees[${index}].address`,
+        ),
+        amount: requireString(entry.amount, `payees[${index}].amount`),
+      }));
 
       const order = store.getOrder(orderId);
       if (!order) throw new Error("order not found");
@@ -111,7 +121,7 @@ export function createSettlementReleaseHandler(
 
       let txHash: string | undefined;
       if (config.settlement.mode === "contract") {
-        const escrow = new EscrowAdapter(config.chain, config.settlement);
+        const escrow = createEscrowAdapter(config.chain, config.settlement);
         txHash = await escrow.release(order.orderHash, payees);
       }
 
@@ -167,6 +177,10 @@ export function createSettlementRefundHandler(
       const actorId = requireActorId(opts, config, input);
       const orderId = requireString(input.orderId, "orderId");
       const payer = requireString(input.payer, "payer");
+      const payerAddress =
+        config.settlement.mode === "contract"
+          ? requireChainAddress(config.chain.network, payer, "payer")
+          : payer;
       const reason =
         typeof input.reason === "string" && input.reason.trim().length > 0
           ? input.reason
@@ -187,8 +201,8 @@ export function createSettlementRefundHandler(
 
       let txHash: string | undefined;
       if (config.settlement.mode === "contract") {
-        const escrow = new EscrowAdapter(config.chain, config.settlement);
-        txHash = await escrow.refund(order.orderHash, payer);
+        const escrow = createEscrowAdapter(config.chain, config.settlement);
+        txHash = await escrow.refund(order.orderHash, payerAddress);
       }
 
       order.status = "settlement_cancelled";

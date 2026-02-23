@@ -31,8 +31,32 @@ export type WalletIdentity = {
   createdAt: string;
 };
 
-export type WalletRecord = WalletIdentity & {
+type WalletRecordV1 = WalletIdentity & {
   encryptedPrivateKey: EncryptedPayload;
+};
+
+type TonWalletSection = {
+  address: string;
+  publicKey?: string;
+  createdAt: string;
+  encryptedMnemonic: EncryptedPayload;
+};
+
+type WalletRecordV2 = {
+  version: 2;
+  address: string;
+  publicKey?: string;
+  createdAt: string;
+  encryptedPrivateKey: EncryptedPayload;
+  ton?: TonWalletSection;
+};
+
+type WalletRecord = WalletRecordV1 | WalletRecordV2;
+
+export type TonWalletIdentity = {
+  address: string;
+  publicKey?: string;
+  createdAt: string;
 };
 
 function resolveStorePath(config: AgentWalletConfig): string {
@@ -53,11 +77,11 @@ function deriveKey(secret: string): Buffer {
   return createHash("sha256").update(secret).digest();
 }
 
-function encryptPrivateKey(privateKey: string, secret: string): EncryptedPayload {
+function encryptString(plaintext: string, secret: string): EncryptedPayload {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", deriveKey(secret), iv);
-  const plaintext = Buffer.from(privateKey, "utf8");
-  const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const buf = Buffer.from(plaintext, "utf8");
+  const encrypted = Buffer.concat([cipher.update(buf), cipher.final()]);
   const tag = cipher.getAuthTag();
   return {
     version: 1,
@@ -68,7 +92,7 @@ function encryptPrivateKey(privateKey: string, secret: string): EncryptedPayload
   };
 }
 
-function decryptPrivateKey(payload: EncryptedPayload, secret: string): string {
+function decryptString(payload: EncryptedPayload, secret: string): string {
   if (payload.alg !== "aes-256-gcm") {
     throw new Error(`unsupported wallet cipher: ${payload.alg}`);
   }
@@ -77,8 +101,7 @@ function decryptPrivateKey(payload: EncryptedPayload, secret: string): string {
   const data = Buffer.from(payload.data, "base64");
   const decipher = createDecipheriv("aes-256-gcm", deriveKey(secret), iv);
   decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
-  return plaintext;
+  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
 }
 
 async function ensureDir(dir: string) {
@@ -94,24 +117,42 @@ async function readFileIfExists(target: string): Promise<string | null> {
   }
 }
 
-export async function loadWalletRecord(
-  config: AgentWalletConfig,
-): Promise<{ identity: WalletIdentity; privateKey: `0x${string}` } | null> {
+async function loadWalletFile(config: AgentWalletConfig): Promise<WalletRecord | null> {
   const target = resolveStorePath(config);
-  const key = resolveEncryptionKey(config);
-
   const raw = await readFileIfExists(target);
   if (!raw) return null;
 
   const parsed = JSON.parse(raw) as WalletRecord;
-  const decrypted = decryptPrivateKey(parsed.encryptedPrivateKey, key) as `0x${string}`;
+  if (parsed && typeof parsed === "object" && typeof parsed.version === "number") {
+    return parsed;
+  }
+  throw new Error("invalid agent-wallet record");
+}
+
+async function saveWalletFile(config: AgentWalletConfig, record: WalletRecord): Promise<void> {
+  const target = resolveStorePath(config);
+  await ensureDir(path.dirname(target));
+
+  await withFileLock(target, DEFAULT_LOCK_OPTIONS, async () => {
+    await fs.writeFile(target, JSON.stringify(record, null, 2), "utf8");
+  });
+}
+
+export async function loadWalletRecord(
+  config: AgentWalletConfig,
+): Promise<{ identity: WalletIdentity; privateKey: `0x${string}` } | null> {
+  const key = resolveEncryptionKey(config);
+  const record = await loadWalletFile(config);
+  if (!record) return null;
+
+  const decrypted = decryptString(record.encryptedPrivateKey, key) as `0x${string}`;
 
   return {
     identity: {
       version: 1,
-      address: parsed.address,
-      publicKey: parsed.publicKey,
-      createdAt: parsed.createdAt,
+      address: record.address,
+      publicKey: record.publicKey,
+      createdAt: record.createdAt,
     },
     privateKey: decrypted,
   };
@@ -122,17 +163,76 @@ export async function saveWalletRecord(
   identity: WalletIdentity,
   privateKey: `0x${string}`,
 ): Promise<void> {
-  const target = resolveStorePath(config);
   const key = resolveEncryptionKey(config);
-  await ensureDir(path.dirname(target));
 
-  const encrypted = encryptPrivateKey(privateKey, key);
-  const record: WalletRecord = {
+  const existing = await loadWalletFile(config);
+  const encryptedPrivateKey = encryptString(privateKey, key);
+
+  // Preserve TON section if present.
+  if (existing && existing.version === 2) {
+    const record: WalletRecordV2 = {
+      version: 2,
+      address: identity.address,
+      publicKey: identity.publicKey,
+      createdAt: identity.createdAt,
+      encryptedPrivateKey,
+      ton: existing.ton,
+    };
+    await saveWalletFile(config, record);
+    return;
+  }
+
+  const record: WalletRecordV1 = {
     ...identity,
-    encryptedPrivateKey: encrypted,
+    encryptedPrivateKey,
   };
 
-  await withFileLock(target, DEFAULT_LOCK_OPTIONS, async () => {
-    await fs.writeFile(target, JSON.stringify(record, null, 2), "utf8");
-  });
+  await saveWalletFile(config, record);
+}
+
+export async function loadTonWalletRecord(
+  config: AgentWalletConfig,
+): Promise<{ identity: TonWalletIdentity; mnemonic: string } | null> {
+  const key = resolveEncryptionKey(config);
+  const record = await loadWalletFile(config);
+  if (!record || record.version !== 2 || !record.ton) return null;
+
+  return {
+    identity: {
+      address: record.ton.address,
+      publicKey: record.ton.publicKey,
+      createdAt: record.ton.createdAt,
+    },
+    mnemonic: decryptString(record.ton.encryptedMnemonic, key),
+  };
+}
+
+export async function saveTonWalletRecord(
+  config: AgentWalletConfig,
+  identity: TonWalletIdentity,
+  mnemonic: string,
+): Promise<void> {
+  const key = resolveEncryptionKey(config);
+  const existing = await loadWalletFile(config);
+  if (!existing) {
+    throw new Error("agent-wallet base record missing; create EVM wallet first");
+  }
+
+  const ton: TonWalletSection = {
+    address: identity.address,
+    publicKey: identity.publicKey,
+    createdAt: identity.createdAt,
+    encryptedMnemonic: encryptString(mnemonic, key),
+  };
+
+  const record: WalletRecordV2 = {
+    version: 2,
+    address: existing.address,
+    publicKey: existing.publicKey,
+    createdAt: existing.createdAt,
+    encryptedPrivateKey: existing.encryptedPrivateKey,
+    ton,
+  };
+
+  await saveWalletFile(config, record);
 }

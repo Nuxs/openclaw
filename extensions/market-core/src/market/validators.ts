@@ -1,3 +1,4 @@
+import { normalizeTonAddress } from "@openclaw/blockchain-adapter";
 import { getAddress } from "viem";
 import type { AssetType, DeliveryPayload, DeliveryType, UsageScope } from "./types.js";
 
@@ -11,6 +12,18 @@ export function requireString(value: unknown, field: string): string {
 export function requireAddress(value: unknown, field: string): `0x${string}` {
   const input = requireString(value, field);
   return getAddress(input) as `0x${string}`;
+}
+
+/**
+ * Validate and normalise a chain address. TON networks use base64 addresses;
+ * EVM networks use checksummed hex addresses.
+ */
+export function requireChainAddress(network: string, value: unknown, field: string): string {
+  if (network.startsWith("ton-")) {
+    const raw = requireString(value, field);
+    return normalizeTonAddress(raw);
+  }
+  return requireAddress(value, field);
 }
 
 export function requireNumber(value: unknown, field: string): number {
