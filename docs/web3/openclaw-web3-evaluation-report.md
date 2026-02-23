@@ -13,7 +13,7 @@
 
 - **`web3-core`** 负责横切能力：钱包身份（SIWE）、审计事件（本地 JSONL + 可选去中心化归档 + 可选链上锚定）、计费与配额、资源共享的 Provider/Consumer 编排、以及一套“安全可分享”的状态/工具输出（强制脱敏）。
 - **`market-core`** 提供市场内核：资源发布/下架、租约签发/撤销/过期清理、账本追加与汇总、纠纷与透明度接口、以及可选的 EVM 合约托管结算（Escrow）。
-- **双栈路线（TON+EVM，统一口径）**：已补齐“支付双入口、结算单出口、最小披露与零泄露”的规划口径（见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`）；当前代码关键路径仍以 EVM 为主，TON 侧链能力位于 `extensions/blockchain-adapter`（尚未纳入主线编排/结算关键路径）。
+- **双栈路线（TON+EVM，统一口径）**：已补齐“支付双入口、结算单出口、最小披露与零泄露”的规划口径（见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`）；当前关键路径仍以 EVM 为主，且 `market-core` 的 EVM escrow 已通过 `@openclaw/blockchain-adapter` 执行层发送合约交易；TON 侧能力位于 `extensions/blockchain-adapter`（尚未纳入主线编排/统一回执/结算口径落地）。
 
 **关键判断**：
 

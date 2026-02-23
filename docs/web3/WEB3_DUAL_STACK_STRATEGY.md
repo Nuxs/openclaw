@@ -28,7 +28,7 @@ OpenClaw Web3 Market 是一个"去中心化资源/能力市场"的 AI 管家入�
 ### 1.2 明确非目标（避免误解）
 
 - 不追求"把每次调用明细全上链"；链上仅做**最小披露**（hash/承诺/汇总/回执）。
-- 不把 `extensions/blockchain-adapter` 误读为"已进入主线关键路径"：它是 **TON-first 多链适配层（规划中的可插拔后端）**，现阶段主线仍以 EVM 能力为主。
+- 不把 `extensions/blockchain-adapter` 误读为“已完成双栈主线编排”：它已作为**执行层**被 `market-core` 的 EVM escrow（以及 `agent-wallet`）复用，但 TON-first/统一支付回执/编排仍属规划；现阶段对外主线仍以 EVM 能力为主。
 
 ---
 
