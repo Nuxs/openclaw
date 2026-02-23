@@ -225,39 +225,7 @@ export function createMarketMetricsSnapshotHandler(
   return createMarketProxyHandler(config, "market.metrics.snapshot", { requireResources: false });
 }
 
-type ReconciliationPaymentReceipt = {
-  chain: "ton" | "evm";
-  network?: string;
-  txHash?: string;
-  amount?: string;
-  tokenAddress?: string;
-  confirmedAt?: string;
-  mode: "live" | "simulated";
-};
-
-type ReconciliationDisputeSummary = {
-  total: number;
-  byStatus: Record<string, number>;
-};
-
-type ReconciliationSummary = {
-  orderId: string;
-  settlementId: string;
-  leaseId?: string;
-  paymentReceipt?: ReconciliationPaymentReceipt;
-  settlement: {
-    status?: string;
-    amount?: string;
-    tokenAddress?: string;
-    lockedAt?: string;
-    releasedAt?: string;
-    refundedAt?: string;
-  };
-  ledgerSummary?: unknown;
-  disputes?: ReconciliationDisputeSummary;
-  archiveReceipt?: { cid?: string; uri?: string; updatedAt?: string };
-  anchorReceipt?: { tx?: string; network?: string; block?: number; updatedAt?: string };
-};
+import type { PaymentChain, PaymentReceipt, ReconciliationSummary } from "@openclaw/market-core";
 
 type ReconciliationInput = {
   orderId?: string;
@@ -278,7 +246,7 @@ function countByStatus(items: Array<{ status?: string }>): Record<string, number
 }
 
 function resolvePaymentReceipt(params: {
-  chain: "ton" | "evm";
+  chain: PaymentChain;
   network?: string;
   amount?: string;
   tokenAddress?: string;
@@ -288,7 +256,7 @@ function resolvePaymentReceipt(params: {
   releasedAt?: string;
   refundTxHash?: string;
   refundedAt?: string;
-}): ReconciliationPaymentReceipt | undefined {
+}): PaymentReceipt | undefined {
   const {
     chain,
     network,
@@ -358,7 +326,7 @@ export function createMarketReconciliationSummaryHandler(
         throw new Error("settlement response missing orderId or settlementId");
       }
 
-      let disputeSummary: ReconciliationDisputeSummary | undefined;
+      let disputeSummary: ReconciliationSummary["disputes"];
       if (includeDisputes) {
         const disputeResponse = await callGateway({
           method: "market.dispute.list",
@@ -376,7 +344,7 @@ export function createMarketReconciliationSummaryHandler(
         }
       }
 
-      let ledgerSummary: unknown;
+      let ledgerSummary: ReconciliationSummary["ledgerSummary"];
       if (includeLedger && leaseId) {
         const ledgerResponse = await callGateway({
           method: "market.ledger.summary",
@@ -386,7 +354,9 @@ export function createMarketReconciliationSummaryHandler(
         const ledgerResult = normalizeGatewayResult(ledgerResponse);
         if (ledgerResult.ok) {
           const payload = (ledgerResult.result ?? {}) as { summary?: unknown };
-          ledgerSummary = redactUnknown(payload.summary ?? payload);
+          ledgerSummary = redactUnknown(
+            payload.summary ?? payload,
+          ) as ReconciliationSummary["ledgerSummary"];
         }
       }
 

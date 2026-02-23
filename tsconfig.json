@@ -21,7 +21,8 @@
       "openclaw/plugin-sdk": ["./src/plugin-sdk/index.ts"],
       "openclaw/plugin-sdk/*": ["./src/plugin-sdk/*.ts"],
       "openclaw/plugin-sdk/account-id": ["./src/plugin-sdk/account-id.ts"],
-      "@openclaw/blockchain-adapter": ["./extensions/blockchain-adapter/src/index.ts"]
+      "@openclaw/blockchain-adapter": ["./extensions/blockchain-adapter/src/index.ts"],
+      "@openclaw/market-core": ["./extensions/market-core/src/index.ts"]
     }
   },
   "include": ["src/**/*", "ui/**/*", "extensions/**/*"],

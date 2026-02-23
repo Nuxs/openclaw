@@ -326,3 +326,79 @@ export type BridgeRouteFilter = {
   toChain?: string;
   assetSymbol?: string;
 };
+
+// ---- Dual-Stack Payment Objects (TON + EVM) ----
+// Ref: docs/web3/WEB3_DUAL_STACK_STRATEGY.md
+
+/** Chain family for payment routing. */
+export type PaymentChain = "ton" | "evm";
+
+/** Live payments hit on-chain; simulated are off-chain dry-runs. */
+export type PaymentMode = "live" | "simulated";
+
+/** Intent to pay — created before on-chain tx. */
+export type PaymentIntent = {
+  intentId: string;
+  chain: PaymentChain;
+  asset: string;
+  amount: string;
+  currency: string;
+  orderId?: string;
+  createdAt: string;
+};
+
+/** On-chain payment confirmation. */
+export type PaymentReceipt = {
+  receiptId?: string;
+  chain: PaymentChain;
+  network?: string;
+  txHash?: string;
+  amount?: string;
+  tokenAddress?: string;
+  confirmedAt?: string;
+  mode: PaymentMode;
+};
+
+/** Foreign-exchange quote snapshot. */
+export type FXQuote = {
+  quoteId: string;
+  fromAsset: string;
+  toAsset: string;
+  rate: string;
+  /** e.g. "cex:binance" | "oracle:pyth" | "manual" */
+  source: string;
+  expiresAt: string;
+  roundingRule?: "floor" | "ceil" | "nearest";
+};
+
+/** Provider payout preference per chain. */
+export type PayoutPreference = {
+  providerActorId: string;
+  chain: PaymentChain;
+  settlementAsset: string;
+  rewardToken?: string;
+  discountBps?: number;
+};
+
+/** Unified reconciliation summary for a completed order. */
+export type ReconciliationSummary = {
+  orderId: string;
+  settlementId: string;
+  leaseId?: string;
+  paymentReceipt?: PaymentReceipt;
+  settlement: {
+    status?: string;
+    amount?: string;
+    tokenAddress?: string;
+    lockedAt?: string;
+    releasedAt?: string;
+    refundedAt?: string;
+  };
+  ledgerSummary?: {
+    byUnit: Record<string, { quantity: string; cost: string }>;
+    totalCost: string;
+  };
+  disputes?: { total: number; byStatus: Record<string, number> };
+  archiveReceipt?: { cid?: string; uri?: string; updatedAt?: string };
+  anchorReceipt?: { tx?: string; network?: string; block?: number; updatedAt?: string };
+};

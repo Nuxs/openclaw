@@ -217,3 +217,14 @@ const plugin: OpenClawPluginDefinition = {
 };
 
 export default plugin;
+
+// Re-export dual-stack payment types for cross-plugin consumption (e.g. web3-core)
+export type {
+  PaymentChain,
+  PaymentMode,
+  PaymentIntent,
+  PaymentReceipt,
+  FXQuote,
+  PayoutPreference,
+  ReconciliationSummary,
+} from "./market/types.js";
