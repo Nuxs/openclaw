@@ -70,7 +70,7 @@ market-core/
 │   │   └── ...                # Other internal modules
 │   └── state/
 │       └── store.ts           # State persistence
-└── docs/                      # Implementation docs (internal)
+└── demo.ts                    # 功能演示脚本
 ```
 
 ## 🔄 Inter-Plugin Communication
@@ -102,96 +102,57 @@ export function createMarketResourcePublishHandler(config) {
 
 ## 🎨 Design Principles
 
-### 1. Facade Pattern
+### 1) Single entry for user-facing contracts
 
-- `facade.ts` provides simplified, stable API
-- Hides internal complexity (state machine, storage, etc.)
-- Semantic versioning for breaking changes
+- **Public contract**: user/agent/UI should integrate via `web3.*` (registered by `web3-core`).
+- **Internal authority**: `market-core` currently registers access-controlled `market.*` gateway methods as the authoritative execution layer.
 
-### 2. OpenClaw Plugin Philosophy
+> If any extension-level doc conflicts with the repo’s Web3 contract, treat the contract as authoritative:
+>
+> - `docs/reference/web3-resource-market-api.md`
+> - `docs/reference/web3-market-output-redaction.md`
+> - `skills/web3-market/**` (design constraints / non-negotiables)
 
-> "Core stays lean; optional capability should usually ship as plugins"
-> — VISION.md
+### 2) Safety by default (non-negotiables)
 
-Market-core IS a plugin, but it's an **internal capability plugin**, not a **user-facing plugin**.
+- **Never leak**: `accessToken`, provider endpoints, real file paths (in errors/logs/status/tool results).
+- **One-time token**: plaintext token may only appear in the successful lease issuance response (`market.lease.issue` and its `web3.*` proxy), and only once.
+- **Provider-only ledger**: `market.ledger.append` must reject consumer-forged entries.
 
-### 3. Complexity Containment
+### 3) State & storage
 
-- ✅ Complex state machines are FINE internally
-- ✅ 6900 lines of code is ACCEPTABLE
-- ❌ Exposing 50+ gateway methods is NOT ACCEPTABLE
-- ✅ Exposing 10 high-level operations IS ACCEPTABLE
+- `market-core` persists under `STATE_DIR/market/` (file or SQLite; behaviors must match).
 
-## 📝 User-Facing Documentation
+## ✅ Current integration snapshot (2026.2.21)
 
-Users should ONLY see:
+- `market-core` registers internal `market.*` gateway methods (access-controlled) and is the authoritative state machine.
+- `web3-core` exposes the user-facing `web3.*` / `web3.market.*` methods, and may proxy into `market.*`.
+- `market-core` also exports an **optional** in-process facade (for internal callers/tests), but the primary integration surface remains the gateway methods.
 
-```markdown
-# Web3 Market Commands
+## 🔧 Development workflow
 
-## Check Payment Status
+### Adding new market behavior
 
-/pay_status
+1. Implement/extend handler in `market-core/src/market/handlers/*`.
+2. Register/extend the corresponding internal `market.*` gateway method in `market-core/src/index.ts`.
+3. If the capability is user/agent-facing, add/update the `web3.*` proxy/handler in `web3-core` (and keep output redaction + stable errors).
+4. Update the contract docs first when changing behavior:
+   - `docs/reference/web3-resource-market-api.md`
+   - `docs/reference/web3-market-output-redaction.md`
 
-## Publish Resource
-
-Gateway: web3.market.resource.publish
-Params: { resourceId, metadata }
-
-## Lease Resource
-
-Gateway: web3.market.lease.issue
-Params: { resourceId, consumer, durationSec }
-```
-
-NO mention of:
-
-- `market.*` namespace
-- Internal state machine
-- Settlement/consent/delivery details
-- market-core plugin
-
-## 🚀 Migration Notes
-
-### Before (2026.2.16)
-
-- market-core registered 50+ `market.*` gateway methods
-- web3-core registered 20+ `web3.market.*` gateway methods
-- Duplication and confusion
-
-### After (2026.2.21)
-
-- market-core registers 0 gateway methods
-- market-core exports Facade API
-- web3-core is the ONLY gateway registrar
-- Users see unified `web3.*` namespace
-
-## 🔧 Development Workflow
-
-### Adding New Market Features
-
-1. Implement handler in `market-core/src/market/handlers.ts`
-2. Add method to `facade.ts` interface
-3. Update `web3-core/src/market/handlers.ts` to call facade
-4. Register gateway in `web3-core/src/index.ts`
-5. Update USER documentation (only `web3.*`)
-
-### Testing
+### Testing (minimum)
 
 ```bash
-# Unit tests (internal)
 pnpm test extensions/market-core
-
-# Integration tests (through web3-core)
 pnpm test extensions/web3-core
-
-# E2E tests (user-facing)
 pnpm test:e2e
 ```
 
 ## 📖 References
 
-- [OpenClaw VISION.md](../../VISION.md) - Plugin philosophy
-- [Web3 Market Assessment](../../skills/web3-market/references/web3-market-assessment-2026-02-19.md) - Architecture decisions
-- [Market Facade API](./src/facade.ts) - External interface
-- [Web3 Core Gateway](../web3-core/src/index.ts) - Public API
+- `docs/reference/web3-resource-market-api.md`
+- `docs/reference/web3-market-output-redaction.md`
+- `skills/web3-market/references/web3-market-resource-security.md`
+- `skills/web3-market/references/web3-market-resource-ops.md`
+- `../web3-core/src/index.ts`
+- `./src/index.ts`

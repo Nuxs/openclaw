@@ -37,6 +37,14 @@ node --import tsx demo.ts
 - **Disputes**：`market.dispute.open` / `market.dispute.submitEvidence` / `market.dispute.resolve` / `market.dispute.reject` / `market.dispute.get` / `market.dispute.list`
 - **Transparency/ops**：`market.status.summary` / `market.metrics.snapshot` / `market.audit.query` / `market.transparency.summary` / `market.transparency.trace` / `market.repair.retry` / `market.revocation.retry`
 
+## 权威契约与脱敏（务必对齐）
+
+- **对外单入口契约**：`docs/reference/web3-resource-market-api.md`
+- **对外输出脱敏验收**：`docs/reference/web3-market-output-redaction.md`
+- **设计约束（不可妥协）**：`skills/web3-market/**`
+
+> 提醒：任何对外输出（错误/日志/status/tool 结果/HTTP 响应）不得包含 `accessToken`、Provider endpoint 或真实文件路径。
+
 ## 安全与访问控制（强烈建议先配置）
 
 `market-core` 支持通过配置限制访问：
@@ -49,7 +57,9 @@ node --import tsx demo.ts
 
 ## 数据存储
 
-支持 `store.mode: file | sqlite`（默认 `sqlite`），用于保存市场状态与审计信息。
+- **状态目录**：`STATE_DIR/market/`（`STATE_DIR` 可通过 `OPENCLAW_STATE_DIR` 覆盖）。
+- **存储模式**：支持 `store.mode: file | sqlite`（默认 `sqlite`），用于保存市场状态与审计信息。
+- **一致性要求**：file/sqlite 两种模式的关键路径行为必须一致。
 
 ## 版本
 

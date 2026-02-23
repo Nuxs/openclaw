@@ -42,6 +42,11 @@ cat ARCHITECTURE.md
 - `/credits` - 查看配额
 - `/pay_status` - 支付状态
 - `/audit_status` - 审计事件
+- `/alerts` - 查看告警与监控概览
+- `/alert_ack <alertId>` - 确认告警
+- `/alert_resolve <alertId> [note]` - 关闭告警（可选备注）
+- `/health` - 健康检查
+- `/web3-market [start|status|help]` - Web3 Market 运维入口（只读/指引为主）
 
 ### Gateway API
 
@@ -51,10 +56,18 @@ cat ARCHITECTURE.md
 - `web3.billing.status` - 计费状态
 - `web3.billing.summary` - 计费汇总
 - `web3.status.summary` - Web3 整体状态
-- `web3.resources.*` - 资源发布/租用/状态
-- `web3.market.*` - 市场代理（资源/租约/账本/争议/监控）
+- `web3.resources.*` - 资源发布/租用/状态（对外编排入口）
+- `web3.market.*` - 市场代理（资源/租约/账本/桥接/争议等）
 - `web3.index.*` - 资源索引上报/查询
 - `web3.monitor.*` - 监控与告警
+- `web3.dispute.*` - 争议（对外单入口）
+- `web3.capabilities.*` - 能力自描述（给 UI/Agent 构造调用）
+
+### 权威契约与脱敏（务必对齐）
+
+- **对外单入口契约**：`docs/reference/web3-resource-market-api.md`
+- **对外输出脱敏验收**：`docs/reference/web3-market-output-redaction.md`
+- **设计约束（不可妥协）**：`skills/web3-market/**`
 
 ### Hooks
 

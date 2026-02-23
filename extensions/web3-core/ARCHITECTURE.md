@@ -134,7 +134,7 @@ Hook: llm_output
 
 ## 🗄️ 状态存储结构
 
-所有状态存储在 `~/.openclaw/web3/` (或自定义 state 目录):
+所有状态存储在 `STATE_DIR/web3/`（默认 `STATE_DIR=~/.openclaw`，可通过 `OPENCLAW_STATE_DIR` 覆盖）:
 
 ```
 web3/
@@ -155,14 +155,19 @@ web3/
 
 ### 命令 (Commands)
 
-| 命令             | 描述                     | 用法                      |
-| ---------------- | ------------------------ | ------------------------- |
-| `/bind_wallet`   | 校验地址并引导 SIWE 绑定 | `/bind_wallet 0x123...`   |
-| `/unbind_wallet` | 解绑钱包地址             | `/unbind_wallet 0x123...` |
-| `/whoami_web3`   | 查看已绑定钱包           | `/whoami_web3`            |
-| `/credits`       | 查看配额余额             | `/credits`                |
-| `/pay_status`    | 查看支付状态             | `/pay_status`             |
-| `/audit_status`  | 查看最近审计事件         | `/audit_status`           |
+| 命令                       | 描述                                  | 用法                           |
+| -------------------------- | ------------------------------------- | ------------------------------ |
+| `/bind_wallet`             | 校验地址并引导 SIWE 绑定              | `/bind_wallet 0x123...`        |
+| `/unbind_wallet`           | 解绑钱包地址                          | `/unbind_wallet 0x123...`      |
+| `/whoami_web3`             | 查看已绑定钱包                        | `/whoami_web3`                 |
+| `/credits`                 | 查看配额余额                          | `/credits`                     |
+| `/pay_status`              | 查看支付状态                          | `/pay_status`                  |
+| `/audit_status`            | 查看最近审计事件                      | `/audit_status`                |
+| `/alerts`                  | 查看告警与监控概览                    | `/alerts`                      |
+| `/alert_ack <alertId>`     | 确认告警                              | `/alert_ack abc123`            |
+| `/alert_resolve <alertId>` | 关闭告警（可选备注）                  | `/alert_resolve abc123 已修复` |
+| `/health`                  | 健康检查                              | `/health`                      |
+| `/web3-market`             | Web3 Market 运维入口（只读/指引为主） | `/web3-market status`          |
 
 ### Hooks (生命周期钩子)
 
@@ -176,18 +181,20 @@ web3/
 
 ### Gateway API (RPC 方法)
 
-| 方法                   | 参数                       | 返回                          | 描述                       |
-| ---------------------- | -------------------------- | ----------------------------- | -------------------------- |
-| `web3.siwe.challenge`  | `{ address, chainId }`     | `{ message, nonce }`          | 生成 SIWE 挑战             |
-| `web3.siwe.verify`     | `{ message, signature }`   | `{ ok, address }`             | 验证 SIWE 签名             |
-| `web3.audit.query`     | `{ limit? }`               | `{ events }`                  | 查询审计日志               |
-| `web3.billing.status`  | `{ sessionIdHash }`        | `{ usage }`                   | 查询计费状态               |
-| `web3.billing.summary` | `{ sessionKey, senderId }` | `{ usage }`                   | 计费汇总                   |
-| `web3.status.summary`  | -                          | `{ auditStats, anchorStats }` | Web3 整体状态              |
-| `web3.resources.*`     | 各方法参数                 | 各方法返回                    | 资源发布/租用/状态         |
-| `web3.market.*`        | 各方法参数                 | 各方法返回                    | 市场代理（资源/租约/争议） |
-| `web3.index.*`         | 各方法参数                 | 各方法返回                    | 资源索引上报/查询          |
-| `web3.monitor.*`       | 各方法参数                 | 各方法返回                    | 监控与告警                 |
+| 方法                   | 参数                       | 返回                          | 描述                                   |
+| ---------------------- | -------------------------- | ----------------------------- | -------------------------------------- |
+| `web3.siwe.challenge`  | `{ address, chainId }`     | `{ message, nonce }`          | 生成 SIWE 挑战                         |
+| `web3.siwe.verify`     | `{ message, signature }`   | `{ ok, address }`             | 验证 SIWE 签名                         |
+| `web3.audit.query`     | `{ limit? }`               | `{ events }`                  | 查询审计日志                           |
+| `web3.billing.status`  | `{ sessionIdHash }`        | `{ usage }`                   | 查询计费状态                           |
+| `web3.billing.summary` | `{ sessionKey, senderId }` | `{ usage }`                   | 计费汇总                               |
+| `web3.status.summary`  | -                          | `{ auditStats, anchorStats }` | Web3 整体状态                          |
+| `web3.resources.*`     | 各方法参数                 | 各方法返回                    | 资源发布/租用/状态（对外编排入口）     |
+| `web3.market.*`        | 各方法参数                 | 各方法返回                    | 市场代理（资源/租约/账本/桥接/争议等） |
+| `web3.index.*`         | 各方法参数                 | 各方法返回                    | 资源索引上报/查询                      |
+| `web3.monitor.*`       | 各方法参数                 | 各方法返回                    | 监控与告警                             |
+| `web3.dispute.*`       | 各方法参数                 | 各方法返回                    | 争议（对外单入口）                     |
+| `web3.capabilities.*`  | 各方法参数                 | 各方法返回                    | 能力自描述（供 UI/Agent 构造调用）     |
 
 ### 后台服务 (Background Service)
 
@@ -216,7 +223,7 @@ web3/
       "storage": {
         "provider": "ipfs",
         "gateway": "https://w3s.link",
-        "pinataJwt": "eyJhbGci..."
+        "pinataJwt": "..."
       },
       "privacy": {
         "onChainData": "hash_only",
