@@ -14,6 +14,11 @@ import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
 import { resolveConfig, type MarketPluginConfig } from "./config.js";
 import { createMarketFacade } from "./facade.js";
 import {
+  createBridgeListHandler,
+  createBridgeRequestHandler,
+  createBridgeRoutesHandler,
+  createBridgeStatusHandler,
+  createBridgeUpdateHandler,
   createConsentGrantHandler,
   createConsentRevokeHandler,
   createDeliveryCompleteHandler,
@@ -50,11 +55,17 @@ import {
   createResourceListHandler,
   createResourcePublishHandler,
   createResourceUnpublishHandler,
+  createReputationSummaryHandler,
+  createTokenEconomyBurnHandler,
+  createTokenEconomyConfigureHandler,
+  createTokenEconomyGovernanceUpdateHandler,
+  createTokenEconomyMintHandler,
+  createTokenEconomySummaryHandler,
   createSettlementLockHandler,
   createSettlementRefundHandler,
   createSettlementReleaseHandler,
   createSettlementStatusHandler,
-} from "./market/handlers.js";
+} from "./market/handlers/index.js";
 import { MarketStateStore } from "./state/store.js";
 
 // Re-export facade types for web3-core to use (optional inter-plugin API)
@@ -113,6 +124,36 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("market.ledger.append", createLedgerAppendHandler(store, config));
     api.registerGatewayMethod("market.ledger.list", createLedgerListHandler(store, config));
     api.registerGatewayMethod("market.ledger.summary", createLedgerSummaryHandler(store, config));
+
+    api.registerGatewayMethod(
+      "market.reputation.summary",
+      createReputationSummaryHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.tokenEconomy.summary",
+      createTokenEconomySummaryHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.tokenEconomy.configure",
+      createTokenEconomyConfigureHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.tokenEconomy.mint",
+      createTokenEconomyMintHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.tokenEconomy.burn",
+      createTokenEconomyBurnHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.tokenEconomy.governance.update",
+      createTokenEconomyGovernanceUpdateHandler(store, config),
+    );
+    api.registerGatewayMethod("market.bridge.routes", createBridgeRoutesHandler(store, config));
+    api.registerGatewayMethod("market.bridge.request", createBridgeRequestHandler(store, config));
+    api.registerGatewayMethod("market.bridge.update", createBridgeUpdateHandler(store, config));
+    api.registerGatewayMethod("market.bridge.status", createBridgeStatusHandler(store, config));
+    api.registerGatewayMethod("market.bridge.list", createBridgeListHandler(store, config));
 
     api.registerGatewayMethod("market.settlement.lock", createSettlementLockHandler(store, config));
     api.registerGatewayMethod(

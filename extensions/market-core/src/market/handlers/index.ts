@@ -58,6 +58,21 @@ export {
   createMarketTransparencyTraceHandler,
 } from "./transparency.js";
 export { createMarketRepairRetryHandler, createMarketRevocationRetryHandler } from "./repair.js";
+export { createReputationSummaryHandler } from "./reputation.js";
+export {
+  createBridgeListHandler,
+  createBridgeRequestHandler,
+  createBridgeRoutesHandler,
+  createBridgeStatusHandler,
+  createBridgeUpdateHandler,
+} from "./bridge.js";
+export {
+  createTokenEconomyBurnHandler,
+  createTokenEconomyConfigureHandler,
+  createTokenEconomyGovernanceUpdateHandler,
+  createTokenEconomyMintHandler,
+  createTokenEconomySummaryHandler,
+} from "./token-economy.js";
 export {
   createPricingModelHandler,
   getPricingModelHandler,

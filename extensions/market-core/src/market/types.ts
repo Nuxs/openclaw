@@ -146,7 +146,15 @@ export type AuditEventKind =
   | "repair_retry"
   | "revocation_retry"
   | "revocation_succeeded"
-  | "revocation_failed";
+  | "revocation_failed"
+  | "token_economy_configured"
+  | "token_minted"
+  | "token_burned"
+  | "token_governance_updated"
+  | "bridge_requested"
+  | "bridge_in_flight"
+  | "bridge_completed"
+  | "bridge_failed";
 
 export type AuditEvent = {
   id: string;
@@ -207,4 +215,114 @@ export type Dispute = {
   openedAt: string;
   resolvedAt?: string;
   updatedAt: string;
+};
+
+export type TokenEconomyStatus = "token_draft" | "token_active" | "token_paused";
+
+export type TokenEconomyEmission = {
+  rate: string;
+  period: "day" | "week" | "month";
+  cap?: string;
+};
+
+export type TokenEconomyBurnPolicy = {
+  burnRateBps?: number;
+};
+
+export type TokenGovernancePolicy = {
+  quorumBps?: number;
+  votingPeriodDays?: number;
+  proposalThreshold?: string;
+};
+
+export type TokenEconomyPolicy = {
+  symbol: string;
+  name?: string;
+  decimals?: number;
+  chain?: string;
+  tokenAddress?: string;
+  emission?: TokenEconomyEmission;
+  burn?: TokenEconomyBurnPolicy;
+  governance?: TokenGovernancePolicy;
+};
+
+export type TokenEconomyState = {
+  status: TokenEconomyStatus;
+  policy: TokenEconomyPolicy;
+  totals: {
+    /** Cumulative amount ever minted (monotonically increasing). */
+    minted: string;
+    /** Cumulative amount ever burned (monotonically increasing). */
+    burned: string;
+    /**
+     * Net supply on-chain: `minted - burned`.
+     * Currently equals `circulating` because locked/staked tracking is not yet implemented.
+     */
+    totalSupply: string;
+    /**
+     * Freely transferable supply: `totalSupply - locked - staked`.
+     * Currently equals `totalSupply`; will diverge once locked/staked deductions are added.
+     */
+    circulating: string;
+  };
+  updatedAt: string;
+};
+
+export type CrossChainAsset = {
+  assetId: string;
+  symbol: string;
+  decimals: number;
+  chains: string[];
+  addresses?: Record<string, string | undefined>;
+};
+
+export type BridgeRoute = {
+  routeId: string;
+  fromChain: string;
+  toChain: string;
+  assetSymbol: string;
+  minAmount?: string;
+  maxAmount?: string;
+  feeBps?: number;
+  estimatedSeconds?: number;
+  provider?: string;
+};
+
+export type BridgeStatus =
+  | "bridge_requested"
+  | "bridge_in_flight"
+  | "bridge_completed"
+  | "bridge_failed";
+
+export type BridgeTransfer = {
+  bridgeId: string;
+  orderId?: string;
+  settlementId?: string;
+  routeId: string;
+  fromChain: string;
+  toChain: string;
+  assetSymbol: string;
+  amount: string;
+  status: BridgeStatus;
+  txHash?: string;
+  failureReason?: string;
+  requestedAt: string;
+  updatedAt: string;
+};
+
+export type BridgeTransferFilter = {
+  orderId?: string;
+  settlementId?: string;
+  status?: BridgeStatus;
+  fromChain?: string;
+  toChain?: string;
+  assetSymbol?: string;
+  limit?: number;
+};
+
+/** Filter for bridge route lookups (independent of transfer-specific fields). */
+export type BridgeRouteFilter = {
+  fromChain?: string;
+  toChain?: string;
+  assetSymbol?: string;
 };
