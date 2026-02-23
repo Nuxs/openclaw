@@ -132,7 +132,7 @@ FXQuote 的最小结构：
 ## 6. 与现有模块的对齐（当前事实 vs 规划）
 
 - **已存在（EVM 主线）**：SIWE 身份、EVM audit anchoring、market-core escrow settlement、资源租约与 Provider 权威账本、dispute 机制、索引签名验证与 endpoint 脱敏。
-- **规划中（TON 融合）**：将 TON 支付/回执/结算能力纳入统一口径；链交互由 `extensions/blockchain-adapter` 的 TON provider 抽象承接。
+- **规划中（TON 融合）**：将 TON 支付/回执/结算能力纳入统一口径；链交互将由 `extensions/blockchain-adapter` 的 TON provider 抽象承接（补充：EVM escrow 侧已通过 blockchain-adapter 的 EVM provider 发送合约交易）。
 
 > 本文档只定义口径与输出格式；具体实现以 `web3-core`/`market-core` 的后续开发为准。
 
