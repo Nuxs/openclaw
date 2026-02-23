@@ -5,21 +5,20 @@
  * between tab-registry.ts and app-settings.ts. Both import from here.
  */
 
+import { loadWeb3StatusForOverview } from "./app-tab-loaders-web3.ts";
 import type { OpenClawApp } from "./app.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import { loadConfig, loadConfigSchema } from "./controllers/config.ts";
 import { loadCronJobs, loadCronStatus } from "./controllers/cron.ts";
 import { loadDebug } from "./controllers/debug.ts";
-import { loadMarketStatus } from "./controllers/market-status.ts";
-import { loadWeb3MarketSummary } from "./controllers/market-summary.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import { loadUsage } from "./controllers/usage.ts";
-import { loadWeb3BillingSummary } from "./controllers/web3-billing.ts";
-import { loadWeb3Dashboard } from "./controllers/web3-dashboard.ts";
-import { loadWeb3Status } from "./controllers/web3-status.ts";
 import type { AttentionItem } from "./types.ts";
+
+// Re-export web3 loaders so existing consumers keep working via this module.
+export { loadMarket, loadWeb3 } from "./app-tab-loaders-web3.ts";
 
 type LoadHost = {
   tab: string;
@@ -45,7 +44,7 @@ export async function loadOverview(host: LoadHost) {
     loadSkills(app),
     loadUsage(app),
     loadOverviewLogs(app),
-    loadWeb3Status(app),
+    loadWeb3StatusForOverview(app),
   ]);
   buildAttentionItems(app);
 }
@@ -150,30 +149,6 @@ function buildAttentionItems(host: OpenClawApp) {
   }
 
   host.attentionItems = items;
-}
-
-export async function loadMarket(host: LoadHost) {
-  await loadMarketStatus(host as unknown as OpenClawApp);
-}
-
-export async function loadWeb3(host: LoadHost) {
-  const app = host as unknown as OpenClawApp;
-  app.web3Loading = true;
-  let anySuccess = false;
-  const results = await Promise.allSettled([
-    loadWeb3Dashboard(app),
-    loadWeb3BillingSummary(app),
-    loadWeb3MarketSummary(app),
-  ]);
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      anySuccess = true;
-    }
-  }
-  if (anySuccess) {
-    app.web3LastSuccess = Date.now();
-  }
-  app.web3Loading = false;
 }
 
 export async function loadChannelsTabData(host: LoadHost) {

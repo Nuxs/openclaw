@@ -54,20 +54,13 @@ import { renderAgentsTab } from "./app-render-agents-tab.ts";
 import { renderChannelsTab } from "./app-render-channels-tab.ts";
 import { renderChatTab } from "./app-render-chat-tab.ts";
 import { renderConfigTab } from "./app-render-config-tab.ts";
-import { renderMarketTab } from "./app-render-market-tab.ts";
 import { renderNodesTab } from "./app-render-nodes-tab.ts";
 import { renderOverviewTab } from "./app-render-overview-tab.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
 import { renderChatControls } from "./app-render.helpers.ts";
 import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
 // Loaders — from extracted module to avoid circular deps with app-settings.ts
-import {
-  loadOverview,
-  loadMarket,
-  loadWeb3,
-  loadChannelsTabData,
-  loadCronData,
-} from "./app-tab-loaders.ts";
+import { loadOverview, loadChannelsTabData, loadCronData } from "./app-tab-loaders.ts";
 import type { OpenClawApp } from "./app.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
@@ -96,14 +89,14 @@ import {
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills.ts";
+// Web3/Market tab entries (overlay)
+import { WEB3_TAB_ENTRIES } from "./tab-registry-web3.ts";
 import { renderCron } from "./views/cron.ts";
 import { renderDebug } from "./views/debug.ts";
 import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
-// Simple tab render adapters (inline)
-import { renderWeb3 } from "./views/web3.ts";
 
 // ---------------------------------------------------------------------------
 // Registry: ordered array — group order + intra-group order preserved
@@ -143,42 +136,8 @@ export const TAB_REGISTRY: TabDefinition[] = [
       await loadOverview(host as Parameters<typeof loadOverview>[0]);
     },
   },
-  {
-    id: "web3",
-    path: "/web3",
-    icon: "globe",
-    group: "control",
-    render: (state) => {
-      if (state.tab !== "web3") {
-        return nothing;
-      }
-      return renderWeb3({
-        connected: state.connected,
-        loading: state.web3Loading,
-        error: state.web3Error,
-        status: state.web3Status,
-        billing: state.web3BillingSummary,
-        billingError: state.web3BillingError,
-        marketStatus: state.web3MarketStatus,
-        marketError: state.web3MarketError,
-        lastSuccessAt: state.web3LastSuccess,
-        onRefresh: () => state.loadWeb3(),
-      });
-    },
-    load: async (host) => {
-      await loadWeb3(host as Parameters<typeof loadWeb3>[0]);
-    },
-  },
-  {
-    id: "market",
-    path: "/market",
-    icon: "radio",
-    group: "control",
-    render: renderMarketTab,
-    load: async (host) => {
-      await loadMarket(host as Parameters<typeof loadMarket>[0]);
-    },
-  },
+  // Web3 / Market tabs (from overlay)
+  ...WEB3_TAB_ENTRIES,
   {
     id: "channels",
     path: "/channels",

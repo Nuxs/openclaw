@@ -248,53 +248,6 @@ export class OpenClawApp extends LitElement {
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
 
-  @state() overviewWeb3Status: import("./types.js").Web3StatusSummary | null = null;
-  @state() overviewWeb3Error: string | null = null;
-  @state() web3Loading = false;
-  @state() web3Error: string | null = null;
-  @state() web3Status: import("./types.js").Web3StatusSummary | null = null;
-  @state() web3BillingSummary: import("./types.js").Web3BillingSummary | null = null;
-  @state() web3BillingError: string | null = null;
-  @state() web3MarketStatus: import("./types.js").MarketStatusSummary | null = null;
-  @state() web3MarketError: string | null = null;
-  @state() web3LastSuccess: number | null = null;
-
-  @state() marketLoading = false;
-  @state() marketError: string | null = null;
-  @state() marketEnableBusy = false;
-  @state() marketEnableError: string | null = null;
-  @state() marketEnableNotice: string | null = null;
-  @state() marketStatus: import("./types.js").MarketStatusSummary | null = null;
-  @state() marketMetrics: import("./types.js").MarketMetricsSnapshot | null = null;
-  @state() marketIndexEntries: import("./types.js").Web3IndexEntry[] = [];
-  @state() marketIndexStats: import("./types.js").Web3IndexStats | null = null;
-  @state() marketMonitor: import("./types.js").Web3MonitorSnapshot | null = null;
-  @state() marketResources: import("./types.js").MarketResource[] = [];
-  @state() marketLeases: import("./types.js").MarketLease[] = [];
-  @state() marketLedgerSummary: import("./types.js").MarketLedgerSummary | null = null;
-  @state() marketLedgerEntries: import("./types.js").MarketLedgerEntry[] = [];
-  @state() marketDisputes: import("./types.js").MarketDispute[] = [];
-  @state() marketReputation: import("./types.js").MarketReputationSummary | null = null;
-  @state() marketTokenEconomy: import("./types.js").TokenEconomyState | null = null;
-  @state() marketBridgeRoutes: import("./types.js").BridgeRoutesSnapshot | null = null;
-  @state() marketBridgeTransfers: import("./types.js").BridgeTransfer[] = [];
-  @state() marketLastSuccess: number | null = null;
-  @state() marketResourceKind: import("./types.js").MarketResourceKind | "all" = "all";
-  @state() marketFilters: import("./types.js").MarketFilters = {
-    resourceSearch: "",
-    resourceStatus: "all",
-    resourceSort: "updated_desc",
-    leaseSearch: "",
-    leaseStatus: "all",
-    leaseSort: "issued_desc",
-    disputeSearch: "",
-    disputeStatus: "all",
-    disputeSort: "opened_desc",
-    ledgerSearch: "",
-    ledgerUnit: "all",
-    ledgerSort: "time_desc",
-  };
-
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;
   @state() usageCostSummary: import("./types.js").CostUsageSummary | null = null;
@@ -538,18 +491,6 @@ export class OpenClawApp extends LitElement {
     await loadOverviewInternal(this as unknown as Parameters<typeof loadOverviewInternal>[0]);
   }
 
-  async loadMarket() {
-    await loadMarketInternal(this as unknown as Parameters<typeof loadMarketInternal>[0]);
-  }
-
-  async loadWeb3() {
-    await loadWeb3Internal(this as unknown as Parameters<typeof loadWeb3Internal>[0]);
-  }
-
-  async handleMarketEnable() {
-    await enableWeb3Market(this as unknown as Parameters<typeof enableWeb3Market>[0]);
-  }
-
   async loadCron() {
     await loadCronInternal(this as unknown as Parameters<typeof loadCronInternal>[0]);
   }
@@ -689,6 +630,67 @@ export class OpenClawApp extends LitElement {
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
   }
+
+  // ── private fork: web3/market state & methods ──────────────────────
+  @state() overviewWeb3Status: import("./types.js").Web3StatusSummary | null = null;
+  @state() overviewWeb3Error: string | null = null;
+  @state() web3Loading = false;
+  @state() web3Error: string | null = null;
+  @state() web3Status: import("./types.js").Web3StatusSummary | null = null;
+  @state() web3BillingSummary: import("./types.js").Web3BillingSummary | null = null;
+  @state() web3BillingError: string | null = null;
+  @state() web3MarketStatus: import("./types.js").MarketStatusSummary | null = null;
+  @state() web3MarketError: string | null = null;
+  @state() web3LastSuccess: number | null = null;
+
+  @state() marketLoading = false;
+  @state() marketError: string | null = null;
+  @state() marketEnableBusy = false;
+  @state() marketEnableError: string | null = null;
+  @state() marketEnableNotice: string | null = null;
+  @state() marketStatus: import("./types.js").MarketStatusSummary | null = null;
+  @state() marketMetrics: import("./types.js").MarketMetricsSnapshot | null = null;
+  @state() marketIndexEntries: import("./types.js").Web3IndexEntry[] = [];
+  @state() marketIndexStats: import("./types.js").Web3IndexStats | null = null;
+  @state() marketMonitor: import("./types.js").Web3MonitorSnapshot | null = null;
+  @state() marketResources: import("./types.js").MarketResource[] = [];
+  @state() marketLeases: import("./types.js").MarketLease[] = [];
+  @state() marketLedgerSummary: import("./types.js").MarketLedgerSummary | null = null;
+  @state() marketLedgerEntries: import("./types.js").MarketLedgerEntry[] = [];
+  @state() marketDisputes: import("./types.js").MarketDispute[] = [];
+  @state() marketReputation: import("./types.js").MarketReputationSummary | null = null;
+  @state() marketTokenEconomy: import("./types.js").TokenEconomyState | null = null;
+  @state() marketBridgeRoutes: import("./types.js").BridgeRoutesSnapshot | null = null;
+  @state() marketBridgeTransfers: import("./types.js").BridgeTransfer[] = [];
+  @state() marketLastSuccess: number | null = null;
+  @state() marketResourceKind: import("./types.js").MarketResourceKind | "all" = "all";
+  @state() marketFilters: import("./types.js").MarketFilters = {
+    resourceSearch: "",
+    resourceStatus: "all",
+    resourceSort: "updated_desc",
+    leaseSearch: "",
+    leaseStatus: "all",
+    leaseSort: "issued_desc",
+    disputeSearch: "",
+    disputeStatus: "all",
+    disputeSort: "opened_desc",
+    ledgerSearch: "",
+    ledgerUnit: "all",
+    ledgerSort: "time_desc",
+  };
+
+  async loadMarket() {
+    await loadMarketInternal(this as unknown as Parameters<typeof loadMarketInternal>[0]);
+  }
+
+  async loadWeb3() {
+    await loadWeb3Internal(this as unknown as Parameters<typeof loadWeb3Internal>[0]);
+  }
+
+  async handleMarketEnable() {
+    await enableWeb3Market(this as unknown as Parameters<typeof enableWeb3Market>[0]);
+  }
+  // ── end private fork: web3/market ─────────────────────────────────
 
   render() {
     return renderApp(this as unknown as AppViewState);

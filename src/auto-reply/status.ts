@@ -48,6 +48,7 @@ import {
 import type { CommandCategory } from "./commands-registry.types.js";
 import { resolveActiveFallbackState } from "./fallback-state.js";
 import { formatProviderModelRef, resolveSelectedAndActiveModel } from "./model-runtime.js";
+import { FEATURED_COMMAND_KEYS } from "./status-featured-commands.js";
 import type { ElevatedLevel, ReasoningLevel, ThinkLevel, VerboseLevel } from "./thinking.js";
 
 type AgentDefaults = NonNullable<NonNullable<OpenClawConfig["agents"]>["defaults"]>;
@@ -746,7 +747,7 @@ function formatCommandEntry(command: ChatCommandDefinition): string {
     });
   const aliasLabel = aliases.length ? ` (${aliases.join(", ")})` : "";
   const scopeLabel = command.scope === "text" ? " [text]" : "";
-  const featuredLabel = command.key === "web3-market" ? " [featured]" : "";
+  const featuredLabel = FEATURED_COMMAND_KEYS.has(command.key) ? " [featured]" : "";
   return `${primary}${aliasLabel}${scopeLabel}${featuredLabel} - ${command.description}`;
 }
 

@@ -22,6 +22,8 @@ import { formatHealthChannelLines, type HealthSummary } from "./health.js";
 import { resolveControlUiLinks } from "./onboard-helpers.js";
 import { statusAllCommand } from "./status-all.js";
 import { formatGatewayAuthUsed } from "./status-all/format.js";
+// Web3 overlay — keeps web3 rendering in a separate file
+import { renderWeb3StatusPanel } from "./status-command-web3.js";
 import { getDaemonStatusSummary, getNodeDaemonStatusSummary } from "./status.daemon.js";
 import {
   formatDuration,
@@ -403,49 +405,14 @@ export async function statusCommand(
     }).trimEnd(),
   );
 
-  runtime.log("");
-  runtime.log(theme.heading("Web3"));
-  const web3Rows = (() => {
-    if (!gatewayReachable) {
-      return [{ Item: "Status", Value: warn("unavailable (gateway unreachable)") }];
-    }
-    if (web3Error) {
-      return [{ Item: "Status", Value: warn(shortenText(web3Error, 160)) }];
-    }
-    if (!web3) {
-      return [{ Item: "Status", Value: muted("unavailable (plugin disabled?)") }];
-    }
-    const lastAuditAt = web3.auditLastAt ? Date.parse(web3.auditLastAt) : NaN;
-    const lastAuditAge = Number.isNaN(lastAuditAt) ? null : Date.now() - lastAuditAt;
-    const lastAuditLabel = lastAuditAge == null ? "unknown" : formatTimeAgo(lastAuditAge);
-    const archiveLabel = web3.archiveLastCid ? shortenText(web3.archiveLastCid, 20) : "none";
-    const anchorLabel = web3.anchorLastTx ? shortenText(web3.anchorLastTx, 20) : "none";
-    return [
-      { Item: "Audits (24h)", Value: `${web3.auditEventsRecent}` },
-      { Item: "Last audit", Value: lastAuditLabel },
-      {
-        Item: "Archive",
-        Value: `${web3.archiveProvider ?? "unknown"} · ${archiveLabel}`,
-      },
-      {
-        Item: "Anchor",
-        Value: `${web3.anchorNetwork ?? "unknown"} · ${anchorLabel}`,
-      },
-      {
-        Item: "Anchoring",
-        Value: `${web3.anchoringEnabled ? ok("enabled") : muted("disabled")} · pending ${web3.pendingAnchors}`,
-      },
-    ];
-  })();
+  // Web3 panel — rendered by overlay (status-command-web3.ts)
   runtime.log(
-    renderTable({
-      width: tableWidth,
-      columns: [
-        { key: "Item", header: "Item", minWidth: 12 },
-        { key: "Value", header: "Value", flex: true, minWidth: 32 },
-      ],
-      rows: web3Rows,
-    }).trimEnd(),
+    renderWeb3StatusPanel({
+      web3,
+      web3Error,
+      gatewayReachable,
+      tableWidth,
+    }),
   );
 
   runtime.log("");

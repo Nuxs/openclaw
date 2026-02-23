@@ -1,5 +1,6 @@
 import type { EventLogEntry } from "./app-events.ts";
 import type { CompactionStatus, FallbackStatus } from "./app-tool-stream.ts";
+import type { Web3ViewState } from "./app-view-state-web3.ts";
 import type { ChatProgressState } from "./controllers/chat.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
@@ -15,8 +16,6 @@ import type {
   AgentsFilesListResult,
   AgentIdentityResult,
   AttentionItem,
-  BridgeRoutesSnapshot,
-  BridgeTransfer,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   ConfigUiHints,
@@ -26,21 +25,7 @@ import type {
   HealthSummary,
   LogEntry,
   LogLevel,
-  MarketDispute,
-  MarketFilters,
-  MarketLedgerEntry,
-  MarketLedgerSummary,
-  MarketLease,
-  MarketMetricsSnapshot,
-  MarketReputationSummary,
-  MarketResource,
-  MarketResourceKind,
-  MarketStatusSummary,
   ModelCatalogEntry,
-  TokenEconomyState,
-  Web3IndexEntry,
-  Web3IndexStats,
-  Web3MonitorSnapshot,
   NostrProfile,
   PresenceEntry,
   SessionsUsageResult,
@@ -54,7 +39,9 @@ import type { ChatAttachment, ChatQueueItem, CronFormState } from "./ui-types.ts
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
 import type { SessionLogEntry } from "./views/usage.ts";
 
-export type AppViewState = {
+export type AppViewState = AppViewStateCore & Web3ViewState;
+
+type AppViewStateCore = {
   settings: UiSettings;
   password: string;
   tab: Tab;
@@ -172,40 +159,6 @@ export type AppViewState = {
   sessionsFilterLimit: string;
   sessionsIncludeGlobal: boolean;
   sessionsIncludeUnknown: boolean;
-  overviewWeb3Status: import("./types.ts").Web3StatusSummary | null;
-  overviewWeb3Error: string | null;
-  web3Loading: boolean;
-  web3Error: string | null;
-  web3Status: import("./types.ts").Web3StatusSummary | null;
-  web3BillingSummary: import("./types.ts").Web3BillingSummary | null;
-  web3BillingError: string | null;
-  web3MarketStatus: import("./types.ts").MarketStatusSummary | null;
-  web3MarketError: string | null;
-  web3LastSuccess: number | null;
-  marketLoading: boolean;
-  marketError: string | null;
-  marketStatus: MarketStatusSummary | null;
-  marketMetrics: MarketMetricsSnapshot | null;
-  marketIndexEntries: Web3IndexEntry[];
-  marketIndexStats: Web3IndexStats | null;
-  marketMonitor: Web3MonitorSnapshot | null;
-  marketResources: MarketResource[];
-  marketLeases: MarketLease[];
-  marketLedgerSummary: MarketLedgerSummary | null;
-  marketLedgerEntries: MarketLedgerEntry[];
-  marketDisputes: MarketDispute[];
-  marketReputation: MarketReputationSummary | null;
-  marketTokenEconomy: TokenEconomyState | null;
-  marketBridgeRoutes: BridgeRoutesSnapshot | null;
-  marketBridgeTransfers: BridgeTransfer[];
-  marketLastSuccess: number | null;
-  marketResourceKind: MarketResourceKind | "all";
-  marketFilters: MarketFilters;
-  marketEnableBusy: boolean;
-  marketEnableError: string | null;
-  marketEnableNotice: string | null;
-  handleMarketEnable(): void;
-  loadWeb3(): Promise<void>;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;

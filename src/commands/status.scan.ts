@@ -11,6 +11,8 @@ import type { MemoryProviderStatus } from "../memory/types.js";
 import { runExec } from "../process/exec.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { buildChannelsTable } from "./status-all/channels.js";
+// Web3 overlay — keeps web3-specific logic in a separate file
+import { scanWeb3Status, type Web3StatusScanSummary } from "./status-scan-web3.js";
 import { getAgentLocalStatuses } from "./status.agent-local.js";
 import { pickGatewaySelfPresence, resolveGatewayProbeAuth } from "./status.gateway-probe.js";
 import { getStatusSummary } from "./status.summary.js";
@@ -25,41 +27,6 @@ type MemoryPluginStatus = {
   slot: string | null;
   reason?: string;
 };
-
-type Web3StatusSummary = {
-  auditEventsRecent: number;
-  auditLastAt: string | null;
-  archiveProvider: string | null;
-  archiveLastCid: string | null;
-  anchorNetwork: string | null;
-  anchorLastTx: string | null;
-  pendingAnchors: number;
-  anchoringEnabled: boolean;
-  brain?: {
-    source: "web3/decentralized" | "centralized" | null;
-    provider: string | null;
-    model: string | null;
-    availability: "ok" | "degraded" | "unavailable" | null;
-  };
-  billing?: {
-    status: "active" | "exhausted" | "unbound";
-    credits: number;
-  };
-  settlement?: {
-    pending: number;
-  };
-};
-
-function normalizeWeb3Summary(input: unknown): Web3StatusSummary | null {
-  if (!input || typeof input !== "object") {
-    return null;
-  }
-  const payload = (input as { result?: unknown }).result ?? input;
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-  return payload as Web3StatusSummary;
-}
 
 function resolveMemoryPluginStatus(cfg: ReturnType<typeof loadConfig>): MemoryPluginStatus {
   const pluginsEnabled = cfg.plugins?.enabled !== false;
@@ -92,7 +59,7 @@ export type StatusScanResult = {
   summary: Awaited<ReturnType<typeof getStatusSummary>>;
   memory: MemoryStatusSnapshot | null;
   memoryPlugin: MemoryPluginStatus;
-  web3: Web3StatusSummary | null;
+  web3: Web3StatusScanSummary | null;
   web3Error: string | null;
 };
 
@@ -164,8 +131,6 @@ export async function scanStatus(
       progress.tick();
 
       progress.setLabel("Querying channel status…");
-      let web3: Web3StatusSummary | null = null;
-      let web3Error: string | null = null;
       const channelsStatus = gatewayReachable
         ? await callGateway({
             method: "channels.status",
@@ -178,19 +143,12 @@ export async function scanStatus(
         : null;
       const channelIssues = channelsStatus ? collectChannelStatusIssues(channelsStatus) : [];
 
-      if (gatewayReachable) {
-        try {
-          const res = await callGateway({
-            method: "web3.status.summary",
-            params: {},
-            timeoutMs: Math.min(opts.all ? 5000 : 2500, opts.timeoutMs ?? 10_000),
-          });
-          web3 = normalizeWeb3Summary(res);
-        } catch (err) {
-          web3 = null;
-          web3Error = String(err);
-        }
-      }
+      // Web3 status — delegated to overlay file (status-scan-web3.ts)
+      const { web3, web3Error } = await scanWeb3Status({
+        gatewayReachable,
+        timeoutMs: opts.timeoutMs,
+        all: opts.all,
+      });
 
       progress.tick();
 

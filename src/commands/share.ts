@@ -1,4 +1,3 @@
-import { Web3StateStore } from "../../extensions/web3-core/src/state/store.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { readConfigFileSnapshot, writeConfigFile } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
@@ -7,6 +6,7 @@ import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
 import { theme } from "../terminal/theme.js";
 import { shortenHomePath } from "../utils.js";
+import { ProviderIdStore } from "./share-provider-id.js";
 
 export type ShareStartOptions = {
   providerId?: string;
@@ -145,7 +145,7 @@ export async function shareStartCommand(opts: ShareStartOptions) {
   runtime.log(info("Enabled web3-core resource sharing. Restart the gateway to apply."));
 
   const stateDir = resolveStateDir();
-  const store = new Web3StateStore(stateDir);
+  const store = new ProviderIdStore(stateDir);
   const providerId = opts.providerId?.trim() || store.ensureProviderId();
   if (opts.providerId) {
     store.saveProviderId(providerId);
