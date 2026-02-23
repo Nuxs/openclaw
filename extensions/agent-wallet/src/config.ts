@@ -1,4 +1,31 @@
-export type AgentWalletChainNetwork = "ethereum" | "base" | "optimism" | "arbitrum" | "sepolia";
+export type AgentWalletChainNetwork =
+  | "ethereum"
+  | "base"
+  | "optimism"
+  | "arbitrum"
+  | "sepolia"
+  | "ton-mainnet"
+  | "ton-testnet";
+
+/** Chains that use the EVM execution path. */
+const EVM_NETWORKS: ReadonlySet<string> = new Set([
+  "ethereum",
+  "base",
+  "optimism",
+  "arbitrum",
+  "sepolia",
+]);
+
+/** Chains that use the TON execution path. */
+const TON_NETWORKS: ReadonlySet<string> = new Set(["ton-mainnet", "ton-testnet"]);
+
+export function isEVMNetwork(network: AgentWalletChainNetwork): boolean {
+  return EVM_NETWORKS.has(network);
+}
+
+export function isTONNetwork(network: AgentWalletChainNetwork): boolean {
+  return TON_NETWORKS.has(network);
+}
 
 export type AgentWalletChainConfig = {
   network: AgentWalletChainNetwork;
@@ -25,9 +52,17 @@ export function resolveConfig(raw?: Record<string, unknown>): AgentWalletConfig 
 
   const chainRaw =
     raw.chain && typeof raw.chain === "object" ? (raw.chain as Record<string, unknown>) : {};
+  const VALID_NETWORKS = [
+    "ethereum",
+    "base",
+    "optimism",
+    "arbitrum",
+    "sepolia",
+    "ton-mainnet",
+    "ton-testnet",
+  ];
   const network =
-    typeof chainRaw.network === "string" &&
-    ["ethereum", "base", "optimism", "arbitrum", "sepolia"].includes(chainRaw.network)
+    typeof chainRaw.network === "string" && VALID_NETWORKS.includes(chainRaw.network)
       ? (chainRaw.network as AgentWalletChainNetwork)
       : DEFAULT_CONFIG.chain.network;
 

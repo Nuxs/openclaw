@@ -1,12 +1,17 @@
 import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
 import type { AgentWalletConfig } from "./config.js";
-import { resolveConfig } from "./config.js";
+import { isTONNetwork, resolveConfig } from "./config.js";
 import {
   createAgentWalletBalanceHandler,
   createAgentWalletCreateHandler,
   createAgentWalletSendHandler,
   createAgentWalletSignHandler,
 } from "./handlers.js";
+import {
+  createTonWalletBalanceHandler,
+  createTonWalletCreateHandler,
+  createTonWalletSendHandler,
+} from "./ton-handlers.js";
 
 const agentWalletConfigSchema = {
   parse(value: unknown): AgentWalletConfig {
@@ -33,11 +38,26 @@ const plugin: OpenClawPluginDefinition = {
 
   register(api) {
     const config = agentWalletConfigSchema.parse(api.pluginConfig);
+    const tonMode = isTONNetwork(config.chain.network);
 
-    api.registerGatewayMethod("agent-wallet.create", createAgentWalletCreateHandler(config));
-    api.registerGatewayMethod("agent-wallet.balance", createAgentWalletBalanceHandler(config));
-    api.registerGatewayMethod("agent-wallet.sign", createAgentWalletSignHandler(config));
-    api.registerGatewayMethod("agent-wallet.send", createAgentWalletSendHandler(config));
+    // Core wallet methods — dispatch to EVM or TON based on chain config
+    api.registerGatewayMethod(
+      "agent-wallet.create",
+      tonMode ? createTonWalletCreateHandler(config) : createAgentWalletCreateHandler(config),
+    );
+    api.registerGatewayMethod(
+      "agent-wallet.balance",
+      tonMode ? createTonWalletBalanceHandler(config) : createAgentWalletBalanceHandler(config),
+    );
+    api.registerGatewayMethod(
+      "agent-wallet.send",
+      tonMode ? createTonWalletSendHandler(config) : createAgentWalletSendHandler(config),
+    );
+
+    // EVM-only: sign (TON signing requires TonConnect, not yet supported)
+    if (!tonMode) {
+      api.registerGatewayMethod("agent-wallet.sign", createAgentWalletSignHandler(config));
+    }
   },
 };
 
