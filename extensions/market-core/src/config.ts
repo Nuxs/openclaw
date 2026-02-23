@@ -2,7 +2,14 @@
  * Plugin configuration types and defaults for market-core.
  */
 
-export type ChainNetwork = "base" | "optimism" | "arbitrum" | "ethereum" | "sepolia";
+export type ChainNetwork =
+  | "base"
+  | "optimism"
+  | "arbitrum"
+  | "ethereum"
+  | "sepolia"
+  | "ton-mainnet"
+  | "ton-testnet";
 
 export type ChainConfig = {
   network: ChainNetwork;

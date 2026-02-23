@@ -121,6 +121,61 @@ export function coreCapabilities(config: Web3PluginConfig): CapabilityDescriptor
       ],
     },
     {
+      name: "web3.identity.resolveEns",
+      summary: "Resolve an ENS name to an Ethereum address.",
+      kind: "gateway",
+      group: "identity",
+      availability: availability(identityEnabled, "siwe disabled"),
+      stability: "stable",
+      paramsSchema: {
+        type: "object",
+        required: ["name"],
+        properties: {
+          name: {
+            type: "string",
+            description: "ENS name to resolve (e.g. vitalik.eth)",
+            example: "vitalik.eth",
+          },
+        },
+      },
+      returns: "Resolved Ethereum address or null if not found.",
+      risk: { level: "low" },
+      examples: [
+        {
+          summary: "Resolve ENS name",
+          params: { name: "vitalik.eth" },
+        },
+      ],
+    },
+    {
+      name: "web3.identity.reverseEns",
+      summary: "Reverse-resolve an Ethereum address to an ENS name.",
+      kind: "gateway",
+      group: "identity",
+      availability: availability(identityEnabled, "siwe disabled"),
+      stability: "stable",
+      paramsSchema: {
+        type: "object",
+        required: ["address"],
+        properties: {
+          address: {
+            type: "string",
+            description: "Ethereum address to reverse-resolve",
+            pattern: "^0x[a-fA-F0-9]{40}$",
+            example: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+          },
+        },
+      },
+      returns: "ENS name or null if no reverse record exists.",
+      risk: { level: "low" },
+      examples: [
+        {
+          summary: "Reverse-resolve address to ENS",
+          params: { address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045" },
+        },
+      ],
+    },
+    {
       name: "web3.audit.query",
       summary: "Query recent audit events.",
       kind: "gateway",
