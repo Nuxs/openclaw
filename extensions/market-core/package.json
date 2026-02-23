@@ -5,6 +5,7 @@
   "description": "OpenClaw Market plugin: decentralized exchange for data/service/assets with on-chain settlement and audit",
   "type": "module",
   "dependencies": {
+    "@openclaw/blockchain-adapter": "1.0.0",
     "viem": "^2.28.0"
   },
   "devDependencies": {

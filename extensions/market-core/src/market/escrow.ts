@@ -1,4 +1,9 @@
-import { getAddress } from "viem";
+import {
+  getEVMProvider,
+  initBlockchainFactory,
+  type IProviderEVM,
+} from "@openclaw/blockchain-adapter";
+import { encodeFunctionData, getAddress } from "viem";
 import type { ChainConfig, SettlementConfig } from "../config.js";
 
 const ESCROW_ABI = [
@@ -45,17 +50,17 @@ const CHAIN_IDS: Record<string, number> = {
   sepolia: 11155111,
 };
 
-const DEFAULT_RPC: Record<string, string> = {
-  base: "https://mainnet.base.org",
-  optimism: "https://mainnet.optimism.io",
-  arbitrum: "https://arb1.arbitrum.io/rpc",
-  ethereum: "https://eth.llamarpc.com",
-  sepolia: "https://rpc.sepolia.org",
-};
+let blockchainFactoryReady = false;
+
+function ensureBlockchainFactory() {
+  if (!blockchainFactoryReady) {
+    initBlockchainFactory();
+    blockchainFactoryReady = true;
+  }
+}
 
 export class EscrowAdapter {
   private readonly chainId: number;
-  private readonly rpcUrl: string;
   private readonly privateKey?: string;
   private readonly contractAddress?: string;
   private readonly tokenAddress?: string;
@@ -63,7 +68,6 @@ export class EscrowAdapter {
 
   constructor(chain: ChainConfig, settlement: SettlementConfig) {
     this.chainId = CHAIN_IDS[chain.network] ?? 8453;
-    this.rpcUrl = chain.rpcUrl ?? DEFAULT_RPC[chain.network] ?? DEFAULT_RPC.base;
     this.privateKey = chain.privateKey;
     this.contractAddress = chain.escrowContractAddress;
     this.tokenAddress = settlement.tokenAddress;
@@ -85,19 +89,20 @@ export class EscrowAdapter {
     }
   }
 
-  async lock(orderId: string, payer: string, amount: string): Promise<string> {
+  private async loadEvmProvider(): Promise<IProviderEVM> {
     this.ensureContractReady();
-    const { createWalletClient, http } = await import("viem");
-    const { privateKeyToAccount } = await import("viem/accounts");
+    ensureBlockchainFactory();
 
-    const account = privateKeyToAccount(this.privateKey as `0x${string}`);
-    const client = createWalletClient({
-      account,
-      transport: http(this.rpcUrl),
-    });
+    const provider = getEVMProvider(this.chainId) as IProviderEVM;
+    if (!provider.isConnected) {
+      await provider.connect({ privateKey: this.privateKey as `0x${string}` });
+    }
+    return provider;
+  }
 
-    const tx = await client.writeContract({
-      address: getAddress(this.contractAddress as `0x${string}`),
+  async lock(orderId: string, payer: string, amount: string): Promise<string> {
+    const provider = await this.loadEvmProvider();
+    const data = encodeFunctionData({
       abi: ESCROW_ABI,
       functionName: "lock",
       args: [
@@ -106,25 +111,18 @@ export class EscrowAdapter {
         BigInt(amount),
         getAddress(this.tokenAddress as `0x${string}`),
       ],
-      chain: { id: this.chainId } as any,
     });
 
-    return tx;
+    return provider.sendTransaction({
+      to: getAddress(this.contractAddress as `0x${string}`),
+      value: 0n,
+      data,
+    });
   }
 
   async release(orderId: string, payees: { address: string; amount: string }[]): Promise<string> {
-    this.ensureContractReady();
-    const { createWalletClient, http } = await import("viem");
-    const { privateKeyToAccount } = await import("viem/accounts");
-
-    const account = privateKeyToAccount(this.privateKey as `0x${string}`);
-    const client = createWalletClient({
-      account,
-      transport: http(this.rpcUrl),
-    });
-
-    const tx = await client.writeContract({
-      address: getAddress(this.contractAddress as `0x${string}`),
+    const provider = await this.loadEvmProvider();
+    const data = encodeFunctionData({
       abi: ESCROW_ABI,
       functionName: "release",
       args: [
@@ -132,31 +130,27 @@ export class EscrowAdapter {
         payees.map((p) => getAddress(p.address)),
         payees.map((p) => BigInt(p.amount)),
       ],
-      chain: { id: this.chainId } as any,
     });
 
-    return tx;
+    return provider.sendTransaction({
+      to: getAddress(this.contractAddress as `0x${string}`),
+      value: 0n,
+      data,
+    });
   }
 
   async refund(orderId: string, payer: string): Promise<string> {
-    this.ensureContractReady();
-    const { createWalletClient, http } = await import("viem");
-    const { privateKeyToAccount } = await import("viem/accounts");
-
-    const account = privateKeyToAccount(this.privateKey as `0x${string}`);
-    const client = createWalletClient({
-      account,
-      transport: http(this.rpcUrl),
-    });
-
-    const tx = await client.writeContract({
-      address: getAddress(this.contractAddress as `0x${string}`),
+    const provider = await this.loadEvmProvider();
+    const data = encodeFunctionData({
       abi: ESCROW_ABI,
       functionName: "refund",
       args: [orderId as `0x${string}`, getAddress(payer)],
-      chain: { id: this.chainId } as any,
     });
 
-    return tx;
+    return provider.sendTransaction({
+      to: getAddress(this.contractAddress as `0x${string}`),
+      value: 0n,
+      data,
+    });
   }
 }
