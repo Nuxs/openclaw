@@ -56,21 +56,23 @@ export function resolveSearxngApiKey(search: unknown): string | undefined {
   return fromEnv || undefined;
 }
 
-export function resolvePrivateWebSearchProvider(
-  search: unknown,
-): PrivateWebSearchProviderId | undefined {
-  const cfg = asWebSearchConfig(search);
-  const raw = typeof cfg?.provider === "string" ? cfg.provider.trim().toLowerCase() : "";
+export function resolvePrivateWebSearchProvider(params: {
+  rawProvider: string;
+  searchConfig: unknown;
+}): PrivateWebSearchProviderId | undefined {
+  const raw = params.rawProvider;
   if (raw === "searxng") {
     return "searxng";
   }
+
   // Auto-detect: if a baseUrl is configured, prefer searxng.
   if (!raw) {
-    const baseUrl = resolveSearxngBaseUrl(search);
+    const baseUrl = resolveSearxngBaseUrl(params.searchConfig);
     if (baseUrl) {
       return "searxng";
     }
   }
+
   return undefined;
 }
 
