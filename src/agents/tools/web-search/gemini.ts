@@ -1,4 +1,4 @@
-import { fetchWithSsrFGuard } from "../../infra/net/fetch-guard.js";
+import { fetchWithSsrFGuard } from "../../../infra/net/fetch-guard.js";
 import { readResponseText, withTimeout } from "../web-shared.js";
 
 export type GeminiConfig = {
