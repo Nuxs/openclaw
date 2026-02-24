@@ -31,7 +31,17 @@ export class MarketStateStore {
   constructor(stateDir: string, config: MarketPluginConfig) {
     const fileStore = new MarketFileStore(stateDir);
     if (config.store.mode === "sqlite") {
-      this.store = new MarketSqliteStore(stateDir, config, fileStore);
+      try {
+        this.store = new MarketSqliteStore(stateDir, config, fileStore);
+      } catch (err) {
+        // If the current Node runtime does not ship `node:sqlite`, fall back to the file store.
+        // This keeps market-core usable in constrained/private deployments (with a clear warning).
+        // eslint-disable-next-line no-console
+        console.warn(
+          `market-core: sqlite store unavailable; falling back to file store. ${String(err)}`,
+        );
+        this.store = fileStore;
+      }
     } else {
       this.store = fileStore;
     }

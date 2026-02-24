@@ -1,13 +1,16 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveConfig } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
+import { tryRequireNodeSqlite } from "../utils/require-node-sqlite.js";
 import { createPayStatusCommand } from "./commands.js";
 
 describe("/pay_status command", () => {
+  const sqlite = tryRequireNodeSqlite();
+  const itSqlite = sqlite ? it : it.skip;
+
   let tempDir: string;
 
   beforeEach(async () => {
@@ -72,10 +75,11 @@ describe("/pay_status command", () => {
     expect(result.text).toContain("Pending settlements:");
   });
 
-  it("returns settlement status from sqlite store using settlement prefix", async () => {
+  itSqlite("returns settlement status from sqlite store using settlement prefix", async () => {
     const marketDir = path.join(tempDir, "market");
     await fs.mkdir(marketDir, { recursive: true });
     const dbPath = path.join(marketDir, "market.db");
+    const { DatabaseSync } = sqlite!;
     const db = new DatabaseSync(dbPath);
     db.exec("CREATE TABLE IF NOT EXISTS settlements (id TEXT PRIMARY KEY, data TEXT NOT NULL);");
     db.exec("CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, data TEXT NOT NULL);");

@@ -4,11 +4,11 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import type { PluginCommandHandler } from "openclaw/plugin-sdk";
 import { hashString } from "../audit/canonicalize.js";
 import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
+import { requireNodeSqlite } from "../utils/require-node-sqlite.js";
 
 type MarketStoreMode = "sqlite" | "file";
 
@@ -125,6 +125,7 @@ function readFromSqliteStore(
   const dbPath = config.dbPath ?? join(dir, "market.db");
   if (!existsSync(dbPath)) return {};
 
+  const { DatabaseSync } = requireNodeSqlite();
   const db = new DatabaseSync(dbPath);
   try {
     let settlement: SettlementSnapshot | undefined;
@@ -217,7 +218,19 @@ export function createPayStatusCommand(
       ((ctx.config.plugins?.entries?.["market-core"]?.config ?? {}) as Record<string, unknown>);
     const storeConfig = resolveMarketStoreConfig(marketConfig);
 
-    const { settlement, order } = readMarketSettlementStatus(deps.stateDir, storeConfig, ids);
+    let snapshot: { settlement?: SettlementSnapshot; order?: OrderSnapshot };
+    try {
+      snapshot = readMarketSettlementStatus(deps.stateDir, storeConfig, ids);
+    } catch (err) {
+      return {
+        text:
+          "Unable to read market settlement status. " +
+          `(${storeConfig.mode} store) ` +
+          String(err),
+      };
+    }
+
+    const { settlement, order } = snapshot;
     if (!settlement) {
       const ref = ids.orderId ?? ids.settlementId ?? "unknown";
       return { text: `No settlement found for ${ref}.` };

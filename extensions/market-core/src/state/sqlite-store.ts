@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import type { MarketPluginConfig } from "../config.js";
 import type {
   MarketLedgerEntry,
@@ -25,6 +25,7 @@ import type {
   TokenEconomyState,
 } from "../market/types.js";
 import { MarketFileStore } from "./file-store.js";
+import { requireNodeSqlite } from "./require-node-sqlite.js";
 import type { MarketStore } from "./store-types.js";
 
 const tokenEconomyId = "token_economy";
@@ -36,6 +37,8 @@ export class MarketSqliteStore implements MarketStore {
     const dir = join(stateDir, "market");
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     const dbPath = config.store.dbPath ?? join(dir, "market.db");
+
+    const { DatabaseSync } = requireNodeSqlite();
     this.db = new DatabaseSync(dbPath);
     this.db.exec("PRAGMA journal_mode=WAL;");
     this.db.exec("PRAGMA busy_timeout=5000;");
