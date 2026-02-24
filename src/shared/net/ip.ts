@@ -51,6 +51,10 @@ const RFC2544_BENCHMARK_PREFIX: [Ipv4Address, number] = [
   15,
 ];
 
+export type Ipv4SpecialUseBlockOptions = {
+  allowRfc2544BenchmarkRange?: boolean;
+};
+
 const EMBEDDED_IPV4_SENTINEL_RULES: Array<{
   matches: (parts: number[]) => boolean;
   toHextets: (parts: number[]) => [high: number, low: number];
@@ -268,10 +272,15 @@ export function isCarrierGradeNatIpv4Address(raw: string | undefined): boolean {
   return parsed.range() === "carrierGradeNat";
 }
 
-export function isBlockedSpecialUseIpv4Address(address: Ipv4Address): boolean {
-  return (
-    BLOCKED_IPV4_SPECIAL_USE_RANGES.has(address.range()) || address.match(RFC2544_BENCHMARK_PREFIX)
-  );
+export function isBlockedSpecialUseIpv4Address(
+  address: Ipv4Address,
+  options: Ipv4SpecialUseBlockOptions = {},
+): boolean {
+  const inRfc2544BenchmarkRange = address.match(RFC2544_BENCHMARK_PREFIX);
+  if (inRfc2544BenchmarkRange && options.allowRfc2544BenchmarkRange === true) {
+    return false;
+  }
+  return BLOCKED_IPV4_SPECIAL_USE_RANGES.has(address.range()) || inRfc2544BenchmarkRange;
 }
 
 function decodeIpv4FromHextets(high: number, low: number): Ipv4Address {
