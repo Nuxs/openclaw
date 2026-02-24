@@ -19,6 +19,14 @@ provider:
 - **稳定契约**：对外返回 payload 的旧字段不改不删，只允许新增；尤其注意 `externalContent` 与 `wrapWebContent` 一致性。
 - **缓存一致性**：任何会改变输出的私有后处理（评分/重排/过滤）必须发生在写缓存之前，且 cache key 必须纳入影响结果的配置。
 
+### 适用范围（强制使用 Overlay Hooks）
+- **中心编排/注册表/入口文件（Merge Magnets）**：例如 tool 入口、command orchestrator、tab registry、barrel re-export、provider registry。
+- **会被 upstream 频繁修改的文件**：越热的文件越要“薄入口”。
+
+### 不适用范围（优先直接合并 upstream）
+- **叶子模块/纯工具函数**：如 `src/shared/**` 的纯函数、单一职责的小模块；这里的 overlay 往往只会增加跳转与维护成本。
+- **一次性改动且后续不再注入私有行为**：优先最小 diff。
+
 ### 推荐结构（示例：web_search）
 - **上游文件**：`src/agents/tools/web-search.ts`
   - 尽量保持官方原样。
@@ -32,9 +40,9 @@ provider:
 
 ### 建议的最小 Hook 点（优先不超过 3 处）
 1. **Provider 选择扩展点**：允许私有 provider 优先于官方 auto-detect。
-   - 例：`resolvePrivateWebSearchProvider(searchConfig) -> "searxng" | undefined`
+   - 例：`resolvePrivateWebSearchProvider({ rawProvider, searchConfig }) -> "searxng" | undefined`
 2. **Provider 运行扩展点**：当选择到私有 provider 时，委托给私有执行函数。
-   - 例：`executePrivateWebSearch({ provider, searchConfig, args, timeoutSeconds, cacheTtlMs })`
+   - 例：`executePrivateWebSearch({ provider, searchConfig, query, count, timeoutSeconds, cacheTtlMs })`
 3. **列表结果后处理扩展点（可选）**：仅用于列表型 results（如 Brave/SearxNG）在写缓存前做评分/重排。
    - 例：`postProcessListResults({ provider, query, results, config })`
 
