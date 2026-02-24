@@ -1,0 +1,172 @@
+# ==========================================================================
+# Scheduled upstream sync — open PRs instead of pushing to main
+# ==========================================================================
+# This workflow runs only on forks (skipped on openclaw/openclaw) and:
+# - checks if fork main is behind upstream/main
+# - if yes, creates a branch, merges upstream/main, runs checks
+# - commits updated upstream pin files, then opens a PR
+
+name: Sync Upstream (scheduled)
+
+on:
+  schedule:
+    # Mondays 03:10 UTC (adjust to your preference)
+    - cron: "10 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Upstream ref to merge (usually upstream/main or a tag)"
+        required: true
+        default: "upstream/main"
+      strategy:
+        description: "Sync strategy (merge|rebase). Note: PR flow is designed for merge."
+        required: true
+        default: "merge"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream-scheduled-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository != 'openclaw/openclaw'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote (if missing)
+        run: |
+          if ! git remote get-url upstream >/dev/null 2>&1; then
+            git remote add upstream https://github.com/openclaw/openclaw.git
+          fi
+
+      - name: Fetch upstream
+        run: git fetch upstream --tags --prune
+
+      - name: Decide whether sync is needed
+        id: behind
+        env:
+          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
+        run: |
+          BEHIND=$(git rev-list --count "HEAD..${TARGET_REF}" 2>/dev/null || echo "?")
+          echo "behind=${BEHIND}" >> "$GITHUB_OUTPUT"
+          if [ "$BEHIND" = "0" ]; then
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: No sync needed
+        if: steps.behind.outputs.needs_sync != 'true'
+        run: echo "Already up-to-date with ${{ inputs.target_ref || 'upstream/main' }}"
+
+      - name: Create sync branch
+        if: steps.behind.outputs.needs_sync == 'true'
+        id: branch
+        run: |
+          DATE=$(date -u +"%Y-%m-%d")
+          BRANCH="sync/upstream-${DATE}-${GITHUB_RUN_ID}"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          git checkout -b "$BRANCH"
+
+      - name: Predict conflicts (best-effort)
+        if: steps.behind.outputs.needs_sync == 'true'
+        env:
+          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
+        run: |
+          if [ -x private/scripts/predict-conflicts.sh ]; then
+            bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --no-fetch --json | cat
+          else
+            echo "(skip) private/scripts/predict-conflicts.sh not found"
+          fi
+
+      - name: Sync from upstream
+        if: steps.behind.outputs.needs_sync == 'true'
+        env:
+          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
+          STRATEGY: ${{ inputs.strategy || 'merge' }}
+        run: |
+          if [ "$TARGET_REF" = "upstream/main" ]; then
+            if [ "$STRATEGY" = "rebase" ]; then
+              bash private/scripts/sync-upstream.sh --rebase
+            else
+              bash private/scripts/sync-upstream.sh
+            fi
+          else
+            # sync-upstream.sh exposes --tag for non-default refs
+            if [ "$STRATEGY" = "rebase" ]; then
+              bash private/scripts/sync-upstream.sh --rebase --tag "$TARGET_REF"
+            else
+              bash private/scripts/sync-upstream.sh --tag "$TARGET_REF"
+            fi
+          fi
+
+      - name: Run base checks
+        if: steps.behind.outputs.needs_sync == 'true'
+        run: pnpm check
+
+      - name: Commit updated upstream pin files (if any)
+        if: steps.behind.outputs.needs_sync == 'true'
+        run: |
+          if git diff --quiet -- private/upstream-pin.json private/upstream-pin.md; then
+            echo "No pin changes to commit"
+            exit 0
+          fi
+          ./scripts/committer "Private fork: update upstream pin" private/upstream-pin.json private/upstream-pin.md
+
+      - name: Push branch
+        if: steps.behind.outputs.needs_sync == 'true'
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: git push --set-upstream origin "$BRANCH"
+
+      - name: Open PR
+        if: steps.behind.outputs.needs_sync == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
+        run: |
+          TITLE="Sync ${TARGET_REF} (${GITHUB_RUN_ID})"
+          BODY=$(cat <<'EOF'
+This is an automated upstream sync PR.
+
+- Strategy: merge/rebase via `private/scripts/sync-upstream.sh`
+- Pin files updated: `private/upstream-pin.json`, `private/upstream-pin.md`
+
+If this PR is unexpectedly large or conflicts, review `private/scripts/predict-conflicts.sh` output and keep upstream blocks first.
+EOF
+)
+
+          # If a PR for this head branch already exists, do nothing.
+          if gh pr list --head "$BRANCH" --json number --jq 'length' | grep -q '^0$'; then
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
+          else
+            echo "PR already exists for $BRANCH"
+          fi
