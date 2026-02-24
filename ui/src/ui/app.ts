@@ -86,6 +86,7 @@ import type {
   SkillStatusReport,
   ToolsCatalogResult,
   StatusSummary,
+  AttentionItem,
   NostrProfile,
 } from "./types.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
@@ -134,6 +135,10 @@ export class OpenClawApp extends LitElement {
   @state() lastError: string | null = null;
   @state() lastErrorCode: string | null = null;
   @state() eventLog: EventLogEntry[] = [];
+  @state() attentionItems: AttentionItem[] = [];
+  @state() overviewLogLines: string[] = [];
+  @state() overviewLogCursor: number | null = null;
+  @state() streamMode = false;
   private eventLogBuffer: EventLogEntry[] = [];
   private toolStreamSyncTimer: number | null = null;
   private sidebarCloseTimer: number | null = null;

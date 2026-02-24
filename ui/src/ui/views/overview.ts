@@ -1,10 +1,20 @@
 import { html } from "lit";
 import { ConnectErrorDetailCodes } from "../../../../src/gateway/protocol/connect-error-details.js";
 import { t, i18n, type Locale } from "../../i18n/index.ts";
+import type { EventLogEntry } from "../app-events.ts";
 import { formatRelativeTimestamp, formatDurationHuman } from "../format.ts";
 import type { GatewayHelloOk } from "../gateway.ts";
+import type { Tab } from "../navigation.ts";
 import { formatNextRun } from "../presenter.ts";
 import type { UiSettings } from "../storage.ts";
+import type {
+  AttentionItem,
+  CronJob,
+  CronStatus,
+  SessionsListResult,
+  SessionsUsageResult,
+  SkillStatusReport,
+} from "../types.ts";
 import { shouldShowPairingHint } from "./overview-hints.ts";
 
 export type OverviewProps = {
@@ -19,11 +29,28 @@ export type OverviewProps = {
   cronEnabled: boolean | null;
   cronNext: number | null;
   lastChannelsRefresh: number | null;
+
+  // Optional extended data (newer renderers can pass these; UI may choose to ignore).
+  usageResult?: SessionsUsageResult | null;
+  sessionsResult?: SessionsListResult | null;
+  skillsReport?: SkillStatusReport | null;
+  cronJobs?: CronJob[];
+  cronStatus?: CronStatus | null;
+  attentionItems?: AttentionItem[];
+  eventLog?: EventLogEntry[];
+  overviewLogLines?: string[];
+  streamMode?: boolean;
+  web3Status?: unknown;
+  web3Error?: string | null;
+
   onSettingsChange: (next: UiSettings) => void;
   onPasswordChange: (next: string) => void;
   onSessionKeyChange: (next: string) => void;
   onConnect: () => void;
   onRefresh: () => void;
+  onRefreshLogs?: () => void;
+  onNavigate?: (tab: Tab) => void;
+  onToggleStreamMode?: () => void;
 };
 
 export function renderOverview(props: OverviewProps) {

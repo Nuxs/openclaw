@@ -9,7 +9,7 @@ import {
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer.ts";
 import { icons } from "../icons.ts";
 import { detectTextDirection } from "../text-direction.ts";
-import type { SessionsListResult } from "../types.ts";
+import type { AgentsListResult, SessionsListResult } from "../types.ts";
 import type { ChatItem, MessageGroup } from "../types/chat-types.ts";
 import type { ChatAttachment, ChatQueueItem } from "../ui-types.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
@@ -54,6 +54,13 @@ export type ChatProps = {
   disabledReason: string | null;
   error: string | null;
   sessions: SessionsListResult | null;
+  // Agent/session helpers (optional)
+  agentsList?: AgentsListResult | null;
+  currentAgentId?: string;
+  onAgentChange?: (agentId: string) => void;
+  onNavigateToAgent?: () => void;
+  onSessionSelect?: (key: string) => void;
+  onClearHistory?: () => void | Promise<void>;
   // Focus mode
   focusMode: boolean;
   // Sidebar state

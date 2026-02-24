@@ -69,10 +69,20 @@ import { loadChannels } from "./controllers/channels.ts";
 import { loadConfigSchema, loadConfig } from "./controllers/config.ts";
 import {
   loadCronRuns,
+  loadMoreCronJobs,
+  loadMoreCronRuns,
+  reloadCronJobs,
   toggleCronJob,
   runCronJob,
   removeCronJob,
   addCronJob,
+  startCronEdit,
+  startCronClone,
+  cancelCronEdit,
+  validateCronForm,
+  hasCronFormErrors,
+  updateCronJobsFilter,
+  updateCronRunsFilter,
   normalizeCronFormState,
 } from "./controllers/cron.ts";
 import { loadDebug, callDebugMethod } from "./controllers/debug.ts";
@@ -101,6 +111,44 @@ import { renderSkills } from "./views/skills.ts";
 // ---------------------------------------------------------------------------
 // Registry: ordered array — group order + intra-group order preserved
 // ---------------------------------------------------------------------------
+
+const CRON_THINKING_SUGGESTIONS = ["off", "minimal", "low", "medium", "high"];
+const CRON_TIMEZONE_SUGGESTIONS = [
+  "UTC",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Tokyo",
+];
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
+function normalizeSuggestionValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function uniquePreserveOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const value of values) {
+    const normalized = value.trim();
+    if (!normalized) {
+      continue;
+    }
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(normalized);
+  }
+  return output;
+}
 
 export const TAB_REGISTRY: TabDefinition[] = [
   // ── chat ──────────────────────────────────────────────────────────────
@@ -220,14 +268,81 @@ export const TAB_REGISTRY: TabDefinition[] = [
       if (state.tab !== "cron") {
         return nothing;
       }
+      const cronAgentSuggestions = Array.from(
+        new Set(
+          [
+            ...(state.agentsList?.agents?.map((entry) => entry.id.trim()) ?? []),
+            ...state.cronJobs
+              .map((job) => (typeof job.agentId === "string" ? job.agentId.trim() : ""))
+              .filter(Boolean),
+          ].filter(Boolean),
+        ),
+      ).toSorted((a, b) => a.localeCompare(b));
+
+      const cronModelSuggestions = Array.from(
+        new Set(
+          [
+            ...state.cronModelSuggestions,
+            ...state.cronJobs
+              .map((job) => {
+                if (job.payload.kind !== "agentTurn" || typeof job.payload.model !== "string") {
+                  return "";
+                }
+                return job.payload.model.trim();
+              })
+              .filter(Boolean),
+          ].filter(Boolean),
+        ),
+      ).toSorted((a, b) => a.localeCompare(b));
+
+      const selectedDeliveryChannel =
+        state.cronForm.deliveryChannel && state.cronForm.deliveryChannel.trim()
+          ? state.cronForm.deliveryChannel.trim()
+          : "last";
+
+      const jobToSuggestions = state.cronJobs
+        .map((job) => normalizeSuggestionValue(job.delivery?.to))
+        .filter(Boolean);
+
+      const accountToSuggestions = (
+        selectedDeliveryChannel === "last"
+          ? Object.values(state.channelsSnapshot?.channelAccounts ?? {}).flat()
+          : (state.channelsSnapshot?.channelAccounts?.[selectedDeliveryChannel] ?? [])
+      )
+        .flatMap((account) => [
+          normalizeSuggestionValue(account.accountId),
+          normalizeSuggestionValue(account.name),
+        ])
+        .filter(Boolean);
+
+      const rawDeliveryToSuggestions = uniquePreserveOrder([
+        ...jobToSuggestions,
+        ...accountToSuggestions,
+      ]);
+
+      const deliveryToSuggestions =
+        state.cronForm.deliveryMode === "webhook"
+          ? rawDeliveryToSuggestions.filter((value) => isHttpUrl(value))
+          : rawDeliveryToSuggestions;
+
       return renderCron({
         basePath: state.basePath,
         loading: state.cronLoading,
+        jobsLoadingMore: state.cronJobsLoadingMore,
         status: state.cronStatus,
         jobs: state.cronJobs,
+        jobsTotal: state.cronJobsTotal,
+        jobsHasMore: state.cronJobsHasMore,
+        jobsQuery: state.cronJobsQuery,
+        jobsEnabledFilter: state.cronJobsEnabledFilter,
+        jobsSortBy: state.cronJobsSortBy,
+        jobsSortDir: state.cronJobsSortDir,
         error: state.cronError,
         busy: state.cronBusy,
         form: state.cronForm,
+        fieldErrors: state.cronFieldErrors,
+        canSubmit: !hasCronFormErrors(state.cronFieldErrors),
+        editingJobId: state.cronEditingJobId,
         channels: state.channelsSnapshot?.channelMeta?.length
           ? state.channelsSnapshot.channelMeta.map((entry) => entry.id)
           : (state.channelsSnapshot?.channelOrder ?? []),
@@ -235,14 +350,50 @@ export const TAB_REGISTRY: TabDefinition[] = [
         channelMeta: state.channelsSnapshot?.channelMeta ?? [],
         runsJobId: state.cronRunsJobId,
         runs: state.cronRuns,
-        onFormChange: (patch) =>
-          (state.cronForm = normalizeCronFormState({ ...state.cronForm, ...patch })),
+        runsTotal: state.cronRunsTotal,
+        runsHasMore: state.cronRunsHasMore,
+        runsLoadingMore: state.cronRunsLoadingMore,
+        runsScope: state.cronRunsScope,
+        runsStatuses: state.cronRunsStatuses,
+        runsDeliveryStatuses: state.cronRunsDeliveryStatuses,
+        runsStatusFilter: state.cronRunsStatusFilter,
+        runsQuery: state.cronRunsQuery,
+        runsSortDir: state.cronRunsSortDir,
+        agentSuggestions: cronAgentSuggestions,
+        modelSuggestions: cronModelSuggestions,
+        thinkingSuggestions: CRON_THINKING_SUGGESTIONS,
+        timezoneSuggestions: CRON_TIMEZONE_SUGGESTIONS,
+        deliveryToSuggestions,
+        onFormChange: (patch) => {
+          state.cronForm = normalizeCronFormState({ ...state.cronForm, ...patch });
+          state.cronFieldErrors = validateCronForm(state.cronForm);
+        },
         onRefresh: () => state.loadCron(),
         onAdd: () => addCronJob(state as unknown as OpenClawApp),
+        onEdit: (job) => startCronEdit(state as unknown as OpenClawApp, job),
+        onClone: (job) => startCronClone(state as unknown as OpenClawApp, job),
+        onCancelEdit: () => cancelCronEdit(state as unknown as OpenClawApp),
         onToggle: (job, enabled) => toggleCronJob(state as unknown as OpenClawApp, job, enabled),
         onRun: (job) => runCronJob(state as unknown as OpenClawApp, job),
         onRemove: (job) => removeCronJob(state as unknown as OpenClawApp, job),
-        onLoadRuns: (jobId) => loadCronRuns(state as unknown as OpenClawApp, jobId),
+        onLoadRuns: async (jobId) => {
+          updateCronRunsFilter(state as unknown as OpenClawApp, { cronRunsScope: "job" });
+          await loadCronRuns(state as unknown as OpenClawApp, jobId);
+        },
+        onLoadMoreJobs: () => loadMoreCronJobs(state as unknown as OpenClawApp),
+        onJobsFiltersChange: async (patch) => {
+          updateCronJobsFilter(state as unknown as OpenClawApp, patch);
+          await reloadCronJobs(state as unknown as OpenClawApp);
+        },
+        onLoadMoreRuns: () => loadMoreCronRuns(state as unknown as OpenClawApp),
+        onRunsFiltersChange: async (patch) => {
+          updateCronRunsFilter(state as unknown as OpenClawApp, patch);
+          if (state.cronRunsScope === "all") {
+            await loadCronRuns(state as unknown as OpenClawApp, null);
+            return;
+          }
+          await loadCronRuns(state as unknown as OpenClawApp, state.cronRunsJobId);
+        },
       });
     },
     load: async (host) => {

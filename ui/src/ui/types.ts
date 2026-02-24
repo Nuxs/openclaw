@@ -21,6 +21,15 @@ export type ChannelUiMetaEntry = {
 
 export const CRON_CHANNEL_LAST = "last";
 
+export type AttentionItem = {
+  severity: "info" | "warning" | "error";
+  icon: string;
+  title: string;
+  description: string;
+  href?: string;
+  external?: boolean;
+};
+
 export type ChannelAccountSnapshot = {
   accountId: string;
   name?: string | null;

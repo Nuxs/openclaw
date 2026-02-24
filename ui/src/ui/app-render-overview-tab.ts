@@ -18,6 +18,7 @@ export function renderOverviewTab(state: AppViewState) {
     settings: state.settings,
     password: state.password,
     lastError: state.lastError,
+    lastErrorCode: state.lastErrorCode,
     presenceCount,
     sessionsCount,
     cronEnabled: state.cronStatus?.enabled ?? null,
@@ -49,7 +50,7 @@ export function renderOverviewTab(state: AppViewState) {
     },
     onConnect: () => state.connect(),
     onRefresh: () => state.loadOverview(),
-    onNavigate: (tab) => state.setTab(tab as Tab),
+    onNavigate: (tab: Tab) => state.setTab(tab),
     onRefreshLogs: () => state.loadOverview(),
     onToggleStreamMode: () => {
       state.streamMode = !state.streamMode;

@@ -32,47 +32,36 @@ export function renderAgentsTab(state: AppViewState) {
     agentsList: state.agentsList,
     selectedAgentId: resolvedAgentId,
     activePanel: state.agentsPanel,
-    config: {
-      form: configValue,
-      loading: state.configLoading,
-      saving: state.configSaving,
-      dirty: state.configFormDirty,
-    },
-    channels: {
-      snapshot: state.channelsSnapshot,
-      loading: state.channelsLoading,
-      error: state.channelsError,
-      lastSuccess: state.channelsLastSuccess,
-    },
-    cron: {
-      status: state.cronStatus,
-      jobs: state.cronJobs,
-      loading: state.cronLoading,
-      error: state.cronError,
-    },
-    agentFiles: {
-      list: state.agentFilesList,
-      loading: state.agentFilesLoading,
-      error: state.agentFilesError,
-      active: state.agentFileActive,
-      contents: state.agentFileContents,
-      drafts: state.agentFileDrafts,
-      saving: state.agentFileSaving,
-    },
+    configForm: configValue,
+    configLoading: state.configLoading,
+    configSaving: state.configSaving,
+    configDirty: state.configFormDirty,
+    channelsLoading: state.channelsLoading,
+    channelsError: state.channelsError,
+    channelsSnapshot: state.channelsSnapshot,
+    channelsLastSuccess: state.channelsLastSuccess,
+    cronLoading: state.cronLoading,
+    cronStatus: state.cronStatus,
+    cronJobs: state.cronJobs,
+    cronError: state.cronError,
+    agentFilesLoading: state.agentFilesLoading,
+    agentFilesError: state.agentFilesError,
+    agentFilesList: state.agentFilesList,
+    agentFileActive: state.agentFileActive,
+    agentFileContents: state.agentFileContents,
+    agentFileDrafts: state.agentFileDrafts,
+    agentFileSaving: state.agentFileSaving,
     agentIdentityLoading: state.agentIdentityLoading,
     agentIdentityError: state.agentIdentityError,
     agentIdentityById: state.agentIdentityById,
-    agentSkills: {
-      report: state.agentSkillsReport,
-      loading: state.agentSkillsLoading,
-      error: state.agentSkillsError,
-      agentId: state.agentSkillsAgentId,
-      filter: state.skillsFilter,
-    },
-    sidebarFilter: state.agentsSidebarFilter,
-    onSidebarFilterChange: (value) => {
-      state.agentsSidebarFilter = value;
-    },
+    agentSkillsLoading: state.agentSkillsLoading,
+    agentSkillsReport: state.agentSkillsReport,
+    agentSkillsError: state.agentSkillsError,
+    agentSkillsAgentId: state.agentSkillsAgentId,
+    toolsCatalogLoading: state.toolsCatalogLoading,
+    toolsCatalogError: state.toolsCatalogError,
+    toolsCatalogResult: state.toolsCatalogResult,
+    skillsFilter: state.skillsFilter,
     onRefresh: async () => {
       await loadAgents(state);
       const agentIds = state.agentsList?.agents?.map((entry) => entry.id) ?? [];
@@ -210,9 +199,6 @@ export function renderAgentsTab(state: AppViewState) {
     onConfigSave: () => saveConfig(state),
     onChannelsRefresh: () => loadChannels(state, false),
     onCronRefresh: () => state.loadCron(),
-    onCronRunNow: (_jobId) => {
-      // Stub: backend support pending
-    },
     onSkillsFilterChange: (next) => (state.skillsFilter = next),
     onSkillsRefresh: () => {
       if (resolvedAgentId) {
@@ -379,7 +365,7 @@ export function renderAgentsTab(state: AppViewState) {
       const next = primary ? { primary, fallbacks: normalized } : { fallbacks: normalized };
       updateConfigFormValue(state, basePath, next);
     },
-    onSetDefault: (agentId) => {
+    onSetDefault: (agentId: string) => {
       if (!configValue) {
         return;
       }

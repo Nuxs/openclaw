@@ -14,6 +14,7 @@ export type ConfigProps = {
   applying: boolean;
   updating: boolean;
   connected: boolean;
+  streamMode?: boolean;
   schema: unknown;
   schemaLoading: boolean;
   uiHints: ConfigUiHints;

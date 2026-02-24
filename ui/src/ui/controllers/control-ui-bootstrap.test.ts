@@ -47,7 +47,7 @@ describe("loadControlUiBootstrapConfig", () => {
     expect(document.title).toBe("MyClaw Control");
 
     expect(document.querySelector(".sidebar-brand__title")?.textContent).toBe("MyClaw");
-    expect(document.querySelector(".sidebar-brand__logo")?.alt).toBe("MyClaw");
+    expect(document.querySelector<HTMLImageElement>(".sidebar-brand__logo")?.alt).toBe("MyClaw");
 
     vi.unstubAllGlobals();
   });

@@ -135,18 +135,22 @@ async function promptWebToolsConfig(
   const existingProvider = existingSearch?.provider ?? "brave";
   const existingPerplexity = existingSearch?.perplexity;
   const existingGrok = existingSearch?.grok;
+  const existingGemini = existingSearch?.gemini;
+  const existingKimi = existingSearch?.kimi;
   const existingSearxng = existingSearch?.searxng;
   const existingSearxngRerank = existingSearxng?.rerank;
   const hasBraveKey = Boolean(existingSearch?.apiKey);
   const hasPerplexityKey = Boolean(existingPerplexity?.apiKey);
   const hasGrokKey = Boolean(existingGrok?.apiKey);
+  const hasGeminiKey = Boolean(existingGemini?.apiKey);
+  const hasKimiKey = Boolean(existingKimi?.apiKey);
   const hasSearxngBaseUrl = Boolean(existingSearxng?.baseUrl);
   const hasSearxngRerankEndpoint = Boolean(existingSearxngRerank?.endpoint);
 
   note(
     [
       "Web search lets your agent look things up online using the `web_search` tool.",
-      "Supported providers: Brave, Perplexity, Grok, SearxNG (self-hosted).",
+      "Supported providers: Brave, Perplexity, Grok, Gemini, Kimi, SearxNG (self-hosted).",
       "Docs: https://docs.openclaw.ai/tools/web",
     ].join("\n"),
     "Web search",
@@ -157,7 +161,12 @@ async function promptWebToolsConfig(
       message: "Enable web_search?",
       initialValue:
         existingSearch?.enabled ??
-        (hasBraveKey || hasPerplexityKey || hasGrokKey || hasSearxngBaseUrl),
+        (hasBraveKey ||
+          hasPerplexityKey ||
+          hasGrokKey ||
+          hasGeminiKey ||
+          hasKimiKey ||
+          hasSearxngBaseUrl),
     }),
     runtime,
   );
@@ -175,6 +184,8 @@ async function promptWebToolsConfig(
           { value: "brave", label: "Brave Search" },
           { value: "perplexity", label: "Perplexity (Sonar/OpenRouter)" },
           { value: "grok", label: "xAI Grok" },
+          { value: "gemini", label: "Gemini (Google Search grounding)" },
+          { value: "kimi", label: "Kimi (Moonshot)" },
           { value: "searxng", label: "SearxNG (self-hosted)" },
         ],
         initialValue: existingProvider,
@@ -262,6 +273,68 @@ async function promptWebToolsConfig(
           [
             "No xAI API key stored yet, so web_search will stay unavailable.",
             "Store a key here or set XAI_API_KEY in the Gateway environment.",
+            "Docs: https://docs.openclaw.ai/tools/web",
+          ].join("\n"),
+          "Web search",
+        );
+      }
+    }
+
+    if (provider === "gemini") {
+      const keyInput = guardCancel(
+        await text({
+          message: hasGeminiKey
+            ? "Gemini API key (leave blank to keep current or use GEMINI_API_KEY)"
+            : "Gemini API key (paste it here; leave blank to use GEMINI_API_KEY)",
+          placeholder: hasGeminiKey ? "Leave blank to keep current" : "AIza...",
+        }),
+        runtime,
+      );
+      const key = String(keyInput ?? "").trim();
+      if (key) {
+        nextSearch = {
+          ...nextSearch,
+          gemini: {
+            ...existingGemini,
+            apiKey: key,
+          },
+        };
+      } else if (!hasGeminiKey) {
+        note(
+          [
+            "No Gemini API key stored yet, so web_search will stay unavailable.",
+            "Store a key here or set GEMINI_API_KEY in the Gateway environment.",
+            "Docs: https://docs.openclaw.ai/tools/web",
+          ].join("\n"),
+          "Web search",
+        );
+      }
+    }
+
+    if (provider === "kimi") {
+      const keyInput = guardCancel(
+        await text({
+          message: hasKimiKey
+            ? "Moonshot/Kimi API key (leave blank to keep current or use KIMI_API_KEY/MOONSHOT_API_KEY)"
+            : "Moonshot/Kimi API key (paste it here; leave blank to use KIMI_API_KEY/MOONSHOT_API_KEY)",
+          placeholder: hasKimiKey ? "Leave blank to keep current" : "sk-...",
+        }),
+        runtime,
+      );
+      const key = String(keyInput ?? "").trim();
+      if (key) {
+        nextSearch = {
+          ...nextSearch,
+          kimi: {
+            ...existingKimi,
+            apiKey: key,
+          },
+        };
+      } else if (!hasKimiKey) {
+        note(
+          [
+            "No Moonshot/Kimi API key stored yet, so web_search will stay unavailable.",
+            "Store a key here or set KIMI_API_KEY/MOONSHOT_API_KEY in the Gateway environment.",
             "Docs: https://docs.openclaw.ai/tools/web",
           ].join("\n"),
           "Web search",

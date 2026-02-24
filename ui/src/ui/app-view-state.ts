@@ -36,6 +36,7 @@ import type {
   PresenceEntry,
   SessionsUsageResult,
   CostUsageSummary,
+  AttentionItem,
   SessionUsageTimeSeries,
   SessionsListResult,
   SkillStatusReport,
@@ -61,6 +62,10 @@ type AppViewStateCore = {
   lastError: string | null;
   lastErrorCode: string | null;
   eventLog: EventLogEntry[];
+  attentionItems: AttentionItem[];
+  overviewLogLines: string[];
+  overviewLogCursor: number | null;
+  streamMode: boolean;
   assistantName: string;
   assistantAvatar: string | null;
   assistantAgentId: string | null;

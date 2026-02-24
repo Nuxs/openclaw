@@ -7,6 +7,7 @@ export type InstancesProps = {
   entries: PresenceEntry[];
   lastError: string | null;
   statusMessage: string | null;
+  streamMode?: boolean;
   onRefresh: () => void;
 };
 
