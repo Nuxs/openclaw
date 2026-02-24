@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { withEnv } from "../../test-utils/env.js";
 import { __testing } from "./web-search.js";
+import { resolveSearxngApiKey, resolveSearxngBaseUrl } from "./web-search/private-hooks.js";
 
 const {
   inferPerplexityBaseUrlFromApiKey,
@@ -13,8 +14,6 @@ const {
   resolveGrokModel,
   resolveGrokInlineCitations,
   extractGrokContent,
-  resolveSearxngBaseUrl,
-  resolveSearxngApiKey,
   resolveSearchProvider,
   resolveKimiApiKey,
   resolveKimiModel,

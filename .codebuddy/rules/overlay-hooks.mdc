@@ -1,0 +1,52 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-02-24T04:03:45.759Z
+provider: 
+---
+
+## Overlay Hooks 私有化开发准则（Upstream 合流友好）
+
+### 目标
+- **将合流冲突面最小化**：优先让冲突只发生在少量 `import`/注册/钩子调用行，而不是业务逻辑块。
+- **保持官方功能可用且易于吸收更新**：上游在官方实现迭代时，我们的分支应能“原样吸收”，无需反复搬家。
+- **私有能力可独立演进**：私有 provider/评分/重排/站点权重等逻辑应集中在新增文件中。
+
+### 核心原则
+- **Overlay，不 Inline**：私有逻辑通过新增文件实现，不在上游热点文件中内联大段实现。
+- **薄入口**：入口文件只做参数/配置解析、统一输出契约、缓存与钩子调用；私有实现都在独立模块。
+- **稳定契约**：对外返回 payload 的旧字段不改不删，只允许新增；尤其注意 `externalContent` 与 `wrapWebContent` 一致性。
+- **缓存一致性**：任何会改变输出的私有后处理（评分/重排/过滤）必须发生在写缓存之前，且 cache key 必须纳入影响结果的配置。
+
+### 推荐结构（示例：web_search）
+- **上游文件**：`src/agents/tools/web-search.ts`
+  - 尽量保持官方原样。
+  - 仅允许：
+    - 追加 1 个 `import` 引入私有 hooks
+    - 在固定位置调用 1–3 个 hooks（见下文）
+- **私有 hooks**：`src/agents/tools/web-search/private-hooks.ts`
+  - 汇总对上游入口的扩展点（默认无副作用，或只在命中私有 provider 时生效）。
+- **私有实现（叶子模块）**：`src/agents/tools/web-search/private/*`
+  - 例如：私有 provider、评分/重排、站点权重、配置解析等。
+
+### 建议的最小 Hook 点（优先不超过 3 处）
+1. **Provider 选择扩展点**：允许私有 provider 优先于官方 auto-detect。
+   - 例：`resolvePrivateWebSearchProvider(searchConfig) -> "searxng" | undefined`
+2. **Provider 运行扩展点**：当选择到私有 provider 时，委托给私有执行函数。
+   - 例：`executePrivateWebSearch({ provider, searchConfig, args, timeoutSeconds, cacheTtlMs })`
+3. **列表结果后处理扩展点（可选）**：仅用于列表型 results（如 Brave/SearxNG）在写缓存前做评分/重排。
+   - 例：`postProcessListResults({ provider, query, results, config })`
+
+### 禁止事项
+- 禁止在上游热点文件中追加大段私有业务逻辑。
+- 禁止在 `writeCache(...)` 之后再做会改变输出的重排/过滤。
+- 禁止修改既有字段语义（例如把 `content`/`citations` 结构改成不兼容形态）。
+
+### 合流 SOP（简版）
+- 合流冲突优先策略：
+  - **先保留 upstream 的实现块**
+  - 再恢复/追加我们那几行 `import` + hook 调用
+- 若 upstream 新增 provider 或新增参数：
+  - 优先让 upstream 在上游文件原样落地
+  - 私有扩展通过 hooks 或新增私有 provider 文件吸收
