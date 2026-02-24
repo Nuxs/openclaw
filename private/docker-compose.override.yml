@@ -11,6 +11,7 @@ services:
     image: ${OPENCLAW_IMAGE:-ghcr.io/your-org/openclaw:latest}
     env_file:
       - ./private/env/${DEPLOY_ENV:-dev}.env
+      - ./private/env/${DEPLOY_ENV:-dev}.env.local
     # 允许在 dev 环境下跳过配置守卫（由 OPENCLAW_ALLOW_UNCONFIGURED 控制）
     command: >
       sh -lc 'node dist/index.js gateway --bind "${OPENCLAW_GATEWAY_BIND:-lan}" --port 18789 ${OPENCLAW_ALLOW_UNCONFIGURED:+--allow-unconfigured}'
@@ -40,3 +41,4 @@ services:
     image: ${OPENCLAW_IMAGE:-ghcr.io/your-org/openclaw:latest}
     env_file:
       - ./private/env/${DEPLOY_ENV:-dev}.env
+      - ./private/env/${DEPLOY_ENV:-dev}.env.local

@@ -11,7 +11,7 @@
 #
 # Scope 说明:
 # - apps: 仅应用包层面品牌化（Info.plist / bundleId / Android appName 等）【默认】
-# - src:  仅替换 src/ 内的少量用户可见字符串与 API 来源标识
+# - src:  （已弃用）曾用于替换 src/ 内用户可见字符串与 API 来源标识；现已迁移为运行时注入/解析
 # - full: apps + src
 #
 # 注意:
@@ -199,50 +199,10 @@ fi
 if [[ "$SCOPE" == "src" || "$SCOPE" == "full" ]]; then
   echo ""
   echo "=== src/ 用户可见文本 ==="
-  replace_in "src/daemon/constants.ts" '"OpenClaw Gateway"' "\"$NAME Gateway\""
-  replace_in "src/daemon/constants.ts" '"OpenClaw Node"' "\"$NAME Node\""
-  replace_in "src/daemon/constants.ts" '"OpenClaw Node Host"' "\"$NAME Node Host\""
-  replace_in "src/gateway/server-discovery.ts" 'return "OpenClaw"' "return \"$NAME\""
-  replace_in "src/infra/bonjour.ts" 'return "OpenClaw"' "return \"$NAME\""
-  replace_in "src/canvas-host/server.ts" "<title>OpenClaw Canvas</title>" "<title>$NAME Canvas</title>"
-  replace_in "src/canvas-host/server.ts" "<h1>OpenClaw Canvas</h1>" "<h1>$NAME Canvas</h1>"
-  replace_in "src/canvas-host/a2ui/index.html" "<title>OpenClaw Canvas</title>" "<title>$NAME Canvas</title>"
-
-  # CLI 用户提示中的品牌名
-  for F in \
-    "src/cli/update-cli/update-command.ts" \
-    "src/cli/update-cli/status.ts" \
-    "src/wizard/onboarding.finalize.ts" \
-    "src/browser/client-fetch.ts" \
-    "src/infra/tailscale.ts" \
-    "src/channels/plugins/onboarding/whatsapp.ts" \
-    "src/channels/plugins/onboarding/slack.ts" \
-    "src/channels/plugins/onboarding/signal.ts"; do
-    if [[ -f "$REPO_ROOT/$F" ]]; then
-      if grep -q "OpenClaw" "$REPO_ROOT/$F" 2>/dev/null; then
-        if $DRY_RUN; then
-          echo "  📝 [dry-run] $F: 'OpenClaw' → '$NAME'"
-        else
-          # 只替换用户可见字符串中的 OpenClaw，不改变 import/require/env var 名
-          sedi "s/Updating OpenClaw/Updating $NAME/g" "$REPO_ROOT/$F"
-          sedi "s/OpenClaw update status/$NAME update status/g" "$REPO_ROOT/$F"
-          sedi "s/this OpenClaw install/this $NAME install/g" "$REPO_ROOT/$F"
-          sedi "s/so OpenClaw can/so $NAME can/g" "$REPO_ROOT/$F"
-          sedi "s/the OpenClaw gateway/the $NAME gateway/g" "$REPO_ROOT/$F"
-          sedi "s/OpenClaw uses/\"$NAME uses/g" "$REPO_ROOT/$F"
-          sedi "s/for OpenClaw/for $NAME/g" "$REPO_ROOT/$F"
-          sedi "s/\"OpenClaw\"/\"$NAME\"/g" "$REPO_ROOT/$F"
-          echo "  ✅ $F"
-        fi
-      fi
-    fi
-  done
-
-  echo ""
-  echo "=== API 来源标识 ==="
-  replace_in "src/agents/pi-embedded-runner/extra-params.ts" '"X-Title": "OpenClaw"' "\"X-Title\": \"$NAME\""
-  replace_in "src/agents/minimax-vlm.ts" '"MM-API-Source": "OpenClaw"' "\"MM-API-Source\": \"$NAME\""
-  replace_in "src/infra/provider-usage.fetch.minimax.ts" '"MM-API-Source": "OpenClaw"' "\"MM-API-Source\": \"$NAME\""
+  echo "  ℹ️  为了降低与 upstream 的长期合流冲突，src/ 品牌化已迁移为运行时解析："
+  echo "     - Control UI: src/gateway/control-ui.ts 读取 private/brand.json"
+  echo "     - Canvas/default HTML 与第三方请求头：由 src/infra/brand.ts 统一提供"
+  echo "  因此本脚本不再改写 src/*。"
 fi
 
 # ============================================================================

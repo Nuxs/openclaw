@@ -105,48 +105,74 @@ require_cmd() {
 
 # --- 通用: 加载环境配置（可选）---------------------------------------------------
 # 说明：
-# - 会把 private/env/<env>.env 作为 bash 文件 source 进来（因此该文件必须是纯变量赋值）
-# - 建议把非机密默认值放 env 文件，机密通过 CI/K8s Secret 注入
+# - 会把 private/env/<env>.env 和 private/env/<env>.env.local 作为 bash 文件 source 进来（因此该文件必须是纯变量赋值）
+# - 优先级: 显式传入的环境变量 > <env>.env.local > <env>.env
+# - 建议把非机密默认值放 env 文件；机密放到 *.env.local 或 CI/K8s Secret 注入
+
+# 记录脚本启动时就已存在的环境变量 key（这些 key 视为“显式传入”，后续 source 不应覆盖）
+# 注意：必须只记录一次，否则会把 <env>.env 写入的值也当成“显式传入”，导致 <env>.env.local 无法覆盖。
+PRESET_ENV_KEYS_INIT=0
+# shellcheck disable=SC2034
+declare -A PRESET_ENV_KEYS
+
+remember_preset_env_keys() {
+  if [[ "$PRESET_ENV_KEYS_INIT" == "1" ]]; then
+    return 0
+  fi
+  PRESET_ENV_KEYS_INIT=1
+
+  while IFS='=' read -r k _; do
+    [[ -n "$k" ]] && PRESET_ENV_KEYS["$k"]=1
+  done < <(env)
+}
+
+load_env_file_path() {
+  local env_file="$1"
+  [[ -f "$env_file" ]] || return 0
+
+  # 规则：显式传入的环境变量优先（避免被 env 文件覆盖）。
+  # 做法：先解析 env 文件里出现的 key，记录“脚本启动时就已存在”的 key/value，source 后再恢复。
+  local -a keys saved
+  keys=()
+  saved=()
+
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)= ]]; then
+      keys+=("${BASH_REMATCH[1]}")
+    fi
+  done <"$env_file"
+
+  for k in "${keys[@]}"; do
+    if [[ -n "${PRESET_ENV_KEYS[$k]+x}" ]]; then
+      saved+=("$k")
+    fi
+  done
+
+  local restore_file
+  restore_file="$(mktemp)"
+  for k in "${saved[@]}"; do
+    # %q 会生成可被 bash 安全解析的转义字符串
+    printf 'export %s=%q\n' "$k" "${!k}" >>"$restore_file"
+  done
+
+  # shellcheck disable=SC1090
+  set -a
+  source "$env_file"
+  set +a
+
+  # shellcheck disable=SC1090
+  source "$restore_file"
+  rm -f "$restore_file"
+}
+
 load_env_file() {
   local env="$1"
-  local env_file="private/env/$env.env"
-  if [[ -f "$env_file" ]]; then
-    # 规则：显式传入的环境变量优先（避免被 env 文件覆盖）。
-    # 做法：先解析 env 文件里出现的 key，记录当前 shell 已设置的 key/value，source 后再恢复。
-    local -a keys saved
-    keys=()
-    saved=()
+  remember_preset_env_keys
 
-    while IFS= read -r line; do
-      [[ "$line" =~ ^[[:space:]]*# ]] && continue
-      [[ "$line" =~ ^[[:space:]]*$ ]] && continue
-      if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)= ]]; then
-        keys+=("${BASH_REMATCH[1]}")
-      fi
-    done <"$env_file"
-
-    for k in "${keys[@]}"; do
-      if [[ -n "${!k+x}" ]]; then
-        saved+=("$k")
-      fi
-    done
-
-    local restore_file
-    restore_file="$(mktemp)"
-    for k in "${saved[@]}"; do
-      # %q 会生成可被 bash 安全解析的转义字符串
-      printf 'export %s=%q\n' "$k" "${!k}" >>"$restore_file"
-    done
-
-    # shellcheck disable=SC1090
-    set -a
-    source "$env_file"
-    set +a
-
-    # shellcheck disable=SC1090
-    source "$restore_file"
-    rm -f "$restore_file"
-  fi
+  load_env_file_path "private/env/$env.env"
+  load_env_file_path "private/env/$env.env.local"
 }
 
 # --- 通用: 从 image 引用里拆出 repository + tag ---------------------------------
@@ -493,10 +519,19 @@ deploy_bare() {
 
   # 安装环境配置
   local env_file="private/env/$env.env"
-  if [[ -f "$env_file" ]]; then
+  local env_local="private/env/$env.env.local"
+  local env_to_install=""
+
+  if [[ -f "$env_local" ]]; then
+    env_to_install="$env_local"
+  elif [[ -f "$env_file" ]]; then
+    env_to_install="$env_file"
+  fi
+
+  if [[ -n "$env_to_install" ]]; then
     sudo mkdir -p /etc/openclaw
-    sudo cp "$env_file" /etc/openclaw/.env
-    echo "✅ 环境配置已安装到 /etc/openclaw/.env"
+    sudo cp "$env_to_install" /etc/openclaw/.env
+    echo "✅ 环境配置已安装到 /etc/openclaw/.env ($(basename "$env_to_install"))"
   fi
 
   # 创建 openclaw 用户（如果不存在）

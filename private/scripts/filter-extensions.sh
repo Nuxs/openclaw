@@ -3,10 +3,13 @@
 # filter-extensions.sh — 裁剪渠道/扩展，只保留指定的 extensions
 # ============================================================================
 # 用法:
-#   ./private/scripts/filter-extensions.sh --keep telegram,discord,slack
-#   ./private/scripts/filter-extensions.sh --keep-file private/extensions.keep
-#   ./private/scripts/filter-extensions.sh --list          # 列出所有可用扩展
-#   ./private/scripts/filter-extensions.sh --dry-run --keep telegram
+#   ./private/scripts/filter-extensions.sh --list
+#   ./private/scripts/filter-extensions.sh --keep telegram,discord,slack              # 默认 dry-run
+#   ./private/scripts/filter-extensions.sh --apply --keep telegram,discord,slack      # 真正写入 pnpm-workspace.yaml
+#   ./private/scripts/filter-extensions.sh --apply --keep-file private/extensions.keep
+#
+# 注意：
+# - 该脚本会改写 pnpm-workspace.yaml（上游高频变动文件），请谨慎提交这类改动；默认仅 dry-run。
 #
 # 原理:
 #   1. 读取 extensions/ 下所有子目录（即可用扩展列表）
@@ -20,7 +23,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKSPACE_FILE="$REPO_ROOT/pnpm-workspace.yaml"
 EXTENSIONS_DIR="$REPO_ROOT/extensions"
 
-DRY_RUN=false
+DRY_RUN=true
 REMOVE_DIRS=false
 KEEP_LIST=""
 KEEP_FILE=""
@@ -41,6 +44,10 @@ while [[ $# -gt 0 ]]; do
       DRY_RUN=true
       shift
       ;;
+    --apply|--write)
+      DRY_RUN=false
+      shift
+      ;;
     --remove-dirs)
       REMOVE_DIRS=true
       shift
@@ -50,7 +57,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -h|--help)
-      echo "用法: $0 [--keep ext1,ext2] [--keep-file path] [--dry-run] [--remove-dirs] [--list]"
+      echo "用法: $0 [--keep ext1,ext2] [--keep-file path] [--apply|--write] [--dry-run] [--remove-dirs] [--list]"
       exit 0
       ;;
     *)

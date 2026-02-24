@@ -1,51 +1,72 @@
 ---
 name: private-fork-dev
-description: Maintain a private OpenClaw fork with minimal upstream merge conflicts (overlay hooks) and reliable pnpm workspace installs.
+description: 维护 OpenClaw 私有化 fork（overlay-first），降低与 upstream/main 的长期合流成本。
 ---
 
 # private-fork-dev
 
-## Trigger
+## 适用场景（Trigger）
 
-Use this skill when working on a **private fork** that regularly syncs `upstream/main`, especially when:
+当你在维护一个**私有化 fork**（当前仓库 `main`）并且需要周期性同步 `upstream/main` 时使用本 Skill，尤其是：
 
-- Merge conflicts repeat in the same “hot” files (orchestrators/registries).
-- Private features should be upstream-friendly (overlay hooks).
-- `pnpm install` tries to fetch local workspace packages and fails with 404 (often due to mirror registries + workspace linking).
+- 合流冲突集中在“上游热文件”（入口/编排/注册表/协议/构建脚本）。
+- 私有化需求包含：品牌化、部署脚本、裁剪扩展、环境变量/密钥注入。
+- 你希望把私有化差异收敛为 overlay/插件，而不是长期堆在 `src/`。
 
-## Principles
+## 核心原则（Principles）
 
-- Keep upstream “hot” files as close to upstream as possible.
-- Implement private logic in **new leaf modules**.
-- Limit upstream-file edits to **a few lines** (imports + one call/spread).
+- **Overlay-first**：私有化差异优先落在 `private/`（部署、brand、helm、systemd、脚本）。
+- **Plugin-first**：业务差异优先做成插件/扩展；避免改 `src/` 的“合并磁铁”文件。
+- **Secrets never in Git**：机密只允许：`private/env/*.env.local` 或 CI/K8s Secret 注入。
+- **上游优先**：凡是通用修复（测试稳定性、错误处理、hook 能力点）优先做成上游可接受的 PR。
 
-## Workflow
+## 推荐工作流（Workflow）
 
-### 1) Before writing code: decide whether this file is a merge magnet
+### 1) 同步上游前先预测冲突
 
-- Use overlay hooks for **entrypoints/orchestrators/registries/barrels**.
-- Avoid overlay hooks for **leaf utilities** (prefer direct merge with upstream).
+- `bash private/scripts/predict-conflicts.sh`
 
-### 2) Implement private behavior with overlay hooks
+输出会按“品牌相关/非品牌”分组。优先把“品牌相关”继续迁移到运行时（减少改源码）。
 
-- Create a `private-*` module or `*-<area>.ts` overlay module next to the upstream file.
-- In the upstream file, add only:
-  - 1 import
-  - 1–3 hook calls (provider resolution / execute / post-process)
+### 2) 同步上游（merge 或 rebase）
 
-### 3) Sync upstream safely (`private/scripts/sync-upstream.sh`)
+- `bash private/scripts/sync-upstream.sh`（默认 merge）
+- `bash private/scripts/sync-upstream.sh --rebase`
 
-- Run the script.
-- If conflicts happen:
-  - Keep upstream blocks first.
-  - Re-apply private lines (imports + hook calls) in a dedicated “private fork” section.
-- Validate with `pnpm check`.
+注意：脚本要求工作区干净，且不会自动 stash（multi-agent 安全）。
 
-### 4) Fix pnpm workspace 404 / mirror issues
+### 3) 私有化品牌化
 
-If `pnpm install` tries to fetch a local workspace package (e.g. `@openclaw/blockchain-adapter`) from a mirror registry:
+- 运行时品牌（推荐）：修改 `private/brand.json`。
+- `apply-brand.sh` 只负责 `apps/` 层品牌化（`--scope apps`）。
+- 避免用脚本批量改写 `src/`（这是长期冲突热点）。
 
-- Ensure repo `.npmrc` enables workspace linking.
-- Re-run `pnpm install`.
+### 4) 环境变量与密钥
 
-See `references/pnpm-workspace-404.md` for the exact checklist.
+- 模板文件（可提交）：`private/env/dev.env` / `staging.env` / `prod.env`
+- 机密文件（禁止提交）：`private/env/<env>.env.local`
+
+优先级：显式传入 env > `.env.local` > `.env`
+
+### 5) 部署
+
+统一入口：`bash private/scripts/deploy.sh <target> <env>`
+
+- AnyDev：`deploy.sh anydev dev`
+- Docker：`deploy.sh docker dev`
+- K8s：`deploy.sh k8s staging` 或 `deploy.sh k8s-onekey prod`
+- 裸机：`deploy.sh bare prod`
+
+### 6) 合流后的最低验证
+
+- `pnpm install`
+- `pnpm build`
+- `pnpm test`
+
+---
+
+## 常见踩坑（Pitfalls）
+
+- **把 token 写进 `private/env/prod.env` 并提交**：禁止。请用 `prod.env.local` 或 Secret。
+- **品牌化通过改 `src/`**：会导致每次合流都冲突；优先改运行时品牌入口。
+- **提交 `pnpm-workspace.yaml` 的裁剪改动**：除非你非常确定，否则不要把“裁剪 workspace 包”的变更进主线。

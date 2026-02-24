@@ -66,23 +66,9 @@ EOF
 fi
 
 # src scope: 用户可见字符串/来源标识
+#
+# 说明：src/ 的品牌化已迁移为运行时解析（减少与 upstream 的冲突），因此这里不再列出任何
+# “会被脚本主动改写”的 src/ 文件。
 if [[ "$SCOPE" == "src" || "$SCOPE" == "full" ]]; then
-  cat <<'EOF'
-src/daemon/constants.ts
-src/gateway/server-discovery.ts
-src/infra/bonjour.ts
-src/canvas-host/server.ts
-src/canvas-host/a2ui/index.html
-src/cli/update-cli/update-command.ts
-src/cli/update-cli/status.ts
-src/wizard/onboarding.finalize.ts
-src/browser/client-fetch.ts
-src/infra/tailscale.ts
-src/channels/plugins/onboarding/whatsapp.ts
-src/channels/plugins/onboarding/slack.ts
-src/channels/plugins/onboarding/signal.ts
-src/agents/pi-embedded-runner/extra-params.ts
-src/agents/minimax-vlm.ts
-src/infra/provider-usage.fetch.minimax.ts
-EOF
+  :
 fi
