@@ -1,3 +1,4 @@
+import { resolveProductName } from "../infra/brand.js";
 import { isRecord } from "../utils.js";
 import { normalizeSecretInput } from "../utils/normalize-secret-input.js";
 
@@ -70,7 +71,7 @@ export async function minimaxUnderstandImage(params: {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "MM-API-Source": "OpenClaw",
+      "MM-API-Source": resolveProductName(),
     },
     body: JSON.stringify({
       prompt,

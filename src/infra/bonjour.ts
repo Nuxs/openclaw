@@ -2,6 +2,7 @@ import { logDebug, logWarn } from "../logger.js";
 import { getLogger } from "../logging.js";
 import { ignoreCiaoCancellationRejection } from "./bonjour-ciao.js";
 import { formatBonjourError } from "./bonjour-errors.js";
+import { resolveProductName } from "./brand.js";
 import { isTruthyEnvValue } from "./env.js";
 import { registerUnhandledRejectionHandler } from "./unhandled-rejections.js";
 
@@ -38,14 +39,19 @@ function isDisabledByEnv() {
   return false;
 }
 
-function safeServiceName(name: string) {
+function safeServiceName(name: string, productName: string) {
   const trimmed = name.trim();
-  return trimmed.length > 0 ? trimmed : "OpenClaw";
+  return trimmed.length > 0 ? trimmed : productName;
 }
 
-function prettifyInstanceName(name: string) {
+function escapeForRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function prettifyInstanceName(name: string, productName: string) {
   const normalized = name.trim().replace(/\s+/g, " ");
-  return normalized.replace(/\s+\(OpenClaw\)\s*$/i, "").trim() || normalized;
+  const suffix = escapeForRegex(productName);
+  return normalized.replace(new RegExp(`\\s+\\(${suffix}\\)\\s*$`, "i"), "").trim() || normalized;
 }
 
 type BonjourService = {
@@ -91,6 +97,8 @@ export async function startGatewayBonjourAdvertiser(
   const { getResponder, Protocol } = await import("@homebridge/ciao");
   const responder = getResponder();
 
+  const productName = resolveProductName();
+
   // mDNS service instance names are single DNS labels; dots in hostnames (like
   // `Mac.localdomain`) can confuse some resolvers/browsers and break discovery.
   // Keep only the first label and normalize away a trailing `.local`.
@@ -106,8 +114,8 @@ export async function startGatewayBonjourAdvertiser(
   const instanceName =
     typeof opts.instanceName === "string" && opts.instanceName.trim()
       ? opts.instanceName.trim()
-      : `${hostname} (OpenClaw)`;
-  const displayName = prettifyInstanceName(instanceName);
+      : `${hostname} (${productName})`;
+  const displayName = prettifyInstanceName(instanceName, productName);
 
   const txtBase: Record<string, string> = {
     role: "gateway",
@@ -146,7 +154,7 @@ export async function startGatewayBonjourAdvertiser(
   }
 
   const gateway = responder.createService({
-    name: safeServiceName(instanceName),
+    name: safeServiceName(instanceName, productName),
     type: "openclaw-gw",
     protocol: Protocol.TCP,
     port: opts.gatewayPort,
@@ -168,7 +176,7 @@ export async function startGatewayBonjourAdvertiser(
 
   logDebug(
     `bonjour: starting (hostname=${hostname}, instance=${JSON.stringify(
-      safeServiceName(instanceName),
+      safeServiceName(instanceName, productName),
     )}, gatewayPort=${opts.gatewayPort}${opts.minimal ? ", minimal=true" : `, sshPort=${opts.sshPort ?? 22}`})`,
   );
 

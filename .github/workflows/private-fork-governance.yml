@@ -1,0 +1,47 @@
+# ==========================================================================
+# Private fork governance — enforce sync hygiene (pin + basic checks)
+# ==========================================================================
+# This workflow is intended for long-lived forks of openclaw/openclaw.
+# It is skipped on the upstream repository via a job-level condition.
+
+name: Private Fork Governance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: private-fork-governance-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  governance:
+    if: github.repository != 'openclaw/openclaw'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate upstream pin files
+        run: node --import tsx private/scripts/write-upstream-pin.ts --check
+
+      - name: Run base checks
+        run: pnpm check

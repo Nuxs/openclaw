@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "remote": "upstream",
+    "ref": "upstream/main",
+    "sha": "097a6a83a0184e0977ec6836177f930a01305337"
+  },
+  "sync": {
+    "beforeSha": "75d16272f1627cafc1956934444341f76d18db02",
+    "afterSha": "75d16272f1627cafc1956934444341f76d18db02",
+    "at": "2026-02-24T09:47:42.725Z",
+    "strategy": "merge"
+  }
+}

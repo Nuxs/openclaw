@@ -110,6 +110,19 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+BEFORE_SHA="$(git rev-parse HEAD)"
+SYNC_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+PREDICT_JSON_FILE=""
+if [[ -x "private/scripts/predict-conflicts.sh" ]]; then
+  tmp_predict="$(mktemp)"
+  if bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --no-fetch --json >"$tmp_predict"; then
+    PREDICT_JSON_FILE="$tmp_predict"
+  else
+    rm -f "$tmp_predict"
+  fi
+fi
+
 # --- 执行合并 ---------------------------------------------------------------
 echo ""
 echo "🔀 使用 $STRATEGY 策略合并 $TARGET_REF..."
@@ -192,6 +205,32 @@ else
       git merge --continue --no-edit 2>/dev/null || git commit --no-edit
     fi
   fi
+fi
+
+AFTER_SHA="$(git rev-parse HEAD)"
+
+# --- 写入 upstream pin（JSON 为准 + MD 摘要） --------------------------------
+if [[ -f "private/scripts/write-upstream-pin.ts" ]]; then
+  echo ""
+  echo "🧷 写入 upstream pin..."
+  if [[ -n "$PREDICT_JSON_FILE" ]]; then
+    node --import tsx private/scripts/write-upstream-pin.ts \
+      --target "$TARGET_REF" \
+      --strategy "$STRATEGY" \
+      --before "$BEFORE_SHA" \
+      --after "$AFTER_SHA" \
+      --at "$SYNC_AT" \
+      --conflicts-json "$PREDICT_JSON_FILE"
+  else
+    node --import tsx private/scripts/write-upstream-pin.ts \
+      --target "$TARGET_REF" \
+      --strategy "$STRATEGY" \
+      --before "$BEFORE_SHA" \
+      --after "$AFTER_SHA" \
+      --at "$SYNC_AT"
+  fi
+
+  [[ -n "$PREDICT_JSON_FILE" ]] && rm -f "$PREDICT_JSON_FILE"
 fi
 
 # --- 后续步骤 ---------------------------------------------------------------
