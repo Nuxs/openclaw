@@ -1,4 +1,5 @@
 import { isRecord } from "../utils.js";
+import { resolveProductName } from "./brand.js";
 import {
   buildUsageHttpErrorSnapshot,
   fetchJson,
@@ -308,7 +309,7 @@ export async function fetchMinimaxUsage(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "MM-API-Source": "OpenClaw",
+        "MM-API-Source": resolveProductName(),
       },
     },
     timeoutMs,

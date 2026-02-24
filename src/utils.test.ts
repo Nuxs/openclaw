@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertWebChannel,
   CONFIG_DIR,
@@ -28,6 +28,15 @@ function withTempDirSync<T>(prefix: string, run: (dir: string) => T): T {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+
+beforeEach(() => {
+  // Many dev/CI environments set OPENCLAW_HOME/OPENCLAW_STATE_DIR globally.
+  // Clear them so tests that reason about HOME/os.homedir() are hermetic.
+  vi.unstubAllEnvs();
+  vi.stubEnv("OPENCLAW_HOME", "");
+  vi.stubEnv("OPENCLAW_STATE_DIR", "");
+  vi.stubEnv("CLAWDBOT_STATE_DIR", "");
+});
 
 describe("normalizePath", () => {
   it("adds leading slash when missing", () => {

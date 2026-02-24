@@ -3,12 +3,15 @@ import type { SimpleStreamOptions } from "@mariozechner/pi-ai";
 import { streamSimple } from "@mariozechner/pi-ai";
 import type { ThinkLevel } from "../../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { resolveProductName } from "../../infra/brand.js";
 import { log } from "./logger.js";
 
-const OPENROUTER_APP_HEADERS: Record<string, string> = {
-  "HTTP-Referer": "https://openclaw.ai",
-  "X-Title": "OpenClaw",
-};
+function buildOpenRouterAppHeaders(): Record<string, string> {
+  return {
+    "HTTP-Referer": "https://openclaw.ai",
+    "X-Title": resolveProductName(),
+  };
+}
 const ANTHROPIC_CONTEXT_1M_BETA = "context-1m-2025-08-07";
 const ANTHROPIC_1M_MODEL_PREFIXES = ["claude-opus-4", "claude-sonnet-4"] as const;
 // NOTE: We only force `store=true` for *direct* OpenAI Responses.
@@ -422,7 +425,7 @@ function createOpenRouterWrapper(
     return underlying(model, context, {
       ...options,
       headers: {
-        ...OPENROUTER_APP_HEADERS,
+        ...buildOpenRouterAppHeaders(),
         ...options?.headers,
       },
       onPayload: (payload) => {

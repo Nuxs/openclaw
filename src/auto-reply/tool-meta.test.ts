@@ -8,6 +8,9 @@ const home = path.resolve("/Users/test");
 describe("tool meta formatting", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
+    // This repo often runs tests with OPENCLAW_HOME set in the environment.
+    // Clear it so HOME-based shortening tests are deterministic.
+    vi.stubEnv("OPENCLAW_HOME", "");
   });
 
   it("shortens paths under HOME", () => {
