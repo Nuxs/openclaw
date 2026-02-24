@@ -72,6 +72,14 @@ describe("handleFeishuMessage command authorization", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Make this suite hermetic even when the developer machine has private state overrides.
+    // The Feishu dedupe cache reads OPENCLAW_STATE_DIR; if it points at a shared folder,
+    // tests can be flaky (messages appear "already processed").
+    vi.unstubAllEnvs();
+    vi.stubEnv("OPENCLAW_HOME", "");
+    vi.stubEnv("OPENCLAW_STATE_DIR", "");
+    vi.stubEnv("CLAWDBOT_STATE_DIR", "");
+
     setFeishuRuntime({
       system: {
         enqueueSystemEvent: vi.fn(),
