@@ -115,7 +115,6 @@ private/env/*.env.local
 private/assets/*.ico
 private/assets/*.svg
 private/assets/*.png
-private/env/prod.env
 
 # Generated protocol schema (produced via pnpm protocol:gen)
 dist/protocol.schema.json

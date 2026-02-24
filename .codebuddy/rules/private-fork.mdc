@@ -1,0 +1,52 @@
+---
+description: 私有化 Fork（overlay-first）规则。目标：最小化与 upstream/main 的长期合流冲突，杜绝机密入库。
+alwaysApply: true
+enabled: true
+updatedAt: 2026-02-24T00:00:00.000Z
+---
+
+## 私有化 Fork 规则（overlay-first）
+
+### 目标
+- **最小化长期合流冲突**：尽量把冲突压缩到少量 `import/export/registry` 行，不让业务逻辑产生冲突。
+- **可审计、可复现**：私有化部署与品牌化通过可追踪的 overlay/配置实现。
+- **机密不入库**：任何 token/key 只能来自本地或密钥系统。
+
+### 一、强制规则（必须遵守）
+
+- **Secrets never in Git**
+  - 允许：`private/env/*.env.local`（本地文件，必须被 `.gitignore` 忽略）、CI 注入、K8s Secret（`envFrom`/`existingSecret`）。
+  - 禁止：在任何 tracked 文件（尤其 `private/env/prod.env`）写入真实 token/key/password。
+  - 生产环境部署时：只提交 `prod.env` 的**模板/默认值**；机密只放 `prod.env.local` 或 Secret。
+
+- **品牌化优先运行时（不要批量改写 `src/`）**
+  - UI 品牌：通过运行时读取 `private/brand.json`（例如 Control UI 侧已经这么做）。
+  - 代码中需要展示/上报产品名：统一走 `src/infra/brand.ts`，禁止在上游热点文件里做字符串替换。
+  - `private/scripts/apply-brand.sh` 只用于 `apps/` 层（BundleId/appName/plist/gradle 等），**默认禁止**用脚本改写 `src/`。
+
+- **扩展裁剪不要提交 workspace 根文件改动**
+  - `pnpm-workspace.yaml` 属于上游高频变动文件，改动它会显著放大合流冲突。
+  - 扩展裁剪建议只在构建/打包阶段做（例如 `pnpm --filter ...`），`filter-extensions.sh` 默认应为 dry-run；只有临时场景才 `--apply`。
+
+- **同步 upstream 前必须跑冲突预测**
+  - 同步前：运行 `private/scripts/predict-conflicts.sh` 做只读冲突预测。
+  - 冲突处理优先级：先保留 upstream 的实现块，再恢复我们那几行 hook/import/registry 追加。
+
+### 二、推荐工程形态（最优长期维护）
+
+- **Overlay（部署/品牌/发行）**：集中在 `private/`（helm/systemd/compose/env/brand/scripts）。
+- **Plugins（功能差异）**：尽量做成插件/扩展（独立目录/独立包），避免侵入 `src/` 的上游热点文件。
+- **Core Hook 最小化**：如果某私有需求无法插件化实现，只允许在 core 增加最小 hook（1–3 处），并优先上游化。
+
+### 三、环境变量与本地开发约定
+
+- env 文件加载优先级建议：**显式环境变量 > `private/env/<env>.env.local` > `private/env/<env>.env`**。
+- `OPENCLAW_HOME/OPENCLAW_STATE_DIR` 等会影响路径解析与测试 hermetic；
+  - 生产部署可使用这些变量，但开发/测试尽量不要污染全局 shell，必要时在测试中显式 stub/clear。
+
+### 四、自检清单（提交前必看）
+
+- [ ] 这项私有化改动是否能通过 **新增文件/插件** 完成？
+- [ ] 是否避免了修改 `pnpm-workspace.yaml`、registry/barrel、入口编排等合并磁铁文件？
+- [ ] 是否确保 **机密不入库**（本地 `.env.local` / Secret 注入）？
+- [ ] 品牌相关字符串是否统一走 `private/brand.json` / `src/infra/brand.ts`？
