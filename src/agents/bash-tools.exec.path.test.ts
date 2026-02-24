@@ -48,6 +48,9 @@ vi.mock("../infra/exec-approvals.js", async (importOriginal) => {
   return { ...mod, resolveExecApprovals: () => approvals };
 });
 
+const { createExecTool } = await import("./bash-tools.exec.js");
+const { getShellPathFromLoginShell } = await import("../infra/shell-env.js");
+
 const normalizeText = (value?: string) =>
   sanitizeBinaryOutput(value ?? "")
     .replace(/\r\n/g, "\n")
@@ -77,8 +80,6 @@ describe("exec PATH login shell merge", () => {
     }
     process.env.PATH = "/usr/bin";
 
-    const { createExecTool } = await import("./bash-tools.exec.js");
-    const { getShellPathFromLoginShell } = await import("../infra/shell-env.js");
     const shellPathMock = vi.mocked(getShellPathFromLoginShell);
     shellPathMock.mockClear();
     shellPathMock.mockReturnValue("/custom/bin:/opt/bin");
@@ -97,8 +98,6 @@ describe("exec PATH login shell merge", () => {
     }
     process.env.PATH = "/usr/bin";
 
-    const { createExecTool } = await import("./bash-tools.exec.js");
-    const { getShellPathFromLoginShell } = await import("../infra/shell-env.js");
     const shellPathMock = vi.mocked(getShellPathFromLoginShell);
     shellPathMock.mockClear();
 
@@ -117,7 +116,6 @@ describe("exec PATH login shell merge", () => {
 
 describe("exec host env validation", () => {
   it("blocks LD_/DYLD_ env vars on host execution", async () => {
-    const { createExecTool } = await import("./bash-tools.exec.js");
     const tool = createExecTool({ host: "gateway", security: "full", ask: "off" });
 
     await expect(
@@ -128,24 +126,28 @@ describe("exec host env validation", () => {
     ).rejects.toThrow(/Security Violation: Environment variable 'LD_DEBUG' is forbidden/);
   });
 
-  it("defaults to gateway when sandbox runtime is unavailable", async () => {
-    const { createExecTool } = await import("./bash-tools.exec.js");
+  it("defaults to sandbox when sandbox runtime is unavailable", async () => {
     const tool = createExecTool({ security: "full", ask: "off" });
 
+    const result = await tool.execute("call1", {
+      command: "echo ok",
+    });
+    const text = normalizeText(result.content.find((c) => c.type === "text")?.text);
+    expect(text).toContain("ok");
+
     const err = await tool
-      .execute("call1", {
+      .execute("call2", {
         command: "echo ok",
-        host: "sandbox",
+        host: "gateway",
       })
       .then(() => null)
       .catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
     expect(err).toBeTruthy();
     expect(err?.message).toMatch(/exec host not allowed/);
-    expect(err?.message).toMatch(/tools\.exec\.host=gateway/);
+    expect(err?.message).toMatch(/tools\.exec\.host=sandbox/);
   });
 
   it("fails closed when sandbox host is explicitly configured without sandbox runtime", async () => {
-    const { createExecTool } = await import("./bash-tools.exec.js");
     const tool = createExecTool({ host: "sandbox", security: "full", ask: "off" });
 
     await expect(

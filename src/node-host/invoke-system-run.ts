@@ -8,18 +8,18 @@ import {
   evaluateExecAllowlist,
   evaluateShellAllowlist,
   recordAllowlistUse,
-  requiresExecApproval,
   resolveAllowAlwaysPatterns,
   resolveExecApprovals,
-  resolveSafeBins,
   type ExecAllowlistEntry,
   type ExecAsk,
   type ExecCommandSegment,
   type ExecSecurity,
 } from "../infra/exec-approvals.js";
 import type { ExecHostRequest, ExecHostResponse, ExecHostRunResult } from "../infra/exec-host.js";
-import { getTrustedSafeBinDirs } from "../infra/exec-safe-bin-trust.js";
+import { resolveExecSafeBinRuntimePolicy } from "../infra/exec-safe-bin-runtime-policy.js";
+import { sanitizeSystemRunEnvOverrides } from "../infra/host-env-security.js";
 import { resolveSystemRunCommand } from "../infra/system-run-command.js";
+import { evaluateSystemRunPolicy, resolveExecApprovalDecision } from "./exec-policy.js";
 import type {
   ExecEventPayload,
   RunResult,
@@ -32,6 +32,7 @@ type SystemRunInvokeResult = {
   payloadJSON?: string | null;
   error?: { code?: string; message?: string } | null;
 };
+export { formatSystemRunAllowlistMissMessage } from "./exec-policy.js";
 
 export async function handleSystemRunInvoke(opts: {
   client: GatewayClient;
@@ -69,6 +70,7 @@ export async function handleSystemRunInvoke(opts: {
       success?: boolean;
     };
   }) => Promise<void>;
+  preferMacAppExecHost: boolean;
 }): Promise<void> {
   const command = resolveSystemRunCommand({
     command: opts.params.command,
@@ -109,9 +111,16 @@ export async function handleSystemRunInvoke(opts: {
   const autoAllowSkills = approvals.agent.autoAllowSkills;
   const sessionKey = opts.params.sessionKey?.trim() || "node";
   const runId = opts.params.runId?.trim() || crypto.randomUUID();
-  const env = opts.sanitizeEnv(opts.params.env ?? undefined);
-  const safeBins = resolveSafeBins(agentExec?.safeBins ?? cfg.tools?.exec?.safeBins);
-  const trustedSafeBinDirs = getTrustedSafeBinDirs();
+  const approvalDecision = resolveExecApprovalDecision(opts.params.approvalDecision);
+  const envOverrides = sanitizeSystemRunEnvOverrides({
+    overrides: opts.params.env ?? undefined,
+    shellWrapper: shellCommand !== null,
+  });
+  const env = opts.sanitizeEnv(envOverrides);
+  const { safeBins, safeBinProfiles, trustedSafeBinDirs } = resolveExecSafeBinRuntimePolicy({
+    global: cfg.tools?.exec,
+    local: agentExec,
+  });
   const bins = autoAllowSkills ? await opts.skillBins.current() : new Set<string>();
   let analysisOk = false;
   let allowlistMatches: ExecAllowlistEntry[] = [];
@@ -122,6 +131,7 @@ export async function handleSystemRunInvoke(opts: {
       command: shellCommand,
       allowlist: approvals.allowlist,
       safeBins,
+      safeBinProfiles,
       cwd: opts.params.cwd ?? undefined,
       env,
       trustedSafeBinDirs,
@@ -140,6 +150,7 @@ export async function handleSystemRunInvoke(opts: {
       analysis,
       allowlist: approvals.allowlist,
       safeBins,
+      safeBinProfiles,
       cwd: opts.params.cwd ?? undefined,
       trustedSafeBinDirs,
       skillBins: bins,
@@ -155,23 +166,45 @@ export async function handleSystemRunInvoke(opts: {
   const cmdInvocation = shellCommand
     ? opts.isCmdExeInvocation(segments[0]?.argv ?? [])
     : opts.isCmdExeInvocation(argv);
-  if (security === "allowlist" && isWindows && cmdInvocation) {
-    analysisOk = false;
-    allowlistSatisfied = false;
+  const policy = evaluateSystemRunPolicy({
+    security,
+    ask,
+    analysisOk,
+    allowlistSatisfied,
+    approvalDecision,
+    approved: opts.params.approved === true,
+    isWindows,
+    cmdInvocation,
+    shellWrapperInvocation: shellCommand !== null,
+  });
+  analysisOk = policy.analysisOk;
+  allowlistSatisfied = policy.allowlistSatisfied;
+  if (!policy.allowed) {
+    await opts.sendNodeEvent(
+      opts.client,
+      "exec.denied",
+      opts.buildExecEventPayload({
+        sessionKey,
+        runId,
+        host: "node",
+        command: cmdText,
+        reason: policy.eventReason,
+      }),
+    );
+    await opts.sendInvokeResult({
+      ok: false,
+      error: { code: "UNAVAILABLE", message: policy.errorMessage },
+    });
+    return;
   }
 
-  const useMacAppExec = process.platform === "darwin";
+  const useMacAppExec = opts.preferMacAppExecHost;
   if (useMacAppExec) {
-    const approvalDecision =
-      opts.params.approvalDecision === "allow-once" ||
-      opts.params.approvalDecision === "allow-always"
-        ? opts.params.approvalDecision
-        : null;
     const execRequest: ExecHostRequest = {
       command: argv,
       rawCommand: rawCommand || shellCommand || null,
       cwd: opts.params.cwd ?? null,
-      env: opts.params.env ?? null,
+      env: envOverrides ?? null,
       timeoutMs: opts.params.timeoutMs ?? null,
       needsScreenRecording: opts.params.needsScreenRecording ?? null,
       agentId: agentId ?? null,
@@ -230,57 +263,8 @@ export async function handleSystemRunInvoke(opts: {
     }
   }
 
-  if (security === "deny") {
-    await opts.sendNodeEvent(
-      opts.client,
-      "exec.denied",
-      opts.buildExecEventPayload({
-        sessionKey,
-        runId,
-        host: "node",
-        command: cmdText,
-        reason: "security=deny",
-      }),
-    );
-    await opts.sendInvokeResult({
-      ok: false,
-      error: { code: "UNAVAILABLE", message: "SYSTEM_RUN_DISABLED: security=deny" },
-    });
-    return;
-  }
-
-  const requiresAsk = requiresExecApproval({
-    ask,
-    security,
-    analysisOk,
-    allowlistSatisfied,
-  });
-
-  const approvalDecision =
-    opts.params.approvalDecision === "allow-once" || opts.params.approvalDecision === "allow-always"
-      ? opts.params.approvalDecision
-      : null;
-  const approvedByAsk = approvalDecision !== null || opts.params.approved === true;
-  if (requiresAsk && !approvedByAsk) {
-    await opts.sendNodeEvent(
-      opts.client,
-      "exec.denied",
-      opts.buildExecEventPayload({
-        sessionKey,
-        runId,
-        host: "node",
-        command: cmdText,
-        reason: "approval-required",
-      }),
-    );
-    await opts.sendInvokeResult({
-      ok: false,
-      error: { code: "UNAVAILABLE", message: "SYSTEM_RUN_DENIED: approval required" },
-    });
-    return;
-  }
-  if (approvalDecision === "allow-always" && security === "allowlist") {
-    if (analysisOk) {
+  if (policy.approvalDecision === "allow-always" && security === "allowlist") {
+    if (policy.analysisOk) {
       const patterns = resolveAllowAlwaysPatterns({
         segments,
         cwd: opts.params.cwd ?? undefined,
@@ -293,25 +277,6 @@ export async function handleSystemRunInvoke(opts: {
         }
       }
     }
-  }
-
-  if (security === "allowlist" && (!analysisOk || !allowlistSatisfied) && !approvedByAsk) {
-    await opts.sendNodeEvent(
-      opts.client,
-      "exec.denied",
-      opts.buildExecEventPayload({
-        sessionKey,
-        runId,
-        host: "node",
-        command: cmdText,
-        reason: "allowlist-miss",
-      }),
-    );
-    await opts.sendInvokeResult({
-      ok: false,
-      error: { code: "UNAVAILABLE", message: "SYSTEM_RUN_DENIED: allowlist miss" },
-    });
-    return;
   }
 
   if (allowlistMatches.length > 0) {
@@ -354,10 +319,10 @@ export async function handleSystemRunInvoke(opts: {
   if (
     security === "allowlist" &&
     isWindows &&
-    !approvedByAsk &&
+    !policy.approvedByAsk &&
     shellCommand &&
-    analysisOk &&
-    allowlistSatisfied &&
+    policy.analysisOk &&
+    policy.allowlistSatisfied &&
     segments.length === 1 &&
     segments[0]?.argv.length > 0
   ) {

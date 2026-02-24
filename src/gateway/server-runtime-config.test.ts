@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveGatewayRuntimeConfig } from "./server-runtime-config.js";
 
 const TRUSTED_PROXY_AUTH = {
@@ -103,6 +103,21 @@ describe("resolveGatewayRuntimeConfig", () => {
   });
 
   describe("token/password auth modes", () => {
+    let originalToken: string | undefined;
+
+    beforeEach(() => {
+      originalToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+      delete process.env.OPENCLAW_GATEWAY_TOKEN;
+    });
+
+    afterEach(() => {
+      if (originalToken !== undefined) {
+        process.env.OPENCLAW_GATEWAY_TOKEN = originalToken;
+      } else {
+        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+      }
+    });
+
     it.each([
       {
         name: "lan binding with token",
@@ -126,7 +141,8 @@ describe("resolveGatewayRuntimeConfig", () => {
       {
         name: "token mode without token",
         cfg: { gateway: { bind: "lan" as const, auth: { mode: "token" as const } } },
-        expectedMessage: "gateway auth mode is token, but no token was configured",
+        expectedMessage:
+          "gateway auth mode is token, but no token was configured (set gateway.auth.token or OPENCLAW_GATEWAY_TOKEN)",
       },
       {
         name: "lan binding with explicit none auth",
@@ -171,6 +187,46 @@ describe("resolveGatewayRuntimeConfig", () => {
       await expect(resolveGatewayRuntimeConfig({ cfg, port: 18789, host })).rejects.toThrow(
         expectedMessage,
       );
+    });
+  });
+
+  describe("HTTP security headers", () => {
+    it("resolves strict transport security header from config", async () => {
+      const result = await resolveGatewayRuntimeConfig({
+        cfg: {
+          gateway: {
+            bind: "loopback",
+            auth: { mode: "none" },
+            http: {
+              securityHeaders: {
+                strictTransportSecurity: "  max-age=31536000; includeSubDomains  ",
+              },
+            },
+          },
+        },
+        port: 18789,
+      });
+
+      expect(result.strictTransportSecurityHeader).toBe("max-age=31536000; includeSubDomains");
+    });
+
+    it("does not set strict transport security when explicitly disabled", async () => {
+      const result = await resolveGatewayRuntimeConfig({
+        cfg: {
+          gateway: {
+            bind: "loopback",
+            auth: { mode: "none" },
+            http: {
+              securityHeaders: {
+                strictTransportSecurity: false,
+              },
+            },
+          },
+        },
+        port: 18789,
+      });
+
+      expect(result.strictTransportSecurityHeader).toBeUndefined();
     });
   });
 });

@@ -331,3 +331,35 @@ describe("createModelSelectionState respects channel overrides", () => {
     expect(sessionEntry.modelOverridesByContext?.[contextKey]).toBeUndefined();
   });
 });
+
+describe("createModelSelectionState resolveDefaultReasoningLevel", () => {
+  it("returns on when catalog model has reasoning true", async () => {
+    const { loadModelCatalog } = await import("../../agents/model-catalog.js");
+    vi.mocked(loadModelCatalog).mockResolvedValueOnce([
+      { provider: "openrouter", id: "x-ai/grok-4.1-fast", name: "Grok", reasoning: true },
+    ]);
+    const state = await createModelSelectionState({
+      cfg: {} as OpenClawConfig,
+      agentCfg: undefined,
+      defaultProvider: "openrouter",
+      defaultModel: "x-ai/grok-4.1-fast",
+      provider: "openrouter",
+      model: "x-ai/grok-4.1-fast",
+      hasModelDirective: false,
+    });
+    await expect(state.resolveDefaultReasoningLevel()).resolves.toBe("on");
+  });
+
+  it("returns off when catalog model has no reasoning", async () => {
+    const state = await createModelSelectionState({
+      cfg: {} as OpenClawConfig,
+      agentCfg: undefined,
+      defaultProvider: "openai",
+      defaultModel: "gpt-4o-mini",
+      provider: "openai",
+      model: "gpt-4o-mini",
+      hasModelDirective: false,
+    });
+    await expect(state.resolveDefaultReasoningLevel()).resolves.toBe("off");
+  });
+});

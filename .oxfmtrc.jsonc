@@ -11,6 +11,7 @@
   "ignorePatterns": [
     "apps/",
     "assets/",
+    "CLAUDE.md",
     "docker-compose.yml",
     "dist/",
     "docs/_layouts/",
@@ -18,6 +19,7 @@
     "patches/",
     "pnpm-lock.yaml/",
     "private/helm/",
+    "src/gateway/server-methods/CLAUDE.md",
     "src/auto-reply/reply/export-html/",
     "Swabble/",
     "vendor/",

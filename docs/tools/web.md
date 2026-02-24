@@ -1,10 +1,12 @@
 ---
-summary: "Web search + fetch tools (Brave Search API, Perplexity direct/OpenRouter, xAI Grok, SearxNG self-hosted)"
+summary: "Web search + fetch tools (Brave Search API, Perplexity direct/OpenRouter, xAI Grok, Gemini Google Search grounding, Kimi, SearxNG self-hosted)"
 read_when:
   - You want to enable web_search or web_fetch
   - You need Brave Search API key setup
   - You want to use Perplexity Sonar for web search
   - You want to use xAI Grok for web search
+  - You want to use Gemini with Google Search grounding
+  - You want to use Kimi for web search
   - You want to use SearxNG for web search
 title: "Web Tools"
 ---
@@ -13,7 +15,7 @@ title: "Web Tools"
 
 OpenClaw ships two lightweight web tools:
 
-- `web_search` — Search the web via Brave Search API (default), Perplexity Sonar (direct or via OpenRouter), xAI Grok, or SearxNG (self-hosted).
+- `web_search` — Search the web via Brave Search API (default), Perplexity Sonar (direct or via OpenRouter), xAI Grok, Gemini with Google Search grounding, Kimi, or SearxNG (self-hosted).
 - `web_fetch` — HTTP fetch + readable extraction (HTML → markdown/text).
 
 These are **not** browser automation. For JS-heavy sites or logins, use the
@@ -25,6 +27,8 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
   - **Brave** (default): returns structured results (title, URL, snippet).
   - **Perplexity**: returns AI-synthesized answers with citations from real-time web search.
   - **Grok**: returns AI-synthesized answers with citations via xAI Responses API.
+  - **Gemini**: returns AI-synthesized answers grounded in Google Search with citations.
+  - **Kimi**: returns AI-synthesized answers with citations from native $web_search.
   - **SearxNG**: returns structured results from your self-hosted instance.
 - Results are cached by query for 15 minutes (configurable).
 - `web_fetch` does a plain HTTP GET and extracts readable content
@@ -37,10 +41,27 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 | ------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
 | **Brave** (default) | Fast, structured results, free tier          | Traditional search results               | `BRAVE_API_KEY`                              |
 | **Perplexity**      | AI-synthesized answers, citations, real-time | Requires Perplexity or OpenRouter access | `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` |
-| **Grok**            | AI-synthesized answers, inline citations     | Requires xAI API access                  | `XAI_API_KEY`                                |
-| **SearxNG**         | Self-hosted, open-source                     | You host and maintain it                 | Optional (proxy token)                       |
+| **Grok**            | AI-synthesized answers, citations            | Requires xAI API access                  | `XAI_API_KEY`                                |
+| **Gemini**          | Google Search grounding, AI-synthesized      | Requires Gemini API key                  | `GEMINI_API_KEY`                             |
+| **Kimi**            | AI-synthesized answers, citations            | Requires Moonshot API access             | `KIMI_API_KEY` or `MOONSHOT_API_KEY`         |
+| **SearxNG**         | Self-hosted, open-source                     | You host and maintain it                 | Optional (`SEARXNG_API_KEY`)                 |
 
 See [Brave Search setup](/brave-search), [Perplexity Sonar](/perplexity), [SearxNG](/searxng) for provider-specific details.
+
+### Auto-detection
+
+If no `provider` is explicitly set, OpenClaw auto-detects which provider to use based on configured SearxNG base URL (if present) or available API keys, checking in this order:
+
+1. **SearxNG** — `search.searxng.baseUrl` config
+2. **Brave** — `BRAVE_API_KEY` env var or `search.apiKey` config
+3. **Gemini** — `GEMINI_API_KEY` env var or `search.gemini.apiKey` config
+4. **Kimi** — `KIMI_API_KEY` / `MOONSHOT_API_KEY` env var or `search.kimi.apiKey` config
+5. **Perplexity** — `PERPLEXITY_API_KEY` / `OPENROUTER_API_KEY` env var or `search.perplexity.apiKey` config
+6. **Grok** — `XAI_API_KEY` env var or `search.grok.apiKey` config
+
+If no keys are found, it falls back to Brave (you'll get a missing-key error prompting you to configure one).
+
+### Explicit provider
 
 Set the provider in config:
 
@@ -49,7 +70,7 @@ Set the provider in config:
   tools: {
     web: {
       search: {
-        provider: "brave", // or "perplexity", "grok", or "searxng"
+        provider: "brave", // or "perplexity", "grok", "gemini", "kimi", or "searxng"
       },
     },
   },
@@ -192,6 +213,47 @@ If no base URL is set, OpenClaw chooses a default based on the API key source:
 | `perplexity/sonar`               | Fast Q&A with web search             | Quick lookups     |
 | `perplexity/sonar-pro` (default) | Multi-step reasoning with web search | Complex questions |
 | `perplexity/sonar-reasoning-pro` | Chain-of-thought analysis            | Deep research     |
+
+## Using Gemini (Google Search grounding)
+
+Gemini models support built-in [Google Search grounding](https://ai.google.dev/gemini-api/docs/grounding),
+which returns AI-synthesized answers backed by live Google Search results with citations.
+
+### Getting a Gemini API key
+
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Create an API key
+3. Set `GEMINI_API_KEY` in the Gateway environment, or configure `tools.web.search.gemini.apiKey`
+
+### Setting up Gemini search
+
+```json5
+{
+  tools: {
+    web: {
+      search: {
+        provider: "gemini",
+        gemini: {
+          // API key (optional if GEMINI_API_KEY is set)
+          apiKey: "AIza...",
+          // Model (defaults to "gemini-2.5-flash")
+          model: "gemini-2.5-flash",
+        },
+      },
+    },
+  },
+}
+```
+
+**Environment alternative:** set `GEMINI_API_KEY` in the Gateway environment.
+For a gateway install, put it in `~/.openclaw/.env`.
+
+### Notes
+
+- Citation URLs from Gemini grounding are automatically resolved from Google's
+  redirect URLs to direct URLs.
+- The default model (`gemini-2.5-flash`) is fast and cost-effective.
+  Any Gemini model that supports grounding can be used.
 
 ## web_search
 

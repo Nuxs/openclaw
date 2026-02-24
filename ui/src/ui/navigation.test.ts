@@ -89,31 +89,39 @@ describe("subtitleForTab", () => {
 });
 
 describe("normalizeBasePath", () => {
-  it("normalizes base-path variants", () => {
-    const cases = [
-      { input: "", expected: "" },
-      { input: "ui", expected: "/ui" },
-      { input: "/ui/", expected: "/ui" },
-      { input: "/", expected: "" },
-      { input: "/apps/openclaw", expected: "/apps/openclaw" },
-    ] as const;
-    for (const testCase of cases) {
-      expect(normalizeBasePath(testCase.input), testCase.input).toBe(testCase.expected);
-    }
+  it("returns empty string for falsy input", () => {
+    expect(normalizeBasePath("")).toBe("");
+  });
+
+  it("adds leading slash if missing", () => {
+    expect(normalizeBasePath("ui")).toBe("/ui");
+  });
+
+  it("removes trailing slash", () => {
+    expect(normalizeBasePath("/ui/")).toBe("/ui");
+  });
+
+  it("returns empty string for root path", () => {
+    expect(normalizeBasePath("/")).toBe("");
+  });
+
+  it("handles nested paths", () => {
+    expect(normalizeBasePath("/apps/openclaw")).toBe("/apps/openclaw");
   });
 });
 
 describe("normalizePath", () => {
-  it("normalizes paths", () => {
-    const cases = [
-      { input: "", expected: "/" },
-      { input: "chat", expected: "/chat" },
-      { input: "/chat/", expected: "/chat" },
-      { input: "/", expected: "/" },
-    ] as const;
-    for (const testCase of cases) {
-      expect(normalizePath(testCase.input), testCase.input).toBe(testCase.expected);
-    }
+  it("returns / for falsy input", () => {
+    expect(normalizePath("")).toBe("/");
+  });
+
+  it("adds leading slash if missing", () => {
+    expect(normalizePath("chat")).toBe("/chat");
+  });
+
+  it("removes trailing slash except for root", () => {
+    expect(normalizePath("/chat/")).toBe("/chat");
+    expect(normalizePath("/")).toBe("/");
   });
 });
 
@@ -159,28 +167,33 @@ describe("tabFromPath", () => {
 });
 
 describe("inferBasePathFromPathname", () => {
-  it("infers base-path variants from pathname", () => {
-    const cases = [
-      { path: "/", expected: "" },
-      { path: "/chat", expected: "" },
-      { path: "/overview", expected: "" },
-      { path: "/ui/chat", expected: "/ui" },
-      { path: "/apps/openclaw/sessions", expected: "/apps/openclaw" },
-      { path: "/index.html", expected: "" },
-      { path: "/ui/index.html", expected: "/ui" },
-    ] as const;
-    for (const testCase of cases) {
-      expect(inferBasePathFromPathname(testCase.path), testCase.path).toBe(testCase.expected);
-    }
+  it("returns empty string for root", () => {
+    expect(inferBasePathFromPathname("/")).toBe("");
+  });
+
+  it("returns empty string for direct tab path", () => {
+    expect(inferBasePathFromPathname("/chat")).toBe("");
+    expect(inferBasePathFromPathname("/overview")).toBe("");
+  });
+
+  it("infers base path from nested paths", () => {
+    expect(inferBasePathFromPathname("/ui/chat")).toBe("/ui");
+    expect(inferBasePathFromPathname("/apps/openclaw/sessions")).toBe("/apps/openclaw");
+  });
+
+  it("handles index.html suffix", () => {
+    expect(inferBasePathFromPathname("/index.html")).toBe("");
+    expect(inferBasePathFromPathname("/ui/index.html")).toBe("/ui");
   });
 });
 
 describe("TAB_GROUPS", () => {
   it("contains all expected groups", () => {
-    const labels = TAB_GROUPS.map((g) => g.label.toLowerCase());
-    for (const expected of ["chat", "control", "agent", "settings"]) {
-      expect(labels).toContain(expected);
-    }
+    const labels = TAB_GROUPS.map((g) => g.label);
+    expect(labels).toContain("Chat");
+    expect(labels).toContain("Control");
+    expect(labels).toContain("Agent");
+    expect(labels).toContain("Settings");
   });
 
   it("all tabs are unique", () => {

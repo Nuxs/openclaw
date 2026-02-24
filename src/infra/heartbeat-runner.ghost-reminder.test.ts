@@ -1,24 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { telegramPlugin } from "../../extensions/telegram/src/channel.js";
-import { setTelegramRuntime } from "../../extensions/telegram/src/runtime.js";
 import * as replyModule from "../auto-reply/reply.js";
 import type { OpenClawConfig } from "../config/config.js";
-import { setActivePluginRegistry } from "../plugins/runtime.js";
-import { createPluginRuntime } from "../plugins/runtime/index.js";
-import { createTestRegistry } from "../test-utils/channel-plugins.js";
 import { runHeartbeatOnce } from "./heartbeat-runner.js";
-import { seedMainSessionStore, withTempHeartbeatSandbox } from "./heartbeat-runner.test-utils.js";
+import {
+  seedMainSessionStore,
+  setupTelegramHeartbeatPluginRuntimeForTests,
+  withTempHeartbeatSandbox,
+} from "./heartbeat-runner.test-utils.js";
 import { enqueueSystemEvent, resetSystemEventsForTest } from "./system-events.js";
 
 // Avoid pulling optional runtime deps during isolated runs.
 vi.mock("jiti", () => ({ createJiti: () => () => ({}) }));
 
 beforeEach(() => {
-  const runtime = createPluginRuntime();
-  setTelegramRuntime(runtime);
-  setActivePluginRegistry(
-    createTestRegistry([{ pluginId: "telegram", plugin: telegramPlugin, source: "test" }]),
-  );
+  setupTelegramHeartbeatPluginRuntimeForTests();
   resetSystemEventsForTest();
 });
 
@@ -88,15 +83,34 @@ describe("Ghost reminder bug (issue #13317)", () => {
     sendTelegram: ReturnType<typeof vi.fn>;
     calledCtx: { Provider?: string; Body?: string } | null;
   }> => {
+    return runHeartbeatCase({
+      tmpPrefix,
+      replyText: "Relay this reminder now",
+      reason: "cron:reminder-job",
+      enqueue,
+    });
+  };
+
+  const runHeartbeatCase = async (params: {
+    tmpPrefix: string;
+    replyText: string;
+    reason: string;
+    enqueue: (sessionKey: string) => void;
+  }): Promise<{
+    result: Awaited<ReturnType<typeof runHeartbeatOnce>>;
+    sendTelegram: ReturnType<typeof vi.fn>;
+    calledCtx: { Provider?: string; Body?: string } | null;
+    replyCallCount: number;
+  }> => {
     return withTempHeartbeatSandbox(
       async ({ tmpDir, storePath }) => {
-        const { sendTelegram, getReplySpy } = createHeartbeatDeps("Relay this reminder now");
+        const { sendTelegram, getReplySpy } = createHeartbeatDeps(params.replyText);
         const { cfg, sessionKey } = await createConfig({ tmpDir, storePath });
-        enqueue(sessionKey);
+        params.enqueue(sessionKey);
         const result = await runHeartbeatOnce({
           cfg,
           agentId: "main",
-          reason: "cron:reminder-job",
+          reason: params.reason,
           deps: {
             sendTelegram,
           },
@@ -105,38 +119,32 @@ describe("Ghost reminder bug (issue #13317)", () => {
           Provider?: string;
           Body?: string;
         } | null;
-        return { result, sendTelegram, calledCtx };
+        return {
+          result,
+          sendTelegram,
+          calledCtx,
+          replyCallCount: getReplySpy.mock.calls.length,
+        };
       },
-      { prefix: tmpPrefix },
+      { prefix: params.tmpPrefix },
     );
   };
 
   it("does not use CRON_EVENT_PROMPT when only a HEARTBEAT_OK event is present", async () => {
-    await withTempHeartbeatSandbox(
-      async ({ tmpDir, storePath }) => {
-        const { sendTelegram, getReplySpy } = createHeartbeatDeps("Heartbeat check-in");
-        const { cfg, sessionKey } = await createConfig({ tmpDir, storePath });
+    const { result, sendTelegram, calledCtx, replyCallCount } = await runHeartbeatCase({
+      tmpPrefix: "openclaw-ghost-",
+      replyText: "Heartbeat check-in",
+      reason: "cron:test-job",
+      enqueue: (sessionKey) => {
         enqueueSystemEvent("HEARTBEAT_OK", { sessionKey });
-
-        const result = await runHeartbeatOnce({
-          cfg,
-          agentId: "main",
-          reason: "cron:test-job",
-          deps: {
-            sendTelegram,
-          },
-        });
-
-        expect(result.status).toBe("ran");
-        expect(getReplySpy).toHaveBeenCalledTimes(1);
-        const calledCtx = getReplySpy.mock.calls[0]?.[0];
-        expect(calledCtx?.Provider).toBe("heartbeat");
-        expect(calledCtx?.Body).not.toContain("scheduled reminder has been triggered");
-        expect(calledCtx?.Body).not.toContain("relay this reminder");
-        expect(sendTelegram).toHaveBeenCalled();
       },
-      { prefix: "openclaw-ghost-" },
-    );
+    });
+    expect(result.status).toBe("ran");
+    expect(replyCallCount).toBe(1);
+    expect(calledCtx?.Provider).toBe("heartbeat");
+    expect(calledCtx?.Body).not.toContain("scheduled reminder has been triggered");
+    expect(calledCtx?.Body).not.toContain("relay this reminder");
+    expect(sendTelegram).toHaveBeenCalled();
   });
 
   it("uses CRON_EVENT_PROMPT when an actionable cron event exists", async () => {
@@ -165,34 +173,23 @@ describe("Ghost reminder bug (issue #13317)", () => {
   });
 
   it("uses CRON_EVENT_PROMPT for tagged cron events on interval wake", async () => {
-    await withTempHeartbeatSandbox(
-      async ({ tmpDir, storePath }) => {
-        const { sendTelegram, getReplySpy } = createHeartbeatDeps("Relay this cron update now");
-        const { cfg, sessionKey } = await createConfig({ tmpDir, storePath });
+    const { result, sendTelegram, calledCtx, replyCallCount } = await runHeartbeatCase({
+      tmpPrefix: "openclaw-cron-interval-",
+      replyText: "Relay this cron update now",
+      reason: "interval",
+      enqueue: (sessionKey) => {
         enqueueSystemEvent("Cron: QMD maintenance completed", {
           sessionKey,
           contextKey: "cron:qmd-maintenance",
         });
-
-        const result = await runHeartbeatOnce({
-          cfg,
-          agentId: "main",
-          reason: "interval",
-          deps: {
-            sendTelegram,
-          },
-        });
-
-        expect(result.status).toBe("ran");
-        expect(getReplySpy).toHaveBeenCalledTimes(1);
-        const calledCtx = getReplySpy.mock.calls[0]?.[0];
-        expect(calledCtx?.Provider).toBe("cron-event");
-        expect(calledCtx?.Body).toContain("scheduled reminder has been triggered");
-        expect(calledCtx?.Body).toContain("Cron: QMD maintenance completed");
-        expect(calledCtx?.Body).not.toContain("Read HEARTBEAT.md");
-        expect(sendTelegram).toHaveBeenCalled();
       },
-      { prefix: "openclaw-cron-interval-" },
-    );
+    });
+    expect(result.status).toBe("ran");
+    expect(replyCallCount).toBe(1);
+    expect(calledCtx?.Provider).toBe("cron-event");
+    expect(calledCtx?.Body).toContain("scheduled reminder has been triggered");
+    expect(calledCtx?.Body).toContain("Cron: QMD maintenance completed");
+    expect(calledCtx?.Body).not.toContain("Read HEARTBEAT.md");
+    expect(sendTelegram).toHaveBeenCalled();
   });
 });
