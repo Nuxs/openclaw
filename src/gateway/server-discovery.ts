@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { resolveProductName } from "../infra/brand.js";
 import { getTailnetHostname } from "../infra/tailscale.js";
 import { runExec } from "../process/exec.js";
 
@@ -12,14 +13,17 @@ export type ResolveBonjourCliPathOptions = {
 };
 
 export function formatBonjourInstanceName(displayName: string) {
+  const productName = resolveProductName();
   const trimmed = displayName.trim();
   if (!trimmed) {
-    return "OpenClaw";
+    return productName;
   }
-  if (/openclaw/i.test(trimmed)) {
+  const productLower = productName.toLowerCase();
+  const trimmedLower = trimmed.toLowerCase();
+  if (trimmedLower.includes("openclaw") || (productLower && trimmedLower.includes(productLower))) {
     return trimmed;
   }
-  return `${trimmed} (OpenClaw)`;
+  return `${trimmed} (${productName})`;
 }
 
 export function resolveBonjourCliPath(opts: ResolveBonjourCliPathOptions = {}): string | undefined {

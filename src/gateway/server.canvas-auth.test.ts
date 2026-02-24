@@ -20,7 +20,20 @@ async function listen(
   port: number;
   close: () => Promise<void>;
 }> {
-  await new Promise<void>((resolve) => server.listen(0, host, resolve));
+  await new Promise<void>((resolve, reject) => {
+    const onError = (err: unknown) => {
+      server.off("listening", onListening);
+      reject(err);
+    };
+    const onListening = () => {
+      server.off("error", onError);
+      resolve();
+    };
+
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(0, host);
+  });
   const addr = server.address();
   const port = typeof addr === "object" && addr ? addr.port : 0;
   return {
