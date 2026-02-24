@@ -1,3 +1,4 @@
+import { fetchWithSsrFGuard } from "../../infra/net/fetch-guard.js";
 import { readResponseText, withTimeout } from "../web-shared.js";
 
 export type GeminiConfig = {
@@ -36,19 +37,25 @@ export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 export const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 const REDIRECT_TIMEOUT_MS = 5000;
+const TRUSTED_NETWORK_SSRF_POLICY = { dangerouslyAllowPrivateNetwork: true } as const;
 
 /**
- * Resolve a redirect URL to its final destination using a HEAD request.
+ * Resolve a redirect URL to its final destination using an SSRF-guarded HEAD request.
  * Returns the original URL if resolution fails or times out.
  */
-async function resolveRedirectUrl(url: string): Promise<string> {
+export async function resolveRedirectUrl(url: string): Promise<string> {
   try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: withTimeout(undefined, REDIRECT_TIMEOUT_MS),
+    const { finalUrl, release } = await fetchWithSsrFGuard({
+      url,
+      init: { method: "HEAD" },
+      timeoutMs: REDIRECT_TIMEOUT_MS,
+      policy: TRUSTED_NETWORK_SSRF_POLICY,
     });
-    return res.url || url;
+    try {
+      return finalUrl || url;
+    } finally {
+      await release();
+    }
   } catch {
     return url;
   }

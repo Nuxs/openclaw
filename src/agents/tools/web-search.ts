@@ -8,7 +8,12 @@ import type { AnyAgentTool } from "./common.js";
 import { jsonResult, readNumberParam, readStringParam } from "./common.js";
 import { runBraveSearch } from "./web-search/brave.js";
 import { normalizeFreshness, freshnessToPerplexityRecency } from "./web-search/freshness.js";
-import { runGeminiSearch, DEFAULT_GEMINI_MODEL, type GeminiConfig } from "./web-search/gemini.js";
+import {
+  DEFAULT_GEMINI_MODEL,
+  resolveRedirectUrl,
+  runGeminiSearch,
+  type GeminiConfig,
+} from "./web-search/gemini.js";
 import { runGrokSearch, DEFAULT_GROK_MODEL, extractGrokContent } from "./web-search/grok.js";
 import {
   DEFAULT_KIMI_BASE_URL,
@@ -784,4 +789,5 @@ export const __testing = {
   resolveKimiModel,
   resolveKimiBaseUrl,
   extractKimiCitations,
+  resolveRedirectUrl,
 } as const;
