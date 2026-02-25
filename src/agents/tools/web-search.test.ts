@@ -251,7 +251,7 @@ describe("web_search grok response parsing", () => {
 
 describe("web_search searxng config resolution", () => {
   it("resolves baseUrl from config", () => {
-    expect(resolveSearxngBaseUrl({ baseUrl: "https://search.example.com" })).toBe(
+    expect(resolveSearxngBaseUrl({ searxng: { baseUrl: "https://search.example.com" } })).toBe(
       "https://search.example.com",
     );
   });
@@ -291,7 +291,7 @@ describe("web_search searxng config resolution", () => {
 
   it("prefers config apiKey over env var", () => {
     withEnv({ SEARXNG_API_KEY: "env-token" }, () => {
-      expect(resolveSearxngApiKey({ apiKey: "config-token" })).toBe("config-token");
+      expect(resolveSearxngApiKey({ searxng: { apiKey: "config-token" } })).toBe("config-token");
     });
   });
 });
@@ -299,6 +299,12 @@ describe("web_search searxng config resolution", () => {
 describe("resolveSearchProvider", () => {
   it("resolves searxng provider", () => {
     expect(resolveSearchProvider({ provider: "searxng" })).toBe("searxng");
+  });
+
+  it("auto-detects searxng when baseUrl is configured and provider omitted", () => {
+    expect(resolveSearchProvider({ searxng: { baseUrl: "https://search.example.com" } })).toBe(
+      "searxng",
+    );
   });
 
   it("resolves grok provider", () => {

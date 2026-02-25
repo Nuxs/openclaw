@@ -50,6 +50,29 @@ describe("web search provider config", () => {
 
     expect(res.ok).toBe(true);
   });
+
+  it("accepts searxng provider and config", () => {
+    const res = validateConfigObject(
+      buildWebSearchProviderConfig({
+        enabled: true,
+        provider: "searxng",
+        providerConfig: {
+          baseUrl: "https://search.example.com",
+          apiKey: "test-key",
+          siteWeights: { "example.com": 1.2 },
+          rerank: {
+            mode: "auto",
+            endpoint: "http://127.0.0.1:8899/rerank",
+            timeoutSeconds: 1,
+            maxCandidates: 10,
+            maxLength: 256,
+          },
+        },
+      }),
+    );
+
+    expect(res.ok).toBe(true);
+  });
 });
 
 describe("web search provider auto-detection", () => {

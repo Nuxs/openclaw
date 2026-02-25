@@ -292,7 +292,8 @@ export async function runSearxngSearch(params: {
             score: scores[index],
             index,
           }));
-          ranked = scored
+
+          const reranked = scored
             .toSorted((a, b) => {
               if (b.score !== a.score) {
                 return b.score - a.score;
@@ -300,6 +301,9 @@ export async function runSearxngSearch(params: {
               return a.index - b.index;
             })
             .map((entry) => entry.entry);
+
+          // Keep the remaining results after reranking the top candidates.
+          ranked = reranked.concat(deduped.slice(candidates.length));
         } catch (error) {
           if (rerankMode === "on") {
             throw error;

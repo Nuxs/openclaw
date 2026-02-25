@@ -33,10 +33,11 @@ function asWebSearchConfig(value: unknown): WebSearchConfigLike {
 function resolveSearxngConfig(search: unknown): SearxngConfig | undefined {
   const cfg = asWebSearchConfig(search);
   const searxng = cfg?.searxng;
-  if (!searxng || typeof searxng !== "object") {
-    return undefined;
+  if (searxng && typeof searxng === "object") {
+    return searxng;
   }
-  return searxng;
+
+  return undefined;
 }
 
 export function resolveSearxngBaseUrl(search: unknown): string | undefined {
