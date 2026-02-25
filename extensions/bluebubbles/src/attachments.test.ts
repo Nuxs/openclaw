@@ -89,7 +89,7 @@ describe("downloadBlueBubblesAttachment", () => {
         serverUrl: "http://localhost:1234",
         password: "test-password",
       }),
-    ).rejects.toThrow("guid is required");
+    ).rejects.toThrow("BlueBubbles attachment guid is required");
   });
 
   it("throws when guid is empty string", async () => {
@@ -105,7 +105,7 @@ describe("downloadBlueBubblesAttachment", () => {
   it("throws when serverUrl is missing", async () => {
     const attachment: BlueBubblesAttachment = { guid: "att-123" };
     await expect(downloadBlueBubblesAttachment(attachment, {})).rejects.toThrow(
-      "serverUrl is required",
+      "BlueBubbles serverUrl is required",
     );
   });
 
@@ -115,7 +115,7 @@ describe("downloadBlueBubblesAttachment", () => {
       downloadBlueBubblesAttachment(attachment, {
         serverUrl: "http://localhost:1234",
       }),
-    ).rejects.toThrow("password is required");
+    ).rejects.toThrow("BlueBubbles password is required");
   });
 
   it("downloads attachment successfully", async () => {
