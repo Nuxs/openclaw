@@ -155,14 +155,14 @@ jobs:
         run: |
           TITLE="Sync ${TARGET_REF} (${GITHUB_RUN_ID})"
           BODY=$(cat <<'EOF'
-This is an automated upstream sync PR.
+          This is an automated upstream sync PR.
 
-- Strategy: merge/rebase via `private/scripts/sync-upstream.sh`
-- Pin files updated: `private/upstream-pin.json`, `private/upstream-pin.md`
+          - Strategy: merge/rebase via `private/scripts/sync-upstream.sh`
+          - Pin files updated: `private/upstream-pin.json`, `private/upstream-pin.md`
 
-If this PR is unexpectedly large or conflicts, review `private/scripts/predict-conflicts.sh` output and keep upstream blocks first.
-EOF
-)
+          If this PR is unexpectedly large or conflicts, review `private/scripts/predict-conflicts.sh` output and keep upstream blocks first.
+          EOF
+          )
 
           # If a PR for this head branch already exists, do nothing.
           if gh pr list --head "$BRANCH" --json number --jq 'length' | grep -q '^0$'; then

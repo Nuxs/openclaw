@@ -355,14 +355,20 @@ async function main() {
     ensureCommitExists(pin.sync.beforeSha, "pin.sync.beforeSha");
     ensureCommitExists(pin.sync.afterSha, "pin.sync.afterSha");
 
-    const expectedJson = pinToJson(pin);
-    const actualJson = fs.readFileSync(args.outJsonPath, "utf8");
+    function normalizeText(value: string): string {
+      // Tolerate editor differences (CRLF vs LF, missing trailing newline, extra trailing blank lines).
+      const lf = value.replaceAll("\r\n", "\n");
+      return `${lf.trimEnd()}\n`;
+    }
+
+    const expectedJson = normalizeText(pinToJson(pin));
+    const actualJson = normalizeText(fs.readFileSync(args.outJsonPath, "utf8"));
     if (actualJson !== expectedJson) {
       throw new Error("Pin JSON is not normalized (run write-upstream-pin.ts to rewrite)");
     }
 
-    const expectedMd = renderPinMarkdown(pin);
-    const actualMd = fs.readFileSync(args.outMdPath, "utf8");
+    const expectedMd = normalizeText(renderPinMarkdown(pin));
+    const actualMd = normalizeText(fs.readFileSync(args.outMdPath, "utf8"));
     if (actualMd !== expectedMd) {
       throw new Error("Pin Markdown does not match JSON (run write-upstream-pin.ts to rewrite)");
     }
