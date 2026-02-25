@@ -63,6 +63,10 @@ description: 维护 OpenClaw 私有化 fork（overlay-first），降低与 upstr
 - `pnpm build`
 - `pnpm test`
 
+### 7) 更新 Skill 后的同步（仅当你改了 `skills/*`）
+
+- `bash scripts/sync-codebuddy.sh`
+
 ---
 
 ## 常见踩坑（Pitfalls）
