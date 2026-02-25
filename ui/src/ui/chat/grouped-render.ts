@@ -4,6 +4,7 @@ import { t } from "../../i18n/index.ts";
 import type { AssistantIdentity } from "../assistant-identity.ts";
 import type { ChatProgressState, ChatProgressStep } from "../controllers/chat.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
+import { openExternalUrlSafe } from "../open-external-url.ts";
 import { detectTextDirection } from "../text-direction.ts";
 import { resolveToolDisplay } from "../tool-display.ts";
 import type { MessageGroup } from "../types/chat-types.ts";
@@ -263,6 +264,10 @@ function renderMessageImages(images: ImageBlock[]) {
     return nothing;
   }
 
+  const openImage = (url: string) => {
+    openExternalUrlSafe(url, { allowDataImage: true });
+  };
+
   return html`
     <div class="chat-message-images">
       ${images.map(
@@ -271,7 +276,7 @@ function renderMessageImages(images: ImageBlock[]) {
             src=${img.url}
             alt=${img.alt ?? "Attached image"}
             class="chat-message-image"
-            @click=${() => window.open(img.url, "_blank")}
+            @click=${() => openImage(img.url)}
           />
         `,
       )}

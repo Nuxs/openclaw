@@ -116,6 +116,11 @@ private/assets/*.ico
 private/assets/*.svg
 private/assets/*.png
 
+# Xcode build directories (xcodebuild output)
+apps/ios/build/
+apps/shared/OpenClawKit/build/
+Swabble/build/
+
 # Generated protocol schema (produced via pnpm protocol:gen)
 dist/protocol.schema.json
 .ant-colony/
