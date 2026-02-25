@@ -28,7 +28,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: sync-upstream-scheduled-${{ github.workflow }}-${{ github.ref }}
+  group: "sync-upstream-scheduled-${{ github.workflow }}-${{ github.ref }}"
   cancel-in-progress: false
 
 jobs:
@@ -72,7 +72,7 @@ jobs:
       - name: Decide whether sync is needed
         id: behind
         env:
-          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
+          TARGET_REF: "${{ inputs.target_ref || 'upstream/main' }}"
         run: |
           BEHIND=$(git rev-list --count "HEAD..${TARGET_REF}" 2>/dev/null || echo "?")
           echo "behind=${BEHIND}" >> "$GITHUB_OUTPUT"
@@ -84,7 +84,8 @@ jobs:
 
       - name: No sync needed
         if: steps.behind.outputs.needs_sync != 'true'
-        run: echo "Already up-to-date with ${{ inputs.target_ref || 'upstream/main' }}"
+        run: |
+          echo "Already up-to-date with ${{ inputs.target_ref || 'upstream/main' }}"
 
       - name: Create sync branch
         if: steps.behind.outputs.needs_sync == 'true'
@@ -98,7 +99,7 @@ jobs:
       - name: Predict conflicts (best-effort)
         if: steps.behind.outputs.needs_sync == 'true'
         env:
-          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
+          TARGET_REF: "${{ inputs.target_ref || 'upstream/main' }}"
         run: |
           if [ -x private/scripts/predict-conflicts.sh ]; then
             bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --no-fetch --json | cat
@@ -109,8 +110,8 @@ jobs:
       - name: Sync from upstream
         if: steps.behind.outputs.needs_sync == 'true'
         env:
-          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
-          STRATEGY: ${{ inputs.strategy || 'merge' }}
+          TARGET_REF: "${{ inputs.target_ref || 'upstream/main' }}"
+          STRATEGY: "${{ inputs.strategy || 'merge' }}"
         run: |
           if [ "$TARGET_REF" = "upstream/main" ]; then
             if [ "$STRATEGY" = "rebase" ]; then
@@ -143,15 +144,15 @@ jobs:
       - name: Push branch
         if: steps.behind.outputs.needs_sync == 'true'
         env:
-          BRANCH: ${{ steps.branch.outputs.branch }}
+          BRANCH: "${{ steps.branch.outputs.branch }}"
         run: git push --set-upstream origin "$BRANCH"
 
       - name: Open PR
         if: steps.behind.outputs.needs_sync == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: ${{ steps.branch.outputs.branch }}
-          TARGET_REF: ${{ inputs.target_ref || 'upstream/main' }}
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          BRANCH: "${{ steps.branch.outputs.branch }}"
+          TARGET_REF: "${{ inputs.target_ref || 'upstream/main' }}"
         run: |
           TITLE="Sync ${TARGET_REF} (${GITHUB_RUN_ID})"
           BODY=$(cat <<'EOF'
