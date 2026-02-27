@@ -227,7 +227,7 @@ else
       echo "解决步骤:"
       echo "  1. 编辑冲突文件"
       echo "  2. git add <已解决的文件>"
-      echo "  3. git merge --continue"
+      echo "  3. git commit --no-edit   # 或 git commit（自定义 merge message）"
       echo ""
       echo "放弃: git merge --abort"
       exit 1
