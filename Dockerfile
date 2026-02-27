@@ -24,10 +24,12 @@ COPY --chown=node:node scripts ./scripts
 
 USER node
 ARG OPENCLAW_PNPM_FORCE="0"
+# Reduce OOM risk on low-memory hosts during dependency installation.
+# Docker builds on small VMs may otherwise fail with "Killed" (exit 137).
 RUN if [ "$OPENCLAW_PNPM_FORCE" = "1" ]; then \
-      pnpm install --force; \
+      NODE_OPTIONS=--max-old-space-size=2048 pnpm install --force; \
     else \
-      pnpm install --frozen-lockfile; \
+      NODE_OPTIONS=--max-old-space-size=2048 pnpm install --frozen-lockfile; \
     fi
 
 # Optionally install Chromium and Xvfb for browser automation.
@@ -53,6 +55,11 @@ RUN pnpm build
 # Force pnpm for UI build (Bun may fail on ARM/Synology architectures)
 ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
+
+# Expose the CLI binary without requiring npm global writes as non-root.
+USER root
+RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
+ && chmod 755 /app/openclaw.mjs
 
 ENV NODE_ENV=production
 
