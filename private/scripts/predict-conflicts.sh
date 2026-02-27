@@ -9,11 +9,12 @@
 #   ./private/scripts/predict-conflicts.sh --no-fetch
 #
 # 输出:
-# - 打印预计会发生冲突的文件列表，并按“品牌相关/非品牌相关”分组。
+# - 打印预计会发生冲突的文件列表，并按"品牌相关/非品牌相关"分组。
+# - 对非品牌冲突文件提示是否需要进一步做 overlay 拆分。
 #
 # 实现:
-# - 使用 `git merge-tree --write-tree --messages` 做只读三方合并。
-# - 解析 "CONFLICT ...: Merge conflict in <path>" 行得到冲突文件路径。
+# - 优先使用 git merge-tree --write-tree（Git 2.38+）；不支持时 fallback 到
+#   git merge-tree <base> <ours> <theirs>（旧语法）。
 # - 全程不 touch index、不 checkout 文件。
 set -euo pipefail
 
@@ -88,23 +89,38 @@ conflicts_tmp="$(mktemp)"
 brand_tmp="$(mktemp)"
 trap 'rm -f "$conflicts_tmp" "$brand_tmp"' EXIT
 
-# `git merge-tree` 在冲突场景下可能返回非 0（不同 Git 版本行为不完全一致），
-# 所以这里显式忽略 exit code，只解析输出中的冲突行。
 BASE="$(git merge-base HEAD "$TARGET_REF" 2>/dev/null || true)"
 if [[ -z "$BASE" ]]; then
   echo "❌ 无法计算 merge-base（HEAD vs ${TARGET_REF}）"
   exit 1
 fi
 
-{
-  git merge-tree --write-tree --messages --name-only "$BASE" HEAD "$TARGET_REF" 2>/dev/null || true
-} \
-  | sed -n 's/^CONFLICT .*: Merge conflict in //p' \
-  | sort -u >"$conflicts_tmp"
+# 尝试 Git 2.38+ 的 merge-tree --write-tree，不支持时 fallback 到旧语法
+merge_tree_output=""
+if git merge-tree --write-tree --messages --name-only HEAD "$TARGET_REF" >/dev/null 2>&1; then
+  # 新语法可用（注意：有冲突时可能返回非 0）
+  merge_tree_output="$(git merge-tree --write-tree --messages --name-only HEAD "$TARGET_REF" 2>/dev/null || true)"
+  printf '%s\n' "$merge_tree_output" \
+    | sed -n 's/^CONFLICT .*: Merge conflict in //p' \
+    | sort -u >"$conflicts_tmp"
+else
+  # Fallback: 旧版 Git 的 merge-tree 输出格式不稳定，直接使用近似预测：
+  # 取 base->HEAD 与 base->TARGET_REF 的变更文件交集。
+  ours_changed="$(mktemp)"
+  theirs_changed="$(mktemp)"
+  git diff --name-only "$BASE" HEAD | sort -u >"$ours_changed"
+  git diff --name-only "$BASE" "$TARGET_REF" | sort -u >"$theirs_changed"
+  comm -12 "$ours_changed" "$theirs_changed" >"$conflicts_tmp"
+  rm -f "$ours_changed" "$theirs_changed"
+
+  if [[ -s "$conflicts_tmp" && "$OUTPUT_MODE" == "text" ]]; then
+    echo "⚠️  Git 版本较旧（$(git --version)），冲突预测为近似结果（双方都修改的文件）。"
+  fi
+fi
 
 if [[ ! -s "$conflicts_tmp" ]]; then
   if [[ "$OUTPUT_MODE" == "json" ]]; then
-    node -e 'console.log(JSON.stringify({ predicted: { total: 0, brand: 0, other: 0, files: [], brandFiles: [], otherFiles: [] } }, null, 2))'
+    echo '{ "predicted": { "total": 0, "brand": 0, "other": 0, "files": [], "brandFiles": [], "otherFiles": [] } }'
     exit 0
   fi
   echo "✅ 未检测到 merge 冲突（HEAD vs ${TARGET_REF}）"
@@ -137,11 +153,15 @@ function readLines(filePath) {
     .filter(Boolean);
 }
 
+function normalize(filePath) {
+  return filePath.replaceAll("\\\\", "/");
+}
+
 const conflictsFile = process.env.CONFLICTS_FILE;
 const brandTargetsFile = process.env.BRAND_TARGETS_FILE;
 
-const files = readLines(conflictsFile);
-const brandTargets = new Set(readLines(brandTargetsFile));
+const files = readLines(conflictsFile).map(normalize);
+const brandTargets = new Set(readLines(brandTargetsFile).map(normalize));
 const brandFiles = files.filter((f) => brandTargets.has(f));
 const otherFiles = files.filter((f) => !brandTargets.has(f));
 
@@ -174,7 +194,12 @@ if [[ -n "${other_conflicts// }" ]]; then
   echo ""
   echo "=== 非品牌冲突（${count_other}） ==="
   printf '%s\n' "$other_conflicts" | sed '/^$/d' | sed 's/^/  - /'
+  echo ""
+  echo "💡 非品牌冲突提示："
+  echo "   如果冲突文件是上游热点文件，说明 overlay 拆分还不够彻底。"
+  echo "   建议：先将私有逻辑拆到独立叶子模块，再同步上游（参考 AGENTS.md 的 overlay 规范）。"
 fi
 
 echo ""
 echo "提示：这是 merge 冲突预测（只读）。实际 rebase 冲突集合可能略有不同。"
+echo "      pnpm-lock.yaml 冲突会在 sync-upstream.sh 中自动处理（accept theirs + pnpm install）。"
