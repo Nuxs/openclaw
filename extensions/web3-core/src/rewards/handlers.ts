@@ -42,3 +42,9 @@ export function createWeb3RewardListHandler(config: Web3PluginConfig): GatewayRe
 export function createWeb3RewardClaimHandler(config: Web3PluginConfig): GatewayRequestHandler {
   return createRewardProxyHandler(config, "market.reward.issueClaim");
 }
+
+export function createWeb3RewardUpdateStatusHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createRewardProxyHandler(config, "market.reward.updateStatus");
+}

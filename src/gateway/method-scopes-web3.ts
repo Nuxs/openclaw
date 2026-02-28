@@ -43,6 +43,10 @@ export const WEB3_READ_METHODS: readonly string[] = [
   "web3.dispute.get",
   "web3.dispute.list",
   "web3.monitor.snapshot",
+  "web3.billing.status",
+  "web3.billing.summary",
+  "web3.audit.query",
+  "web3.market.reconciliation.summary",
 ] as const;
 
 export const WEB3_WRITE_METHODS: readonly string[] = [
@@ -59,6 +63,7 @@ export const WEB3_WRITE_METHODS: readonly string[] = [
   "market.settlement.refund",
   "market.reward.create",
   "market.reward.issueClaim",
+  "market.reward.updateStatus",
   "market.consent.grant",
   "market.consent.revoke",
   "market.delivery.issue",
@@ -80,6 +85,7 @@ export const WEB3_WRITE_METHODS: readonly string[] = [
   "web3.market.lease.revoke",
   "web3.market.lease.expireSweep",
   "web3.reward.claim",
+  "web3.reward.updateStatus",
   "web3.dispute.open",
   "web3.dispute.submitEvidence",
   "web3.dispute.resolve",
