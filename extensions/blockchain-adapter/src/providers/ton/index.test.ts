@@ -50,7 +50,7 @@ describe("TONProvider getTransactionReceipt", () => {
     client.getTransactions.mockResolvedValue([]);
 
     const receipt = await provider.getTransactionReceipt("some-hash");
-    expect(receipt).toBeNull();
+    expect(receipt).toBeUndefined();
   });
 
   it("finds transaction by hash", async () => {
@@ -69,8 +69,8 @@ describe("TONProvider getTransactionReceipt", () => {
     client.getTransactions.mockResolvedValue([mockTx]);
 
     const receipt = await provider.getTransactionReceipt(txHash);
-    expect(receipt).not.toBeNull();
-    expect(receipt?.transactionHash).toBe(txHash);
+    expect(receipt).not.toBeUndefined();
+    expect(receipt?.txHash).toBe(txHash);
     expect(receipt?.status).toBe("success");
   });
 
@@ -93,7 +93,7 @@ describe("TONProvider getTransactionReceipt", () => {
     client.getTransactions.mockResolvedValue([mockTx]);
 
     const receipt = await provider.getTransactionReceipt(msgHash);
-    expect(receipt).not.toBeNull();
-    expect(receipt?.transactionHash).toBe(txHash);
+    expect(receipt).not.toBeUndefined();
+    expect(receipt?.txHash).toBe(txHash);
   });
 });

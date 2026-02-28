@@ -155,20 +155,26 @@ export class TONProvider implements IProviderTON {
     const keyPair = await mnemonicToPrivateKey(words);
     const workchain = typeof config.tonWorkchain === "number" ? config.tonWorkchain : 0;
 
-    const wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
+    const wallet = WalletContractV4.create({
+      workchain,
+      publicKey: Buffer.from(keyPair.publicKey),
+    });
     const provider = this.client.provider(wallet.address, wallet.init);
 
     this.tonConnect = undefined;
     this.headless = {
       workchain,
-      keyPair,
+      keyPair: {
+        publicKey: Buffer.from(keyPair.publicKey),
+        secretKey: Buffer.from(keyPair.secretKey),
+      },
       wallet,
       provider,
     };
 
     this.connectedWallet = {
       address: wallet.address.toString(),
-      publicKey: keyPair.publicKey.toString("hex"),
+      publicKey: Buffer.from(keyPair.publicKey).toString("hex"),
       chainId: await this.getChainId(),
     };
 
@@ -339,22 +345,23 @@ export class TONProvider implements IProviderTON {
     return masterchain.latestSeqno;
   }
 
-  async getTransactionReceipt(txHash: TxHash): Promise<TxReceipt | null> {
-    if (!this.connectedWallet) return null;
+  async getTransactionReceipt(txHash: string): Promise<TxReceipt | undefined> {
+    if (!this.connectedWallet) return undefined;
     const address = Address.parse(this.connectedWallet.address);
 
     try {
       // Searching for transaction with specific hash or message hash.
       // NOTE: For external BOCs returned by transfer(), we might need to search by message hash.
-      const txs = await this.client.getTransactions(address, { limit: 20 });
+      const txs = await (this.client as any).getTransactions(address, { limit: 20 });
       for (const tx of txs) {
         // Match by tx hash
         if (tx.hash().toString("base64") === txHash || tx.hash().toString("hex") === txHash) {
           return {
             status: "success",
-            blockNumber: tx.lt.toString(),
-            transactionHash: tx.hash().toString("hex"),
-            confirmations: 1,
+            blockNumber: Number(tx.lt),
+            txHash: tx.hash().toString("hex"),
+            from: this.connectedWallet.address,
+            logs: [],
           };
         }
         // Match by message hash (if txHash is actually a msg hash or BOC hash)
@@ -364,16 +371,17 @@ export class TONProvider implements IProviderTON {
         ) {
           return {
             status: "success",
-            blockNumber: tx.lt.toString(),
-            transactionHash: tx.hash().toString("hex"),
-            confirmations: 1,
+            blockNumber: Number(tx.lt),
+            txHash: tx.hash().toString("hex"),
+            from: this.connectedWallet.address,
+            logs: [],
           };
         }
       }
     } catch (err) {
       console.error("TON getTransactionReceipt error:", err);
     }
-    return null;
+    return undefined;
   }
 
   getExplorerUrl(txHash: TxHash | string): string {
