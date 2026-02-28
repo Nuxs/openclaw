@@ -134,6 +134,11 @@ import {
   createWeb3StorageListTool,
   createWeb3StoragePutTool,
 } from "./resources/tools.js";
+import {
+  createWeb3RewardClaimHandler,
+  createWeb3RewardGetHandler,
+  createWeb3RewardListHandler,
+} from "./rewards/handlers.js";
 import { Web3StateStore } from "./state/store.js";
 import { createWeb3StatusSummaryHandler } from "./status/summary-handler.js";
 
@@ -268,6 +273,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("web3.billing.status", createBillingStatusHandler(store, config));
     api.registerGatewayMethod("web3.billing.summary", createBillingSummaryHandler(store, config));
     api.registerGatewayMethod("web3.status.summary", createWeb3StatusSummaryHandler(store, config));
+
+    api.registerGatewayMethod("web3.reward.get", createWeb3RewardGetHandler(config));
+    api.registerGatewayMethod("web3.reward.list", createWeb3RewardListHandler(config));
+    api.registerGatewayMethod("web3.reward.claim", createWeb3RewardClaimHandler(config));
 
     api.registerGatewayMethod("web3.resources.publish", createResourcePublishHandler(config));
     api.registerGatewayMethod("web3.resources.unpublish", createResourceUnpublishHandler(config));
