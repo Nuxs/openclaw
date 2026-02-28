@@ -161,6 +161,7 @@ export type AuditEventKind =
   | "token_burned"
   | "token_governance_updated"
   | "reward_created"
+  | "reward_status_updated"
   | "reward_claim_issued"
   | "reward_onchain_submitted"
   | "reward_onchain_confirmed"
