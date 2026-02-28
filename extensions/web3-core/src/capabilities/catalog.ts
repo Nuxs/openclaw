@@ -7,6 +7,7 @@ import { coreCapabilities } from "./catalog/core.js";
 import { marketCapabilities } from "./catalog/market.js";
 import { monitorCapabilities } from "./catalog/monitor.js";
 import { resourceCapabilities } from "./catalog/resources.js";
+import { rewardCapabilities } from "./catalog/reward.js";
 import { toolsCapabilities } from "./catalog/tools.js";
 import type { CapabilityDescriptor, CapabilitySummary } from "./types.js";
 
@@ -35,6 +36,7 @@ export function describeWeb3Capabilities(
   const capabilities: CapabilityDescriptor[] = [
     ...coreCapabilities(config),
     ...resourceCapabilities(config),
+    ...rewardCapabilities(config),
     ...monitorCapabilities(),
     ...marketCapabilities(config),
     ...toolsCapabilities(config),
