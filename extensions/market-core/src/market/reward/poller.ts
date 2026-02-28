@@ -21,11 +21,7 @@ export async function flushPendingRewards(
     if (!txHash) continue;
 
     try {
-      const provider = getProvider(reward.chainFamily as any, {
-        rpcUrl: config.chain.rpcUrl,
-        // Heuristic for testnet
-        testnet: config.chain.network.includes("testnet") || config.chain.network === "sepolia",
-      });
+      const provider = getProvider(reward.network as any);
 
       const receipt = await provider.getTransactionReceipt(txHash);
       if (receipt) {
@@ -42,11 +38,11 @@ export async function flushPendingRewards(
             },
             updatedAt: now,
           };
-        } else if (receipt.status === "reverted") {
+        } else if (receipt.status === "failure") {
           updated = {
             ...reward,
             status: "onchain_failed",
-            lastError: "transaction reverted",
+            lastError: "transaction failed on-chain",
             updatedAt: now,
           };
         }
