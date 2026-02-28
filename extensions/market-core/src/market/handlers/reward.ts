@@ -218,13 +218,39 @@ export function createRewardListHandler(
         typeof input.recipient === "string" && input.recipient.trim().length > 0
           ? input.recipient.trim()
           : undefined;
+      const statusInput =
+        typeof input.status === "string" && input.status.trim().length > 0
+          ? input.status.trim()
+          : undefined;
+      const limit = typeof input.limit === "number" ? Math.min(Math.max(1, input.limit), 500) : 50;
+      const offset = typeof input.offset === "number" ? Math.max(0, input.offset) : 0;
+
       const rewards = store.listRewards();
-      const filtered = recipientInput
-        ? rewards.filter(
-            (r) => r.recipient === recipientInput || r.recipient === recipientInput.toLowerCase(),
-          )
-        : rewards;
-      respond(true, { rewards: filtered, count: filtered.length });
+      let filtered = rewards;
+
+      if (recipientInput) {
+        filtered = filtered.filter(
+          (r) => r.recipient === recipientInput || r.recipient === recipientInput.toLowerCase(),
+        );
+      }
+
+      if (statusInput) {
+        filtered = filtered.filter((r) => r.status === statusInput);
+      }
+
+      // Sort by newest first
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const totalCount = filtered.length;
+      const paginated = filtered.slice(offset, offset + limit);
+
+      respond(true, {
+        rewards: paginated,
+        count: paginated.length,
+        totalCount,
+        limit,
+        offset,
+      });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }

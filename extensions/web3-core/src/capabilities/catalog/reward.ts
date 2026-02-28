@@ -35,10 +35,22 @@ export function rewardCapabilities(config: Web3PluginConfig): CapabilityDescript
         type: "object",
         properties: {
           recipient: { type: "string", description: "Optional recipient address filter" },
-          limit: { type: "number", minimum: 1, maximum: 100 },
+          status: {
+            type: "string",
+            enum: [
+              "reward_created",
+              "claim_issued",
+              "onchain_submitted",
+              "onchain_confirmed",
+              "onchain_failed",
+            ],
+            description: "Filter by status",
+          },
+          limit: { type: "number", minimum: 1, maximum: 500 },
+          offset: { type: "number", minimum: 0 },
         },
       },
-      returns: "List of reward grants and count.",
+      returns: "List of reward grants, totalCount, and paging metadata.",
       risk: { level: "low" },
     },
     {
