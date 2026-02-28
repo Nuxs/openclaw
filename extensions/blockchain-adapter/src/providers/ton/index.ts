@@ -339,7 +339,40 @@ export class TONProvider implements IProviderTON {
     return masterchain.latestSeqno;
   }
 
-  async getTransactionReceipt(_txHash: TxHash): Promise<TxReceipt | null> {
+  async getTransactionReceipt(txHash: TxHash): Promise<TxReceipt | null> {
+    if (!this.connectedWallet) return null;
+    const address = Address.parse(this.connectedWallet.address);
+
+    try {
+      // Searching for transaction with specific hash or message hash.
+      // NOTE: For external BOCs returned by transfer(), we might need to search by message hash.
+      const txs = await this.client.getTransactions(address, { limit: 20 });
+      for (const tx of txs) {
+        // Match by tx hash
+        if (tx.hash().toString("base64") === txHash || tx.hash().toString("hex") === txHash) {
+          return {
+            status: "success",
+            blockNumber: tx.lt.toString(),
+            transactionHash: tx.hash().toString("hex"),
+            confirmations: 1,
+          };
+        }
+        // Match by message hash (if txHash is actually a msg hash or BOC hash)
+        if (
+          tx.inMessage?.hash().toString("base64") === txHash ||
+          tx.inMessage?.hash().toString("hex") === txHash
+        ) {
+          return {
+            status: "success",
+            blockNumber: tx.lt.toString(),
+            transactionHash: tx.hash().toString("hex"),
+            confirmations: 1,
+          };
+        }
+      }
+    } catch (err) {
+      console.error("TON getTransactionReceipt error:", err);
+    }
     return null;
   }
 
