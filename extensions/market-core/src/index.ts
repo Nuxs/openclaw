@@ -61,6 +61,11 @@ import {
   createTokenEconomyGovernanceUpdateHandler,
   createTokenEconomyMintHandler,
   createTokenEconomySummaryHandler,
+  createRewardCreateHandler,
+  createRewardGetHandler,
+  createRewardIssueClaimHandler,
+  createRewardListHandler,
+  createRewardUpdateStatusHandler,
   createSettlementLockHandler,
   createSettlementRefundHandler,
   createSettlementReleaseHandler,
@@ -154,6 +159,18 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("market.bridge.update", createBridgeUpdateHandler(store, config));
     api.registerGatewayMethod("market.bridge.status", createBridgeStatusHandler(store, config));
     api.registerGatewayMethod("market.bridge.list", createBridgeListHandler(store, config));
+
+    api.registerGatewayMethod("market.reward.create", createRewardCreateHandler(store, config));
+    api.registerGatewayMethod("market.reward.get", createRewardGetHandler(store, config));
+    api.registerGatewayMethod("market.reward.list", createRewardListHandler(store, config));
+    api.registerGatewayMethod(
+      "market.reward.issueClaim",
+      createRewardIssueClaimHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.reward.updateStatus",
+      createRewardUpdateStatusHandler(store, config),
+    );
 
     api.registerGatewayMethod("market.settlement.lock", createSettlementLockHandler(store, config));
     api.registerGatewayMethod(
