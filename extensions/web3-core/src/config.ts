@@ -221,6 +221,7 @@ export type Web3PluginConfig = {
   resources: ResourceSharingConfig;
   browserIngest: BrowserIngestConfig;
   monitor: MonitorConfig;
+  rewards?: { enabled: boolean };
 };
 
 // ---------------------------------------------------------------------------

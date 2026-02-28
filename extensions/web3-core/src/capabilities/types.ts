@@ -13,6 +13,7 @@ export type CapabilityGroup =
   | "status"
   | "resources"
   | "market"
+  | "reward"
   | "index"
   | "monitor"
   | "dispute"
