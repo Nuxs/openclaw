@@ -140,6 +140,59 @@ describe("P1 Fix: createRewardUpdateStatusHandler", () => {
     expect((updateEvent!.details as any).newStatus).toBe("onchain_confirmed");
   });
 
+  it("handles onchain_failed status and records error", async () => {
+    const createHandler = createRewardCreateHandler(store, config);
+    const updateHandler = createRewardUpdateStatusHandler(store, config);
+
+    await createHandler({
+      params: {
+        rewardId: "failed-test",
+        recipient: "0xAbCdEf0123456789AbCdEf0123456789AbCdEf01",
+        amount: "1000",
+        eventHash: "0x" + "dd".repeat(32),
+        asset: { type: "erc20", tokenAddress: "0x1234567890123456789012345678901234567890" },
+      },
+      respond: () => {},
+      client: createClient(),
+    } as any);
+
+    // Initial manual transition
+    const reward = store.getReward("failed-test")!;
+    store.saveReward({ ...reward, status: "claim_issued" });
+
+    // 1. Submit
+    await updateHandler({
+      params: { rewardId: "failed-test", status: "onchain_submitted", txHash: "0xfail1" },
+      respond: () => {},
+      client: createClient(),
+    } as any);
+
+    // 2. Fail
+    const r = createResponder();
+    await updateHandler({
+      params: {
+        rewardId: "failed-test",
+        status: "onchain_failed",
+        error: "insufficient funds",
+      },
+      respond: r.respond,
+      client: createClient(),
+    } as any);
+
+    expect(r.result()!.ok).toBe(true);
+    const updated = r.result()!.payload as any;
+    expect(updated.status).toBe("onchain_failed");
+    expect(updated.lastError).toBe("insufficient funds");
+
+    const auditEvents = store.readAuditEvents();
+    const failEvent = auditEvents.find(
+      (e) =>
+        e.kind === "reward_status_updated" && (e.details as any).newStatus === "onchain_failed",
+    );
+    expect(failEvent).toBeDefined();
+    expect((failEvent!.details as any).error).toBe("insufficient funds");
+  });
+
   it("rejects invalid transitions", async () => {
     const createHandler = createRewardCreateHandler(store, config);
     const updateHandler = createRewardUpdateStatusHandler(store, config);
@@ -169,6 +222,6 @@ describe("P1 Fix: createRewardUpdateStatusHandler", () => {
       client: createClient(),
     } as any);
     expect(r.result()!.ok).toBe(false);
-    expect((r.result()!.payload as any).error).toBe("E_INVALID_ARGUMENT");
+    expect((r.result()!.payload as any).error).toBe("E_CONFLICT");
   });
 });

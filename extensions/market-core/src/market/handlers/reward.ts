@@ -364,6 +364,8 @@ export function createRewardUpdateStatusHandler(
 
       const now = nowIso();
       const resolvedTxHash = txHash ?? reward.onchain?.txHash;
+      const resolvedSubmittedAt =
+        status === "onchain_submitted" ? now : (reward.onchain?.submittedAt ?? now);
       const resolvedConfirmedAt =
         status === "onchain_confirmed" ? now : reward.onchain?.confirmedAt;
 
@@ -373,6 +375,7 @@ export function createRewardUpdateStatusHandler(
         onchain: resolvedTxHash
           ? {
               txHash: resolvedTxHash,
+              submittedAt: resolvedSubmittedAt,
               confirmedAt: resolvedConfirmedAt,
             }
           : reward.onchain,
@@ -390,7 +393,7 @@ export function createRewardUpdateStatusHandler(
         newStatus: status,
       };
       if (resolvedTxHash) details.txHash = resolvedTxHash;
-      if (lastError) details.error = lastError;
+      if (updated.lastError) details.error = updated.lastError;
 
       await recordAuditWithAnchor({
         store,

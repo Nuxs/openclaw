@@ -71,6 +71,7 @@ import {
   createSettlementReleaseHandler,
   createSettlementStatusHandler,
 } from "./market/handlers/index.js";
+import { flushPendingRewards } from "./market/reward/poller.js";
 import { MarketStateStore } from "./state/store.js";
 
 // Re-export facade types for web3-core to use (optional inter-plugin API)
@@ -228,6 +229,27 @@ const plugin: OpenClawPluginDefinition = {
       "market.revocation.retry",
       createMarketRevocationRetryHandler(store, config),
     );
+
+    // ---- Background service: Reward polling & Cleanup ----
+    api.registerService({
+      id: "market-reward-poller",
+      async start(ctx) {
+        ctx.logger.info("Market reward poller service started");
+        const interval = setInterval(async () => {
+          try {
+            await flushPendingRewards(store, config);
+          } catch (err) {
+            ctx.logger.warn(`Reward poll error: ${err}`);
+          }
+        }, 60_000); // Check every minute
+        (ctx as any)._rewardInterval = interval;
+      },
+      stop(ctx) {
+        const interval = (ctx as any)._rewardInterval;
+        if (interval) clearInterval(interval);
+        ctx.logger.info("Market reward poller service stopped");
+      },
+    });
 
     api.logger.info("Market Core engine initialized");
   },
