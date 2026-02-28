@@ -4,6 +4,7 @@ import type {
   DisputeStatus,
   OfferStatus,
   OrderStatus,
+  RewardStatus,
   SettlementStatus,
 } from "./types.js";
 
@@ -54,6 +55,20 @@ export function assertSettlementTransition(from: SettlementStatus, to: Settlemen
   };
   if (!allowed[from].includes(to)) {
     throw new Error(`Invalid settlement transition: ${from} -> ${to}`);
+  }
+}
+
+export function assertRewardTransition(from: RewardStatus, to: RewardStatus) {
+  const allowed: Record<RewardStatus, RewardStatus[]> = {
+    reward_created: ["claim_issued", "reward_cancelled"],
+    claim_issued: ["onchain_submitted", "reward_cancelled"],
+    onchain_submitted: ["onchain_confirmed", "onchain_failed"],
+    onchain_confirmed: [],
+    onchain_failed: ["claim_issued", "reward_cancelled"],
+    reward_cancelled: [],
+  };
+  if (!allowed[from].includes(to)) {
+    throw new Error(`Invalid reward transition: ${from} -> ${to}`);
   }
 }
 

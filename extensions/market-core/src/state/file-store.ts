@@ -26,6 +26,8 @@ import type {
   Offer,
   Order,
   RevocationJob,
+  RewardGrant,
+  RewardNonceRecord,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -359,6 +361,42 @@ export class MarketFileStore implements MarketStore {
     return "bridge-transfers.json";
   }
 
+  private get rewardsPath() {
+    return "rewards.json";
+  }
+
+  listRewards(): RewardGrant[] {
+    return Object.values(this.readMap<RewardGrant>(this.rewardsPath));
+  }
+
+  getReward(rewardId: string): RewardGrant | undefined {
+    return this.readMap<RewardGrant>(this.rewardsPath)[rewardId];
+  }
+
+  saveReward(reward: RewardGrant): void {
+    const map = this.readMap<RewardGrant>(this.rewardsPath);
+    map[reward.rewardId] = reward;
+    this.writeMap(this.rewardsPath, map);
+  }
+
+  private get rewardNoncesPath() {
+    return "reward-nonces.json";
+  }
+
+  listRewardNonces(): RewardNonceRecord[] {
+    return Object.values(this.readMap<RewardNonceRecord>(this.rewardNoncesPath));
+  }
+
+  getRewardNonce(nonceId: string): RewardNonceRecord | undefined {
+    return this.readMap<RewardNonceRecord>(this.rewardNoncesPath)[nonceId];
+  }
+
+  saveRewardNonce(record: RewardNonceRecord): void {
+    const map = this.readMap<RewardNonceRecord>(this.rewardNoncesPath);
+    map[record.nonceId] = record;
+    this.writeMap(this.rewardNoncesPath, map);
+  }
+
   listBridgeTransfers(filter?: BridgeTransferFilter): BridgeTransfer[] {
     let transfers = Object.values(this.readMap<BridgeTransfer>(this.bridgeTransfersPath));
     if (filter?.orderId) {
@@ -426,6 +464,8 @@ export class MarketFileStore implements MarketStore {
       this.listRevocations().length > 0 ||
       this.getTokenEconomy() !== undefined ||
       this.listBridgeTransfers({ limit: 1 }).length > 0 ||
+      this.listRewards().length > 0 ||
+      this.listRewardNonces().length > 0 ||
       (existsSync(this.auditLogPath) && statSync(this.auditLogPath).size > 0)
     );
   }

@@ -1,6 +1,15 @@
 export type AssetType = "data" | "api" | "service";
 export type DeliveryType = "download" | "api" | "service";
 
+// Reward/claim primitives are defined in a leaf module to avoid bloating this file.
+export type {
+  RewardAsset,
+  RewardChainFamily,
+  RewardGrant,
+  RewardNonceRecord,
+  RewardStatus,
+} from "./reward/types.js";
+
 export type OfferStatus = "offer_created" | "offer_published" | "offer_closed";
 export type OrderStatus =
   | "order_created"
@@ -151,6 +160,12 @@ export type AuditEventKind =
   | "token_minted"
   | "token_burned"
   | "token_governance_updated"
+  | "reward_created"
+  | "reward_claim_issued"
+  | "reward_onchain_submitted"
+  | "reward_onchain_confirmed"
+  | "reward_onchain_failed"
+  | "reward_cancelled"
   | "bridge_requested"
   | "bridge_in_flight"
   | "bridge_completed"
