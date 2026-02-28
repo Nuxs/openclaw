@@ -85,14 +85,19 @@ declare module "@ton/core" {
 }
 
 declare module "@ton/crypto" {
+  export type KeyPair = { publicKey: Uint8Array; secretKey: Uint8Array };
+
+  export function sign(message: Uint8Array, secretKey: Uint8Array): Uint8Array;
+  export function signVerify(
+    message: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array,
+  ): boolean;
+
   export function mnemonicNew(wordsCount?: number): Promise<string[]>;
   export function mnemonicValidate(mnemonic: string[]): Promise<boolean>;
-  export function mnemonicToPrivateKey(
-    mnemonic: string[],
-  ): Promise<{ publicKey: Buffer; secretKey: Buffer }>;
-  export function mnemonicToWalletKey(
-    mnemonic: string[],
-  ): Promise<{ publicKey: Buffer; secretKey: Buffer }>;
+  export function mnemonicToPrivateKey(mnemonic: string[]): Promise<KeyPair>;
+  export function mnemonicToWalletKey(mnemonic: string[]): Promise<KeyPair>;
 }
 
 declare module "@ton/ton" {
