@@ -13,6 +13,7 @@ import {
   encodeTonSettlementLockPayload,
   encodeTonSettlementReleasePayload,
   encodeTonSettlementRefundPayload,
+  signTonSettlementReleasePayload,
   getProvider,
   initBlockchainFactory,
   isProviderTON,
@@ -116,12 +117,23 @@ export class TonEscrowAdapter {
     }
 
     const actualAmount = BigInt(payees[0].amount);
+
+    // 64-bit queryId nonce for signature domain separation and tracing.
+    const { randomBytes } = await import("node:crypto");
+    const queryId = BigInt(`0x${randomBytes(8).toString("hex")}`);
+
+    const signature = await signTonSettlementReleasePayload({
+      orderHash: orderId,
+      actualAmount,
+      queryId,
+      tonMnemonic: requireTonMnemonic(this.chain),
+    });
+
     const payload = encodeTonSettlementReleasePayload({
       orderHash: orderId,
       actualAmount,
-      // NOTE: settlement.fc currently does not verify this signature; keep zeros.
-      signature: Buffer.alloc(64),
-      queryId: 0n,
+      signature,
+      queryId,
     });
 
     const GAS_TRIGGER = 50_000_000n; // ~0.05 TON
