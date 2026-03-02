@@ -33,7 +33,7 @@
 
 ---
 
-## Week 5：双栈支付口径可落地（不要求全实现）🔄 进行中
+## Week 5：双栈支付口径可落地（不要求全实现）✅ 已完成
 
 - **双栈口径**：
   - ✅ `PaymentIntent`/`PaymentReceipt`/`FXQuote`/`PayoutPreference`/`ReconciliationSummary` 类型已定义在 `market-core/types.ts`
@@ -60,6 +60,10 @@
 - ✅ TON Escrow Adapter：`market-core/src/market/escrow-ton.ts`（lock/release/refund via TON Provider）
 - ✅ 统一 Escrow 工厂：`market-core/src/market/escrow-factory.ts`（IEscrowAdapter + chain dispatch）
 - ✅ Agent Wallet TON 支持：config 扩展 + ton-handlers + register() 链分发
+
+### Week 5 追加验收（2026-03-02 UI 类型对齐）
+
+- ✅ UI Overlay 同步：`ui/src/ui/types-web3.ts` 已补齐 `PaymentIntent`/`PaymentReceipt`/`FXQuote`/`PayoutPreference`/`ReconciliationSummary`，消除前后端契约 GAP。
 
 ---
 

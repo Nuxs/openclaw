@@ -1,7 +1,7 @@
 # OpenClaw Web3 Market：整体进度口径（可验证）
 
 > **状态**：Draft（随实现推进更新）  
-> **更新日期**：2026-02-23  
+> **更新日期**：2026-03-02  
 > **适用范围**：Web3 Market（资源/能力市场 + AI 管家编排）
 
 本文档用于解决一个问题：当我们说"Web3 Market 已做到哪里"，**到底哪些是已实现、可演示、可验收的事实**，哪些仍是规划。
@@ -65,9 +65,36 @@
 - **BOC/payload 与发送**：补齐 payload 编码（base64 BOC）并支持通过 TON provider 发送。
 - **验收指南**：`docs/web3/TON_E2E_SETTLEMENT.md`
 
+### 2.9 UI 类型对齐（2026-03-02 完成）
+
+- **UI Overlay 同步**：`ui/src/ui/types-web3.ts` 已补齐 `PaymentIntent`/`PaymentReceipt`/`FXQuote`/`PayoutPreference`/`ReconciliationSummary`，消除前后端契约 GAP。
+
 ---
 
 ## 3. 已定义但仍属规划（需要明确里程碑）
+
+### 3.1 PayFi Agentic Commerce（2026 新战略）
+
+> 详情见：`skills/web3-market/references/WEB3_PAYFI_AGENTIC_ARCH.md`
+
+- **KYA (Know Your Agent)**：计划 Week 6 落地 WalletPolicy 策略引擎（预算/白名单），收回 Agent 上帝权限。
+- **PayFi (Streaming Settlement)**：计划 Week 7 落地 Ledger 驱动的增量释放（Incremental Release），实现分段结算。
+- **x402 (Auto-Pay Loop)**：计划 Week 8 落地 Gateway Interceptor，实现机器对机器的自动支付闭环。
+
+#### 3.1.1 治理就绪状态（2026-03-02）
+
+- **技术评审**：✅ 已完成（`references/WEB3_TECH_STACK_REVIEW.md` 论证了自研必要性）。
+- **文档治理**：✅ 已完成（架构契约、测试矩阵、灰度门禁、DoD、回滚策略已固化）。
+- **代码实现**：⏳ 未开始（KYA/PayFi/x402 仍处于实施前状态）。
+- **执行口径**：`WEB3_PAYFI_AGENTIC_ARCH.md` + `WEB3_DEV_PLAN_PAYFI.md` 为后续开发唯一执行规范。
+
+#### 3.1.2 阻断分级结论（严格审计）
+
+- **不阻断当前能力迭代**：Week3-5 已完成能力可继续迭代与优化。
+- **阻断新能力上线**：KYA、PayFi metered release、x402 auto-pay 未代码落地前，不可宣称上线。
+- **上线前硬门禁**：必须满足 `WEB3_DEV_PLAN_PAYFI.md` 的可勾选 DoD 与灰度门禁。
+
+### 3.2 其他规划
 
 - **"可分享对账摘要"完整闭环**：输出格式已有口径，但需要持续把所有对外输出点收敛为"可复制粘贴传播"的脱敏摘要。
 - **个人数据/私有知识纳入市场**：需要补齐 consent/脱敏/可撤销/合规回放的强约束规范（见本轮新增 skill references）。
@@ -78,7 +105,9 @@
 
 ## 4. 下一步（与 Week3-5 路线图对齐）
 
+- PayFi 演进路线图：`skills/web3-market/internal/WEB3_DEV_PLAN_PAYFI.md` (NEW)
 - 路线图：`skills/web3-market/internal/WEB3_WEEK3_5_ROADMAP.md`
+
 - 5 周执行计划：`skills/web3-market/internal/WEB3_DEV_PLAN_5_WEEKS.md`
 - 走查差距报告：`skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
 
