@@ -210,3 +210,31 @@ export function createAgentWalletSendHandler(config: AgentWalletConfig): Gateway
     }
   };
 }
+
+export function createAgentWalletAutopayHandler(config: AgentWalletConfig): GatewayRequestHandler {
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      ensureEnabled(config);
+      const input = (params ?? {}) as Record<string, unknown>;
+      const to = getAddress(requireString(input.to, "to"));
+      const value = parseAmount(input.value, "value");
+      const data = typeof input.data === "string" ? input.data : undefined;
+      const enforcement = await enforcePolicy(config, {
+        action: "autopay",
+        chain: "evm",
+        tool: "agent-wallet.autopay",
+        to,
+        amount: value,
+        method: parseMethodSelector(data),
+      });
+
+      const wallet = await loadOrCreateWallet(config);
+      const provider = await resolveProvider(config, wallet.privateKey);
+      const txHash = await provider.sendTransaction({ to, value, data });
+      await enforcement.commitUsage();
+      respond(true, { txHash });
+    } catch (err) {
+      respondError(respond, err);
+    }
+  };
+}

@@ -9,6 +9,7 @@
  *   web3/resource-index.json      — resource index entries
  *   web3/p2p-peers.json           — P2P peer gossip table (internal)
  *   web3/pending-settlements.json — settlement retry queue
+ *   web3/payment-required.json    — x402 idempotency records
  *   web3/pending-tx.json          — pending chain transactions (retry queue)
  */
 
@@ -16,7 +17,7 @@ import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AuditEvent } from "../audit/types.js";
-import type { UsageRecord } from "../billing/types.js";
+import type { PaymentResumeToken, UsageRecord } from "../billing/types.js";
 import type { DisputeRecord } from "../disputes/types.js";
 import type { SiweChallenge, WalletBinding } from "../identity/types.js";
 import type { AlertEvent } from "../monitor/types.js";
@@ -45,6 +46,13 @@ export type PendingSettlement = {
   actorId?: string;
   attempts?: number;
   lastError?: string;
+};
+
+export type PaymentRequiredRecord = {
+  idempotencyKey: string;
+  invoiceHash: string;
+  resumeToken: PaymentResumeToken;
+  createdAt: string;
 };
 
 export type IndexedResourceKind = "model" | "search" | "storage";
@@ -419,6 +427,33 @@ export class Web3StateStore {
       (entry) => entry.sessionIdHash !== sessionIdHash,
     );
     this.savePendingSettlements(list);
+  }
+
+  // ---- Payment required (x402 idempotency) ----
+
+  private get paymentRequiredPath() {
+    return join(this.dir, "payment-required.json");
+  }
+
+  getPaymentRequired(idempotencyKey: string): PaymentRequiredRecord | undefined {
+    if (!existsSync(this.paymentRequiredPath)) return undefined;
+    const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
+      string,
+      PaymentRequiredRecord
+    >;
+    return map[idempotencyKey];
+  }
+
+  savePaymentRequired(record: PaymentRequiredRecord): void {
+    let map: Record<string, PaymentRequiredRecord> = {};
+    if (existsSync(this.paymentRequiredPath)) {
+      map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
+        string,
+        PaymentRequiredRecord
+      >;
+    }
+    map[record.idempotencyKey] = record;
+    writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
   }
 
   // ---- Pending archives (retry queue) ----

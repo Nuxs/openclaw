@@ -29,6 +29,8 @@ export type PolicyReasonCode =
   | "approved"
   | "budget_daily_exceeded"
   | "budget_per_tx_exceeded"
+  | "autopay_disabled"
+  | "autopay_amount_exceeded"
   | "scope_contract_denied"
   | "scope_method_denied"
   | "scope_tool_denied"
@@ -287,6 +289,15 @@ export function checkPolicy(
   }
 
   try {
+    if (intent.action === "autopay" && !policy.autoPay.enabled) {
+      return buildDecision({
+        action: intent.action,
+        result: "rejected",
+        reasonCode: "autopay_disabled",
+        now,
+      });
+    }
+
     const ttl = policy.ttl;
     if (ttl) {
       const notBefore = parseIso(ttl.notBefore);
@@ -351,6 +362,22 @@ export function checkPolicy(
     }
 
     if (typeof intent.amount === "bigint") {
+      if (intent.action === "autopay") {
+        const maxAutoPay = asBigInt(policy.autoPay.maxAutoPayPerRequest ?? "0");
+        if (maxAutoPay > 0n && intent.amount > maxAutoPay) {
+          return buildDecision({
+            action: intent.action,
+            result: "rejected",
+            reasonCode: "autopay_amount_exceeded",
+            now,
+            metadata: {
+              amount: intent.amount.toString(),
+              maxAutoPayPerRequest: policy.autoPay.maxAutoPayPerRequest,
+            },
+          });
+        }
+      }
+
       const perTxCap = asBigInt(policy.budget.perTxCap);
       if (intent.amount > perTxCap) {
         return buildDecision({

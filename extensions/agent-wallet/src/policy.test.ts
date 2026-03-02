@@ -125,6 +125,48 @@ describe("checkPolicy", () => {
     expect(decision.reasonCode).toBe("policy_missing");
   });
 
+  it("rejects autopay when disabled", () => {
+    const decision = checkPolicy(SAMPLE_POLICY, {
+      action: "autopay",
+      chain: "evm",
+      tool: "agent-wallet.autopay",
+      to: SAMPLE_POLICY.scope.allowedContracts?.[0],
+      amount: 10n,
+      method: "0xa9059cbb",
+    });
+
+    expect(decision.result).toBe("rejected");
+    expect(decision.reasonCode).toBe("autopay_disabled");
+  });
+
+  it("rejects autopay when max per request is exceeded", () => {
+    const decision = checkPolicy(
+      {
+        ...SAMPLE_POLICY,
+        scope: {
+          ...SAMPLE_POLICY.scope,
+          allowedTools: [...(SAMPLE_POLICY.scope.allowedTools ?? []), "agent-wallet.autopay"],
+        },
+        autoPay: {
+          enabled: true,
+          maxRetries: 1,
+          maxAutoPayPerRequest: "50",
+        },
+      },
+      {
+        action: "autopay",
+        chain: "evm",
+        tool: "agent-wallet.autopay",
+        to: SAMPLE_POLICY.scope.allowedContracts?.[0],
+        amount: 60n,
+        method: "0xa9059cbb",
+      },
+    );
+
+    expect(decision.result).toBe("rejected");
+    expect(decision.reasonCode).toBe("autopay_amount_exceeded");
+  });
+
   it("rejects per-tx over cap", () => {
     const decision = checkPolicy(SAMPLE_POLICY, {
       action: "send",

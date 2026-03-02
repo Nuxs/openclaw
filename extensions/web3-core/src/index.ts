@@ -22,6 +22,7 @@ import {
   createBillingLlmUsageHook,
   resolveSessionHash,
 } from "./billing/guard.js";
+import { createBillingHandlePaymentRequiredHandler } from "./billing/payment-required.js";
 import { flushPendingSettlements } from "./billing/settlement.js";
 import { resolveBrainModelOverride } from "./brain/resolve.js";
 import { createWeb3StreamFn } from "./brain/stream.js";
@@ -279,6 +280,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("web3.audit.query", createAuditQueryHandler(store));
     api.registerGatewayMethod("web3.billing.status", createBillingStatusHandler(store, config));
     api.registerGatewayMethod("web3.billing.summary", createBillingSummaryHandler(store, config));
+    api.registerGatewayMethod(
+      "web3.billing.handlePaymentRequired",
+      createBillingHandlePaymentRequiredHandler(store, config),
+    );
     api.registerGatewayMethod("web3.status.summary", createWeb3StatusSummaryHandler(store, config));
 
     api.registerGatewayMethod("web3.reward.get", createWeb3RewardGetHandler(config));

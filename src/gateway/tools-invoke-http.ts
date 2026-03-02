@@ -25,6 +25,7 @@ import { DEFAULT_GATEWAY_HTTP_TOOL_DENY } from "../security/dangerous-tools.js";
 import { normalizeMessageChannel } from "../utils/message-channel.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import { authorizeHttpGatewayConnect, type ResolvedGatewayAuth } from "./auth.js";
+import { callGateway } from "./call.js";
 import {
   readJsonBodyOrError,
   sendGatewayAuthFailure,
@@ -129,6 +130,182 @@ function resolveToolInputErrorStatus(err: unknown): number | null {
     return status;
   }
   return name === "ToolAuthorizationError" ? 403 : 400;
+}
+
+type PaymentRequiredContext = {
+  invoice?: string;
+  wwwAuthenticate?: string;
+  status?: number;
+};
+
+type PaymentResumeToken = {
+  invoiceId: string;
+  paymentReceiptId: string;
+  txHash?: string;
+  chain: "evm" | "ton";
+  issuedAt: string;
+  expiresAt: string;
+};
+
+type PaymentRequiredResult = {
+  authorization?: string;
+  resumeToken?: PaymentResumeToken;
+  reused?: boolean;
+};
+
+type GatewayCallResult = {
+  ok?: boolean;
+  error?: string;
+  result?: unknown;
+};
+
+function normalizeGatewayResult(payload: unknown): {
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+} {
+  if (payload && typeof payload === "object") {
+    const record = payload as GatewayCallResult;
+    if (record.ok === false) {
+      return { ok: false, error: record.error ?? "gateway call failed" };
+    }
+    const result = "result" in record ? record.result : payload;
+    return { ok: true, result };
+  }
+  return { ok: true, result: payload };
+}
+
+function resolveErrorStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") {
+    return undefined;
+  }
+  const record = err as { status?: unknown; statusCode?: unknown; code?: unknown };
+  if (typeof record.status === "number") {
+    return record.status;
+  }
+  if (typeof record.statusCode === "number") {
+    return record.statusCode;
+  }
+  if (typeof record.code === "number") {
+    return record.code;
+  }
+  return undefined;
+}
+
+function resolveWwwAuthenticate(err: unknown): string | undefined {
+  if (!err || typeof err !== "object") {
+    return undefined;
+  }
+  const record = err as {
+    headers?: unknown;
+    response?: { headers?: unknown };
+    wwwAuthenticate?: unknown;
+  };
+  if (typeof record.wwwAuthenticate === "string") {
+    return record.wwwAuthenticate;
+  }
+
+  const headers = record.headers ?? record.response?.headers;
+  if (!headers) {
+    return undefined;
+  }
+  if (typeof (headers as { get?: unknown }).get === "function") {
+    const getter = (headers as { get: (name: string) => string | null }).get;
+    return getter.call(headers, "www-authenticate") ?? undefined;
+  }
+  if (headers && typeof headers === "object") {
+    const lower = Object.fromEntries(
+      Object.entries(headers as Record<string, unknown>).map(([key, value]) => [
+        key.toLowerCase(),
+        value,
+      ]),
+    );
+    const candidate = lower["www-authenticate"] ?? lower["www_authenticate"];
+    if (typeof candidate === "string") {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+function resolvePaymentRequiredContext(err: unknown): PaymentRequiredContext | null {
+  const status = resolveErrorStatus(err);
+  const wwwAuthenticate = resolveWwwAuthenticate(err);
+  const invoice =
+    typeof (err as { invoice?: unknown })?.invoice === "string"
+      ? ((err as { invoice?: string }).invoice ?? undefined)
+      : undefined;
+
+  if (status !== 402 && !wwwAuthenticate) {
+    return null;
+  }
+
+  return {
+    status,
+    wwwAuthenticate,
+    invoice,
+  };
+}
+
+function extractInvoiceFromAuthenticate(header: string): string | undefined {
+  const match = header.match(/\binvoice\s*=\s*"([^"]+)"/i);
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+  const loose = header.match(/\binvoice\s*=\s*([^,\s]+)/i);
+  if (loose?.[1]) {
+    return loose[1].trim();
+  }
+  return undefined;
+}
+
+function applyPaymentResumeToken(params: {
+  args: Record<string, unknown>;
+  toolSchema: unknown;
+  authorization?: string;
+  resumeToken?: PaymentResumeToken;
+}): Record<string, unknown> | null {
+  const { args, toolSchema, authorization, resumeToken } = params;
+  const schemaObj = toolSchema as { properties?: Record<string, unknown> } | null;
+  const properties = schemaObj?.properties ?? {};
+  const hasHeadersArg =
+    args.headers && typeof args.headers === "object" && !Array.isArray(args.headers);
+  const supportsHeaders = hasHeadersArg || "headers" in properties;
+  const supportsResumeToken = "paymentResumeToken" in properties;
+
+  if (authorization && supportsHeaders) {
+    const headers = hasHeadersArg ? { ...(args.headers as Record<string, unknown>) } : {};
+    if (!headers.authorization && !headers.Authorization) {
+      headers.authorization = authorization;
+    }
+    return { ...args, headers };
+  }
+
+  if (resumeToken && supportsResumeToken) {
+    return { ...args, paymentResumeToken: resumeToken };
+  }
+
+  return null;
+}
+
+async function tryAutoPay(params: {
+  invoice: string;
+  toolName: string;
+}): Promise<{ result?: PaymentRequiredResult; error?: string }> {
+  try {
+    const response = await callGateway({
+      method: "web3.billing.handlePaymentRequired",
+      params: { invoice: params.invoice, tool: params.toolName },
+    });
+    const normalized = normalizeGatewayResult(response);
+    if (!normalized.ok) {
+      return { error: normalized.error ?? "payment required handler failed" };
+    }
+    const payload = normalized.result as PaymentRequiredResult | undefined;
+    return { result: payload };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function handleToolsInvokeHttpRequest(
@@ -308,13 +485,14 @@ export async function handleToolsInvokeHttpRequest(
     return true;
   }
 
+  const toolArgs = mergeActionIntoArgsIfSupported({
+    // oxlint-disable-next-line typescript/no-explicit-any
+    toolSchema: (tool as any).parameters,
+    action,
+    args,
+  });
+
   try {
-    const toolArgs = mergeActionIntoArgsIfSupported({
-      // oxlint-disable-next-line typescript/no-explicit-any
-      toolSchema: (tool as any).parameters,
-      action,
-      args,
-    });
     // oxlint-disable-next-line typescript/no-explicit-any
     const result = await (tool as any).execute?.(`http-${Date.now()}`, toolArgs);
     sendJson(res, 200, { ok: true, result });
@@ -327,6 +505,57 @@ export async function handleToolsInvokeHttpRequest(
       });
       return true;
     }
+
+    const paymentRequired = resolvePaymentRequiredContext(err);
+    if (paymentRequired) {
+      const wwwAuthenticate = paymentRequired.wwwAuthenticate;
+      const invoice =
+        paymentRequired.invoice ??
+        (wwwAuthenticate ? extractInvoiceFromAuthenticate(wwwAuthenticate) : undefined);
+
+      let autoPayError: string | undefined;
+      let autoPayResult: PaymentRequiredResult | undefined;
+      if (invoice) {
+        const attempt = await tryAutoPay({ invoice, toolName });
+        autoPayError = attempt.error;
+        autoPayResult = attempt.result;
+      }
+
+      if (autoPayResult?.authorization || autoPayResult?.resumeToken) {
+        const retryArgs = applyPaymentResumeToken({
+          args: toolArgs,
+          // oxlint-disable-next-line typescript/no-explicit-any
+          toolSchema: (tool as any).parameters,
+          authorization: autoPayResult.authorization,
+          resumeToken: autoPayResult.resumeToken,
+        });
+
+        if (retryArgs) {
+          try {
+            // oxlint-disable-next-line typescript/no-explicit-any
+            const retryResult = await (tool as any).execute?.(`http-${Date.now()}`, retryArgs);
+            sendJson(res, 200, { ok: true, result: retryResult });
+            return true;
+          } catch (retryErr) {
+            autoPayError = getErrorMessage(retryErr) || autoPayError;
+          }
+        }
+      }
+
+      sendJson(res, 402, {
+        ok: false,
+        error: {
+          type: "payment_required",
+          message: "payment required",
+          invoice,
+          authorization: autoPayResult?.authorization,
+          resumeToken: autoPayResult?.resumeToken,
+          autoPayError,
+        },
+      });
+      return true;
+    }
+
     logWarn(`tools-invoke: tool execution failed: ${String(err)}`);
     sendJson(res, 500, {
       ok: false,

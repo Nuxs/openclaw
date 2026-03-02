@@ -1,0 +1,193 @@
+import { randomUUID } from "node:crypto";
+import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import { hashPayload } from "../audit/canonicalize.js";
+import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
+import { ErrorCode } from "../errors/codes.js";
+import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.js";
+import type { Web3StateStore } from "../state/store.js";
+import type { PaymentRequiredInvoice, PaymentResumeToken } from "./types.js";
+
+export class PaymentRequiredError extends Error {
+  readonly status = 402;
+  readonly invoice?: string;
+  readonly wwwAuthenticate?: string;
+
+  constructor(message: string, params?: { invoice?: string; wwwAuthenticate?: string }) {
+    super(message);
+    this.name = "PaymentRequiredError";
+    this.invoice = params?.invoice;
+    this.wwwAuthenticate = params?.wwwAuthenticate;
+  }
+}
+
+type PaymentRequiredInput = {
+  invoice?: unknown;
+  idempotencyKey?: unknown;
+  tool?: unknown;
+};
+
+function requireString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`E_INVALID_ARGUMENT: ${field} is required`);
+  }
+  return value.trim();
+}
+
+function requireEnum<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
+  if (typeof value === "string" && (allowed as readonly string[]).includes(value)) {
+    return value as T;
+  }
+  throw new Error(`E_INVALID_ARGUMENT: ${field} is invalid`);
+}
+
+function requireNumericString(value: unknown, field: string): string {
+  const raw = requireString(value, field);
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`E_INVALID_ARGUMENT: ${field} must be integer string`);
+  }
+  return raw;
+}
+
+function requireIsoDate(value: unknown, field: string): string {
+  const raw = requireString(value, field);
+  if (Number.isNaN(Date.parse(raw))) {
+    throw new Error(`E_INVALID_ARGUMENT: ${field} must be ISO timestamp`);
+  }
+  return raw;
+}
+
+function parseInvoice(encoded: string): PaymentRequiredInvoice {
+  let payload: unknown;
+  try {
+    const raw = Buffer.from(encoded, "base64").toString("utf8");
+    payload = JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error("E_INVALID_ARGUMENT: invoice must be base64 JSON");
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("E_INVALID_ARGUMENT: invoice payload must be object");
+  }
+  const record = payload as Record<string, unknown>;
+  return {
+    invoiceId: requireString(record.invoiceId, "invoice.invoiceId"),
+    provider: requireString(record.provider, "invoice.provider"),
+    chain: requireEnum(record.chain, "invoice.chain", ["evm", "ton"]),
+    asset: requireString(record.asset, "invoice.asset"),
+    amount: requireNumericString(record.amount, "invoice.amount"),
+    payTo: requireString(record.payTo, "invoice.payTo"),
+    nonce: requireString(record.nonce, "invoice.nonce"),
+    expiresAt: requireIsoDate(record.expiresAt, "invoice.expiresAt"),
+    idempotencyKey:
+      typeof record.idempotencyKey === "string" ? record.idempotencyKey.trim() : undefined,
+  };
+}
+
+function buildPaymentAuthorization(resumeToken: PaymentResumeToken): string {
+  const encoded = Buffer.from(JSON.stringify(resumeToken)).toString("base64");
+  return `OpenClaw-PayFi ${encoded}`;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+export function createBillingHandlePaymentRequiredHandler(
+  store: Web3StateStore,
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      const input = (params ?? {}) as PaymentRequiredInput;
+      const invoiceRaw = requireString(input.invoice, "invoice");
+      const invoice = parseInvoice(invoiceRaw);
+      const idempotencyKey =
+        typeof input.idempotencyKey === "string" && input.idempotencyKey.trim().length > 0
+          ? input.idempotencyKey.trim()
+          : invoice.idempotencyKey;
+
+      if (!idempotencyKey) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse("E_INVALID_ARGUMENT: idempotencyKey is required"),
+        );
+        return;
+      }
+
+      const invoiceHash = hashPayload(invoice);
+      const existing = store.getPaymentRequired(idempotencyKey);
+      if (existing) {
+        if (existing.invoiceHash !== invoiceHash) {
+          respond(
+            false,
+            formatWeb3GatewayErrorResponse(
+              "E_CONFLICT: idempotency key reused",
+              ErrorCode.E_CONFLICT,
+            ),
+          );
+          return;
+        }
+        respond(true, {
+          idempotencyKey,
+          invoiceId: invoice.invoiceId,
+          resumeToken: existing.resumeToken,
+          authorization: buildPaymentAuthorization(existing.resumeToken),
+          reused: true,
+        });
+        return;
+      }
+
+      if (Date.parse(invoice.expiresAt) <= Date.now()) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse("E_EXPIRED: invoice expired", ErrorCode.E_EXPIRED),
+        );
+        return;
+      }
+
+      const callGateway = await loadCallGateway();
+      const paymentResponse = await callGateway({
+        method: "agent-wallet.autopay",
+        params: {
+          to: invoice.payTo,
+          value: invoice.amount,
+          tool: input.tool,
+        },
+        timeoutMs: config.brain.timeoutMs,
+      });
+      const normalized = normalizeGatewayResult(paymentResponse);
+      if (!normalized.ok) {
+        throw new Error(normalized.error ?? "autopay failed");
+      }
+
+      const payload = (normalized.result ?? {}) as Record<string, unknown>;
+      const txHash = typeof payload.txHash === "string" ? payload.txHash : undefined;
+      const issuedAt = nowIso();
+      const resumeToken: PaymentResumeToken = {
+        invoiceId: invoice.invoiceId,
+        paymentReceiptId: randomUUID(),
+        txHash,
+        chain: invoice.chain,
+        issuedAt,
+        expiresAt: invoice.expiresAt,
+      };
+
+      store.savePaymentRequired({
+        idempotencyKey,
+        invoiceHash,
+        resumeToken,
+        createdAt: issuedAt,
+      });
+
+      respond(true, {
+        idempotencyKey,
+        invoiceId: invoice.invoiceId,
+        resumeToken,
+        authorization: buildPaymentAuthorization(resumeToken),
+        reused: false,
+      });
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
+}

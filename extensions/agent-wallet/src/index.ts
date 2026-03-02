@@ -2,12 +2,14 @@ import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
 import type { AgentWalletConfig } from "./config.js";
 import { isTONNetwork, resolveConfig } from "./config.js";
 import {
+  createAgentWalletAutopayHandler,
   createAgentWalletBalanceHandler,
   createAgentWalletCreateHandler,
   createAgentWalletSendHandler,
   createAgentWalletSignHandler,
 } from "./handlers.js";
 import {
+  createTonWalletAutopayHandler,
   createTonWalletBalanceHandler,
   createTonWalletCreateHandler,
   createTonWalletSendHandler,
@@ -56,6 +58,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod(
       "agent-wallet.send",
       tonMode ? createTonWalletSendHandler(config) : createAgentWalletSendHandler(config),
+    );
+    api.registerGatewayMethod(
+      "agent-wallet.autopay",
+      tonMode ? createTonWalletAutopayHandler(config) : createAgentWalletAutopayHandler(config),
     );
 
     // EVM-only: sign (TON signing requires TonConnect, not yet supported)

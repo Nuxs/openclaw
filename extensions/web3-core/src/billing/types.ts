@@ -36,3 +36,24 @@ export type BillingCheckResult = {
   remaining: number;
   reason?: string;
 };
+
+export type PaymentRequiredInvoice = {
+  invoiceId: string;
+  provider: string;
+  chain: "evm" | "ton";
+  asset: string;
+  amount: string;
+  payTo: string;
+  nonce: string;
+  expiresAt: string;
+  idempotencyKey?: string;
+};
+
+export type PaymentResumeToken = {
+  invoiceId: string;
+  paymentReceiptId: string;
+  txHash?: string;
+  chain: "evm" | "ton";
+  issuedAt: string;
+  expiresAt: string;
+};

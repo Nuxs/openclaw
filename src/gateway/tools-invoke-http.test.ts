@@ -6,6 +6,29 @@ const TEST_GATEWAY_TOKEN = "test-gateway-token-1234567890";
 
 let cfg: Record<string, unknown> = {};
 let lastCreateOpenClawToolsContext: Record<string, unknown> | undefined;
+let paymentRequiredCallCount = 0;
+let lastPaymentRequiredArgs: Record<string, unknown> | undefined;
+
+const PAYMENT_INVOICE = {
+  invoiceId: "inv-1",
+  provider: "provider-1",
+  chain: "evm",
+  asset: "ETH",
+  amount: "10",
+  payTo: "0x0000000000000000000000000000000000000002",
+  nonce: "nonce-1",
+  expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  idempotencyKey: "idem-1",
+};
+const PAYMENT_INVOICE_BASE64 = Buffer.from(JSON.stringify(PAYMENT_INVOICE)).toString("base64");
+const PAYMENT_AUTHORIZATION = "OpenClaw-PayFi dGVzdC1yZXN1bWU=";
+const PAYMENT_RESUME_TOKEN = {
+  invoiceId: PAYMENT_INVOICE.invoiceId,
+  paymentReceiptId: "receipt-1",
+  chain: "evm",
+  issuedAt: new Date().toISOString(),
+  expiresAt: PAYMENT_INVOICE.expiresAt,
+};
 
 // Perf: keep this suite pure unit. Mock heavyweight config/session modules.
 vi.mock("../config/config.js", () => ({
@@ -38,8 +61,20 @@ vi.mock("./auth.js", () => ({
   authorizeHttpGatewayConnect: async () => ({ ok: true }),
 }));
 
+const mockCallGateway = vi.fn(async () => ({
+  ok: true,
+  result: {
+    resumeToken: PAYMENT_RESUME_TOKEN,
+    authorization: PAYMENT_AUTHORIZATION,
+  },
+}));
+
 vi.mock("../logger.js", () => ({
   logWarn: () => {},
+}));
+
+vi.mock("./call.js", () => ({
+  callGateway: (...args: unknown[]) => mockCallGateway(...args),
 }));
 
 vi.mock("../plugins/config-state.js", () => ({
@@ -123,6 +158,31 @@ vi.mock("../agents/openclaw-tools.js", () => {
         return { ok: true };
       },
     },
+    {
+      name: "tools_invoke_payment_required",
+      parameters: {
+        type: "object",
+        properties: {
+          headers: { type: "object" },
+        },
+      },
+      execute: async (_toolCallId: string, args: unknown) => {
+        paymentRequiredCallCount += 1;
+        lastPaymentRequiredArgs = (args ?? {}) as Record<string, unknown>;
+        if (paymentRequiredCallCount === 1) {
+          const err = new Error("payment required") as Error & {
+            status?: number;
+            headers?: Record<string, string>;
+          };
+          err.status = 402;
+          err.headers = {
+            "www-authenticate": `OpenClaw-PayFi realm="market", invoice="${PAYMENT_INVOICE_BASE64}"`,
+          };
+          throw err;
+        }
+        return { ok: true };
+      },
+    },
   ];
 
   return {
@@ -187,6 +247,16 @@ beforeEach(() => {
   pluginHttpHandlers = [];
   cfg = {};
   lastCreateOpenClawToolsContext = undefined;
+  paymentRequiredCallCount = 0;
+  lastPaymentRequiredArgs = undefined;
+  mockCallGateway.mockReset();
+  mockCallGateway.mockResolvedValue({
+    ok: true,
+    result: {
+      resumeToken: PAYMENT_RESUME_TOKEN,
+      authorization: PAYMENT_AUTHORIZATION,
+    },
+  });
 });
 
 const resolveGatewayToken = (): string => TEST_GATEWAY_TOKEN;
@@ -520,6 +590,37 @@ describe("POST /tools/invoke", () => {
 
     const resMain = await invokeAgentsListAuthed({ sessionKey: "main" });
     expect(resMain.status).toBe(200);
+  });
+
+  it("auto pays and retries on 402 payment required", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+    };
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(paymentRequiredCallCount).toBe(2);
+    expect(mockCallGateway).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "web3.billing.handlePaymentRequired" }),
+    );
+    const headers = (lastPaymentRequiredArgs?.headers ?? {}) as Record<string, unknown>;
+    expect(headers.authorization).toBe(PAYMENT_AUTHORIZATION);
   });
 
   it("maps tool input/auth errors to 400/403 and unexpected execution errors to 500", async () => {

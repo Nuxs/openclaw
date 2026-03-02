@@ -188,3 +188,29 @@ export function createTonWalletSendHandler(config: AgentWalletConfig): GatewayRe
     }
   };
 }
+
+export function createTonWalletAutopayHandler(config: AgentWalletConfig): GatewayRequestHandler {
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      ensureEnabled(config);
+      const input = (params ?? {}) as Record<string, unknown>;
+      const to = requireString(input.to, "to");
+      const amount = parseAmount(input.amount, "amount");
+      const enforcement = await enforcePolicy(config, {
+        action: "autopay",
+        chain: "ton",
+        tool: "agent-wallet.autopay",
+        to,
+        amount,
+        method: "ton_transfer",
+      });
+
+      const { provider } = await ensureTonConnected(config);
+      const txHash = await provider.transfer(to, amount);
+      await enforcement.commitUsage();
+      respond(true, { txHash, chain: "ton" });
+    } catch (err) {
+      respondError(respond, err);
+    }
+  };
+}
