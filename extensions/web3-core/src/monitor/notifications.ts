@@ -4,6 +4,7 @@
  * Handles alert notifications via various channels (webhook, email, etc.)
  */
 
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import type { AlertEvent } from "./types.js";
 
@@ -91,25 +92,33 @@ export class AlertNotifier {
         details: alert.details,
       };
 
-      const response = await fetch(config.url, {
-        method: config.method || "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...config.headers,
+      const { response, release } = await fetchWithSsrFGuard({
+        url: config.url,
+        init: {
+          method: config.method || "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...config.headers,
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(config.timeout || 10_000),
+        timeoutMs: config.timeout || 10_000,
+        auditContext: "web3-monitor-webhook",
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      try {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
 
-      return {
-        success: true,
-        channel: "webhook",
-        sentAt: new Date().toISOString(),
-      };
+        return {
+          success: true,
+          channel: "webhook",
+          sentAt: new Date().toISOString(),
+        };
+      } finally {
+        await release();
+      }
     } catch (error) {
       return {
         success: false,
@@ -153,27 +162,35 @@ export class AlertNotifier {
         },
       };
 
-      const response = await fetch(config.webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(10_000),
+      const { response, release } = await fetchWithSsrFGuard({
+        url: config.webhookUrl,
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        timeoutMs: 10_000,
+        auditContext: "web3-monitor-wecom",
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      try {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
 
-      const result = await response.json();
-      if (result.errcode !== 0) {
-        throw new Error(`Wecom API error: ${result.errmsg}`);
-      }
+        const result = await response.json();
+        if (result.errcode !== 0) {
+          throw new Error(`Wecom API error: ${result.errmsg}`);
+        }
 
-      return {
-        success: true,
-        channel: "wecom",
-        sentAt: new Date().toISOString(),
-      };
+        return {
+          success: true,
+          channel: "wecom",
+          sentAt: new Date().toISOString(),
+        };
+      } finally {
+        await release();
+      }
     } catch (error) {
       return {
         success: false,

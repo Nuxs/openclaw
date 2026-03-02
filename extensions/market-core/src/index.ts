@@ -61,11 +61,17 @@ import {
   createTokenEconomyGovernanceUpdateHandler,
   createTokenEconomyMintHandler,
   createTokenEconomySummaryHandler,
+  createRewardCreateHandler,
+  createRewardGetHandler,
+  createRewardIssueClaimHandler,
+  createRewardListHandler,
+  createRewardUpdateStatusHandler,
   createSettlementLockHandler,
   createSettlementRefundHandler,
   createSettlementReleaseHandler,
   createSettlementStatusHandler,
 } from "./market/handlers/index.js";
+import { flushPendingRewards } from "./market/reward/poller.js";
 import { MarketStateStore } from "./state/store.js";
 
 // Re-export facade types for web3-core to use (optional inter-plugin API)
@@ -155,6 +161,18 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("market.bridge.status", createBridgeStatusHandler(store, config));
     api.registerGatewayMethod("market.bridge.list", createBridgeListHandler(store, config));
 
+    api.registerGatewayMethod("market.reward.create", createRewardCreateHandler(store, config));
+    api.registerGatewayMethod("market.reward.get", createRewardGetHandler(store, config));
+    api.registerGatewayMethod("market.reward.list", createRewardListHandler(store, config));
+    api.registerGatewayMethod(
+      "market.reward.issueClaim",
+      createRewardIssueClaimHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.reward.updateStatus",
+      createRewardUpdateStatusHandler(store, config),
+    );
+
     api.registerGatewayMethod("market.settlement.lock", createSettlementLockHandler(store, config));
     api.registerGatewayMethod(
       "market.settlement.release",
@@ -211,6 +229,27 @@ const plugin: OpenClawPluginDefinition = {
       "market.revocation.retry",
       createMarketRevocationRetryHandler(store, config),
     );
+
+    // ---- Background service: Reward polling & Cleanup ----
+    api.registerService({
+      id: "market-reward-poller",
+      async start(ctx) {
+        ctx.logger.info("Market reward poller service started");
+        const interval = setInterval(async () => {
+          try {
+            await flushPendingRewards(store, config);
+          } catch (err) {
+            ctx.logger.warn(`Reward poll error: ${err}`);
+          }
+        }, 60_000); // Check every minute
+        (ctx as any)._rewardInterval = interval;
+      },
+      stop(ctx) {
+        const interval = (ctx as any)._rewardInterval;
+        if (interval) clearInterval(interval);
+        ctx.logger.info("Market reward poller service stopped");
+      },
+    });
 
     api.logger.info("Market Core engine initialized");
   },

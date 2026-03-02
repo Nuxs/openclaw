@@ -138,7 +138,118 @@ FXQuote 的最小结构：
 
 ---
 
-## 7. 与 Skill 的关系
+## 7. 合约发奖（Claim + 兜底直发交易）
+
+### 7.1 信任模型
+
+- **禁止以前端/客户端"成功信号"作为发奖依据**。`node.invoke.result` 的 `ok` 仅为 Promise resolve，不是可验证价值凭证。
+- 发奖由后端可信逻辑驱动：后端创建奖励单 → 签发可验证凭证（claim） → 链上验签 + 防重放 → 发放。
+- 后端直发交易仅作为**受控兜底/修复通道**（operator write 权限，默认关闭或强约束）。
+
+### 7.2 双链一致语义
+
+EVM 和 TON 的发奖 payload 共享统一的 canonical 字段集：
+
+| 字段                | 说明                                       |
+| ------------------- | ------------------------------------------ |
+| `recipient`         | 收款方地址                                 |
+| `amount`            | 发奖金额（字符串，避免精度丢失）           |
+| `asset`             | 资产类型（ERC-20 token 地址 / TON native） |
+| `nonce` / `queryId` | 唯一性标识，防止重放                       |
+| `deadline`          | 时效（ISO 时间或 Unix 秒）                 |
+| `chainFamily`       | `"evm"` 或 `"ton"`                         |
+| `network`           | 链网络标识（如 `base` / `ton-mainnet`）    |
+| `eventHash`         | 业务事件哈希，关联触发来源                 |
+
+### 7.3 EVM 发奖流程（EIP-712 Typed Data）
+
+```
+后端(market-core)            合约(RewardDistributor)          前端/Relayer
+    │                              │                              │
+    ├─ 创建 RewardGrant ──────────►│                              │
+    ├─ 生成 EIP-712 签名 ─────────►│                              │
+    │  (domain + RewardClaim type)  │                              │
+    ├─ 返回 claim payload+sig ─────┼─────────────────────────────►│
+    │                              │◄── claimReward(sig,data) ────┤
+    │                              ├─ ecrecover 验签              │
+    │                              ├─ 检查 nonce 唯一性           │
+    │                              ├─ 检查 deadline               │
+    │                              ├─ 转账 ERC-20                 │
+    │                              ├─ emit RewardClaimed ─────────►│
+    │◄── 回写 onchain_confirmed ───┤                              │
+```
+
+- 合约源码：`extensions/blockchain-adapter/contracts/evm/RewardDistributor.sol`
+- ABI：`extensions/blockchain-adapter/src/types/abi/reward-distributor.ts`
+- 签名适配器：`extensions/market-core/src/market/reward/evm-claim.ts`（`EvmRewardClaimAdapter`）
+
+### 7.4 TON 发奖流程（Ed25519 验签）
+
+```
+后端(market-core)            合约(settlement.fc)              链上
+    │                              │                           │
+    ├─ 创建 RewardGrant ──────────►│                           │
+    ├─ escrow-ton.release() ──────►│                           │
+    │  (签名 + queryId + amount)    │                           │
+    │                              ├─ check_signature(hash,    │
+    │                              │   sig, owner_pubkey)      │
+    │                              ├─ 验证 status == LOCKED    │
+    │                              ├─ 记录 release_query_id    │
+    │                              ├─ 转账 TON ────────────────►│
+    │◄── 回写 tx/BOC 标识 ─────────┤                           │
+```
+
+- 合约源码：`extensions/blockchain-adapter/contracts/ton/settlement.fc`
+- 适配层：`extensions/market-core/src/market/escrow-ton.ts`
+- 防重放：settlement record 的 `release_query_id` 字段 + 状态机天然防重放（LOCKED → RELEASED 单向）
+
+### 7.5 状态机
+
+```
+reward_created → claim_issued → onchain_submitted → onchain_confirmed
+                                                  ↘ onchain_failed → claim_issued (可受控重试)
+```
+
+- 状态跃迁由 `assertRewardTransition()` 强制校验
+- `onchain_failed → claim_issued` 允许受控重试（attempts 计数器递增）
+- 每次状态变更均生成审计事件（`reward_created` / `reward_claim_issued`），含 canonical hash
+
+### 7.6 审计锚定
+
+- 每笔奖励单的 canonical hash 由 `rewardCanonicalHash()` 生成（域分离：`domain: "reward"` + 经济身份字段）
+- 审计事件通过 `recordAuditWithAnchor()` 写入，复用现有 web3-core 的 anchor/审计能力
+- Canonical hash 为 `0x` 前缀的 SHA-256 字符串（66 字符）
+
+### 7.7 Feature Gate
+
+- 配置：`MarketPluginConfig.rewards.enabled`（默认 `true`）
+- Handler 入口调用 `assertRewardsEnabled(config)` 检查
+- 可在 `openclaw.plugin.json` 的 `configSchema` 中配置
+
+### 7.8 验收标准
+
+- [ ] **幂等性**：相同 `rewardId` 重复创建返回已有记录，不产生副作用
+- [ ] **防重放（nonce）**：相同 `(chainFamily, network, recipient, nonce)` 组合拒绝创建
+- [ ] **权限控制**：无 write scope 的调用方被拒绝（gateway scope + handler assertAccess 双层）
+- [ ] **状态机完整性**：非法状态跃迁被拒绝（如 `onchain_confirmed → claim_issued`）
+- [ ] **EVM 链上验证**：EIP-712 签名可被 RewardDistributor 合约 ecrecover 验签
+- [ ] **TON 链上验证**：Ed25519 签名可被 settlement.fc 的 `check_signature` 验证
+- [ ] **审计追踪**：每次创建和签发 claim 均产生含 canonical hash 的审计事件
+- [ ] **feature gate**：`rewards.enabled = false` 时 create 和 issueClaim 均被拒绝
+- [ ] **兜底直发交易**：operator write 权限下可通过 escrow-ton 或 EVM provider 直接发送链上交易
+- [ ] **链上证据**：EVM 返回 `txHash` + receipt；TON 返回可追踪 tx/BOC 标识 + `release_query_id`
+
+### 7.9 故障排查路径
+
+1. **claim 签发失败**：检查 `config.chain.privateKey` 是否配置（EVM）；检查 `config.chain.mnemonics` 是否配置（TON）
+2. **链上提交超时**：检查 RPC endpoint 可达性；确认 gas 估算/TON fee 是否足够
+3. **nonce 冲突**：查询 `market.reward.list` 确认已有 reward 的 nonce 值；使用不同 nonce 重新创建
+4. **状态卡在 `onchain_submitted`**：链上交易可能 pending/reverted；需手动查链确认后更新状态
+5. **审计 hash 不一致**：确认 canonical hash 输入字段完全一致（大小写、精度、前缀）
+
+---
+
+## 8. 与 Skill 的关系
 
 - **不新增 Skill**：双栈支付/结算不单独拆 Skill。
 - **复用 `web3-market`**：需要智能体执行主线开发/对齐时，使用 `skills/web3-market/SKILL.md`（其 references 已包含安全模型、资源共享与结算对齐的工作流）。

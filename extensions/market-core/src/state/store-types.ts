@@ -17,6 +17,8 @@ import type {
   Offer,
   Order,
   RevocationJob,
+  RewardGrant,
+  RewardNonceRecord,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -60,6 +62,12 @@ export type MarketStore = {
   listBridgeTransfers: (filter?: BridgeTransferFilter) => BridgeTransfer[];
   getBridgeTransfer: (bridgeId: string) => BridgeTransfer | undefined;
   saveBridgeTransfer: (transfer: BridgeTransfer) => void;
+  listRewards: () => RewardGrant[];
+  getReward: (rewardId: string) => RewardGrant | undefined;
+  saveReward: (reward: RewardGrant) => void;
+  listRewardNonces: () => RewardNonceRecord[];
+  getRewardNonce: (nonceId: string) => RewardNonceRecord | undefined;
+  saveRewardNonce: (record: RewardNonceRecord) => void;
   appendAuditEvent: (event: AuditEvent) => void;
   readAuditEvents: (limit?: number) => AuditEvent[];
   hasAnyData?: () => boolean;

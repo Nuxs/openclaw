@@ -6,6 +6,7 @@
 ;; 存储结构
 ;; storage#_
 ;;   owner:MsgAddress         所有者地址
+;;   owner_pubkey:uint256     所有者公钥（用于 Ed25519 验签）
 ;;   total_locked:Coins       总锁定金额
 ;;   settlement_count:uint32  结算计数
 ;;   settlements:(HashMapE 256 Settlement)  结算映射
@@ -34,6 +35,8 @@ const int error::insufficient_balance = 402;
 const int error::settlement_not_found = 404;
 const int error::invalid_status = 405;
 const int error::timeout_not_reached = 406;
+const int error::invalid_signature = 407;
+const int error::query_id_reused = 408;
 
 ;; 常量
 const int DISPUTE_WINDOW = 600;      ;; 10分钟争议窗口
@@ -43,11 +46,12 @@ const int TIMEOUT_DURATION = 3600;   ;; 1小时超时
 ;; 存储管理
 ;; ============================================================================
 
-;; 加载存储
-(slice, int, int, cell) load_data() inline {
+;; 加载存储（5 个字段：owner, owner_pubkey, total_locked, settlement_count, settlements）
+(slice, int, int, int, cell) load_data() inline {
   var ds = get_data().begin_parse();
   return (
     ds~load_msg_addr(),     ;; owner
+    ds~load_uint(256),      ;; owner_pubkey
     ds~load_coins(),        ;; total_locked
     ds~load_uint(32),       ;; settlement_count
     ds~load_dict()          ;; settlements
@@ -55,10 +59,11 @@ const int TIMEOUT_DURATION = 3600;   ;; 1小时超时
 }
 
 ;; 保存存储
-() save_data(slice owner, int total_locked, int settlement_count, cell settlements) impure inline {
+() save_data(slice owner, int owner_pubkey, int total_locked, int settlement_count, cell settlements) impure inline {
   set_data(
     begin_cell()
       .store_slice(owner)
+      .store_uint(owner_pubkey, 256)
       .store_coins(total_locked)
       .store_uint(settlement_count, 32)
       .store_dict(settlements)
@@ -67,11 +72,28 @@ const int TIMEOUT_DURATION = 3600;   ;; 1小时超时
 }
 
 ;; ============================================================================
+;; 已用 query_id 追踪（防重放）
+;; ============================================================================
+
+;; used_query_ids 存储在合约 c7 寄存器中是不可行的（TON 没有持久 c7），
+;; 因此我们使用 settlements dict 的一个独立命名空间。
+;; 策略：将 query_id 哈希后存入一个独立的 dict（存储在第一个 settlement entry
+;; 的特殊保留键 0 下面）。
+;;
+;; 更简洁的方案：在 settlement record 内记录 release_query_id，
+;; 释放时校验该 settlement 尚未被释放（STATUS_LOCKED），即利用状态机天然防重放。
+;; 因为每个 order_hash 只能被释放一次（LOCKED → RELEASED），query_id 不可能
+;; 对同一个 settlement 被使用两次。
+;;
+;; 如果需要全局 query_id 防重放（跨不同 order_hash），可在 settlement record
+;; 中追加 release_query_id 字段，并在 get_settlement_info 中返回，供链下校验。
+
+;; ============================================================================
 ;; 结算数据管理
 ;; ============================================================================
 
-;; 解析结算数据
-(int, int, slice, slice, int, int, int) parse_settlement(slice settlement_data) inline {
+;; 解析结算数据（含 release_query_id 用于防重放追踪）
+(int, int, slice, slice, int, int, int, int) parse_settlement(slice settlement_data) inline {
   return (
     settlement_data~load_uint(8),        ;; status
     settlement_data~load_coins(),        ;; locked_amount
@@ -79,7 +101,8 @@ const int TIMEOUT_DURATION = 3600;   ;; 1小时超时
     settlement_data~load_msg_addr(),     ;; payee
     settlement_data~load_uint(64),       ;; locked_at
     settlement_data~load_uint(64),       ;; released_at
-    settlement_data~load_uint(64)        ;; dispute_window_end
+    settlement_data~load_uint(64),       ;; dispute_window_end
+    settlement_data~load_uint(64)        ;; release_query_id (0 = not yet released)
   );
 }
 
@@ -91,7 +114,8 @@ builder build_settlement(
   slice payee,
   int locked_at,
   int released_at,
-  int dispute_window_end
+  int dispute_window_end,
+  int release_query_id
 ) inline {
   return begin_cell()
     .store_uint(status, 8)
@@ -100,11 +124,12 @@ builder build_settlement(
     .store_slice(payee)
     .store_uint(locked_at, 64)
     .store_uint(released_at, 64)
-    .store_uint(dispute_window_end, 64);
+    .store_uint(dispute_window_end, 64)
+    .store_uint(release_query_id, 64);
 }
 
 ;; 获取结算数据
-(int, int, slice, slice, int, int, int) get_settlement(cell settlements, int order_hash) inline {
+(int, int, slice, slice, int, int, int, int) get_settlement(cell settlements, int order_hash) inline {
   var (settlement_slice, found) = settlements.udict_get?(256, order_hash);
   throw_unless(error::settlement_not_found, found);
   return parse_settlement(settlement_slice);
@@ -121,7 +146,7 @@ builder build_settlement(
   int amount,
   slice payee
 ) impure {
-  var (owner, total_locked, settlement_count, settlements) = load_data();
+  var (owner, owner_pubkey, total_locked, settlement_count, settlements) = load_data();
 
   ;; 检查是否已存在
   var (_, found) = settlements.udict_get?(256, order_hash);
@@ -139,7 +164,8 @@ builder build_settlement(
     payee,
     now_time,
     0,
-    now_time + TIMEOUT_DURATION
+    now_time + TIMEOUT_DURATION,
+    0   ;; release_query_id = 0 (not yet released)
   );
 
   ;; 保存结算
@@ -147,28 +173,44 @@ builder build_settlement(
   total_locked += amount;
   settlement_count += 1;
 
-  save_data(owner, total_locked, settlement_count, settlements);
+  save_data(owner, owner_pubkey, total_locked, settlement_count, settlements);
 }
 
-;; 2. 释放结算
+;; 2. 释放结算（带 Ed25519 验签 + 防重放）
 () release_settlement(
   slice sender,
   int order_hash,
   int actual_amount,
-  slice signature
+  slice signature,
+  int query_id
 ) impure {
-  var (owner, total_locked, settlement_count, settlements) = load_data();
+  var (owner, owner_pubkey, total_locked, settlement_count, settlements) = load_data();
 
   ;; 获取结算数据
-  var (status, locked_amount, payer, payee, locked_at, _, _) = get_settlement(settlements, order_hash);
+  var (status, locked_amount, payer, payee, locked_at, _, _, prev_query_id) = get_settlement(settlements, order_hash);
 
-  ;; 验证状态
+  ;; 验证状态（只有 LOCKED 才能释放）
   throw_unless(error::invalid_status, status == STATUS_LOCKED);
 
-  ;; 验证签名者 (必须是payee或owner)
+  ;; 验证发送者权限（必须是 payee 或 owner）
   throw_unless(
     error::unauthorized,
     equal_slices(sender, payee) | equal_slices(sender, owner)
+  );
+
+  ;; ── Ed25519 签名验证 ──
+  ;; 签名输入 = Cell{ order_hash:uint256, actual_amount:Coins, query_id:uint64 }
+  ;; 必须与 TS 侧 buildTonSettlementReleaseSigningCell 完全一致。
+  cell signing_cell = begin_cell()
+    .store_uint(order_hash, 256)
+    .store_coins(actual_amount)
+    .store_uint(query_id, 64)
+  .end_cell();
+
+  int signing_hash = cell_hash(signing_cell);
+  throw_unless(
+    error::invalid_signature,
+    check_signature(signing_hash, signature, owner_pubkey)
   );
 
   ;; 验证金额
@@ -203,7 +245,7 @@ builder build_settlement(
     send_raw_message(msg, 1);
   }
 
-  ;; 更新结算状态
+  ;; 更新结算状态（记录 release_query_id 用于链下审计追踪）
   int now_time = now();
   var settlement = build_settlement(
     STATUS_RELEASED,
@@ -212,13 +254,14 @@ builder build_settlement(
     payee,
     locked_at,
     now_time,
-    now_time + DISPUTE_WINDOW
+    now_time + DISPUTE_WINDOW,
+    query_id   ;; 记录本次释放的 query_id
   );
 
   settlements~udict_set_builder(256, order_hash, settlement);
   total_locked -= locked_amount;
 
-  save_data(owner, total_locked, settlement_count, settlements);
+  save_data(owner, owner_pubkey, total_locked, settlement_count, settlements);
 }
 
 ;; 3. 退款结算
@@ -226,10 +269,10 @@ builder build_settlement(
   slice sender,
   int order_hash
 ) impure {
-  var (owner, total_locked, settlement_count, settlements) = load_data();
+  var (owner, owner_pubkey, total_locked, settlement_count, settlements) = load_data();
 
   ;; 获取结算数据
-  var (status, locked_amount, payer, payee, locked_at, _, dispute_window_end) = get_settlement(settlements, order_hash);
+  var (status, locked_amount, payer, payee, locked_at, _, dispute_window_end, _) = get_settlement(settlements, order_hash);
 
   ;; 验证状态
   throw_unless(error::invalid_status, status == STATUS_LOCKED);
@@ -260,13 +303,14 @@ builder build_settlement(
     payee,
     locked_at,
     now_time,
-    0
+    0,
+    0   ;; no release query_id for refund
   );
 
   settlements~udict_set_builder(256, order_hash, settlement);
   total_locked -= locked_amount;
 
-  save_data(owner, total_locked, settlement_count, settlements);
+  save_data(owner, owner_pubkey, total_locked, settlement_count, settlements);
 }
 
 ;; ============================================================================
@@ -296,6 +340,9 @@ builder build_settlement(
     ;; 锁定结算
     int order_hash = in_msg_body~load_uint(256);
     int amount = in_msg_body~load_coins();
+    
+    ;; P0 Fix: Ensure msg_value covers the locked amount plus gas reserve
+    throw_unless(error::insufficient_balance, msg_value >= amount + 50000000); ;; 0.05 TON reserve
     slice payee = in_msg_body~load_msg_addr();
 
     lock_settlement(sender, order_hash, amount, payee);
@@ -303,12 +350,12 @@ builder build_settlement(
   }
 
   if (op == op::release_settlement) {
-    ;; 释放结算
+    ;; 释放结算（带签名验证）
     int order_hash = in_msg_body~load_uint(256);
     int actual_amount = in_msg_body~load_coins();
     slice signature = in_msg_body~load_bits(512);
 
-    release_settlement(sender, order_hash, actual_amount, signature);
+    release_settlement(sender, order_hash, actual_amount, signature, query_id);
     return ();
   }
 
@@ -327,26 +374,32 @@ builder build_settlement(
 ;; Get方法 (查询接口)
 ;; ============================================================================
 
-;; 获取结算信息
-(int, int, slice, slice, int, int, int) get_settlement_info(int order_hash) method_id {
-  var (_, _, _, settlements) = load_data();
+;; 获取结算信息（含 release_query_id）
+(int, int, slice, slice, int, int, int, int) get_settlement_info(int order_hash) method_id {
+  var (_, _, _, _, settlements) = load_data();
   return get_settlement(settlements, order_hash);
 }
 
 ;; 获取总锁定金额
 int get_total_locked() method_id {
-  var (_, total_locked, _, _) = load_data();
+  var (_, _, total_locked, _, _) = load_data();
   return total_locked;
 }
 
 ;; 获取结算数量
 int get_settlement_count() method_id {
-  var (_, _, settlement_count, _) = load_data();
+  var (_, _, _, settlement_count, _) = load_data();
   return settlement_count;
 }
 
 ;; 获取所有者
 slice get_owner() method_id {
-  var (owner, _, _, _) = load_data();
+  var (owner, _, _, _, _) = load_data();
   return owner;
+}
+
+;; 获取所有者公钥
+int get_owner_pubkey() method_id {
+  var (_, owner_pubkey, _, _, _) = load_data();
+  return owner_pubkey;
 }

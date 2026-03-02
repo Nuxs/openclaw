@@ -24,6 +24,9 @@ export type ChainConfig = {
   tonWorkchain?: number;
 
   escrowContractAddress?: string;
+
+  /** EVM RewardDistributor contract address (for claim-based rewards). */
+  rewardDistributorAddress?: string;
 };
 
 export type SettlementMode = "contract" | "anchor_only";
@@ -77,6 +80,11 @@ export type CredentialsConfig = {
   lockTimeoutMs?: number;
 };
 
+export type RewardsConfig = {
+  /** Master switch for reward grant capabilities. Default: true. */
+  enabled: boolean;
+};
+
 export type MarketPluginConfig = {
   chain: ChainConfig;
   settlement: SettlementConfig;
@@ -84,6 +92,7 @@ export type MarketPluginConfig = {
   store: StoreConfig;
   access: AccessConfig;
   credentials: CredentialsConfig;
+  rewards: RewardsConfig;
 };
 
 export const DEFAULT_CONFIG: MarketPluginConfig = {
@@ -111,6 +120,9 @@ export const DEFAULT_CONFIG: MarketPluginConfig = {
     mode: "inline",
     lockTimeoutMs: 5000,
   },
+  rewards: {
+    enabled: true,
+  },
 };
 
 /** Merge user-supplied partial config with defaults. */
@@ -127,5 +139,6 @@ export function resolveConfig(raw?: Record<string, unknown>): MarketPluginConfig
     store: merge(DEFAULT_CONFIG.store, raw.store),
     access: merge(DEFAULT_CONFIG.access, raw.access),
     credentials: merge(DEFAULT_CONFIG.credentials, raw.credentials),
+    rewards: merge(DEFAULT_CONFIG.rewards, raw.rewards),
   };
 }

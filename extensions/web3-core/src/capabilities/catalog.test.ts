@@ -18,6 +18,10 @@ const REGISTERED_GATEWAY_METHODS = [
   "web3.billing.status",
   "web3.billing.summary",
   "web3.status.summary",
+  "web3.reward.get",
+  "web3.reward.list",
+  "web3.reward.claim",
+  "web3.reward.updateStatus",
   "web3.resources.publish",
   "web3.resources.unpublish",
   "web3.resources.list",
@@ -157,6 +161,7 @@ describe("capabilities catalog structure", () => {
       "index",
       "monitor",
       "dispute",
+      "reward",
       "tools",
     ]);
 

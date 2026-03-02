@@ -253,7 +253,7 @@ export function isPrivateOrLoopbackIpAddress(raw: string | undefined): boolean {
   return isBlockedSpecialUseIpv6Address(normalized);
 }
 
-export function isBlockedSpecialUseIpv6Address(address: ipaddr.IPv6): boolean {
+export function isBlockedSpecialUseIpv6Address(address: Ipv6Address): boolean {
   if (BLOCKED_IPV6_SPECIAL_USE_RANGES.has(address.range())) {
     return true;
   }

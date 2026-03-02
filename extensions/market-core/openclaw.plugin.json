@@ -21,6 +21,10 @@
       "label": "Escrow Contract Address",
       "help": "On-chain escrow contract address"
     },
+    "chain.rewardDistributorAddress": {
+      "label": "Reward Distributor Address",
+      "help": "EVM RewardDistributor contract address (claim-based rewards)"
+    },
     "settlement.mode": {
       "label": "Settlement Mode",
       "help": "contract (default) | anchor_only (dev)"
@@ -124,6 +128,10 @@
     "credentials.lockTimeoutMs": {
       "label": "Credentials Lock Timeout (ms)",
       "help": "Timeout for credentials file locking"
+    },
+    "rewards.enabled": {
+      "label": "Rewards Enabled",
+      "help": "Enable or disable the reward grant subsystem (default: true)"
     }
   },
   "configSchema": {
@@ -141,7 +149,8 @@
           },
           "rpcUrl": { "type": "string" },
           "privateKey": { "type": "string" },
-          "escrowContractAddress": { "type": "string" }
+          "escrowContractAddress": { "type": "string" },
+          "rewardDistributorAddress": { "type": "string" }
         }
       },
       "settlement": {
@@ -221,6 +230,13 @@
           "storePath": { "type": "string" },
           "encryptionKey": { "type": "string" },
           "lockTimeoutMs": { "type": "number" }
+        }
+      },
+      "rewards": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": true }
         }
       }
     }

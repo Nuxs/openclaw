@@ -1,4 +1,6 @@
 import { Address, beginCell, Cell } from "@ton/core";
+import { sign } from "@ton/crypto";
+import { deriveTonKeyPairFromMnemonic } from "./mnemonic.js";
 
 export const TON_SETTLEMENT_OP = {
   lock: 1,
@@ -96,4 +98,42 @@ export function encodeTonSettlementRefundPayload(args: {
     .endCell();
 
   return toBocBase64(cell);
+}
+
+/**
+ * Build the canonical signing cell for settlement release authorization.
+ *
+ * IMPORTANT: This must match the FunC contract's signature verification logic.
+ */
+export function buildTonSettlementReleaseSigningCell(args: {
+  orderHash: string;
+  actualAmount: bigint;
+  queryId: bigint;
+}): Cell {
+  const orderHash = requireOrderHashUint256(args.orderHash);
+  return beginCell()
+    .storeUint(orderHash, 256)
+    .storeCoins(args.actualAmount)
+    .storeUint(args.queryId, 64)
+    .endCell();
+}
+
+export function hashTonSettlementReleaseSigningCell(args: {
+  orderHash: string;
+  actualAmount: bigint;
+  queryId: bigint;
+}): Buffer {
+  const cell = buildTonSettlementReleaseSigningCell(args);
+  return cell.hash();
+}
+
+export async function signTonSettlementReleasePayload(args: {
+  orderHash: string;
+  actualAmount: bigint;
+  queryId: bigint;
+  tonMnemonic: string;
+}): Promise<Buffer> {
+  const hash = hashTonSettlementReleaseSigningCell(args);
+  const keyPair = await deriveTonKeyPairFromMnemonic(args.tonMnemonic);
+  return Buffer.from(sign(hash, keyPair.secretKey));
 }

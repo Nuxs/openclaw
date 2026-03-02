@@ -6,6 +6,7 @@ import { resolve, relative, join, sep, dirname } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
+  fetchWithSsrFGuard,
   isRequestBodyLimitError,
   readRequestBodyWithLimit,
   requestBodyErrorToText,
@@ -566,43 +567,51 @@ export function createResourceModelChatHandler(config: Web3PluginConfig) {
         headers.Authorization = `Bearer ${apiKey}`;
       }
 
-      const upstream = await fetch(url, {
-        method: "POST",
-        headers,
-        body: rawBody,
+      const { response: upstream, release: releaseUpstream } = await fetchWithSsrFGuard({
+        url,
+        init: {
+          method: "POST",
+          headers,
+          body: rawBody,
+        },
+        auditContext: "web3-resource-model-forward",
       });
 
-      if (!upstream.ok) {
-        sendJson(res, upstream.status, { ok: false, error: "model backend error" });
-        return;
+      try {
+        if (!upstream.ok) {
+          sendJson(res, upstream.status, { ok: false, error: "model backend error" });
+          return;
+        }
+
+        res.statusCode = upstream.status;
+        const contentType = upstream.headers.get("content-type");
+        if (contentType) {
+          res.setHeader("Content-Type", contentType);
+        }
+
+        if (!upstream.body) {
+          res.end();
+          // Fire-and-forget ledger append even for empty body
+          appendModelLedger({ config, lease: leaseResult.lease, offer }).catch(() => {});
+          return;
+        }
+
+        await pipeline(Readable.fromWeb(upstream.body as any), res);
+
+        // Extract usage tokens from upstream response headers if available
+        const usageHeader = upstream.headers.get("x-usage-tokens");
+        const usageTokens = usageHeader ? Number.parseInt(usageHeader, 10) : undefined;
+
+        // Fire-and-forget: write Provider authority ledger after streaming completes
+        appendModelLedger({
+          config,
+          lease: leaseResult.lease,
+          offer,
+          usageTokens: Number.isFinite(usageTokens) ? usageTokens : undefined,
+        }).catch(() => {});
+      } finally {
+        await releaseUpstream();
       }
-
-      res.statusCode = upstream.status;
-      const contentType = upstream.headers.get("content-type");
-      if (contentType) {
-        res.setHeader("Content-Type", contentType);
-      }
-
-      if (!upstream.body) {
-        res.end();
-        // Fire-and-forget ledger append even for empty body
-        appendModelLedger({ config, lease: leaseResult.lease, offer }).catch(() => {});
-        return;
-      }
-
-      await pipeline(Readable.fromWeb(upstream.body as any), res);
-
-      // Extract usage tokens from upstream response headers if available
-      const usageHeader = upstream.headers.get("x-usage-tokens");
-      const usageTokens = usageHeader ? Number.parseInt(usageHeader, 10) : undefined;
-
-      // Fire-and-forget: write Provider authority ledger after streaming completes
-      appendModelLedger({
-        config,
-        lease: leaseResult.lease,
-        offer,
-        usageTokens: Number.isFinite(usageTokens) ? usageTokens : undefined,
-      }).catch(() => {});
     } finally {
       release();
     }
@@ -687,33 +696,41 @@ export function createResourceSearchQueryHandler(config: Web3PluginConfig) {
           searchUrl.searchParams.set("apikey", apiKey);
         }
 
-        const upstream = await fetch(searchUrl.toString(), {
-          method: "GET",
-          headers: { Accept: "application/json" },
+        const { response: upstream, release: releaseUpstream } = await fetchWithSsrFGuard({
+          url: searchUrl.toString(),
+          init: {
+            method: "GET",
+            headers: { Accept: "application/json" },
+          },
+          auditContext: "web3-resource-search-forward",
         });
-        if (!upstream.ok) {
-          sendJson(res, upstream.status, { ok: false, error: "search backend error" });
-          return;
+        try {
+          if (!upstream.ok) {
+            sendJson(res, upstream.status, { ok: false, error: "search backend error" });
+            return;
+          }
+
+          const data = (await upstream.json()) as {
+            results?: Array<{ title?: string; url?: string; content?: string }>;
+          };
+          const results = Array.isArray(data.results) ? data.results : [];
+          const limit = payload.limit ?? DEFAULT_SEARCH_LIMIT;
+          const mapped = results.slice(0, limit).map((entry) => ({
+            title: entry.title ?? "",
+            url: entry.url ?? "",
+            snippet: entry.content ?? "",
+          }));
+
+          await appendSearchLedger({
+            config,
+            lease: leaseResult.lease,
+            offer,
+          });
+
+          sendJson(res, 200, { ok: true, results: mapped });
+        } finally {
+          await releaseUpstream();
         }
-
-        const data = (await upstream.json()) as {
-          results?: Array<{ title?: string; url?: string; content?: string }>;
-        };
-        const results = Array.isArray(data.results) ? data.results : [];
-        const limit = payload.limit ?? DEFAULT_SEARCH_LIMIT;
-        const mapped = results.slice(0, limit).map((entry) => ({
-          title: entry.title ?? "",
-          url: entry.url ?? "",
-          snippet: entry.content ?? "",
-        }));
-
-        await appendSearchLedger({
-          config,
-          lease: leaseResult.lease,
-          offer,
-        });
-
-        sendJson(res, 200, { ok: true, results: mapped });
       } catch {
         sendJson(res, 500, { ok: false, error: "search provider failed" });
       }

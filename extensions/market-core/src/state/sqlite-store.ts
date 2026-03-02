@@ -21,6 +21,8 @@ import type {
   Offer,
   Order,
   RevocationJob,
+  RewardGrant,
+  RewardNonceRecord,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -62,6 +64,8 @@ export class MarketSqliteStore implements MarketStore {
         "CREATE TABLE IF NOT EXISTS ledger (id TEXT PRIMARY KEY, timestamp TEXT NOT NULL, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS token_economy (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS bridge_transfers (id TEXT PRIMARY KEY, order_id TEXT, settlement_id TEXT, status TEXT, updated_at TEXT, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS rewards (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS reward_nonces (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS audit (id TEXT PRIMARY KEY, timestamp TEXT NOT NULL, data TEXT NOT NULL);" +
         "CREATE INDEX IF NOT EXISTS ledger_ts ON ledger(timestamp);" +
         "CREATE INDEX IF NOT EXISTS audit_ts ON audit(timestamp);" +
@@ -93,6 +97,8 @@ export class MarketSqliteStore implements MarketStore {
       this.countRows("ledger") === 0 &&
       this.countRows("token_economy") === 0 &&
       this.countRows("bridge_transfers") === 0 &&
+      this.countRows("rewards") === 0 &&
+      this.countRows("reward_nonces") === 0 &&
       this.countRows("audit") === 0
     );
   }
@@ -119,6 +125,8 @@ export class MarketSqliteStore implements MarketStore {
     for (const transfer of fileStore.listBridgeTransfers({ limit: 1_000_000 })) {
       this.saveBridgeTransfer(transfer);
     }
+    for (const reward of fileStore.listRewards()) this.saveReward(reward);
+    for (const nonce of fileStore.listRewardNonces()) this.saveRewardNonce(nonce);
     for (const event of fileStore.readAuditEvents(1_000_000)) this.appendAuditEvent(event);
   }
 
@@ -420,6 +428,30 @@ export class MarketSqliteStore implements MarketStore {
         transfer.updatedAt,
         JSON.stringify(transfer),
       );
+  }
+
+  listRewards(): RewardGrant[] {
+    return this.listFrom<RewardGrant>("rewards");
+  }
+
+  getReward(rewardId: string): RewardGrant | undefined {
+    return this.getFrom<RewardGrant>("rewards", rewardId);
+  }
+
+  saveReward(reward: RewardGrant): void {
+    this.saveTo("rewards", reward.rewardId, reward);
+  }
+
+  listRewardNonces(): RewardNonceRecord[] {
+    return this.listFrom<RewardNonceRecord>("reward_nonces");
+  }
+
+  getRewardNonce(nonceId: string): RewardNonceRecord | undefined {
+    return this.getFrom<RewardNonceRecord>("reward_nonces", nonceId);
+  }
+
+  saveRewardNonce(record: RewardNonceRecord): void {
+    this.saveTo("reward_nonces", record.nonceId, record);
   }
 
   appendAuditEvent(event: AuditEvent): void {

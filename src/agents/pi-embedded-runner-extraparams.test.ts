@@ -161,6 +161,17 @@ describe("applyExtraParamsToAgent", () => {
     };
   }
 
+  function asOpenaiResponsesModel(model: {
+    api: "openai-responses";
+    provider: string;
+    id: string;
+    baseUrl?: string;
+    compat?: { supportsStore?: boolean };
+    contextWindow?: number;
+  }): Model<"openai-responses"> {
+    return model as unknown as Model<"openai-responses">;
+  }
+
   function runResponsesPayloadMutationCase(params: {
     applyProvider: string;
     applyModelId: string;
@@ -549,11 +560,11 @@ describe("applyExtraParamsToAgent", () => {
 
     applyExtraParamsToAgent(agent, undefined, "openai", "gpt-5");
 
-    const model = {
+    const model = asOpenaiResponsesModel({
       api: "openai-responses",
       provider: "openai",
       id: "gpt-5",
-    } as Model<"openai-responses">;
+    });
     const context: Context = { messages: [] };
     void agent.streamFn?.(model, context, {});
 
@@ -917,12 +928,12 @@ describe("applyExtraParamsToAgent", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "openai",
       applyModelId: "gpt-5",
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "openai",
         id: "gpt-5",
         baseUrl: "https://api.openai.com/v1",
-      } as Model<"openai-responses">,
+      }),
     });
     expect(payload.store).toBe(true);
   });
@@ -931,12 +942,12 @@ describe("applyExtraParamsToAgent", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "openai",
       applyModelId: "gpt-5",
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "openai",
         id: "gpt-5",
         baseUrl: "https://proxy.example.com/v1",
-      } as Model<"openai-responses">,
+      }),
     });
     expect(payload.store).toBe(false);
   });
@@ -945,12 +956,12 @@ describe("applyExtraParamsToAgent", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "openai",
       applyModelId: "gpt-5",
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "openai",
         id: "gpt-5",
         baseUrl: "",
-      } as Model<"openai-responses">,
+      }),
     });
     expect(payload.store).toBe(false);
   });
@@ -959,19 +970,13 @@ describe("applyExtraParamsToAgent", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "azure-openai-responses",
       applyModelId: "gpt-4o",
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "azure-openai-responses",
         id: "gpt-4o",
-        name: "gpt-4o",
         baseUrl: "https://example.openai.azure.com/openai/v1",
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 128_000,
-        maxTokens: 16_384,
         compat: { supportsStore: false },
-      } as Model<"openai-responses"> & { compat?: { supportsStore?: boolean } },
+      }),
     });
     expect(payload.store).toBe(false);
   });
@@ -980,13 +985,13 @@ describe("applyExtraParamsToAgent", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "openai",
       applyModelId: "gpt-5",
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "openai",
         id: "gpt-5",
         baseUrl: "https://api.openai.com/v1",
         contextWindow: 200_000,
-      } as Model<"openai-responses">,
+      }),
     });
     expect(payload.context_management).toEqual([
       {
@@ -1000,12 +1005,12 @@ describe("applyExtraParamsToAgent", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "azure-openai-responses",
       applyModelId: "gpt-4o",
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "azure-openai-responses",
         id: "gpt-4o",
         baseUrl: "https://example.openai.azure.com/openai/v1",
-      } as Model<"openai-responses">,
+      }),
     });
     expect(payload).not.toHaveProperty("context_management");
   });
@@ -1028,12 +1033,12 @@ describe("applyExtraParamsToAgent", () => {
           },
         },
       },
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "azure-openai-responses",
         id: "gpt-4o",
         baseUrl: "https://example.openai.azure.com/openai/v1",
-      } as Model<"openai-responses">,
+      }),
     });
     expect(payload.context_management).toEqual([
       {
@@ -1047,12 +1052,12 @@ describe("applyExtraParamsToAgent", () => {
     const payload = runResponsesPayloadMutationCase({
       applyProvider: "openai",
       applyModelId: "gpt-5",
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "openai",
         id: "gpt-5",
         baseUrl: "https://api.openai.com/v1",
-      } as Model<"openai-responses">,
+      }),
       payload: {
         store: false,
         context_management: [{ type: "compaction", compact_threshold: 12_345 }],
@@ -1078,12 +1083,12 @@ describe("applyExtraParamsToAgent", () => {
           },
         },
       },
-      model: {
+      model: asOpenaiResponsesModel({
         api: "openai-responses",
         provider: "openai",
         id: "gpt-5",
         baseUrl: "https://api.openai.com/v1",
-      } as Model<"openai-responses">,
+      }),
     });
     expect(payload).not.toHaveProperty("context_management");
   });

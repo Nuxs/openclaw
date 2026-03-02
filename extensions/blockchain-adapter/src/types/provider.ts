@@ -74,6 +74,9 @@ export interface IProvider {
   /** 等待交易确认 */
   waitForTransaction(txHash: TxHash, confirmations?: number): Promise<TxReceipt>;
 
+  /** 获取交易回执 */
+  getTransactionReceipt(txHash: string): Promise<TxReceipt | undefined>;
+
   /** 获取当前区块号 */
   getBlockNumber(): Promise<number>;
 

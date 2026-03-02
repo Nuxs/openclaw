@@ -27,7 +27,11 @@ export async function createTonMnemonic(wordsCount = 24): Promise<string> {
 
 export async function deriveTonKeyPairFromMnemonic(mnemonic: string): Promise<TonKeyPair> {
   const words = splitTonMnemonic(mnemonic);
-  return mnemonicToPrivateKey(words);
+  const keyPair = await mnemonicToPrivateKey(words);
+  return {
+    publicKey: Buffer.from(keyPair.publicKey),
+    secretKey: Buffer.from(keyPair.secretKey),
+  };
 }
 
 export async function deriveTonWalletAddressFromMnemonic(

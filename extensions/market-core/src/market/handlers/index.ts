@@ -11,6 +11,13 @@ export {
   createOfferUpdateHandler,
   createOfferCloseHandler,
 } from "./offer.js";
+export {
+  createRewardCreateHandler,
+  createRewardGetHandler,
+  createRewardIssueClaimHandler,
+  createRewardListHandler,
+  createRewardUpdateStatusHandler,
+} from "./reward.js";
 export { createOrderCreateHandler, createOrderCancelHandler } from "./order.js";
 export {
   createSettlementLockHandler,

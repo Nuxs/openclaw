@@ -75,6 +75,9 @@ export {
   encodeTonSettlementReleasePayload,
   encodeTonSettlementRefundPayload,
   decodeBocBase64ToCell,
+  buildTonSettlementReleaseSigningCell,
+  hashTonSettlementReleaseSigningCell,
+  signTonSettlementReleasePayload,
 } from "./providers/ton/settlement-payload.js";
 export { normalizeTonAddress } from "./providers/ton/address.js";
 

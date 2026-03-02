@@ -435,6 +435,12 @@ export function createDisputeRejectHandler(
         refId: dispute.disputeId,
         hash: dispute.disputeHash,
         anchorId: `dispute:${dispute.disputeId}`,
+        details: {
+          disputeId: dispute.disputeId,
+          orderId: dispute.orderId,
+          status: dispute.status,
+          resolvedAt: dispute.resolvedAt,
+        },
       });
 
       respond(true, {

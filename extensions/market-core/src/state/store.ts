@@ -18,6 +18,8 @@ import type {
   Offer,
   Order,
   RevocationJob,
+  RewardGrant,
+  RewardNonceRecord,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -197,6 +199,30 @@ export class MarketStateStore {
 
   saveBridgeTransfer(transfer: BridgeTransfer): void {
     this.store.saveBridgeTransfer(transfer);
+  }
+
+  listRewards(): RewardGrant[] {
+    return this.store.listRewards();
+  }
+
+  getReward(rewardId: string): RewardGrant | undefined {
+    return this.store.getReward(rewardId);
+  }
+
+  saveReward(reward: RewardGrant): void {
+    this.store.saveReward(reward);
+  }
+
+  listRewardNonces(): RewardNonceRecord[] {
+    return this.store.listRewardNonces();
+  }
+
+  getRewardNonce(nonceId: string): RewardNonceRecord | undefined {
+    return this.store.getRewardNonce(nonceId);
+  }
+
+  saveRewardNonce(record: RewardNonceRecord): void {
+    this.store.saveRewardNonce(record);
   }
 
   appendAuditEvent(event: AuditEvent): void {

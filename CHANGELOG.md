@@ -6,6 +6,7 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Market/Reward: add `market.reward.updateStatus` handler for on-chain status lifecycle updates (onchain_submitted/onchain_confirmed/onchain_failed) with audit trail anchoring.
 - Android/Nodes parity: add `system.notify`, `photos.latest`, `contacts.search`/`contacts.add`, `calendar.events`/`calendar.add`, and `motion.activity`/`motion.pedometer`, with motion sensor-aware command gating and improved activity sampling reliability. (#29398) Thanks @obviyus.
 - Android/Nodes: add `camera.list`, `device.permissions`, `device.health`, and `notifications.actions` (`open`/`dismiss`/`reply`) on Android nodes, plus first-class node-tool actions for the new device/notification commands. (#28260) Thanks @obviyus.
 - Discord/Thread bindings: replace fixed TTL lifecycle with inactivity (`idleHours`, default 24h) plus optional hard `maxAgeHours` lifecycle controls, and add `/session idle` + `/session max-age` commands for focused thread-bound sessions. (#27845) Thanks @osolmaz.
@@ -20,6 +21,8 @@ Docs: https://docs.openclaw.ai
 - Memory/LanceDB: support custom OpenAI `baseUrl` and embedding dimensions for LanceDB memory. (#17874) Thanks @rish2jain and @vincentkoc.
 
 ### Fixes
+
+<<<<<<< HEAD
 
 - Discord/Components wildcard handlers: use distinct internal registration sentinel IDs and parse those sentinels as wildcard keys so select/user/role/channel/mentionable/modal interactions are not dropped by raw customId dedupe paths. Landed from contributor PR #29459 by @Sid-Qin. Thanks @Sid-Qin.
 - Model directives/Auth profiles: split `/model` profile suffixes at the first `@` after the last slash so email-based auth profile IDs (for example OAuth profile IDs) resolve correctly. Landed from contributor PR #30932 by @haosenwang1018. Thanks @haosenwang1018.
@@ -64,6 +67,8 @@ Docs: https://docs.openclaw.ai
 - Feishu/Inbound media regression coverage: add explicit tests for message resource type mapping (`image` stays `image`, non-image maps to `file`) to prevent reintroducing unsupported Feishu `type=audio` fetches. (#16311, #8746) Thanks @Yaxuan42.
 - Feishu/API quota controls: add `typingIndicator` and `resolveSenderNames` config flags (top-level and per-account) so operators can disable typing reactions and sender-name lookup requests while keeping default behavior unchanged. (#10513) Thanks @BigUncle.
 - TTS/Voice bubbles: use opus output and enable `audioAsVoice` routing for Feishu and WhatsApp (in addition to Telegram) so supported channels receive voice-bubble playback instead of file-style audio attachments. (#27366) Thanks @smthfoxy.
+- Market/Reward: add server-side deadline validation in `issueClaim` to reject expired reward grants with `E_EXPIRED`.
+- TON/Settlement: add `msg_value` validation in `lock_settlement` to ensure sufficient TON for locked amount plus gas reserve (0.05 TON).
 - Security/Feishu webhook ingress: bound unauthenticated webhook rate-limit state with stale-window pruning and a hard key cap to prevent unbounded pre-auth memory growth from rotating source keys. (#26050) Thanks @bmendonca3.
 - Security/Compaction audit: remove the post-compaction audit injection message. (#28507) Thanks @fuller-stack-dev and @vincentkoc.
 - Telegram/Reply media context: include replied media files in inbound context when replying to media, defer reply-media downloads to debounce flush, gate reply-media fetch behind DM authorization, and preserve replied media when non-vision sticker fallback runs (including cached-sticker paths). (#28488) Thanks @obviyus.

@@ -1,5 +1,5 @@
 import { Type } from "@sinclair/typebox";
-import type { AnyAgentTool } from "openclaw/plugin-sdk";
+import { fetchWithSsrFGuard, type AnyAgentTool } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode, ERROR_CODE_DESCRIPTIONS } from "../errors/codes.js";
@@ -128,22 +128,30 @@ export function createWeb3SearchTool(config: Web3PluginConfig): AnyAgentTool | n
           site: params.site,
         };
 
-        const response = await fetch(url.toString(), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${lease.accessToken}`,
-            "X-OpenClaw-Lease": lease.leaseId,
+        const { response, release } = await fetchWithSsrFGuard({
+          url: url.toString(),
+          init: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${lease.accessToken}`,
+              "X-OpenClaw-Lease": lease.leaseId,
+            },
+            body: JSON.stringify(body),
           },
-          body: JSON.stringify(body),
+          auditContext: "web3-tool-search-query",
         });
 
-        if (!response.ok) {
-          return errorFromStatus(response.status, { status: response.status });
-        }
+        try {
+          if (!response.ok) {
+            return errorFromStatus(response.status, { status: response.status });
+          }
 
-        const payload = (await response.json()) as { results?: unknown };
-        return jsonResult(payload);
+          const payload = (await response.json()) as { results?: unknown };
+          return jsonResult(payload);
+        } finally {
+          await release();
+        }
       } catch (err) {
         return errorFromException(err);
       }
@@ -239,26 +247,34 @@ export function createWeb3StoragePutTool(config: Web3PluginConfig): AnyAgentTool
         }
 
         const url = new URL(`${resolved.endpoint}/web3/resources/storage/put`);
-        const response = await fetch(url.toString(), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${resolved.lease.accessToken}`,
-            "X-OpenClaw-Lease": resolved.lease.leaseId,
+        const { response, release } = await fetchWithSsrFGuard({
+          url: url.toString(),
+          init: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${resolved.lease.accessToken}`,
+              "X-OpenClaw-Lease": resolved.lease.leaseId,
+            },
+            body: JSON.stringify({
+              path,
+              bytesBase64: params.bytesBase64,
+              mime: params.mime,
+            }),
           },
-          body: JSON.stringify({
-            path,
-            bytesBase64: params.bytesBase64,
-            mime: params.mime,
-          }),
+          auditContext: "web3-tool-storage-put",
         });
 
-        if (!response.ok) {
-          return errorFromStatus(response.status, { status: response.status });
-        }
+        try {
+          if (!response.ok) {
+            return errorFromStatus(response.status, { status: response.status });
+          }
 
-        const payload = (await response.json()) as unknown;
-        return jsonResult(payload);
+          const payload = (await response.json()) as unknown;
+          return jsonResult(payload);
+        } finally {
+          await release();
+        }
       } catch (err) {
         return errorFromException(err);
       }
@@ -291,20 +307,28 @@ export function createWeb3StorageGetTool(config: Web3PluginConfig): AnyAgentTool
 
         const url = new URL(`${resolved.endpoint}/web3/resources/storage/get`);
         url.searchParams.set("path", path);
-        const response = await fetch(url.toString(), {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${resolved.lease.accessToken}`,
-            "X-OpenClaw-Lease": resolved.lease.leaseId,
+        const { response, release } = await fetchWithSsrFGuard({
+          url: url.toString(),
+          init: {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${resolved.lease.accessToken}`,
+              "X-OpenClaw-Lease": resolved.lease.leaseId,
+            },
           },
+          auditContext: "web3-tool-storage-get",
         });
 
-        if (!response.ok) {
-          return errorFromStatus(response.status, { status: response.status });
-        }
+        try {
+          if (!response.ok) {
+            return errorFromStatus(response.status, { status: response.status });
+          }
 
-        const payload = (await response.json()) as unknown;
-        return jsonResult(payload);
+          const payload = (await response.json()) as unknown;
+          return jsonResult(payload);
+        } finally {
+          await release();
+        }
       } catch (err) {
         return errorFromException(err);
       }
@@ -335,22 +359,30 @@ export function createWeb3StorageListTool(config: Web3PluginConfig): AnyAgentToo
         }
 
         const url = new URL(`${resolved.endpoint}/web3/resources/storage/list`);
-        const response = await fetch(url.toString(), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${resolved.lease.accessToken}`,
-            "X-OpenClaw-Lease": resolved.lease.leaseId,
+        const { response, release } = await fetchWithSsrFGuard({
+          url: url.toString(),
+          init: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${resolved.lease.accessToken}`,
+              "X-OpenClaw-Lease": resolved.lease.leaseId,
+            },
+            body: JSON.stringify({ prefix: params.prefix, limit: params.limit }),
           },
-          body: JSON.stringify({ prefix: params.prefix, limit: params.limit }),
+          auditContext: "web3-tool-storage-list",
         });
 
-        if (!response.ok) {
-          return errorFromStatus(response.status, { status: response.status });
-        }
+        try {
+          if (!response.ok) {
+            return errorFromStatus(response.status, { status: response.status });
+          }
 
-        const payload = (await response.json()) as unknown;
-        return jsonResult(payload);
+          const payload = (await response.json()) as unknown;
+          return jsonResult(payload);
+        } finally {
+          await release();
+        }
       } catch (err) {
         return errorFromException(err);
       }

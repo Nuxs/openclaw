@@ -147,7 +147,7 @@ else
     echo "❌ Merge 遇到冲突！"
     echo ""
 
-    # pnpm-lock.yaml 自动处理
+    # pnpm-lock.yaml 自动处理（生成文件，accept theirs + pnpm install 即可）
     if git diff --name-only --diff-filter=U | grep -q "pnpm-lock.yaml"; then
       echo "🔧 检测到 pnpm-lock.yaml 冲突，尝试自动解决..."
       git checkout --theirs pnpm-lock.yaml
@@ -158,6 +158,37 @@ else
         echo "  ⚠️  pnpm install 失败，请手动处理 pnpm-lock.yaml"
       }
     fi
+
+    # labeler.yml 轻量 union 处理（双方通常只是追加不同的 label key）
+    for labeler_file in .github/labeler.yml .github/workflows/labeler.yml; do
+      if git diff --name-only --diff-filter=U | grep -qF "$labeler_file"; then
+        echo "🔧 检测到 $labeler_file 冲突，尝试 union merge..."
+
+        base_stage="$(mktemp)"
+        ours_stage="$(mktemp)"
+        theirs_stage="$(mktemp)"
+        merged_stage="$(mktemp)"
+
+        if git show ":1:$labeler_file" >"$base_stage" 2>/dev/null \
+          && git show ":2:$labeler_file" >"$ours_stage" 2>/dev/null \
+          && git show ":3:$labeler_file" >"$theirs_stage" 2>/dev/null; then
+          cp "$ours_stage" "$merged_stage"
+
+          if git merge-file --union "$merged_stage" "$base_stage" "$theirs_stage" >/dev/null 2>&1 \
+            && ! grep -qE '^(<<<<<<<|=======|>>>>>>>)' "$merged_stage"; then
+            cp "$merged_stage" "$labeler_file"
+            git add "$labeler_file"
+            echo "  ✅ $labeler_file 已 union 合并"
+          else
+            echo "  ⚠️  $labeler_file union merge 后仍有冲突标记，需手动处理"
+          fi
+        else
+          echo "  ⚠️  $labeler_file 无法读取冲突 stage(:1/:2/:3)，需手动处理"
+        fi
+
+        rm -f "$base_stage" "$ours_stage" "$theirs_stage" "$merged_stage"
+      fi
+    done
 
     # 检查是否还有其他冲突
     REMAINING=$(git diff --name-only --diff-filter=U | grep -v "pnpm-lock.yaml" || true)
@@ -196,7 +227,7 @@ else
       echo "解决步骤:"
       echo "  1. 编辑冲突文件"
       echo "  2. git add <已解决的文件>"
-      echo "  3. git merge --continue"
+      echo "  3. git commit --no-edit   # 或 git commit（自定义 merge message）"
       echo ""
       echo "放弃: git merge --abort"
       exit 1

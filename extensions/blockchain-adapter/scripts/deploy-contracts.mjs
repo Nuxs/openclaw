@@ -109,8 +109,11 @@ async function main() {
 
   const { code } = await compileSettlementContract(contractPath);
 
+  const ownerPubkey = BigInt(`0x${Buffer.from(keyPair.publicKey).toString("hex")}`);
+
   const data = beginCell()
     .storeAddress(ownerAddress)
+    .storeUint(ownerPubkey, 256)
     .storeCoins(0n)
     .storeUint(0, 32)
     .storeDict()

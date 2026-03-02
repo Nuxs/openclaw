@@ -3,58 +3,13 @@ import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import type { Web3StateStore } from "../state/store.js";
 import { redactUnknown } from "../utils/redact.js";
-
-type GatewayCallResult = {
-  ok?: boolean;
-  error?: string;
-  result?: unknown;
-};
-
-type CallGatewayFn = (opts: {
-  method: string;
-  params?: unknown;
-  timeoutMs?: number;
-}) => Promise<unknown>;
+import { loadCallGateway, normalizeGatewayResult } from "./proxy-utils.js";
 
 type MarketProxyOptions = {
   requireResources?: boolean;
   requireConsumer?: boolean;
   requireAdvertise?: boolean;
 };
-
-async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import("../../../../src/gateway/call.ts");
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore
-  }
-
-  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
-  const mod = await import("../../../../dist/gateway/call.js");
-  if (typeof mod.callGateway !== "function") {
-    throw new Error("callGateway is not available");
-  }
-  return mod.callGateway as CallGatewayFn;
-}
-
-function normalizeGatewayResult(payload: unknown): {
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-} {
-  if (payload && typeof payload === "object") {
-    const record = payload as GatewayCallResult;
-    if (record.ok === false) {
-      return { ok: false, error: record.error ?? "gateway call failed" };
-    }
-    const result = "result" in record ? record.result : payload;
-    return { ok: true, result };
-  }
-  return { ok: true, result: payload };
-}
 
 function requireResourcesEnabled(config: Web3PluginConfig) {
   if (!config.resources.enabled) {

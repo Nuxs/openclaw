@@ -7,7 +7,11 @@
  * - Caching to avoid excessive RPC calls
  */
 
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import {
+  fetchWithSsrFGuard,
+  type GatewayRequestHandler,
+  type GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk";
 import { getAddress, isAddress, keccak256 } from "viem";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
@@ -101,43 +105,51 @@ export async function resolveEnsName(name: string, rpcUrl?: string): Promise<Ens
   try {
     // Use Ethereum JSON-RPC to resolve ENS name
     // Standard ENS resolution via ERC-137 contract methods
-    const response = await fetch(providerRpc, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "eth_call",
-        params: [
-          {
-            to: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e", // ENS Registry
-            data: "0x0178b8bc" + encodeEnsName(name), // resolve(bytes32,bytes)
-          },
-          "latest",
-        ],
-      }),
+    const { response, release } = await fetchWithSsrFGuard({
+      url: providerRpc,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_call",
+          params: [
+            {
+              to: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e", // ENS Registry
+              data: "0x0178b8bc" + encodeEnsName(name), // resolve(bytes32,bytes)
+            },
+            "latest",
+          ],
+        }),
+      },
+      auditContext: "web3-ens-resolve",
     });
 
-    const data = (await response.json()) as { result?: string };
-    const result = data.result;
+    try {
+      const data = (await response.json()) as { result?: string };
+      const result = data.result;
 
-    if (!result || result === "0x") {
-      return null;
+      if (!result || result === "0x") {
+        return null;
+      }
+
+      // Parse address from result (last 40 hex chars = 20 bytes)
+      const addressHex = "0x" + result.slice(-40);
+      const address = getAddress(addressHex);
+
+      const resolution: EnsResolution = {
+        name,
+        address,
+        resolver: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+        resolvedAt: new Date().toISOString(),
+      };
+
+      ensCache.set(`forward:${name}`, resolution, DEFAULT_CACHE_TTL_MS);
+      return resolution;
+    } finally {
+      await release();
     }
-
-    // Parse address from result (last 40 hex chars = 20 bytes)
-    const addressHex = "0x" + result.slice(-40);
-    const address = getAddress(addressHex);
-
-    const resolution: EnsResolution = {
-      name,
-      address,
-      resolver: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
-      resolvedAt: new Date().toISOString(),
-    };
-
-    ensCache.set(`forward:${name}`, resolution, DEFAULT_CACHE_TTL_MS);
-    return resolution;
   } catch {
     return null;
   }
@@ -163,49 +175,57 @@ export async function resolveEnsAddress(
   try {
     // Reverse resolution: hash address and query ENS resolver
     const addressHash = keccak256(`0x${addressLower.slice(2).padStart(64, "0")}`);
-    const response = await fetch(providerRpc, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "eth_call",
-        params: [
-          {
-            to: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e", // ENS Registry
-            data: "0x5e60fce4" + addressHash, // name(bytes32)
-          },
-          "latest",
-        ],
-      }),
+    const { response, release } = await fetchWithSsrFGuard({
+      url: providerRpc,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_call",
+          params: [
+            {
+              to: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e", // ENS Registry
+              data: "0x5e60fce4" + addressHash, // name(bytes32)
+            },
+            "latest",
+          ],
+        }),
+      },
+      auditContext: "web3-ens-reverse",
     });
 
-    const data = (await response.json()) as { result?: string };
-    const result = data.result;
+    try {
+      const data = (await response.json()) as { result?: string };
+      const result = data.result;
 
-    if (
-      !result ||
-      result === "0x" ||
-      result === "0x0000000000000000000000000000000000000000000000000000000000000000"
-    ) {
-      return null;
+      if (
+        !result ||
+        result === "0x" ||
+        result === "0x0000000000000000000000000000000000000000000000000000000000000000"
+      ) {
+        return null;
+      }
+
+      // Decode ENS name from result (stored as DNS-encoded string)
+      const name = decodeEnsName(result);
+      if (!name) {
+        return null;
+      }
+
+      const resolution: EnsResolution = {
+        name,
+        address: getAddress(address),
+        resolver: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+        resolvedAt: new Date().toISOString(),
+      };
+
+      ensCache.set(`reverse:${addressLower}`, resolution, DEFAULT_CACHE_TTL_MS);
+      return resolution;
+    } finally {
+      await release();
     }
-
-    // Decode ENS name from result (stored as DNS-encoded string)
-    const name = decodeEnsName(result);
-    if (!name) {
-      return null;
-    }
-
-    const resolution: EnsResolution = {
-      name,
-      address: getAddress(address),
-      resolver: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
-      resolvedAt: new Date().toISOString(),
-    };
-
-    ensCache.set(`reverse:${addressLower}`, resolution, DEFAULT_CACHE_TTL_MS);
-    return resolution;
   } catch {
     return null;
   }
