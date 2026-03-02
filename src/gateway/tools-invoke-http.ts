@@ -291,11 +291,16 @@ function applyPaymentResumeToken(params: {
 async function tryAutoPay(params: {
   invoice: string;
   toolName: string;
+  idempotencyKey?: string;
 }): Promise<{ result?: PaymentRequiredResult; error?: string }> {
   try {
     const response = await callGateway({
       method: "web3.billing.handlePaymentRequired",
-      params: { invoice: params.invoice, tool: params.toolName },
+      params: {
+        invoice: params.invoice,
+        tool: params.toolName,
+        idempotencyKey: params.idempotencyKey,
+      },
     });
     const normalized = normalizeGatewayResult(response);
     if (!normalized.ok) {
@@ -392,6 +397,7 @@ export async function handleToolsInvokeHttpRequest(
   const accountId = getHeader(req, "x-openclaw-account-id")?.trim() || undefined;
   const agentTo = getHeader(req, "x-openclaw-message-to")?.trim() || undefined;
   const agentThreadId = getHeader(req, "x-openclaw-thread-id")?.trim() || undefined;
+  const idempotencyKey = getHeader(req, "x-idempotency-key")?.trim() || undefined;
 
   const {
     agentId,
@@ -516,7 +522,7 @@ export async function handleToolsInvokeHttpRequest(
       let autoPayError: string | undefined;
       let autoPayResult: PaymentRequiredResult | undefined;
       if (invoice) {
-        const attempt = await tryAutoPay({ invoice, toolName });
+        const attempt = await tryAutoPay({ invoice, toolName, idempotencyKey });
         autoPayError = attempt.error;
         autoPayResult = attempt.result;
       }

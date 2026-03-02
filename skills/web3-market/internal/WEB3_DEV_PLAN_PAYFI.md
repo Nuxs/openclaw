@@ -77,13 +77,13 @@
 
 ### 3.1 `PaymentRequired` 错误处理
 
-- [ ] 在 `web3-core` 定义 `PaymentRequiredError` (HTTP 402)。
-- [ ] 实现 `web3.billing.handlePaymentRequired(invoice)`：创建 `PaymentIntent` -> 检查 Policy -> 支付 -> 返回凭证。
+- [x] 在 `web3-core` 定义 `PaymentRequiredError` (HTTP 402)。
+- [x] 实现 `web3.billing.handlePaymentRequired(invoice)`：创建 `PaymentIntent` -> 检查 Policy -> 支付 -> 返回凭证。
 
 ### 3.2 Gateway Interceptor
 
-- [ ] 修改 `src/gateway/tools-invoke-http.ts`：捕获 402 响应。
-- [ ] 注入自动支付逻辑：
+- [x] 修改 `src/gateway/tools-invoke-http.ts`：捕获 402 响应。
+- [x] 注入自动支付逻辑：
   - 检查 `WalletPolicy.autoPay` 开关。
   - 调用 `web3.billing.handlePaymentRequired`。
   - 成功后携带凭证重试工具调用。
@@ -91,8 +91,14 @@
 
 ### 3.3 幂等性与熔断
 
-- [ ] 增加 `x-idempotency-key` 支持。
+- [x] 增加 `x-idempotency-key` 支持。
 - [ ] 设置最大重试次数（默认 1 次），防止无限循环扣款。
+
+### 3.4 待优化与补齐（下一步）
+
+- [ ] 将 `WalletPolicy.autoPay.maxRetries` 接入网关重试策略。
+- [ ] 接入熔断与 kill switch（`web3.x402.autopay.enabled`）验证链路。
+- [ ] 指标与告警对齐（`x402.autopay.*`）并补齐故障注入验证。
 
 ---
 
@@ -212,9 +218,9 @@
 
 ### Phase 3 (x402)
 
-- [ ] Gateway 可识别 402 并受控触发自动支付。
-- [ ] 自动支付严格受 `WalletPolicy` 约束。
-- [ ] 幂等键生效，重复请求不重复扣款。
+- [x] Gateway 可识别 402 并受控触发自动支付。
+- [x] 自动支付严格受 `WalletPolicy` 约束。
+- [x] 幂等键生效，重复请求不重复扣款。
 - [ ] 熔断与 kill switch 验证通过。
 
 ### 发布前总门禁

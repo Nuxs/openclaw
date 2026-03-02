@@ -334,11 +334,12 @@ const invokeToolAuthed = async (params: {
   tool: string;
   args?: Record<string, unknown>;
   action?: string;
+  headers?: Record<string, string>;
   sessionKey?: string;
 }) =>
   invokeTool({
     port: sharedPort,
-    headers: gatewayAuthHeaders(),
+    headers: { ...gatewayAuthHeaders(), ...params.headers },
     ...params,
   });
 
@@ -606,10 +607,12 @@ describe("POST /tools/invoke", () => {
       },
     };
 
+    const idempotencyKey = "idem-request-1";
     const res = await invokeToolAuthed({
       tool: "tools_invoke_payment_required",
       args: { headers: {} },
       sessionKey: "main",
+      headers: { "x-idempotency-key": idempotencyKey },
     });
 
     expect(res.status).toBe(200);
@@ -617,7 +620,10 @@ describe("POST /tools/invoke", () => {
     expect(body.ok).toBe(true);
     expect(paymentRequiredCallCount).toBe(2);
     expect(mockCallGateway).toHaveBeenCalledWith(
-      expect.objectContaining({ method: "web3.billing.handlePaymentRequired" }),
+      expect.objectContaining({
+        method: "web3.billing.handlePaymentRequired",
+        params: expect.objectContaining({ idempotencyKey }),
+      }),
     );
     const headers = (lastPaymentRequiredArgs?.headers ?? {}) as Record<string, unknown>;
     expect(headers.authorization).toBe(PAYMENT_AUTHORIZATION);
