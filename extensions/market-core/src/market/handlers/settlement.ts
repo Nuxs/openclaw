@@ -3,8 +3,8 @@ import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { createEscrowAdapter } from "../escrow-factory.js";
 import { hashCanonical } from "../hash.js";
-import { assertOrderTransition } from "../state-machine.js";
-import type { Settlement } from "../types.js";
+import { assertOrderTransition, assertSettlementTransition } from "../state-machine.js";
+import type { Settlement, SettlementStrategy } from "../types.js";
 import { normalizeBuyerId, requireChainAddress, requireString } from "../validators.js";
 import {
   assertAccess,
@@ -15,8 +15,181 @@ import {
   recordAudit,
   recordAuditWithAnchor,
   requireActorId,
-  requireOptionalAddress,
 } from "./_shared.js";
+
+type SettlementPayee = { address: string; amount: string };
+
+function parseAmount(raw: string, field: string): bigint {
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`E_INVALID_ARGUMENT: ${field} must be integer string`);
+  }
+  return BigInt(raw);
+}
+
+function normalizeSettlementStrategy(raw: unknown): SettlementStrategy {
+  return raw === "metered" ? "metered" : "one-shot";
+}
+
+function getReleasedAmount(settlement: Settlement | undefined): bigint {
+  if (!settlement) {
+    return 0n;
+  }
+  if (typeof settlement.releasedAmount === "string" && /^\d+$/.test(settlement.releasedAmount)) {
+    return BigInt(settlement.releasedAmount);
+  }
+  if (settlement.status === "settlement_released" && /^\d+$/.test(settlement.amount)) {
+    return BigInt(settlement.amount);
+  }
+  return 0n;
+}
+
+function sumPayees(payees: SettlementPayee[]): bigint {
+  return payees.reduce((sum, payee) => sum + parseAmount(payee.amount, "payees[].amount"), 0n);
+}
+
+export async function releaseSettlementIncremental(params: {
+  store: MarketStateStore;
+  config: MarketPluginConfig;
+  orderId: string;
+  actorId?: string;
+  payees: SettlementPayee[];
+  releaseAmount?: string;
+}): Promise<{
+  orderId: string;
+  settlementId: string;
+  settlementHash: string;
+  txHash?: string;
+  status: Settlement["status"];
+  orderStatus: string;
+  releasedAmount: string;
+  remainingAmount: string;
+  strategy: SettlementStrategy;
+  completed: boolean;
+}> {
+  const { store, config, orderId, actorId, payees, releaseAmount } = params;
+
+  const order = store.getOrder(orderId);
+  if (!order) throw new Error("order not found");
+  const offer = store.getOffer(order.offerId);
+  if (!offer) throw new Error("offer not found");
+  if (actorId) {
+    assertActorMatch(config, actorId, offer.sellerId, "offer.sellerId");
+  }
+
+  const existingSettlement = store.getSettlementByOrder(orderId);
+  if (!existingSettlement) {
+    throw new Error("settlement not found");
+  }
+  if (existingSettlement.status === "settlement_refunded") {
+    throw new Error("E_CONFLICT: settlement already refunded");
+  }
+
+  const totalAmount = parseAmount(existingSettlement.amount, "settlement.amount");
+  const priorReleased = getReleasedAmount(existingSettlement);
+  if (priorReleased >= totalAmount) {
+    throw new Error("E_CONFLICT: settlement already fully released");
+  }
+
+  const requestedByPayees = sumPayees(payees);
+  const targetReleaseAmount =
+    typeof releaseAmount === "string"
+      ? parseAmount(requireString(releaseAmount, "amount"), "amount")
+      : requestedByPayees;
+
+  if (targetReleaseAmount <= 0n) {
+    throw new Error("E_INVALID_ARGUMENT: release amount must be positive");
+  }
+  if (requestedByPayees !== targetReleaseAmount) {
+    throw new Error("E_INVALID_ARGUMENT: payees total must match amount");
+  }
+
+  const remaining = totalAmount - priorReleased;
+  if (targetReleaseAmount > remaining) {
+    throw new Error("E_CONFLICT: SETTLEMENT_OVER_RELEASE");
+  }
+
+  const updatedReleased = priorReleased + targetReleaseAmount;
+  const completed = updatedReleased === totalAmount;
+  const nextSettlementStatus: Settlement["status"] = completed
+    ? "settlement_released"
+    : "settlement_locked";
+  assertSettlementTransition(existingSettlement.status, nextSettlementStatus);
+
+  if (completed) {
+    assertOrderTransition(order.status, "settlement_completed");
+  }
+
+  let txHash: string | undefined;
+  if (config.settlement.mode === "contract") {
+    const escrow = createEscrowAdapter(config.chain, config.settlement);
+    txHash = await escrow.release(order.orderHash, payees);
+  }
+
+  if (completed) {
+    order.status = "settlement_completed";
+  }
+  order.updatedAt = nowIso();
+
+  const strategy = normalizeSettlementStrategy(existingSettlement.strategy);
+  const settlementId = existingSettlement.settlementId;
+  const settlementHash = hashCanonical({
+    orderId,
+    payees,
+    releaseAmount: targetReleaseAmount.toString(),
+    releasedAmount: updatedReleased.toString(),
+    txHash,
+  });
+  const settlement: Settlement = {
+    settlementId,
+    orderId,
+    status: nextSettlementStatus,
+    amount: existingSettlement.amount,
+    releasedAmount: updatedReleased.toString(),
+    strategy,
+    tokenAddress: config.settlement.tokenAddress,
+    lockedAt: existingSettlement.lockedAt,
+    lockTxHash: existingSettlement.lockTxHash,
+    releasedAt: completed ? nowIso() : existingSettlement.releasedAt,
+    releaseTxHash: txHash,
+    settlementHash,
+  };
+
+  await store.runInTransaction(() => {
+    store.saveOrder(order);
+    store.saveSettlement(settlement);
+  });
+
+  await recordAuditWithAnchor({
+    store,
+    config,
+    kind: "settlement_released",
+    refId: settlementId,
+    hash: settlementHash,
+    anchorId: `settlement:${settlementId}`,
+    actor: actorId || offer.sellerId,
+    details: {
+      payees,
+      txHash,
+      releasedAmount: updatedReleased.toString(),
+      remainingAmount: (totalAmount - updatedReleased).toString(),
+      completed,
+      strategy,
+    },
+  });
+
+  return {
+    orderId,
+    settlementId,
+    settlementHash,
+    txHash,
+    status: nextSettlementStatus,
+    orderStatus: order.status,
+    releasedAmount: updatedReleased.toString(),
+    remainingAmount: (totalAmount - updatedReleased).toString(),
+    strategy,
+    completed,
+  };
+}
 
 export function createSettlementLockHandler(
   store: MarketStateStore,
@@ -31,6 +204,7 @@ export function createSettlementLockHandler(
       const orderId = requireString(input.orderId, "orderId");
       const amount = requireString(input.amount, "amount");
       const payer = requireString(input.payer, "payer");
+      const strategy = normalizeSettlementStrategy(input.strategy);
       const order = store.getOrder(orderId);
       if (!order) throw new Error("order not found");
       const offer = store.getOffer(order.offerId);
@@ -67,21 +241,30 @@ export function createSettlementLockHandler(
         orderId,
         status: "settlement_locked",
         amount,
+        releasedAmount: "0",
+        strategy,
         tokenAddress: config.settlement.tokenAddress,
         lockedAt: nowIso(),
         lockTxHash: txHash,
       };
-      // Atomic: order + settlement must persist together
       await store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveSettlement(settlement);
       });
       recordAudit(store, "payment_locked", orderId, order.orderHash, actorId || payer, {
         amount,
+        strategy,
         txHash,
       });
 
-      respond(true, { orderId, status: order.status, txHash, settlementId });
+      respond(true, {
+        orderId,
+        status: order.status,
+        txHash,
+        settlementId,
+        strategy,
+        releasedAmount: settlement.releasedAmount,
+      });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }
@@ -102,63 +285,38 @@ export function createSettlementReleaseHandler(
       const payeesInput = (input.payees ?? []) as { address: string; amount: string }[];
       if (payeesInput.length === 0) throw new Error("payees is required");
       const payees = payeesInput.map((entry, index) => ({
-        address: requireChainAddress(
-          config.chain.network,
-          entry.address,
-          `payees[${index}].address`,
-        ),
+        address:
+          config.settlement.mode === "contract"
+            ? requireChainAddress(config.chain.network, entry.address, `payees[${index}].address`)
+            : requireString(entry.address, `payees[${index}].address`),
         amount: requireString(entry.amount, `payees[${index}].amount`),
       }));
+      const releaseAmount =
+        typeof input.amount === "string" && input.amount.trim().length > 0
+          ? input.amount
+          : undefined;
 
-      const order = store.getOrder(orderId);
-      if (!order) throw new Error("order not found");
-      const offer = store.getOffer(order.offerId);
-      if (!offer) throw new Error("offer not found");
-      if (actorId) {
-        assertActorMatch(config, actorId, offer.sellerId, "offer.sellerId");
-      }
-      assertOrderTransition(order.status, "settlement_completed");
-
-      let txHash: string | undefined;
-      if (config.settlement.mode === "contract") {
-        const escrow = createEscrowAdapter(config.chain, config.settlement);
-        txHash = await escrow.release(order.orderHash, payees);
-      }
-
-      order.status = "settlement_completed";
-      order.updatedAt = nowIso();
-
-      const existingSettlement = store.getSettlementByOrder(orderId);
-      const settlementId = existingSettlement?.settlementId ?? randomUUID();
-      const settlementHash = hashCanonical({ orderId, payees, txHash });
-      const settlement: Settlement = {
-        settlementId,
-        orderId,
-        status: "settlement_released",
-        amount: payees.reduce((sum, p) => sum + BigInt(p.amount), 0n).toString(),
-        tokenAddress: config.settlement.tokenAddress,
-        lockedAt: existingSettlement?.lockedAt,
-        lockTxHash: existingSettlement?.lockTxHash,
-        releasedAt: nowIso(),
-        releaseTxHash: txHash,
-        settlementHash,
-      };
-      // Atomic: order + settlement must persist together
-      await store.runInTransaction(() => {
-        store.saveOrder(order);
-        store.saveSettlement(settlement);
-      });
-      await recordAuditWithAnchor({
+      const result = await releaseSettlementIncremental({
         store,
         config,
-        kind: "settlement_released",
-        refId: settlementId,
-        hash: settlementHash,
-        anchorId: `settlement:${settlementId}`,
-        actor: actorId || offer.sellerId,
-        details: { payees, txHash },
+        orderId,
+        actorId,
+        payees,
+        releaseAmount,
       });
-      respond(true, { orderId, status: order.status, txHash, settlementId, settlementHash });
+
+      respond(true, {
+        orderId: result.orderId,
+        status: result.orderStatus,
+        settlementStatus: result.status,
+        txHash: result.txHash,
+        settlementId: result.settlementId,
+        settlementHash: result.settlementHash,
+        releasedAmount: result.releasedAmount,
+        remainingAmount: result.remainingAmount,
+        strategy: result.strategy,
+        completed: result.completed,
+      });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }
@@ -218,6 +376,8 @@ export function createSettlementRefundHandler(
         orderId,
         status: "settlement_refunded",
         amount: existingSettlement?.amount ?? "0",
+        releasedAmount: existingSettlement?.releasedAmount,
+        strategy: existingSettlement?.strategy,
         tokenAddress: config.settlement.tokenAddress,
         lockedAt: existingSettlement?.lockedAt,
         lockTxHash: existingSettlement?.lockTxHash,
@@ -226,7 +386,6 @@ export function createSettlementRefundHandler(
         refundTxHash: txHash,
         settlementHash,
       };
-      // Atomic: order + settlement must persist together
       await store.runInTransaction(() => {
         store.saveOrder(order);
         store.saveSettlement(settlement);
@@ -289,6 +448,10 @@ export function createSettlementStatusHandler(
         settlementId: settlement.settlementId,
         status: settlement.status ?? null,
         amount: settlement.amount ?? null,
+        releasedAmount:
+          settlement.releasedAmount ??
+          (settlement.status === "settlement_released" ? settlement.amount : "0"),
+        strategy: settlement.strategy ?? "one-shot",
         tokenAddress: settlement.tokenAddress ?? null,
         lockTxHash: settlement.lockTxHash ?? null,
         releaseTxHash: settlement.releaseTxHash ?? null,

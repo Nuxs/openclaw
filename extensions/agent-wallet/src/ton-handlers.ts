@@ -16,6 +16,7 @@ import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "opencl
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
 import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";
+import { addDailySpent, readDailySpent } from "./state.js";
 import { loadOrCreateTonWallet } from "./ton-wallet.js";
 
 let blockchainFactoryReady = false;
@@ -48,13 +49,28 @@ function parseAmount(value: unknown, label: string): bigint {
   return BigInt(raw);
 }
 
-async function enforcePolicy(config: AgentWalletConfig, intent: PolicyIntent): Promise<void> {
+async function enforcePolicy(
+  config: AgentWalletConfig,
+  intent: PolicyIntent,
+): Promise<{ commitUsage: () => Promise<void> }> {
   if (!config.policy.enabled) {
-    return;
+    return {
+      commitUsage: async () => undefined,
+    };
   }
 
+  const dailySpent =
+    typeof intent.amount === "bigint"
+      ? await readDailySpent({
+          config: config.policy,
+          chainKey: config.chain.network,
+        })
+      : undefined;
+
   const loadedPolicy = await loadPolicy(config.policy);
-  const decision = checkPolicy(loadedPolicy.policy, intent);
+  const decision = checkPolicy(loadedPolicy.policy, intent, {
+    dailySpent,
+  });
 
   try {
     await appendPolicyDecisionLog(config.policy.decisionLogPath, decision);
@@ -65,6 +81,19 @@ async function enforcePolicy(config: AgentWalletConfig, intent: PolicyIntent): P
   if (decision.result === "rejected") {
     throw new Error(`POLICY_REJECTED:${decision.reasonCode}`);
   }
+
+  return {
+    commitUsage: async () => {
+      if (typeof intent.amount !== "bigint") {
+        return;
+      }
+      await addDailySpent({
+        config: config.policy,
+        chainKey: config.chain.network,
+        amount: intent.amount,
+      });
+    },
+  };
 }
 
 function respondError(respond: GatewayRequestHandlerOptions["respond"], err: unknown): void {
@@ -141,7 +170,7 @@ export function createTonWalletSendHandler(config: AgentWalletConfig): GatewayRe
       const input = (params ?? {}) as Record<string, unknown>;
       const to = requireString(input.to, "to");
       const amount = parseAmount(input.amount, "amount");
-      await enforcePolicy(config, {
+      const enforcement = await enforcePolicy(config, {
         action: "send",
         chain: "ton",
         tool: "agent-wallet.send",
@@ -152,6 +181,7 @@ export function createTonWalletSendHandler(config: AgentWalletConfig): GatewayRe
 
       const { provider } = await ensureTonConnected(config);
       const txHash = await provider.transfer(to, amount);
+      await enforcement.commitUsage();
       respond(true, { txHash, chain: "ton" });
     } catch (err) {
       respondError(respond, err);

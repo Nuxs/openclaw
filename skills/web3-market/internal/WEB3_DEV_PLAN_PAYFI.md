@@ -1,6 +1,6 @@
 # OpenClaw Web3 Agentic PayFi 开发计划 (Phased Roadmap)
 
-> **版本**：v1.0 (Draft)
+> **版本**：v1.1 (Plan Updated)
 > **目标**：以 **Agentic Commerce** 为核心，分阶段实现 KYA、PayFi 流支付与 x402 自动支付。
 
 ---
@@ -9,23 +9,42 @@
 
 **时间**：Week 6
 **核心目标**：收回 Agent Wallet 的“上帝权限”，实现基于策略的签名控制。
+**状态**：✅ 已完成 (Phase 1.0)
 
 ### 1.1 `WalletPolicy` 定义与加载
 
-- [ ] 创建 `extensions/agent-wallet/src/policy.ts`，定义 `WalletPolicy` 接口（Budget, Allowlist, Scope）。
-- [ ] 实现 `loadPolicy()`：从 `config.ts` 或 `policy.json` 加载策略，支持热更新。
-- [ ] 编写单元测试：验证 JSON 策略解析与默认值。
+- [x] 创建 `extensions/agent-wallet/src/policy.ts`，定义 `WalletPolicy` 接口（Budget, Allowlist, Scope）。
+- [x] 实现 `loadPolicy()`：从 `config.ts` 或 `policy.json` 加载策略，支持热更新。
+- [x] 编写单元测试：验证 JSON 策略解析与默认值。
 
 ### 1.2 `PolicyEngine` 拦截逻辑
 
-- [ ] 实现 `checkPolicy(intent)`：输入 `(to, amount, data)`，输出 `Decision` (Approved/Rejected)。
-- [ ] 在 `extensions/agent-wallet/src/handlers.ts` 的 `sign/send` 处注入拦截逻辑。
-- [ ] 实现 `DecisionLog`：记录每次决策结果（JSONL 或内存），供审计查询。
+- [x] 实现 `checkPolicy(intent)`：输入 `(to, amount, data)`，输出 `Decision` (Approved/Rejected)。
+- [x] 在 `extensions/agent-wallet/src/handlers.ts` 的 `sign/send` 处注入拦截逻辑。
+- [x] 实现 `DecisionLog`：记录每次决策结果（JSONL 或内存），供审计查询。
 
 ### 1.3 验证
 
-- [ ] 测试用例：尝试超额转账 -> 被拦截。
-- [ ] 测试用例：尝试调用非白名单合约 -> 被拦截。
+- [x] 测试用例：尝试超额转账 -> 被拦截。
+- [x] 测试用例：尝试调用非白名单合约 -> 被拦截。
+
+---
+
+## 📅 阶段 1.5：KYA 状态持久化 (State Persistence)
+
+**时间**：Week 6.5
+**核心目标**：补齐 Daily Cap 的状态累积与重置逻辑，确保 Budget 策略真实生效。
+
+### 1.5.1 状态存储 (KV Store)
+
+- [x] 实现轻量级 KV 存储（复用 `store.ts` 或新增 `state.ts`），用于记录 `dailySpent`。
+- [x] 键设计：`budget:daily:<YYYY-MM-DD>:<chainId>`。
+
+### 1.5.2 状态注入与更新
+
+- [x] 在 `handlers.ts` 调用 `checkPolicy` 前，读取当日已用额度并注入 `context`。
+- [x] 在 `sign/send` 成功后，原子更新 `dailySpent`（累加 `amount`）。
+- [x] 处理并发/失败场景下的状态一致性（尽力而为或悲观锁定，视并发需求而定）。
 
 ---
 
@@ -36,18 +55,18 @@
 
 ### 2.1 `Settlement` 对象升级
 
-- [ ] 修改 `extensions/market-core/src/market/types.ts`，为 `Settlement` 增加 `releasedAmount` 和 `strategy` ("one-shot" | "metered")。
-- [ ] 更新 `extensions/market-core/src/market/handlers/settlement.ts`，兼容旧数据（default releasedAmount=0）。
+- [x] 修改 `extensions/market-core/src/market/types.ts`，为 `Settlement` 增加 `releasedAmount` 和 `strategy` ("one-shot" | "metered")。
+- [x] 更新 `extensions/market-core/src/market/handlers/settlement.ts`，兼容旧数据（default releasedAmount=0）。
 
 ### 2.2 增量释放逻辑 (Incremental Release)
 
-- [ ] 实现 `market.settlement.release(amount)`：支持部分金额释放。
-- [ ] 状态机调整：当 `releasedAmount < totalAmount` 时，保持 `active` 状态；仅当 `releasedAmount == totalAmount` 或显式 `close` 时才结束。
-- [ ] 链上适配：调用 `EscrowContract.release(partial)` (需确认合约支持或使用多次 release)。
+- [x] 实现 `market.settlement.release(amount)`：支持部分金额释放。
+- [x] 状态机调整：当 `releasedAmount < totalAmount` 时，保持 `active` 状态；仅当 `releasedAmount == totalAmount` 或显式 `close` 时才结束。
+- [x] 链上适配：调用 `EscrowContract.release(partial)` (需确认合约支持或使用多次 release)。
 
 ### 2.3 Ledger 驱动
 
-- [ ] 在 `market.ledger.append` 后触发检查：如果累积 `cost` 达到阈值，自动触发一次 `release`。
+- [x] 在 `market.ledger.append` 后触发检查：如果累积 `cost` 达到阈值，自动触发一次 `release`。
 
 ---
 
@@ -88,15 +107,17 @@
 
 ---
 
-## 🔬 测试矩阵（Phase 1/2/3）
+## 🔬 测试矩阵（Phase 1/1.5/2/3）
 
-### Phase 1 (KYA)
+### Phase 1 & 1.5 (KYA)
 
 - **单元测试**
   - `WalletPolicy` 解析与默认值。
   - `checkPolicy` 对预算/白名单/TTL 判定。
+  - `dailySpent` 状态累积与跨日重置。
 - **集成测试**
   - `sign/send` 请求在策略通过时放行、拒绝时阻断。
+  - 连续多笔交易触发 Daily Cap 拦截。
 - **回归测试**
   - 现有 EVM/TON `create/balance/send/sign` 不被破坏。
 - **故障注入**
@@ -172,15 +193,20 @@
 
 ### Phase 1 (KYA)
 
-- [ ] 接口文档与实现一致（`WalletPolicy`, `PolicyDecision`）。
-- [ ] `sign/send` 已接入策略拦截。
-- [ ] 拒绝原因具备结构化 reason code。
-- [ ] 单测/集成/回归全部通过。
+- [x] 接口文档与实现一致（`WalletPolicy`, `PolicyDecision`）。
+- [x] `sign/send` 已接入策略拦截。
+- [x] 拒绝原因具备结构化 reason code。
+- [x] 单测/集成/回归全部通过。
+
+### Phase 1.5 (State Persistence)
+
+- [x] Daily Cap 状态存储已落地。
+- [x] 连续交易测试验证 Daily Cap 生效。
 
 ### Phase 2 (PayFi)
 
-- [ ] `Settlement` 新字段 `releasedAmount/strategy` 已落地且兼容旧数据。
-- [ ] 支持 partial release，且累计释放不超额。
+- [x] `Settlement` 新字段 `releasedAmount/strategy` 已落地且兼容旧数据。
+- [x] 支持 partial release，且累计释放不超额。
 - [ ] `metered` 异常可降级 `one-shot`。
 - [ ] 单测/集成/回归全部通过。
 

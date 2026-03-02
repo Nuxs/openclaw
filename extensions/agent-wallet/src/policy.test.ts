@@ -64,6 +64,15 @@ describe("resolveWalletPolicyConfig", () => {
     expect(cfg.inlinePolicy?.scope.allowedChains).toEqual(["evm", "ton"]);
     expect(cfg.inlinePolicy?.autoPay.maxRetries).toBe(2);
   });
+
+  it("parses statePath", () => {
+    const cfg = resolveWalletPolicyConfig({
+      enabled: true,
+      statePath: "/tmp/agent-wallet-policy-state.json",
+    });
+
+    expect(cfg.statePath).toBe("/tmp/agent-wallet-policy-state.json");
+  });
 });
 
 describe("loadPolicy", () => {
@@ -165,6 +174,24 @@ describe("checkPolicy", () => {
 
     expect(decision.result).toBe("rejected");
     expect(decision.reasonCode).toBe("ttl_expired");
+  });
+
+  it("rejects when daily cap is exceeded with context", () => {
+    const decision = checkPolicy(
+      SAMPLE_POLICY,
+      {
+        action: "send",
+        chain: "evm",
+        tool: "agent-wallet.send",
+        to: SAMPLE_POLICY.scope.allowedContracts?.[0],
+        amount: 200n,
+        method: "0xa9059cbb",
+      },
+      { dailySpent: 900n },
+    );
+
+    expect(decision.result).toBe("rejected");
+    expect(decision.reasonCode).toBe("budget_daily_exceeded");
   });
 
   it("approves valid request", () => {

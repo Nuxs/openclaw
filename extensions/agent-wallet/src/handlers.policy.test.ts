@@ -1,5 +1,8 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentWalletConfig } from "./config.js";
 
 const mockProvider = {
@@ -77,8 +80,15 @@ function buildHandlerOptions(
 }
 
 describe("agent-wallet handlers policy guard", () => {
-  beforeEach(() => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "agent-wallet-handler-policy-test-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   it("rejects send when per-tx cap is exceeded", async () => {
@@ -108,7 +118,15 @@ describe("agent-wallet handlers policy guard", () => {
 
   it("allows send when request matches policy", async () => {
     const { createAgentWalletSendHandler } = await import("./handlers.js");
-    const handler = createAgentWalletSendHandler(buildConfig());
+    const baseConfig = buildConfig();
+    const handler = createAgentWalletSendHandler(
+      buildConfig({
+        policy: {
+          ...baseConfig.policy,
+          statePath: path.join(tmpDir, "policy-state.json"),
+        },
+      }),
+    );
 
     let ok = false;
     let payload: unknown;
@@ -128,6 +146,63 @@ describe("agent-wallet handlers policy guard", () => {
 
     expect(ok).toBe(true);
     expect(payload).toMatchObject({ txHash: "0xtxhash" });
+    expect(mockProvider.sendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects second send when daily cap is exceeded", async () => {
+    const { createAgentWalletSendHandler } = await import("./handlers.js");
+    const baseConfig = buildConfig();
+    const basePolicy = baseConfig.policy.inlinePolicy!;
+    const handler = createAgentWalletSendHandler(
+      buildConfig({
+        policy: {
+          ...baseConfig.policy,
+          statePath: path.join(tmpDir, "policy-state.json"),
+          inlinePolicy: {
+            ...basePolicy,
+            budget: {
+              ...basePolicy.budget,
+              dailyCap: "150",
+              perTxCap: "150",
+            },
+          },
+        },
+      }),
+    );
+
+    let firstOk = false;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockWallet.address,
+          value: "100",
+          data: "0xa9059cbb0000000000000000000000000000000000000000000000000000000000000001",
+        },
+        (resultOk) => {
+          firstOk = resultOk;
+        },
+      ),
+    );
+
+    let secondOk = true;
+    let secondPayload: unknown;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockWallet.address,
+          value: "100",
+          data: "0xa9059cbb0000000000000000000000000000000000000000000000000000000000000001",
+        },
+        (resultOk, resultPayload) => {
+          secondOk = resultOk;
+          secondPayload = resultPayload;
+        },
+      ),
+    );
+
+    expect(firstOk).toBe(true);
+    expect(secondOk).toBe(false);
+    expect(secondPayload).toMatchObject({ error: "E_FORBIDDEN" });
     expect(mockProvider.sendTransaction).toHaveBeenCalledTimes(1);
   });
 

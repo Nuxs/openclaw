@@ -293,6 +293,8 @@ export function createDisputeResolveHandler(
           orderId: order.orderId,
           status: "settlement_refunded",
           amount: existingSettlement?.amount ?? "0",
+          releasedAmount: existingSettlement?.releasedAmount,
+          strategy: existingSettlement?.strategy,
           tokenAddress: config.settlement.tokenAddress,
           lockedAt: existingSettlement?.lockedAt,
           lockTxHash: existingSettlement?.lockTxHash,
@@ -345,11 +347,14 @@ export function createDisputeResolveHandler(
       const existingSettlement = store.getSettlementByOrder(order.orderId);
       const settlementId = existingSettlement?.settlementId ?? randomUUID();
       const settlementHash = hashCanonical({ orderId: order.orderId, payees, txHash });
+      const releasedAmount = payees.reduce((sum, p) => sum + BigInt(p.amount), 0n).toString();
       const settlement: Settlement = {
         settlementId,
         orderId: order.orderId,
         status: "settlement_released",
-        amount: payees.reduce((sum, p) => sum + BigInt(p.amount), 0n).toString(),
+        amount: existingSettlement?.amount ?? releasedAmount,
+        releasedAmount,
+        strategy: existingSettlement?.strategy ?? "one-shot",
         tokenAddress: config.settlement.tokenAddress,
         lockedAt: existingSettlement?.lockedAt,
         lockTxHash: existingSettlement?.lockTxHash,

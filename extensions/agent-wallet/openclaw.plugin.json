@@ -33,6 +33,7 @@
           "enabled": { "type": "boolean" },
           "policyPath": { "type": "string" },
           "decisionLogPath": { "type": "string" },
+          "statePath": { "type": "string" },
           "inlinePolicy": {
             "type": "object",
             "additionalProperties": false,

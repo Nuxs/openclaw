@@ -360,6 +360,14 @@ export function createMarketReconciliationSummaryHandler(
             typeof settlementPayload.status === "string" ? settlementPayload.status : undefined,
           amount:
             typeof settlementPayload.amount === "string" ? settlementPayload.amount : undefined,
+          releasedAmount:
+            typeof settlementPayload.releasedAmount === "string"
+              ? settlementPayload.releasedAmount
+              : undefined,
+          strategy:
+            settlementPayload.strategy === "metered" || settlementPayload.strategy === "one-shot"
+              ? settlementPayload.strategy
+              : undefined,
           tokenAddress:
             typeof settlementPayload.tokenAddress === "string"
               ? settlementPayload.tokenAddress

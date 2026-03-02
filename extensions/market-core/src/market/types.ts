@@ -111,11 +111,15 @@ export type Delivery = {
   payloadRef?: DeliveryPayloadRef;
 };
 
+export type SettlementStrategy = "one-shot" | "metered";
+
 export type Settlement = {
   settlementId: string;
   orderId: string;
   status: SettlementStatus;
   amount: string;
+  releasedAmount?: string;
+  strategy?: SettlementStrategy;
   tokenAddress?: string;
   lockedAt?: string;
   releasedAt?: string;
@@ -405,6 +409,8 @@ export type ReconciliationSummary = {
   settlement: {
     status?: string;
     amount?: string;
+    releasedAmount?: string;
+    strategy?: SettlementStrategy;
     tokenAddress?: string;
     lockedAt?: string;
     releasedAt?: string;

@@ -20,6 +20,14 @@ import {
   recordAudit,
   requireOptionalAddress,
 } from "./_shared.js";
+import { releaseSettlementIncremental } from "./settlement.js";
+
+function parseIntString(value: string, field: string): bigint {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`E_INVALID_ARGUMENT: ${field} must be integer string`);
+  }
+  return BigInt(value);
+}
 
 export function createLedgerAppendHandler(
   store: MarketStateStore,
@@ -125,7 +133,56 @@ export function createLedgerAppendHandler(
           currency,
         });
       });
-      respond(true, { ledgerId: entry.ledgerId, entryHash });
+
+      let settlementRelease:
+        | {
+            settlementId: string;
+            releasedAmount: string;
+            remainingAmount: string;
+            completed: boolean;
+          }
+        | undefined;
+      let settlementReleaseError: string | undefined;
+
+      try {
+        const settlement = store.getSettlementByOrder(lease.orderId);
+        const shouldAutoRelease = settlement && settlement.status === "settlement_locked";
+        const strategy = settlement?.strategy ?? "one-shot";
+        const releasedAmount = settlement?.releasedAmount ?? "0";
+
+        if (shouldAutoRelease && strategy === "metered") {
+          const entryCost = parseIntString(cost, "entry.cost");
+          const totalAmount = parseIntString(settlement.amount, "settlement.amount");
+          const alreadyReleased = parseIntString(releasedAmount, "settlement.releasedAmount");
+          const remaining = totalAmount - alreadyReleased;
+          if (entryCost > 0n && remaining > 0n) {
+            const amountToRelease = entryCost > remaining ? remaining : entryCost;
+            const releaseResult = await releaseSettlementIncremental({
+              store,
+              config,
+              orderId: lease.orderId,
+              actorId,
+              releaseAmount: amountToRelease.toString(),
+              payees: [{ address: lease.providerActorId, amount: amountToRelease.toString() }],
+            });
+            settlementRelease = {
+              settlementId: releaseResult.settlementId,
+              releasedAmount: releaseResult.releasedAmount,
+              remainingAmount: releaseResult.remainingAmount,
+              completed: releaseResult.completed,
+            };
+          }
+        }
+      } catch (err) {
+        settlementReleaseError = err instanceof Error ? err.message : String(err);
+      }
+
+      respond(true, {
+        ledgerId: entry.ledgerId,
+        entryHash,
+        settlementRelease,
+        settlementReleaseError,
+      });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }

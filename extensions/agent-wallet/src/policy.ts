@@ -67,6 +67,7 @@ export type WalletPolicyConfig = {
   policyPath?: string;
   inlinePolicy?: WalletPolicy;
   decisionLogPath?: string;
+  statePath?: string;
 };
 
 export type LoadedWalletPolicy = {
@@ -189,6 +190,7 @@ export function resolveWalletPolicyConfig(raw?: unknown): WalletPolicyConfig {
     enabled,
     policyPath: typeof raw.policyPath === "string" ? raw.policyPath : undefined,
     decisionLogPath: typeof raw.decisionLogPath === "string" ? raw.decisionLogPath : undefined,
+    statePath: typeof raw.statePath === "string" ? raw.statePath : undefined,
     inlinePolicy: raw.inlinePolicy ? normalizePolicy(raw.inlinePolicy) : undefined,
   };
 }

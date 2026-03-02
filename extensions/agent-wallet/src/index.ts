@@ -29,6 +29,7 @@ const agentWalletConfigSchema = {
     "policy.enabled": { label: "Enable Wallet Policy Guard" },
     "policy.policyPath": { label: "Wallet Policy File Path", advanced: true },
     "policy.decisionLogPath": { label: "Wallet Policy Decision Log Path", advanced: true },
+    "policy.statePath": { label: "Wallet Policy State Path", advanced: true },
   },
 };
 

@@ -9,6 +9,7 @@ import { getAddress } from "viem";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
 import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";
+import { addDailySpent, readDailySpent } from "./state.js";
 import { loadOrCreateWallet } from "./wallet.js";
 
 const CHAIN_IDS: Record<string, number> = {
@@ -74,13 +75,28 @@ async function resolveProvider(
   return provider;
 }
 
-async function enforcePolicy(config: AgentWalletConfig, intent: PolicyIntent): Promise<void> {
+async function enforcePolicy(
+  config: AgentWalletConfig,
+  intent: PolicyIntent,
+): Promise<{ commitUsage: () => Promise<void> }> {
   if (!config.policy.enabled) {
-    return;
+    return {
+      commitUsage: async () => undefined,
+    };
   }
 
+  const dailySpent =
+    typeof intent.amount === "bigint"
+      ? await readDailySpent({
+          config: config.policy,
+          chainKey: config.chain.network,
+        })
+      : undefined;
+
   const loadedPolicy = await loadPolicy(config.policy);
-  const decision = checkPolicy(loadedPolicy.policy, intent);
+  const decision = checkPolicy(loadedPolicy.policy, intent, {
+    dailySpent,
+  });
 
   try {
     await appendPolicyDecisionLog(config.policy.decisionLogPath, decision);
@@ -91,6 +107,19 @@ async function enforcePolicy(config: AgentWalletConfig, intent: PolicyIntent): P
   if (decision.result === "rejected") {
     throw new Error(`POLICY_REJECTED:${decision.reasonCode}`);
   }
+
+  return {
+    commitUsage: async () => {
+      if (typeof intent.amount !== "bigint") {
+        return;
+      }
+      await addDailySpent({
+        config: config.policy,
+        chainKey: config.chain.network,
+        amount: intent.amount,
+      });
+    },
+  };
 }
 
 function respondError(respond: GatewayRequestHandlerOptions["respond"], err: unknown): void {
@@ -162,7 +191,7 @@ export function createAgentWalletSendHandler(config: AgentWalletConfig): Gateway
       const to = getAddress(requireString(input.to, "to"));
       const value = parseAmount(input.value, "value");
       const data = typeof input.data === "string" ? input.data : undefined;
-      await enforcePolicy(config, {
+      const enforcement = await enforcePolicy(config, {
         action: "send",
         chain: "evm",
         tool: "agent-wallet.send",
@@ -174,6 +203,7 @@ export function createAgentWalletSendHandler(config: AgentWalletConfig): Gateway
       const wallet = await loadOrCreateWallet(config);
       const provider = await resolveProvider(config, wallet.privateKey);
       const txHash = await provider.sendTransaction({ to, value, data });
+      await enforcement.commitUsage();
       respond(true, { txHash });
     } catch (err) {
       respondError(respond, err);

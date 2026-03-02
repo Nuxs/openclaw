@@ -1,0 +1,183 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { resolveConfig } from "../../config.js";
+import { MarketStateStore } from "../../state/store.js";
+import { createLedgerAppendHandler } from "./ledger.js";
+
+type StoreMode = "file" | "sqlite";
+
+type StoreModeInput = {
+  mode: StoreMode;
+  store: MarketStateStore;
+  config: ReturnType<typeof resolveConfig>;
+};
+
+type HandlerResult = { ok: boolean; payload: Record<string, unknown> } | undefined;
+
+function createResponder() {
+  let result: HandlerResult;
+  return {
+    respond: (ok: boolean, payload: Record<string, unknown>) => {
+      result = { ok, payload };
+    },
+    result: () => result,
+  };
+}
+
+async function withStoreModes(tempDir: string, run: (input: StoreModeInput) => Promise<void>) {
+  for (const mode of ["file", "sqlite"] as const) {
+    const modeDir = path.join(tempDir, mode);
+    await fs.mkdir(modeDir, { recursive: true });
+    const config = resolveConfig({
+      store: { mode },
+      settlement: { mode: "anchor_only" },
+      access: { mode: "open", requireActor: true, requireActorMatch: true },
+    });
+    const store = new MarketStateStore(modeDir, config);
+    await run({ mode, store, config });
+  }
+}
+
+describe("market-core ledger -> metered settlement release", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-market-ledger-settlement-test-"));
+  });
+
+  afterEach(async () => {
+    if (tempDir) {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("auto releases metered settlement on ledger append", async () => {
+    await withStoreModes(tempDir, async ({ store, config }) => {
+      const now = new Date().toISOString();
+      const providerActorId = "0x0000000000000000000000000000000000000001";
+      const consumerActorId = "0x0000000000000000000000000000000000000002";
+
+      store.saveOffer({
+        offerId: "offer-1",
+        sellerId: providerActorId,
+        assetId: "asset-1",
+        assetType: "service",
+        assetMeta: {},
+        price: 1,
+        currency: "USDC",
+        usageScope: { purpose: "compute" },
+        deliveryType: "service",
+        status: "offer_published",
+        offerHash: "offer-hash",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveOrder({
+        orderId: "order-1",
+        offerId: "offer-1",
+        buyerId: consumerActorId,
+        quantity: 1,
+        status: "delivery_completed",
+        orderHash: "order-hash",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveResource({
+        resourceId: "resource-1",
+        kind: "model",
+        status: "resource_published",
+        providerActorId,
+        offerId: "offer-1",
+        label: "model",
+        price: {
+          unit: "token",
+          amount: "1",
+          currency: "USDC",
+        },
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveLease({
+        leaseId: "lease-1",
+        resourceId: "resource-1",
+        kind: "model",
+        providerActorId,
+        consumerActorId,
+        orderId: "order-1",
+        status: "lease_active",
+        issuedAt: now,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      store.saveSettlement({
+        settlementId: "settlement-1",
+        orderId: "order-1",
+        status: "settlement_locked",
+        amount: "200",
+        releasedAmount: "0",
+        strategy: "metered",
+        lockedAt: now,
+      });
+
+      const append = createLedgerAppendHandler(store, config);
+
+      const firstResponder = createResponder();
+      await append({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId: "lease-1",
+            resourceId: "resource-1",
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "80",
+            cost: "80",
+            currency: "USDC",
+          },
+        },
+        respond: firstResponder.respond,
+      } as any);
+
+      expect(firstResponder.result()?.ok).toBe(true);
+      const firstSettlement = store.getSettlementByOrder("order-1");
+      const firstOrder = store.getOrder("order-1");
+      expect(firstSettlement?.status).toBe("settlement_locked");
+      expect(firstSettlement?.releasedAmount).toBe("80");
+      expect(firstOrder?.status).toBe("delivery_completed");
+
+      const secondResponder = createResponder();
+      await append({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId: "lease-1",
+            resourceId: "resource-1",
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "120",
+            cost: "120",
+            currency: "USDC",
+          },
+        },
+        respond: secondResponder.respond,
+      } as any);
+
+      expect(secondResponder.result()?.ok).toBe(true);
+      const finalSettlement = store.getSettlementByOrder("order-1");
+      const finalOrder = store.getOrder("order-1");
+      expect(finalSettlement?.status).toBe("settlement_released");
+      expect(finalSettlement?.releasedAmount).toBe("200");
+      expect(finalOrder?.status).toBe("settlement_completed");
+    });
+  });
+});

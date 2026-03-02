@@ -49,7 +49,7 @@ export function assertDeliveryTransition(from: DeliveryStatus, to: DeliveryStatu
 
 export function assertSettlementTransition(from: SettlementStatus, to: SettlementStatus) {
   const allowed: Record<SettlementStatus, SettlementStatus[]> = {
-    settlement_locked: ["settlement_released", "settlement_refunded"],
+    settlement_locked: ["settlement_locked", "settlement_released", "settlement_refunded"],
     settlement_released: [],
     settlement_refunded: [],
   };

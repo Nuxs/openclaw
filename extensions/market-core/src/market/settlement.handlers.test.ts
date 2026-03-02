@@ -133,8 +133,73 @@ describe("market-core settlement handlers", () => {
       expect(savedOrder?.status).toBe("settlement_completed");
       expect(savedSettlement?.status).toBe("settlement_released");
       expect(savedSettlement?.amount).toBe("150");
+      expect(savedSettlement?.releasedAmount).toBe("150");
+      expect(savedSettlement?.strategy).toBe("one-shot");
       expect(savedSettlement?.lockedAt).toBe(lockedAt);
       expect(savedSettlement?.lockTxHash).toBe("lock-tx");
+    });
+  });
+
+  it("supports partial release and only completes on full release", async () => {
+    await withStoreModes(tempDir, async ({ store, config }) => {
+      const offer = createOffer({ offerId: "offer-partial", sellerId: "seller-1" });
+      const order = createOrder({
+        orderId: "order-partial",
+        offerId: offer.offerId,
+        buyerId: "buyer-3",
+        status: "delivery_completed",
+      });
+      const settlement: Settlement = {
+        settlementId: "settlement-partial",
+        orderId: order.orderId,
+        status: "settlement_locked",
+        amount: "200",
+        releasedAmount: "0",
+        strategy: "metered",
+        lockedAt: new Date().toISOString(),
+      };
+
+      store.saveOffer(offer);
+      store.saveOrder(order);
+      store.saveSettlement(settlement);
+
+      const handler = createSettlementReleaseHandler(store, config);
+      const firstResponder = createResponder();
+      await handler({
+        params: {
+          actorId: offer.sellerId,
+          orderId: order.orderId,
+          amount: "80",
+          payees: [{ address: "0x0000000000000000000000000000000000000002", amount: "80" }],
+        },
+        respond: firstResponder.respond,
+      } as any);
+
+      expect(firstResponder.result()?.ok).toBe(true);
+      const afterFirstOrder = store.getOrder(order.orderId);
+      const afterFirstSettlement = store.getSettlementByOrder(order.orderId);
+      expect(afterFirstOrder?.status).toBe("delivery_completed");
+      expect(afterFirstSettlement?.status).toBe("settlement_locked");
+      expect(afterFirstSettlement?.releasedAmount).toBe("80");
+
+      const secondResponder = createResponder();
+      await handler({
+        params: {
+          actorId: offer.sellerId,
+          orderId: order.orderId,
+          amount: "120",
+          payees: [{ address: "0x0000000000000000000000000000000000000002", amount: "120" }],
+        },
+        respond: secondResponder.respond,
+      } as any);
+
+      expect(secondResponder.result()?.ok).toBe(true);
+      const finalOrder = store.getOrder(order.orderId);
+      const finalSettlement = store.getSettlementByOrder(order.orderId);
+      expect(finalOrder?.status).toBe("settlement_completed");
+      expect(finalSettlement?.status).toBe("settlement_released");
+      expect(finalSettlement?.releasedAmount).toBe("200");
+      expect(finalSettlement?.amount).toBe("200");
     });
   });
 
