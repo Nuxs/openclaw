@@ -249,8 +249,6 @@ type AppViewStateCore = {
     debugHealth: HealthSnapshot | null;
     debugModels: unknown[];
     debugHeartbeat: unknown;
-    debugWeb3Audit: unknown;
-    debugWeb3AuditError: string | null;
     debugCallMethod: string;
     debugCallParams: string;
     debugCallResult: string | null;
@@ -276,7 +274,6 @@ type AppViewStateCore = {
     setTheme: (theme: ThemeMode, context?: ThemeTransitionContext) => void;
     applySettings: (next: UiSettings) => void;
     loadOverview: () => Promise<void>;
-    loadMarket: () => Promise<void>;
     loadAssistantIdentity: () => Promise<void>;
     loadCron: () => Promise<void>;
     handleWhatsAppStart: (force: boolean) => Promise<void>;

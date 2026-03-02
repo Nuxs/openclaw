@@ -373,8 +373,6 @@ export class OpenClawApp extends LitElement {
   @state() debugHealth: HealthSnapshot | null = null;
   @state() debugModels: unknown[] = [];
   @state() debugHeartbeat: unknown = null;
-  @state() debugWeb3Audit: unknown = null;
-  @state() debugWeb3AuditError: string | null = null;
   @state() debugCallMethod = "";
   @state() debugCallParams = "{}";
   @state() debugCallResult: string | null = null;
@@ -684,6 +682,8 @@ export class OpenClawApp extends LitElement {
     ledgerUnit: "all",
     ledgerSort: "time_desc",
   };
+  @state() debugWeb3Audit: unknown = null;
+  @state() debugWeb3AuditError: string | null = null;
 
   async loadMarket() {
     await loadMarketInternal(this as unknown as Parameters<typeof loadMarketInternal>[0]);
