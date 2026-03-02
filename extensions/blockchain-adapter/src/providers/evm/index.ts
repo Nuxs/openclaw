@@ -145,6 +145,30 @@ export class EVMProvider implements IProviderEVM {
     };
   }
 
+  async getTransactionReceipt(txHash: string): Promise<TxReceipt | undefined> {
+    try {
+      const receipt = await this.client.getTransactionReceipt(txHash as `0x${string}`);
+      if (!receipt) return undefined;
+
+      return {
+        txHash,
+        blockNumber: Number(receipt.blockNumber),
+        blockHash: receipt.blockHash,
+        status: receipt.status === "success" ? "success" : "failure",
+        from: receipt.from as Address,
+        to: (receipt.to as Address) || undefined,
+        gasUsed: receipt.gasUsed,
+        logs: receipt.logs.map((log) => ({
+          address: log.address as Address,
+          data: log.data,
+          topics: log.topics,
+        })),
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   async getBlockNumber(): Promise<number> {
     return this.client.getBlockNumber();
   }
