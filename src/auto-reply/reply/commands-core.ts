@@ -10,6 +10,7 @@ import {
   shouldHandleTextCommands,
 } from "../commands-registry.js";
 import { suggestUnknownCommand } from "../commands-suggest.js";
+import { handleAcpCommand } from "./commands-acp.js";
 import { handleAllowlistCommand } from "./commands-allowlist.js";
 import { handleApproveCommand } from "./commands-approve.js";
 import { handleBashCommand } from "./commands-bash.js";
@@ -156,6 +157,7 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
       handleExportSessionCommand,
       handleWhoamiCommand,
       handleSubagentsCommand,
+      handleAcpCommand,
       handleConfigCommand,
       handleDebugCommand,
       handleModelsCommand,
