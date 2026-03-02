@@ -672,148 +672,6 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
     },
     // ── Dispute ─────────────────────────────────────────
     {
-      name: "web3.dispute.open",
-      summary: "Open a dispute for an order or lease.",
-      kind: "gateway",
-      group: "dispute",
-      availability: availability(resourcesEnabled, "resources disabled"),
-      paramsSchema: {
-        type: "object",
-        required: ["orderId", "reason", "resourceId", "consumerId", "providerId"],
-        properties: {
-          orderId: { type: "string", description: "Order or lease identifier" },
-          reason: {
-            type: "string",
-            description: "Dispute reason (10-500 chars)",
-            minLength: 10,
-            maxLength: 500,
-          },
-          resourceId: { type: "string", description: "Resource ID" },
-          consumerId: {
-            type: "string",
-            description: "Consumer actor ID",
-            pattern: "^0x[a-fA-F0-9]{40}$",
-          },
-          providerId: {
-            type: "string",
-            description: "Provider actor ID",
-            pattern: "^0x[a-fA-F0-9]{40}$",
-          },
-        },
-      },
-      returns: "Dispute opened status with expiry information.",
-      risk: { level: "medium", notes: ["Creates dispute record"] },
-    },
-    {
-      name: "web3.dispute.submitEvidence",
-      summary: "Submit dispute evidence.",
-      kind: "gateway",
-      group: "dispute",
-      availability: availability(resourcesEnabled, "resources disabled"),
-      paramsSchema: {
-        type: "object",
-        required: ["disputeId", "submittedBy", "description"],
-        properties: {
-          disputeId: { type: "string", description: "Dispute ID" },
-          submittedBy: {
-            type: "string",
-            description: "Submitting party actor ID",
-            pattern: "^0x[a-fA-F0-9]{40}$",
-          },
-          type: {
-            type: "string",
-            description: "Evidence type",
-            enum: ["usage_log", "screenshot", "api_response", "other"],
-          },
-          description: { type: "string", description: "Evidence summary" },
-          data: { type: "object", description: "Optional evidence payload (limited size)" },
-        },
-      },
-      returns: "Evidence submission status with content hash.",
-      risk: { level: "medium" },
-    },
-    {
-      name: "web3.dispute.resolve",
-      summary: "Resolve a dispute with a ruling.",
-      kind: "gateway",
-      group: "dispute",
-      availability: availability(resourcesEnabled, "resources disabled"),
-      paramsSchema: {
-        type: "object",
-        required: ["disputeId", "ruling", "reason"],
-        properties: {
-          disputeId: { type: "string", description: "Dispute ID" },
-          ruling: {
-            type: "string",
-            description: "Resolution ruling",
-            enum: ["provider_wins", "consumer_wins", "split", "timeout"],
-          },
-          reason: { type: "string", description: "Resolution reason" },
-          refundAmount: {
-            type: "string",
-            description: "Optional refund amount (decimal string)",
-            pattern: "^[0-9]+(\\.[0-9]+)?$",
-          },
-          resolvedBy: { type: "string", description: "Resolver actor ID or system" },
-        },
-      },
-      returns: "Resolution result with ruling details.",
-      risk: { level: "medium" },
-    },
-    {
-      name: "web3.dispute.reject",
-      summary: "Reject a dispute without ruling.",
-      kind: "gateway",
-      group: "dispute",
-      availability: availability(resourcesEnabled, "resources disabled"),
-      paramsSchema: {
-        type: "object",
-        required: ["disputeId"],
-        properties: {
-          disputeId: { type: "string", description: "Dispute ID" },
-          reason: { type: "string", description: "Optional rejection reason" },
-        },
-      },
-      returns: "Rejection result.",
-      risk: { level: "medium" },
-    },
-    {
-      name: "web3.dispute.get",
-      summary: "Get a dispute record.",
-      kind: "gateway",
-      group: "dispute",
-      availability: availability(resourcesEnabled, "resources disabled"),
-      paramsSchema: {
-        type: "object",
-        required: ["disputeId"],
-        properties: { disputeId: { type: "string", description: "Dispute ID" } },
-      },
-      returns: "Dispute record.",
-      risk: { level: "low" },
-    },
-    {
-      name: "web3.dispute.list",
-      summary: "List dispute records.",
-      kind: "gateway",
-      group: "dispute",
-      availability: availability(resourcesEnabled, "resources disabled"),
-      paramsSchema: {
-        type: "object",
-        properties: {
-          orderId: { type: "string", description: "Filter by order/lease ID" },
-          status: {
-            type: "string",
-            description: "Filter by dispute status",
-            enum: ["open", "evidence_submitted", "resolved", "rejected", "expired"],
-          },
-          limit: { type: "number", description: "Max records to return", minimum: 1, maximum: 100 },
-        },
-      },
-      returns: "Dispute list.",
-      risk: { level: "low" },
-    },
-    // ── Dispute (market namespace aliases) ──────────────
-    {
       name: "web3.market.dispute.open",
       summary: "Open a dispute for an order or lease (market namespace).",
       kind: "gateway",
@@ -836,7 +694,6 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         },
       },
       returns: "Dispute opened status with expiry information.",
-      aliases: ["web3.dispute.open"],
       risk: { level: "medium" },
     },
     {
@@ -857,7 +714,6 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         },
       },
       returns: "Evidence submission result.",
-      aliases: ["web3.dispute.submitEvidence"],
       risk: { level: "medium" },
     },
     {
@@ -878,7 +734,6 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         },
       },
       returns: "Resolution result with ruling details.",
-      aliases: ["web3.dispute.resolve"],
       risk: { level: "medium" },
     },
     {
@@ -896,7 +751,6 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         },
       },
       returns: "Rejection result.",
-      aliases: ["web3.dispute.reject"],
       risk: { level: "medium" },
     },
     {
@@ -911,7 +765,6 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         properties: { disputeId: { type: "string", description: "Dispute ID" } },
       },
       returns: "Dispute record.",
-      aliases: ["web3.dispute.get"],
       risk: { level: "low" },
     },
     {
@@ -933,7 +786,6 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         },
       },
       returns: "Dispute list.",
-      aliases: ["web3.dispute.list"],
       risk: { level: "low" },
     },
   ];

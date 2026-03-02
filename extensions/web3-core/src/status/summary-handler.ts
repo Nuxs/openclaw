@@ -44,17 +44,6 @@ export function resolveBillingSummary(store: Web3StateStore, config: Web3PluginC
   return { status, credits: remaining } as const;
 }
 
-function countByStatus<T extends { status?: string }>(items: T[]): Record<string, number> {
-  return items.reduce(
-    (acc, item) => {
-      const status = typeof item.status === "string" ? item.status : "unknown";
-      acc[status] = (acc[status] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
-}
-
 function filterExpiredIndexEntries<T extends { expiresAt?: string }>(
   entries: T[],
   now = Date.now(),
@@ -77,13 +66,6 @@ export function createWeb3StatusSummaryHandler(
     const pendingAnchors = store.getPendingTxs();
     const pendingArchives = store.getPendingArchives();
     const pendingSettlements = store.getPendingSettlements();
-
-    let disputes: ReturnType<typeof store.getDisputes> = [];
-    try {
-      disputes = store.getDisputes();
-    } catch {
-      // Graceful degradation if disputes data is corrupted
-    }
 
     let alerts: ReturnType<typeof store.getAlerts> = [];
     try {
@@ -113,17 +95,6 @@ export function createWeb3StatusSummaryHandler(
         resourceByKind[resource.kind] = (resourceByKind[resource.kind] ?? 0) + 1;
       }
     }
-
-    const disputeByStatus = countByStatus(disputes);
-    const disputeOpen = disputes.filter(
-      (entry) => entry.status === "open" || entry.status === "evidence_submitted",
-    ).length;
-    const disputeInvestigating = disputes.filter(
-      (entry) => entry.status === "evidence_submitted",
-    ).length;
-    const disputeResolved = disputes.filter((entry) => entry.status === "resolved").length;
-    const disputeRejected = disputes.filter((entry) => entry.status === "rejected").length;
-    const disputeExpired = disputes.filter((entry) => entry.status === "expired").length;
 
     const alertsByLevel: Record<AlertLevel, number> = {
       [AlertLevel.P0]: 0,
@@ -180,15 +151,6 @@ export function createWeb3StatusSummaryHandler(
         providers: resourceEntries.length,
         total: resourceTotal,
         byKind: resourceByKind,
-      },
-      disputes: {
-        total: disputes.length,
-        byStatus: disputeByStatus,
-        open: disputeOpen,
-        investigating: disputeInvestigating,
-        resolved: disputeResolved,
-        rejected: disputeRejected,
-        expired: disputeExpired,
       },
       alerts: {
         total: alerts.length,

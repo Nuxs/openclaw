@@ -28,7 +28,7 @@
   - **能力自描述入口**（`web3.capabilities.list/describe`）已上线
   - **体验层代理入口**（`web3.market.*` 代理到 `market.*` 子集）已上线
 - **关键阻断项（上线前必须收敛）**:
-  - **争议仲裁/Dispute** 未实现（`web3.dispute.*` / `market.dispute.*` 不存在）
+  - **争议仲裁/Dispute** 未实现（`web3.market.dispute.*` / `market.dispute.*` 不存在）
   - **索引契约与默认安全未达标**：`web3.index.*` 为本地 indexer，**已有条目签名**（但缺少消费侧验签与信任策略），且 `web3.index.list` 返回结构包含 `endpoint`（与方案 A “默认不暴露 endpoint” 的文档口径冲突）
   - **敏感信息零泄露未达标（Gate-SEC-01）**：多处对外透传原始错误/上游响应文本，存在泄露 endpoint/路径等细节的风险
   - **稳定错误码未达标（Gate-ERR-01）**：多处返回 `err.message` / `String(err)`，缺少统一错误码契约

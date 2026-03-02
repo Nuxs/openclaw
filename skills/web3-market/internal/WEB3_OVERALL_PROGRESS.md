@@ -22,7 +22,7 @@
 
 - **Web3 插件**：`web3-core`（对外 `web3.*` 编排、审计/归档/锚定/配额等）。
 - **Market 插件**：`market-core`（内部权威：资源共享 Resource/Lease/Ledger + 交易结算 Offer/Order/Settlement/Consent/Delivery + Dispute 等）。
-- **UI 看板**：UI 内已有 Web3 Tab（身份/计费/审计/市场一屏概览）与 Market 视图，并通过 Gateway RPC 拉取 `web3.status.summary` / `web3.billing.summary` / `web3.market.status.summary` / `web3.index.*` / `web3.monitor.snapshot` / `web3.dispute.*` 等数据展示健康状态与概览。
+- **UI 看板**：UI 内已有 Web3 Tab（身份/计费/审计/市场一屏概览）与 Market 视图，并通过 Gateway RPC 拉取 `web3.status.summary` / `web3.billing.summary` / `web3.market.status.summary` / `web3.index.*` / `web3.monitor.snapshot` / `web3.market.dispute.*` 等数据展示健康状态与概览。
 - **一页式入口**：`/web3` 命令输出一页式仪表盘，可作为排障与快速分享入口。
 
 ### 2.2 资源共享（B-2：Resource/Lease/Ledger）
@@ -33,7 +33,7 @@
 
 ### 2.3 争议（Dispute）
 
-- `market.dispute.*` 与 `web3.dispute.*` 已存在，可用于列出/查询/处理争议对象（证据应以 hash/引用形式存放，避免敏感信息外泄）。
+- `market.dispute.*` 与 `web3.market.dispute.*` 已存在，可用于列出/查询/处理争议对象（证据应以 hash/引用形式存放，避免敏感信息外泄）。
 
 ### 2.4 双栈支付类型定义（2026-02-23 走查新增）
 

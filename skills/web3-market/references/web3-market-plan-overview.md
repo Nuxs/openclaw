@@ -63,7 +63,7 @@ OpenClaw Web3 Market 让你的 **AI 管家**可以安全地**发现、租用与�
 
 - **能力自描述**：`web3.capabilities.list`，`web3.capabilities.describe`
 - **市场与任务协议**：`web3.market.*`（发布、发现、下单、竞标、授标、交付、验收）
-- **争议与仲裁**：`web3.dispute.*`（发起、提交证据、仲裁、申诉）
+- **争议与仲裁**：`web3.market.dispute.*`（发起、提交证据、仲裁、申诉）
 - **索引与发现**：`web3.index.*`（查询、健康、信誉；默认不返回 Provider `endpoint`）
 - **监控与告警**：`web3.monitor.*`（指标、规则、历史）
 - **管理台聚合**：`web3.admin.*`（概览、资源、租约、账本、争议）
@@ -126,48 +126,48 @@ OpenClaw Web3 Market 让你的 **AI 管家**可以安全地**发现、租用与�
 
 ### **任务协议与仲裁概要表（不重复细节）**
 
-| 对象        | 关键字段（摘要）                                                             | 状态                                                                | 权威落盘层    | 对外入口                                    |
-| ----------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------- | ------------------------------------------- |
-| TaskOrder   | `taskId`, `creatorActorId`, `requirements`, `budget`, `expiryAt`, `hash`     | `task_open/task_awarded/task_closed/task_cancelled/task_expired`    | `market-core` | `web3.market.publishTask/listTasks/getTask` |
-| TaskBid     | `bidId`, `taskId`, `bidderActorId`, `price`, `eta`, `hash`                   | `bid_submitted/bid_withdrawn/bid_accepted/bid_rejected`             | `market-core` | `web3.market.placeBid/listBids`             |
-| TaskAward   | `awardId`, `taskId`, `bidId`, `awarderActorId`, `hash`                       | `award_active/award_revoked`                                        | `market-core` | `web3.market.awardBid`                      |
-| TaskResult  | `resultId`, `taskId`, `bidId`, `delivererActorId`, `artifacts`, `hash`       | `result_submitted/result_accepted/result_rejected`                  | `market-core` | `web3.market.submitResult/reviewResult`     |
-| TaskReceipt | `receiptId`, `taskId`, `bidId`, `amount`, `settlementId`                     | `receipt_pending/receipt_settled/receipt_refunded/receipt_disputed` | `market-core` | `web3.market.reviewResult`                  |
-| Dispute     | `disputeId`, `taskId`, `bidId`, `initiatorActorId`, `resolution`, `evidence` | `dispute_open/dispute_resolved/dispute_rejected`                    | `market-core` | `web3.dispute.open/submitEvidence/resolve`  |
+| 对象        | 关键字段（摘要）                                                             | 状态                                                                | 权威落盘层    | 对外入口                                          |
+| ----------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------- | ------------------------------------------------- |
+| TaskOrder   | `taskId`, `creatorActorId`, `requirements`, `budget`, `expiryAt`, `hash`     | `task_open/task_awarded/task_closed/task_cancelled/task_expired`    | `market-core` | `web3.market.publishTask/listTasks/getTask`       |
+| TaskBid     | `bidId`, `taskId`, `bidderActorId`, `price`, `eta`, `hash`                   | `bid_submitted/bid_withdrawn/bid_accepted/bid_rejected`             | `market-core` | `web3.market.placeBid/listBids`                   |
+| TaskAward   | `awardId`, `taskId`, `bidId`, `awarderActorId`, `hash`                       | `award_active/award_revoked`                                        | `market-core` | `web3.market.awardBid`                            |
+| TaskResult  | `resultId`, `taskId`, `bidId`, `delivererActorId`, `artifacts`, `hash`       | `result_submitted/result_accepted/result_rejected`                  | `market-core` | `web3.market.submitResult/reviewResult`           |
+| TaskReceipt | `receiptId`, `taskId`, `bidId`, `amount`, `settlementId`                     | `receipt_pending/receipt_settled/receipt_refunded/receipt_disputed` | `market-core` | `web3.market.reviewResult`                        |
+| Dispute     | `disputeId`, `taskId`, `bidId`, `initiatorActorId`, `resolution`, `evidence` | `dispute_open/dispute_resolved/dispute_rejected`                    | `market-core` | `web3.market.dispute.open/submitEvidence/resolve` |
 
 ### **状态机迁移规则简表（MVP）**
 
-| 对象        | 允许迁移                                                                                                                     | 禁止迁移（示例）                    | 触发入口                                            |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------- |
-| TaskOrder   | `task_open → task_awarded → task_closed`，`task_open → task_cancelled`，`task_open → task_expired`                           | 已关闭/已取消后回到 `task_open`     | `web3.market.awardBid/cancelTask/expireSweep`       |
-| TaskBid     | `bid_submitted → bid_withdrawn`，`bid_submitted → bid_accepted/bid_rejected`                                                 | `bid_withdrawn → bid_accepted`      | `web3.market.placeBid/awardBid`                     |
-| TaskAward   | `award_active → award_revoked`                                                                                               | `award_revoked → award_active`      | `web3.market.awardBid`（撤销入口可复用）            |
-| TaskResult  | `result_submitted → result_accepted/result_rejected`                                                                         | `result_rejected → result_accepted` | `web3.market.submitResult/reviewResult`             |
-| TaskReceipt | `receipt_pending → receipt_settled/receipt_refunded/receipt_disputed`，`receipt_disputed → receipt_settled/receipt_refunded` | 终态回到 `receipt_pending`          | `web3.market.reviewResult` + `web3.dispute.resolve` |
-| Dispute     | `dispute_open → dispute_resolved/dispute_rejected`                                                                           | `dispute_resolved → dispute_open`   | `web3.dispute.open/resolve`                         |
+| 对象        | 允许迁移                                                                                                                     | 禁止迁移（示例）                    | 触发入口                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------- |
+| TaskOrder   | `task_open → task_awarded → task_closed`，`task_open → task_cancelled`，`task_open → task_expired`                           | 已关闭/已取消后回到 `task_open`     | `web3.market.awardBid/cancelTask/expireSweep`              |
+| TaskBid     | `bid_submitted → bid_withdrawn`，`bid_submitted → bid_accepted/bid_rejected`                                                 | `bid_withdrawn → bid_accepted`      | `web3.market.placeBid/awardBid`                            |
+| TaskAward   | `award_active → award_revoked`                                                                                               | `award_revoked → award_active`      | `web3.market.awardBid`（撤销入口可复用）                   |
+| TaskResult  | `result_submitted → result_accepted/result_rejected`                                                                         | `result_rejected → result_accepted` | `web3.market.submitResult/reviewResult`                    |
+| TaskReceipt | `receipt_pending → receipt_settled/receipt_refunded/receipt_disputed`，`receipt_disputed → receipt_settled/receipt_refunded` | 终态回到 `receipt_pending`          | `web3.market.reviewResult` + `web3.market.dispute.resolve` |
+| Dispute     | `dispute_open → dispute_resolved/dispute_rejected`                                                                           | `dispute_resolved → dispute_open`   | `web3.market.dispute.open/resolve`                         |
 
 ### **状态机触发条件与守卫规则（MVP）**
 
-| 对象        | 触发条件（示例）                          | 守卫规则（必须满足）                                          |
-| ----------- | ----------------------------------------- | ------------------------------------------------------------- |
-| TaskOrder   | `awardBid` / `cancelTask` / `expireSweep` | 仅 `task_open` 可授标或取消；`expireSweep` 需超时且无活跃授标 |
-| TaskBid     | `placeBid` / `awardBid`                   | 仅 `task_open` 可竞标；同一 `bidId` 不可重复提交              |
-| TaskAward   | `awardBid`                                | 竞标必须 `bid_submitted`；预算锁定成功才可 `award_active`     |
-| TaskResult  | `submitResult` / `reviewResult`           | 仅 `award_active` 可提交结果；`reviewResult` 需具备验收权限   |
-| TaskReceipt | `reviewResult` / `dispute.resolve`        | 结算释放/退款必须绑定有效 `settlementId`                      |
-| Dispute     | `dispute.open` / `dispute.resolve`        | 仅结果被拒绝或验收超时可开争议；裁决需审计锚定完成            |
+| 对象        | 触发条件（示例）                                           | 守卫规则（必须满足）                                          |
+| ----------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| TaskOrder   | `awardBid` / `cancelTask` / `expireSweep`                  | 仅 `task_open` 可授标或取消；`expireSweep` 需超时且无活跃授标 |
+| TaskBid     | `placeBid` / `awardBid`                                    | 仅 `task_open` 可竞标；同一 `bidId` 不可重复提交              |
+| TaskAward   | `awardBid`                                                 | 竞标必须 `bid_submitted`；预算锁定成功才可 `award_active`     |
+| TaskResult  | `submitResult` / `reviewResult`                            | 仅 `award_active` 可提交结果；`reviewResult` 需具备验收权限   |
+| TaskReceipt | `reviewResult` / `web3.market.dispute.resolve`             | 结算释放/退款必须绑定有效 `settlementId`                      |
+| Dispute     | `web3.market.dispute.open` / `web3.market.dispute.resolve` | 仅结果被拒绝或验收超时可开争议；裁决需审计锚定完成            |
 
 ### **权限/风控/预算守卫规则（MVP）**
 
-| 维度 | 规则（示例）                                                 | 适用入口                                            |
-| ---- | ------------------------------------------------------------ | --------------------------------------------------- |
-| 权限 | 仅 `creatorActorId` 可取消任务；仅 `awarderActorId` 可授标   | `web3.market.cancelTask/awardBid`                   |
-| 权限 | 仅 `delivererActorId` 可提交结果；仅 `creatorActorId` 可验收 | `web3.market.submitResult/reviewResult`             |
-| 风控 | 单任务预算上限/币种白名单校验                                | `web3.market.publishTask/awardBid`                  |
-| 风控 | 单账户并发任务数与竞标频率限制                               | `web3.market.placeBid/listBids`                     |
-| 风控 | 争议频率限制与重复争议合并                                   | `web3.dispute.open`                                 |
-| 预算 | 授标前必须完成预算锁定（escrow 预锁）                        | `web3.market.awardBid`                              |
-| 预算 | 结算释放/退款需对账一致（账本与 escrow）                     | `web3.market.reviewResult` + `web3.dispute.resolve` |
+| 维度 | 规则（示例）                                                 | 适用入口                                                   |
+| ---- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| 权限 | 仅 `creatorActorId` 可取消任务；仅 `awarderActorId` 可授标   | `web3.market.cancelTask/awardBid`                          |
+| 权限 | 仅 `delivererActorId` 可提交结果；仅 `creatorActorId` 可验收 | `web3.market.submitResult/reviewResult`                    |
+| 风控 | 单任务预算上限/币种白名单校验                                | `web3.market.publishTask/awardBid`                         |
+| 风控 | 单账户并发任务数与竞标频率限制                               | `web3.market.placeBid/listBids`                            |
+| 风控 | 争议频率限制与重复争议合并                                   | `web3.market.dispute.open`                                 |
+| 预算 | 授标前必须完成预算锁定（escrow 预锁）                        | `web3.market.awardBid`                                     |
+| 预算 | 结算释放/退款需对账一致（账本与 escrow）                     | `web3.market.reviewResult` + `web3.market.dispute.resolve` |
 
 ---
 

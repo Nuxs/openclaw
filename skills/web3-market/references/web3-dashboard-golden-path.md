@@ -249,4 +249,4 @@
 ## 11. 备注：已知文档漂移与待对齐点
 
 - `market-core/ARCHITECTURE.md` 中提到的“market-core 不再注册 gateway methods”的迁移叙述，需要与当前实现核对与更新（当前 `market-core/src/index.ts` 仍注册大量 `market.*`）。
-- `web3.dispute.*` 与 `market.dispute.*` 同时存在，且状态命名不同；对外稳定 API 的边界需要在 capabilities + docs 中明确标注。
+- `web3.market.dispute.*` 与 `market.dispute.*` 同时存在，且状态命名不同；对外稳定 API 的边界需要在 capabilities + docs 中明确标注。

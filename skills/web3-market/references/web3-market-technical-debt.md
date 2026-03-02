@@ -96,7 +96,7 @@
 
 - **问题**：`skills/web3-market/references/web3-market-plan-overview.md` 中 UI 表格用 `market.*` 作为 UI 入口，但 UI 实际使用 `web3.*`。
 - **影响**：照抄表格会做错集成。
-- **一次性清理动作**：更新表格为 UI 实际调用的 `web3.market.*`/`web3.index.*`/`web3.monitor.snapshot`/`web3.dispute.*`。
+- **一次性清理动作**：更新表格为 UI 实际调用的 `web3.market.*`/`web3.index.*`/`web3.monitor.snapshot`/`web3.market.dispute.*`。
 - **验收**：表格与 UI `market-status` 控制器调用列表一致。
 
 ---

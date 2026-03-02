@@ -103,7 +103,7 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       state.client.request("web3.market.lease.list", { limit: 50 }),
       state.client.request("web3.market.ledger.summary", {}),
       state.client.request("web3.market.ledger.list", { limit: 50 }),
-      state.client.request("web3.dispute.list", { limit: 50 }),
+      state.client.request("web3.market.dispute.list", { limit: 50 }),
       state.client.request("web3.market.reputation.summary", {}),
       state.client.request("web3.market.tokenEconomy.summary", {}),
       state.client.request("web3.market.bridge.routes", {}),

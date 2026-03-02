@@ -117,7 +117,7 @@ owner: OpenClaw Web3 扩展团队
 **目标**：争议仲裁入口与管理台能力逐步上线。
 
 - **争议仲裁入口**：
-  - `market.dispute.*` / `web3.dispute.*` 最小链路。
+  - `market.dispute.*` / `web3.market.dispute.*` 最小链路。
 - **管理台最小可用**：
   - 资源、租约、账本、结算状态可视化。
 

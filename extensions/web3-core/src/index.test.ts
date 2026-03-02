@@ -49,13 +49,11 @@ describe("web3.status.summary handler", () => {
     expect(payload).toHaveProperty("settlement");
     expect(payload).toHaveProperty("archivePending");
     expect(payload).toHaveProperty("resources");
-    expect(payload).toHaveProperty("disputes");
     expect(payload).toHaveProperty("alerts");
     expect(payload).toHaveProperty("queues");
     expect((payload.settlement as any).pending).toBe(0);
     expect((payload.archivePending as any) ?? 0).toBe(0);
     expect((payload.resources as any).total).toBe(0);
-    expect((payload.disputes as any).total).toBe(0);
     expect((payload.alerts as any).total).toBe(0);
     expect((payload.queues as any).anchors.pending).toBe(0);
     expect(payload).toHaveProperty("identity");
@@ -129,39 +127,6 @@ describe("web3.status.summary handler", () => {
       lastError: "settlement failed",
     });
 
-    store.upsertDispute({
-      disputeId: "dispute-1",
-      orderId: "order-1",
-      resourceId: "resource-1",
-      providerId: "provider-1",
-      consumerId: "consumer-1",
-      reason: "missing data",
-      status: "open",
-      evidences: [],
-      openedAt: now,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: now,
-    });
-    store.upsertDispute({
-      disputeId: "dispute-2",
-      orderId: "order-2",
-      resourceId: "resource-2",
-      providerId: "provider-2",
-      consumerId: "consumer-2",
-      reason: "timeout",
-      status: "resolved",
-      evidences: [],
-      openedAt: now,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: now,
-      resolution: {
-        ruling: "provider_wins",
-        reason: "resolved",
-        resolvedAt: now,
-        resolvedBy: "system",
-      },
-    });
-
     store.appendAlert({
       id: "alert-1",
       level: AlertLevel.P0,
@@ -187,8 +152,6 @@ describe("web3.status.summary handler", () => {
     expect((payload.queues as any).anchors.failed).toBe(1);
     expect((payload.queues as any).archives.pending).toBe(1);
     expect((payload.queues as any).settlements.failed).toBe(1);
-    expect((payload.disputes as any).open).toBe(1);
-    expect((payload.disputes as any).resolved).toBe(1);
     expect((payload.alerts as any).total).toBe(2);
     expect((payload.alerts as any).active).toBe(1);
   });

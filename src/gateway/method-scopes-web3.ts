@@ -40,8 +40,6 @@ export const WEB3_READ_METHODS: readonly string[] = [
   "web3.market.dispute.list",
   "web3.reward.get",
   "web3.reward.list",
-  "web3.dispute.get",
-  "web3.dispute.list",
   "web3.monitor.snapshot",
   "web3.billing.status",
   "web3.billing.summary",
@@ -86,10 +84,6 @@ export const WEB3_WRITE_METHODS: readonly string[] = [
   "web3.market.lease.expireSweep",
   "web3.reward.claim",
   "web3.reward.updateStatus",
-  "web3.dispute.open",
-  "web3.dispute.submitEvidence",
-  "web3.dispute.resolve",
-  "web3.dispute.reject",
 ] as const;
 
 /**

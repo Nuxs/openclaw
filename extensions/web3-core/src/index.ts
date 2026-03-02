@@ -32,14 +32,6 @@ import {
 } from "./capabilities/handlers.js";
 import { resolveConfig } from "./config.js";
 import { createWeb3DashboardCommand } from "./dashboard/command.js";
-import {
-  createDisputeGetHandler,
-  createDisputeListHandler,
-  createDisputeOpenHandler,
-  createDisputeRejectHandler,
-  createDisputeResolveHandler,
-  createDisputeSubmitEvidenceHandler,
-} from "./disputes/handlers.js";
 import { formatWeb3GatewayErrorResponse } from "./errors.js";
 import {
   createBindWalletCommand,
@@ -386,16 +378,6 @@ const plugin: OpenClawPluginDefinition = {
       "web3.market.dispute.reject",
       createMarketDisputeRejectHandler(config),
     );
-    api.registerGatewayMethod("web3.dispute.open", createMarketDisputeOpenHandler(config));
-    api.registerGatewayMethod(
-      "web3.dispute.submitEvidence",
-      createMarketDisputeSubmitEvidenceHandler(config),
-    );
-    api.registerGatewayMethod("web3.dispute.resolve", createMarketDisputeResolveHandler(config));
-    api.registerGatewayMethod("web3.dispute.reject", createMarketDisputeRejectHandler(config));
-    api.registerGatewayMethod("web3.dispute.get", createMarketDisputeGetHandler(config));
-    api.registerGatewayMethod("web3.dispute.list", createMarketDisputeListHandler(config));
-
     api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
     api.registerGatewayMethod("web3.index.gossip", createResourceIndexGossipHandler(store, config));

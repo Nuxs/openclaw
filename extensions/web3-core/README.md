@@ -60,7 +60,7 @@ cat ARCHITECTURE.md
 - `web3.market.*` - 市场代理（资源/租约/账本/桥接/争议等）
 - `web3.index.*` - 资源索引上报/查询
 - `web3.monitor.*` - 监控与告警
-- `web3.dispute.*` - 争议（对外单入口）
+- `web3.market.dispute.*` - 争议（对外单入口）
 - `web3.capabilities.*` - 能力自描述（给 UI/Agent 构造调用）
 
 ### 权威契约与脱敏（务必对齐）

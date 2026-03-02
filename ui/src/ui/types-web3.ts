@@ -131,15 +131,6 @@ export type Web3MetricsSnapshot = {
   settlement: { pending: number };
   billing: { enabled: boolean; usageRecords: number; creditsUsed: number };
   resources: { providers: number; total: number; byKind: Record<string, number> };
-  disputes: {
-    total: number;
-    byStatus: Record<string, number>;
-    open: number;
-    investigating: number;
-    resolved: number;
-    rejected: number;
-    expired: number;
-  };
   alerts: Web3Alert[];
 };
 

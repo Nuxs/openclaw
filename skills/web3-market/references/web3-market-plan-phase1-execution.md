@@ -136,7 +136,7 @@
 
 **模块**: `market-core` / `web3-core`
 
-- **争议入口**：`web3.dispute.open/submitEvidence/resolve`
+- **争议入口**：`web3.market.dispute.open/submitEvidence/resolve`
 - **裁决来源**：预留 `arbitratorType`（platform/community/onchain）
 
 **交付物**:
@@ -212,7 +212,7 @@
 
 - `awardBid` 触发 `market.order.create` + `market.settlement.lock`
 - `reviewResult(accept)` 触发 `market.settlement.release`
-- `reviewResult(reject)` 可触发 `web3.dispute.open`
+- `reviewResult(reject)` 可触发 `web3.market.dispute.open`
 
 ---
 
@@ -229,13 +229,13 @@
   - `evidence`：证据列表（摘要、CID、时间戳）
   - `openedAt` / `resolvedAt`
 
-### `web3.dispute.*` API 清单
+### `web3.market.dispute.*` API 清单
 
-- **`web3.dispute.open`**：发起争议
-- **`web3.dispute.submitEvidence`**：提交证据
-- **`web3.dispute.resolve`**：裁决并回写结算
-- **`web3.dispute.list`**：争议查询
-- **`web3.dispute.get`**：争议详情
+- **`web3.market.dispute.open`**：发起争议
+- **`web3.market.dispute.submitEvidence`**：提交证据
+- **`web3.market.dispute.resolve`**：裁决并回写结算
+- **`web3.market.dispute.list`**：争议查询
+- **`web3.market.dispute.get`**：争议详情
 
 ---
 
@@ -259,7 +259,7 @@
 
 **模块**: `market-core` / `web3-core`
 
-- **争议入口**：`web3.dispute.open/submitEvidence/resolve`
+- **争议入口**：`web3.market.dispute.open/submitEvidence/resolve`
 - **证据锚定**：证据摘要接入审计与锚定管线
 - **仲裁 SLA**：链下裁决流程与责任分配
 
