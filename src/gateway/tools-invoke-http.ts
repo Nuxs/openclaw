@@ -247,6 +247,34 @@ function resolvePaymentRequiredContext(err: unknown): PaymentRequiredContext | n
   };
 }
 
+type X402AutopayConfig = {
+  enabled: boolean;
+  maxRetries: number;
+};
+
+function resolveX402AutopayConfig(cfg: ReturnType<typeof loadConfig>): X402AutopayConfig {
+  const pluginConfig = cfg.plugins?.entries?.["web3-core"]?.config;
+  const x402 = pluginConfig && typeof pluginConfig === "object" ? pluginConfig.x402 : undefined;
+  const autopay =
+    x402 && typeof x402 === "object" ? (x402 as Record<string, unknown>).autopay : undefined;
+
+  const enabled = !(
+    autopay &&
+    typeof autopay === "object" &&
+    (autopay as Record<string, unknown>).enabled === false
+  );
+  const maxRetriesRaw =
+    autopay && typeof autopay === "object"
+      ? (autopay as Record<string, unknown>).maxRetries
+      : undefined;
+  const maxRetries =
+    typeof maxRetriesRaw === "number" && Number.isFinite(maxRetriesRaw)
+      ? Math.max(0, Math.floor(maxRetriesRaw))
+      : 1;
+
+  return { enabled, maxRetries };
+}
+
 function extractInvoiceFromAuthenticate(header: string): string | undefined {
   const match = header.match(/\binvoice\s*=\s*"([^"]+)"/i);
   if (match?.[1]) {
@@ -519,9 +547,12 @@ export async function handleToolsInvokeHttpRequest(
         paymentRequired.invoice ??
         (wwwAuthenticate ? extractInvoiceFromAuthenticate(wwwAuthenticate) : undefined);
 
+      const autoPayConfig = resolveX402AutopayConfig(cfg);
       let autoPayError: string | undefined;
       let autoPayResult: PaymentRequiredResult | undefined;
-      if (invoice) {
+      if (!autoPayConfig.enabled) {
+        autoPayError = "autopay disabled by config";
+      } else if (invoice) {
         const attempt = await tryAutoPay({ invoice, toolName, idempotencyKey });
         autoPayError = attempt.error;
         autoPayResult = attempt.result;
@@ -537,13 +568,16 @@ export async function handleToolsInvokeHttpRequest(
         });
 
         if (retryArgs) {
-          try {
-            // oxlint-disable-next-line typescript/no-explicit-any
-            const retryResult = await (tool as any).execute?.(`http-${Date.now()}`, retryArgs);
-            sendJson(res, 200, { ok: true, result: retryResult });
-            return true;
-          } catch (retryErr) {
-            autoPayError = getErrorMessage(retryErr) || autoPayError;
+          const maxRetries = autoPayConfig.maxRetries;
+          for (let attemptIndex = 0; attemptIndex < maxRetries; attemptIndex += 1) {
+            try {
+              // oxlint-disable-next-line typescript/no-explicit-any
+              const retryResult = await (tool as any).execute?.(`http-${Date.now()}`, retryArgs);
+              sendJson(res, 200, { ok: true, result: retryResult });
+              return true;
+            } catch (retryErr) {
+              autoPayError = getErrorMessage(retryErr) || autoPayError;
+            }
           }
         }
       }

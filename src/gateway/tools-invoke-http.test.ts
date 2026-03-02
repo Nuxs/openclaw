@@ -629,6 +629,76 @@ describe("POST /tools/invoke", () => {
     expect(headers.authorization).toBe(PAYMENT_AUTHORIZATION);
   });
 
+  it("skips autopay when disabled in web3-core config", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+      plugins: {
+        entries: {
+          "web3-core": {
+            config: { x402: { autopay: { enabled: false } } },
+          },
+        },
+      },
+    };
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(paymentRequiredCallCount).toBe(1);
+    expect(mockCallGateway).not.toHaveBeenCalled();
+    expect(body.error?.autoPayError).toBe("autopay disabled by config");
+  });
+
+  it("honors maxRetries=0 for x402 autopay", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+      plugins: {
+        entries: {
+          "web3-core": {
+            config: { x402: { autopay: { maxRetries: 0 } } },
+          },
+        },
+      },
+    };
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(paymentRequiredCallCount).toBe(1);
+    expect(mockCallGateway).toHaveBeenCalled();
+    expect(body.error?.authorization).toBe(PAYMENT_AUTHORIZATION);
+  });
+
   it("maps tool input/auth errors to 400/403 and unexpected execution errors to 500", async () => {
     cfg = {
       ...cfg,

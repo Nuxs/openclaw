@@ -92,12 +92,12 @@
 ### 3.3 幂等性与熔断
 
 - [x] 增加 `x-idempotency-key` 支持。
-- [ ] 设置最大重试次数（默认 1 次），防止无限循环扣款。
+- [x] 设置最大重试次数（默认 1 次），防止无限循环扣款。
 
 ### 3.4 待优化与补齐（下一步）
 
 - [ ] 将 `WalletPolicy.autoPay.maxRetries` 接入网关重试策略。
-- [ ] 接入熔断与 kill switch（`web3.x402.autopay.enabled`）验证链路。
+- [ ] 验证熔断与 kill switch（`web3.x402.autopay.enabled`）链路。
 - [ ] 指标与告警对齐（`x402.autopay.*`）并补齐故障注入验证。
 
 ---
