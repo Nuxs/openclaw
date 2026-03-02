@@ -521,6 +521,9 @@ function mapThinkingLevelToOpenRouterReasoningEffort(
   if (thinkingLevel === "off") {
     return "none";
   }
+  if (thinkingLevel === "adaptive") {
+    return "medium";
+  }
   return thinkingLevel;
 }
 
@@ -634,6 +637,7 @@ function mapThinkLevelToGoogleThinkingLevel(
     case "low":
       return "LOW";
     case "medium":
+    case "adaptive":
       return "MEDIUM";
     case "high":
     case "xhigh":

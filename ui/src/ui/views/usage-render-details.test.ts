@@ -24,6 +24,10 @@ function makePoint(overrides: Partial<TimeSeriesPoint> = {}): TimeSeriesPoint {
 const baseUsage = {
   totalTokens: 1000,
   totalCost: 1.0,
+  inputCost: 0,
+  outputCost: 0,
+  cacheReadCost: 0,
+  cacheWriteCost: 0,
   input: 300,
   output: 400,
   cacheRead: 200,

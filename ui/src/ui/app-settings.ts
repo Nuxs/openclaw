@@ -122,16 +122,7 @@ export function applySettingsFromUrl(host: SettingsHost) {
 }
 
 export function setTab(host: SettingsHost, next: Tab) {
-  const prev = host.tab;
-  if (prev !== next) {
-    const prevDef = TAB_BY_ID.get(prev);
-    prevDef?.onLeave?.(host);
-    host.tab = next;
-    const nextDef = TAB_BY_ID.get(next);
-    nextDef?.onEnter?.(host);
-  }
-  void refreshActiveTab(host);
-  syncUrlWithTab(host, next, false);
+  applyTabSelection(host, next, { refreshPolicy: "always", syncUrl: true });
 }
 
 export function setTheme(host: SettingsHost, next: ThemeMode, context?: ThemeTransitionContext) {
@@ -251,16 +242,26 @@ export function onPopState(host: SettingsHost) {
 }
 
 export function setTabFromRoute(host: SettingsHost, next: Tab) {
-  const prev = host.tab;
-  if (prev !== next) {
-    const prevDef = TAB_BY_ID.get(prev);
-    prevDef?.onLeave?.(host);
+  applyTabSelection(host, next, { refreshPolicy: "connected" });
+}
+
+function applyTabSelection(
+  host: SettingsHost,
+  next: Tab,
+  options: { refreshPolicy: "always" | "connected"; syncUrl?: boolean },
+) {
+  if (host.tab !== next) {
     host.tab = next;
     const nextDef = TAB_BY_ID.get(next);
     nextDef?.onEnter?.(host);
   }
-  if (host.connected) {
+
+  if (options.refreshPolicy === "always" || host.connected) {
     void refreshActiveTab(host);
+  }
+
+  if (options.syncUrl) {
+    syncUrlWithTab(host, next, false);
   }
 }
 
