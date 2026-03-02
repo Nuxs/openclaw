@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk";
 import type { MarketPluginConfig } from "../config.js";
 import { hashCanonical } from "./hash.js";
 import type { Consent, Delivery, Offer, Order } from "./types.js";
@@ -28,9 +29,7 @@ export async function executeRevocation(
     return { ok: false, error: "revocation.endpoint is required" };
   }
 
-  const controller = new AbortController();
   const timeoutMs = config.revocation.timeoutMs ?? 8000;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   const payload = {
     delivery: context.delivery,
@@ -49,22 +48,28 @@ export async function executeRevocation(
     : undefined;
 
   try {
-    const response = await fetch(config.revocation.endpoint, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-market-timestamp": timestamp,
-        "x-market-payload-hash": payloadHash,
-        ...(signature ? { "x-market-signature": signature } : {}),
-        ...(config.revocation.apiKey ? { "x-market-api-key": config.revocation.apiKey } : {}),
+    const { response, release } = await fetchWithSsrFGuard({
+      url: config.revocation.endpoint,
+      init: {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-market-timestamp": timestamp,
+          "x-market-payload-hash": payloadHash,
+          ...(signature ? { "x-market-signature": signature } : {}),
+          ...(config.revocation.apiKey ? { "x-market-api-key": config.revocation.apiKey } : {}),
+        },
+        body,
       },
-      body,
-      signal: controller.signal,
+      timeoutMs,
+      auditContext: "market-revocation",
     });
-    return { ok: response.ok, status: response.status };
+    try {
+      return { ok: response.ok, status: response.status };
+    } finally {
+      await release();
+    }
   } catch (err) {
     return { ok: false, error: String(err) };
-  } finally {
-    clearTimeout(timeout);
   }
 }
