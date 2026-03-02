@@ -17,6 +17,7 @@ import type {
   SkillStatusReport,
 } from "../types.ts";
 import { shouldShowPairingHint } from "./overview-hints.ts";
+import { renderWeb3Overview } from "./overview-web3.ts";
 
 export type OverviewProps = {
   connected: boolean;
@@ -363,6 +364,8 @@ export function renderOverview(props: OverviewProps) {
         <div class="muted">${t("overview.stats.cronNext", { time: formatNextRun(props.cronNext) })}</div>
       </div>
     </section>
+
+    ${renderWeb3Overview(props.web3Status, props.web3Error)}
 
     <section class="card" style="margin-top: 18px;">      <div class="card-title">${t("overview.notes.title")}</div>
       <div class="card-sub">${t("overview.notes.subtitle")}</div>

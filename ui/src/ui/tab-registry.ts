@@ -335,6 +335,8 @@ export const TAB_REGISTRY: TabDefinition[] = [
         jobsHasMore: state.cronJobsHasMore,
         jobsQuery: state.cronJobsQuery,
         jobsEnabledFilter: state.cronJobsEnabledFilter,
+        jobsScheduleKindFilter: state.cronJobsScheduleKindFilter,
+        jobsLastStatusFilter: state.cronJobsLastStatusFilter,
         jobsSortBy: state.cronJobsSortBy,
         jobsSortDir: state.cronJobsSortDir,
         error: state.cronError,
@@ -383,6 +385,24 @@ export const TAB_REGISTRY: TabDefinition[] = [
         onLoadMoreJobs: () => loadMoreCronJobs(state as unknown as OpenClawApp),
         onJobsFiltersChange: async (patch) => {
           updateCronJobsFilter(state as unknown as OpenClawApp, patch);
+          const shouldReload =
+            typeof patch.cronJobsQuery === "string" ||
+            Boolean(patch.cronJobsEnabledFilter) ||
+            Boolean(patch.cronJobsSortBy) ||
+            Boolean(patch.cronJobsSortDir);
+          if (shouldReload) {
+            await reloadCronJobs(state as unknown as OpenClawApp);
+          }
+        },
+        onJobsFiltersReset: async () => {
+          updateCronJobsFilter(state as unknown as OpenClawApp, {
+            cronJobsQuery: "",
+            cronJobsEnabledFilter: "all",
+            cronJobsScheduleKindFilter: "all",
+            cronJobsLastStatusFilter: "all",
+            cronJobsSortBy: "nextRunAtMs",
+            cronJobsSortDir: "asc",
+          });
           await reloadCronJobs(state as unknown as OpenClawApp);
         },
         onLoadMoreRuns: () => loadMoreCronRuns(state as unknown as OpenClawApp),

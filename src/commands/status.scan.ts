@@ -171,6 +171,13 @@ async function scanStatusJsonFast(opts: {
   const [channelsStatus, memory] = await Promise.all([channelsStatusPromise, memoryPromise]);
   const channelIssues = channelsStatus ? collectChannelStatusIssues(channelsStatus) : [];
 
+  // Web3 status — delegated to overlay file (status-scan-web3.ts)
+  const { web3, web3Error } = await scanWeb3Status({
+    gatewayReachable,
+    timeoutMs: opts.timeoutMs,
+    all: opts.all,
+  });
+
   return {
     cfg,
     osSummary,
@@ -190,6 +197,8 @@ async function scanStatusJsonFast(opts: {
     summary,
     memory,
     memoryPlugin,
+    web3,
+    web3Error,
   };
 }
 
