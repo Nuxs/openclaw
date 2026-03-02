@@ -26,18 +26,26 @@ function createResponder() {
   };
 }
 
-async function withStoreModes(tempDir: string, run: (input: StoreModeInput) => Promise<void>) {
+async function withStoreModesConfig(
+  tempDir: string,
+  partial: Record<string, unknown>,
+  run: (input: StoreModeInput) => Promise<void>,
+) {
   for (const mode of ["file", "sqlite"] as const) {
     const modeDir = path.join(tempDir, mode);
     await fs.mkdir(modeDir, { recursive: true });
     const config = resolveConfig({
       store: { mode },
-      settlement: { mode: "anchor_only" },
       access: { mode: "open", requireActor: true, requireActorMatch: true },
+      ...partial,
     });
     const store = new MarketStateStore(modeDir, config);
     await run({ mode, store, config });
   }
+}
+
+async function withStoreModes(tempDir: string, run: (input: StoreModeInput) => Promise<void>) {
+  return withStoreModesConfig(tempDir, { settlement: { mode: "anchor_only" } }, run);
 }
 
 describe("market-core ledger -> metered settlement release", () => {
@@ -179,5 +187,111 @@ describe("market-core ledger -> metered settlement release", () => {
       expect(finalSettlement?.releasedAmount).toBe("200");
       expect(finalOrder?.status).toBe("settlement_completed");
     });
+  });
+
+  it("downgrades metered settlement to one-shot when auto release fails", async () => {
+    await withStoreModesConfig(
+      tempDir,
+      { settlement: { mode: "contract" } },
+      async ({ store, config }) => {
+        const now = new Date().toISOString();
+        const providerActorId = "0x0000000000000000000000000000000000000001";
+        const consumerActorId = "0x0000000000000000000000000000000000000002";
+
+        store.saveOffer({
+          offerId: "offer-1",
+          sellerId: providerActorId,
+          assetId: "asset-1",
+          assetType: "service",
+          assetMeta: {},
+          price: 1,
+          currency: "USDC",
+          usageScope: { purpose: "compute" },
+          deliveryType: "service",
+          status: "offer_published",
+          offerHash: "offer-hash",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        store.saveOrder({
+          orderId: "order-1",
+          offerId: "offer-1",
+          buyerId: consumerActorId,
+          quantity: 1,
+          status: "delivery_completed",
+          orderHash: "order-hash",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        store.saveResource({
+          resourceId: "resource-1",
+          kind: "model",
+          status: "resource_published",
+          providerActorId,
+          offerId: "offer-1",
+          label: "model",
+          price: {
+            unit: "token",
+            amount: "1",
+            currency: "USDC",
+          },
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        store.saveLease({
+          leaseId: "lease-1",
+          resourceId: "resource-1",
+          kind: "model",
+          providerActorId,
+          consumerActorId,
+          orderId: "order-1",
+          status: "lease_active",
+          issuedAt: now,
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        });
+
+        store.saveSettlement({
+          settlementId: "settlement-1",
+          orderId: "order-1",
+          status: "settlement_locked",
+          amount: "200",
+          releasedAmount: "0",
+          strategy: "metered",
+          lockedAt: now,
+        });
+
+        const append = createLedgerAppendHandler(store, config);
+        const responder = createResponder();
+        await append({
+          params: {
+            actorId: providerActorId,
+            entry: {
+              leaseId: "lease-1",
+              resourceId: "resource-1",
+              kind: "model",
+              providerActorId,
+              consumerActorId,
+              unit: "token",
+              quantity: "80",
+              cost: "80",
+              currency: "USDC",
+            },
+          },
+          respond: responder.respond,
+        } as any);
+
+        const response = responder.result();
+        expect(response?.ok).toBe(true);
+        expect(response?.payload.settlementReleaseError).toContain("downgraded to one-shot");
+
+        const updatedSettlement = store.getSettlementByOrder("order-1");
+        expect(updatedSettlement?.strategy).toBe("one-shot");
+        expect(updatedSettlement?.status).toBe("settlement_locked");
+      },
+    );
   });
 });

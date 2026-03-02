@@ -61,7 +61,7 @@ vi.mock("./auth.js", () => ({
   authorizeHttpGatewayConnect: async () => ({ ok: true }),
 }));
 
-const mockCallGateway = vi.fn(async () => ({
+const mockCallGateway = vi.fn(async (..._args: unknown[]) => ({
   ok: true,
   result: {
     resumeToken: PAYMENT_RESUME_TOKEN,

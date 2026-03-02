@@ -98,6 +98,33 @@ describe("web3.billing.handlePaymentRequired", () => {
     expect(secondPayload.resumeToken).toMatchObject({ invoiceId: "inv-1" });
   });
 
+  it("blocks autopay when x402 kill switch is disabled", async () => {
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({ x402: { autopay: { enabled: false } } });
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-2",
+      provider: "provider-2",
+      chain: "evm",
+      asset: "ETH",
+      amount: "10",
+      payTo: "0x0000000000000000000000000000000000000003",
+      nonce: "nonce-2",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-2",
+    };
+
+    const responder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: responder.respond,
+    } as any);
+
+    expect(responder.result()?.ok).toBe(false);
+    expect(responder.result()?.payload).toMatchObject({ error: "E_FORBIDDEN" });
+    expect(mockCallGateway).not.toHaveBeenCalled();
+  });
+
   it("rejects idempotency key reuse with different invoice", async () => {
     const store = new Web3StateStore(tempDir);
     const config = resolveConfig({});

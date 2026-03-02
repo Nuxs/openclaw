@@ -72,6 +72,18 @@ export type BillingConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// x402 autopay (PayFi)
+// ---------------------------------------------------------------------------
+
+export type X402AutopayConfig = {
+  enabled: boolean;
+};
+
+export type X402Config = {
+  autopay: X402AutopayConfig;
+};
+
+// ---------------------------------------------------------------------------
 // Web3 decentralized brain
 // ---------------------------------------------------------------------------
 
@@ -217,6 +229,7 @@ export type Web3PluginConfig = {
   privacy: PrivacyConfig;
   identity: IdentityConfig;
   billing: BillingConfig;
+  x402: X402Config;
   brain: BrainConfig;
   resources: ResourceSharingConfig;
   browserIngest: BrowserIngestConfig;
@@ -256,6 +269,11 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
     quotaPerSession: 1000,
     costPerLlmCall: 1,
     costPerToolCall: 0.5,
+  },
+  x402: {
+    autopay: {
+      enabled: true,
+    },
   },
   brain: {
     enabled: false,
@@ -319,6 +337,7 @@ export function resolveConfig(raw?: Record<string, unknown>): Web3PluginConfig {
     privacy: merge(DEFAULT_CONFIG.privacy, raw.privacy),
     identity: merge(DEFAULT_CONFIG.identity, raw.identity),
     billing: merge(DEFAULT_CONFIG.billing, raw.billing),
+    x402: merge(DEFAULT_CONFIG.x402, raw.x402),
     brain: merge(DEFAULT_CONFIG.brain, raw.brain),
     resources: merge(DEFAULT_CONFIG.resources, raw.resources),
     browserIngest: merge(DEFAULT_CONFIG.browserIngest, raw.browserIngest),

@@ -114,6 +114,17 @@ export function createBillingHandlePaymentRequiredHandler(
         return;
       }
 
+      if (config.x402?.autopay?.enabled === false) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse(
+            "E_FORBIDDEN: x402 autopay disabled",
+            ErrorCode.E_FORBIDDEN,
+          ),
+        );
+        return;
+      }
+
       const invoiceHash = hashPayload(invoice);
       const existing = store.getPaymentRequired(idempotencyKey);
       if (existing) {

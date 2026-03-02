@@ -97,7 +97,7 @@
 ### 3.4 待优化与补齐（下一步）
 
 - [ ] 将 `WalletPolicy.autoPay.maxRetries` 接入网关重试策略。
-- [ ] 验证熔断与 kill switch（`web3.x402.autopay.enabled`）链路。
+- [x] 验证熔断与 kill switch（`web3.x402.autopay.enabled`）链路。
 - [ ] 指标与告警对齐（`x402.autopay.*`）并补齐故障注入验证。
 
 ---
@@ -136,6 +136,7 @@
   - 超额释放返回 `SETTLEMENT_OVER_RELEASE`。
 - **集成测试**
   - `ledger.append -> settlement.release(partial)` 闭环。
+  - `metered` 结算在 `ledger.append` 驱动下可完成释放。
 - **回归测试**
   - `one-shot` 旧路径可用。
 - **故障注入**
@@ -213,7 +214,7 @@
 
 - [x] `Settlement` 新字段 `releasedAmount/strategy` 已落地且兼容旧数据。
 - [x] 支持 partial release，且累计释放不超额。
-- [ ] `metered` 异常可降级 `one-shot`。
+- [x] `metered` 异常可降级 `one-shot`。
 - [ ] 单测/集成/回归全部通过。
 
 ### Phase 3 (x402)
@@ -221,7 +222,7 @@
 - [x] Gateway 可识别 402 并受控触发自动支付。
 - [x] 自动支付严格受 `WalletPolicy` 约束。
 - [x] 幂等键生效，重复请求不重复扣款。
-- [ ] 熔断与 kill switch 验证通过。
+- [x] 熔断与 kill switch 验证通过。
 
 ### 发布前总门禁
 

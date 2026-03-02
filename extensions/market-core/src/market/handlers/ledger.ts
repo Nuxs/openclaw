@@ -3,6 +3,7 @@ import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { hashCanonical } from "../hash.js";
 import type { MarketLedgerFilter, MarketResourceKind } from "../resources.js";
+import type { Settlement } from "../types.js";
 import {
   normalizeBuyerId,
   requireAddress,
@@ -143,14 +144,14 @@ export function createLedgerAppendHandler(
           }
         | undefined;
       let settlementReleaseError: string | undefined;
+      let settlement: Settlement | undefined;
 
       try {
-        const settlement = store.getSettlementByOrder(lease.orderId);
-        const shouldAutoRelease = settlement && settlement.status === "settlement_locked";
+        settlement = store.getSettlementByOrder(lease.orderId);
         const strategy = settlement?.strategy ?? "one-shot";
         const releasedAmount = settlement?.releasedAmount ?? "0";
 
-        if (shouldAutoRelease && strategy === "metered") {
+        if (settlement && settlement.status === "settlement_locked" && strategy === "metered") {
           const entryCost = parseIntString(cost, "entry.cost");
           const totalAmount = parseIntString(settlement.amount, "settlement.amount");
           const alreadyReleased = parseIntString(releasedAmount, "settlement.releasedAmount");
@@ -175,6 +176,11 @@ export function createLedgerAppendHandler(
         }
       } catch (err) {
         settlementReleaseError = err instanceof Error ? err.message : String(err);
+        if (settlement && settlement.strategy === "metered") {
+          const downgraded: Settlement = { ...settlement, strategy: "one-shot" };
+          store.saveSettlement(downgraded);
+          settlementReleaseError = `${settlementReleaseError}; downgraded to one-shot`;
+        }
       }
 
       respond(true, {

@@ -261,4 +261,121 @@ describe("market-core e2e flow", () => {
       expect(payload.settlements?.total ?? 0).toBeGreaterThan(0);
     });
   });
+
+  it("auto releases metered settlement after ledger append for file/sqlite", async () => {
+    await withStoreModes(tempDir, async ({ store, config }) => {
+      const resourcePublishHandler = createResourcePublishHandler(store, config);
+      const leaseIssueHandler = createLeaseIssueHandler(store, config);
+      const deliveryCompleteHandler = createDeliveryCompleteHandler(store, config);
+      const ledgerAppendHandler = createLedgerAppendHandler(store, config);
+
+      const providerActorId = "0x00000000000000000000000000000000000000a1";
+      const consumerActorId = "0x00000000000000000000000000000000000000b1";
+
+      const publish = createResponder();
+      await resourcePublishHandler({
+        params: {
+          actorId: providerActorId,
+          resource: {
+            kind: "model",
+            label: "Metered Model",
+            price: { unit: "token", amount: "1", currency: "USD" },
+            offer: {
+              assetId: "asset-metered-1",
+              assetType: "api",
+              currency: "USD",
+              usageScope: { purpose: "metered" },
+              deliveryType: "api",
+            },
+          },
+        },
+        respond: publish.respond,
+      } as any);
+      expect(publish.result()?.ok).toBe(true);
+      const resourceId = publish.result()?.payload.resourceId as string;
+
+      const leaseIssue = createResponder();
+      await leaseIssueHandler({
+        params: {
+          actorId: consumerActorId,
+          resourceId,
+          consumerActorId,
+          ttlMs: 60_000,
+        },
+        respond: leaseIssue.respond,
+      } as any);
+      expect(leaseIssue.result()?.ok).toBe(true);
+      const leaseId = leaseIssue.result()?.payload.leaseId as string;
+      const orderId = leaseIssue.result()?.payload.orderId as string;
+      const deliveryId = leaseIssue.result()?.payload.deliveryId as string;
+
+      const complete = createResponder();
+      await deliveryCompleteHandler({
+        params: { actorId: providerActorId, deliveryId },
+        respond: complete.respond,
+      } as any);
+      expect(complete.result()?.ok).toBe(true);
+
+      const lockedAt = new Date().toISOString();
+      store.saveSettlement({
+        settlementId: "settlement-metered-1",
+        orderId,
+        status: "settlement_locked",
+        amount: "200",
+        releasedAmount: "0",
+        strategy: "metered",
+        lockedAt,
+      });
+
+      const firstAppend = createResponder();
+      await ledgerAppendHandler({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId,
+            resourceId,
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "80",
+            cost: "80",
+            currency: "USD",
+          },
+        },
+        respond: firstAppend.respond,
+      } as any);
+      expect(firstAppend.result()?.ok).toBe(true);
+      const firstSettlement = store.getSettlementByOrder(orderId);
+      const firstOrder = store.getOrder(orderId);
+      expect(firstSettlement?.status).toBe("settlement_locked");
+      expect(firstSettlement?.releasedAmount).toBe("80");
+      expect(firstOrder?.status).toBe("delivery_completed");
+
+      const secondAppend = createResponder();
+      await ledgerAppendHandler({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId,
+            resourceId,
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "120",
+            cost: "120",
+            currency: "USD",
+          },
+        },
+        respond: secondAppend.respond,
+      } as any);
+      expect(secondAppend.result()?.ok).toBe(true);
+      const finalSettlement = store.getSettlementByOrder(orderId);
+      const finalOrder = store.getOrder(orderId);
+      expect(finalSettlement?.status).toBe("settlement_released");
+      expect(finalSettlement?.releasedAmount).toBe("200");
+      expect(finalOrder?.status).toBe("settlement_completed");
+    });
+  });
 });
