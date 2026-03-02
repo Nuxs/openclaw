@@ -26,6 +26,9 @@ const agentWalletConfigSchema = {
     encryptionKey: { label: "Wallet Encryption Key", sensitive: true },
     storePath: { label: "Wallet Store Path", advanced: true },
     "chain.network": { label: "Chain Network" },
+    "policy.enabled": { label: "Enable Wallet Policy Guard" },
+    "policy.policyPath": { label: "Wallet Policy File Path", advanced: true },
+    "policy.decisionLogPath": { label: "Wallet Policy Decision Log Path", advanced: true },
   },
 };
 

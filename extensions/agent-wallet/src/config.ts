@@ -1,3 +1,5 @@
+import { resolveWalletPolicyConfig, type WalletPolicyConfig } from "./policy.js";
+
 export type AgentWalletChainNetwork =
   | "ethereum"
   | "base"
@@ -36,11 +38,15 @@ export type AgentWalletConfig = {
   storePath?: string;
   encryptionKey?: string;
   chain: AgentWalletChainConfig;
+  policy: WalletPolicyConfig;
 };
 
 export const DEFAULT_CONFIG: AgentWalletConfig = {
   enabled: true,
   chain: { network: "base" },
+  policy: {
+    enabled: false,
+  },
 };
 
 export function resolveConfig(raw?: Record<string, unknown>): AgentWalletConfig {
@@ -71,5 +77,6 @@ export function resolveConfig(raw?: Record<string, unknown>): AgentWalletConfig 
     storePath,
     encryptionKey,
     chain: { network },
+    policy: resolveWalletPolicyConfig(raw.policy),
   };
 }

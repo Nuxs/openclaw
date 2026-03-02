@@ -8,6 +8,7 @@ import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "opencl
 import { getAddress } from "viem";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
+import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";
 import { loadOrCreateWallet } from "./wallet.js";
 
 const CHAIN_IDS: Record<string, number> = {
@@ -48,6 +49,17 @@ function parseAmount(value: unknown, label: string): bigint {
   return BigInt(raw);
 }
 
+function parseMethodSelector(data: string | undefined): string | undefined {
+  if (!data) {
+    return undefined;
+  }
+  const normalized = data.trim().toLowerCase();
+  if (/^0x[a-f0-9]{8,}$/.test(normalized)) {
+    return normalized.slice(0, 10);
+  }
+  return undefined;
+}
+
 async function resolveProvider(
   config: AgentWalletConfig,
   privateKey: `0x${string}`,
@@ -60,6 +72,25 @@ async function resolveProvider(
   }
   assertProviderEVM(provider);
   return provider;
+}
+
+async function enforcePolicy(config: AgentWalletConfig, intent: PolicyIntent): Promise<void> {
+  if (!config.policy.enabled) {
+    return;
+  }
+
+  const loadedPolicy = await loadPolicy(config.policy);
+  const decision = checkPolicy(loadedPolicy.policy, intent);
+
+  try {
+    await appendPolicyDecisionLog(config.policy.decisionLogPath, decision);
+  } catch {
+    // 审计日志失败不改变策略判定结果，避免放大故障域。
+  }
+
+  if (decision.result === "rejected") {
+    throw new Error(`POLICY_REJECTED:${decision.reasonCode}`);
+  }
 }
 
 function respondError(respond: GatewayRequestHandlerOptions["respond"], err: unknown): void {
@@ -106,6 +137,13 @@ export function createAgentWalletSignHandler(config: AgentWalletConfig): Gateway
       ensureEnabled(config);
       const input = (params ?? {}) as Record<string, unknown>;
       const message = requireString(input.message, "message");
+      await enforcePolicy(config, {
+        action: "sign",
+        chain: "evm",
+        tool: "agent-wallet.sign",
+        method: "sign_message",
+      });
+
       const wallet = await loadOrCreateWallet(config);
       const provider = await resolveProvider(config, wallet.privateKey);
       const signature = await provider.signMessage(message);
@@ -124,6 +162,15 @@ export function createAgentWalletSendHandler(config: AgentWalletConfig): Gateway
       const to = getAddress(requireString(input.to, "to"));
       const value = parseAmount(input.value, "value");
       const data = typeof input.data === "string" ? input.data : undefined;
+      await enforcePolicy(config, {
+        action: "send",
+        chain: "evm",
+        tool: "agent-wallet.send",
+        to,
+        amount: value,
+        method: parseMethodSelector(data),
+      });
+
       const wallet = await loadOrCreateWallet(config);
       const provider = await resolveProvider(config, wallet.privateKey);
       const txHash = await provider.sendTransaction({ to, value, data });

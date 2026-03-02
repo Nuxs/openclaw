@@ -21,6 +21,7 @@ function makeConfig(overrides?: Partial<AgentWalletConfig>): AgentWalletConfig {
     storePath: path.join(tmpDir, "wallet.json"),
     encryptionKey: "test-secret-key-32chars-abcdef!",
     chain: { network: "base" },
+    policy: { enabled: false },
     ...overrides,
   };
 }

@@ -15,6 +15,7 @@ import {
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
+import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";
 import { loadOrCreateTonWallet } from "./ton-wallet.js";
 
 let blockchainFactoryReady = false;
@@ -45,6 +46,25 @@ function parseAmount(value: unknown, label: string): bigint {
     throw new Error(`${label} must be an integer string`);
   }
   return BigInt(raw);
+}
+
+async function enforcePolicy(config: AgentWalletConfig, intent: PolicyIntent): Promise<void> {
+  if (!config.policy.enabled) {
+    return;
+  }
+
+  const loadedPolicy = await loadPolicy(config.policy);
+  const decision = checkPolicy(loadedPolicy.policy, intent);
+
+  try {
+    await appendPolicyDecisionLog(config.policy.decisionLogPath, decision);
+  } catch {
+    // 审计日志失败不改变策略判定结果，避免放大故障域。
+  }
+
+  if (decision.result === "rejected") {
+    throw new Error(`POLICY_REJECTED:${decision.reasonCode}`);
+  }
 }
 
 function respondError(respond: GatewayRequestHandlerOptions["respond"], err: unknown): void {
@@ -121,6 +141,14 @@ export function createTonWalletSendHandler(config: AgentWalletConfig): GatewayRe
       const input = (params ?? {}) as Record<string, unknown>;
       const to = requireString(input.to, "to");
       const amount = parseAmount(input.amount, "amount");
+      await enforcePolicy(config, {
+        action: "send",
+        chain: "ton",
+        tool: "agent-wallet.send",
+        to,
+        amount,
+        method: "ton_transfer",
+      });
 
       const { provider } = await ensureTonConnected(config);
       const txHash = await provider.transfer(to, amount);

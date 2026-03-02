@@ -76,7 +76,7 @@ export function formatAgentWalletErrorCode(
 
   const normalized = redactedMessage.toLowerCase();
 
-  if (normalized.includes("disabled")) {
+  if (normalized.includes("disabled") || normalized.includes("policy_rejected")) {
     return "E_FORBIDDEN";
   }
 
