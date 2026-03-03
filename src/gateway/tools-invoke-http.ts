@@ -34,6 +34,12 @@ import {
   sendMethodNotAllowed,
 } from "./http-common.js";
 import { getBearerToken, getHeader } from "./http-utils.js";
+import {
+  comparePaymentResumeTokenIdentity,
+  parsePaymentResumeTokenFromAuthorization,
+  type PaymentResumeToken,
+  validatePaymentResumeToken,
+} from "./payment-resume-token.js";
 
 const DEFAULT_BODY_BYTES = 2 * 1024 * 1024;
 const MEMORY_TOOL_NAMES = new Set(["memory_search", "memory_get"]);
@@ -136,15 +142,6 @@ type PaymentRequiredContext = {
   invoice?: string;
   wwwAuthenticate?: string;
   status?: number;
-};
-
-type PaymentResumeToken = {
-  invoiceId: string;
-  paymentReceiptId: string;
-  txHash?: string;
-  chain: "evm" | "ton";
-  issuedAt: string;
-  expiresAt: string;
 };
 
 type PaymentTraceRef = {
@@ -664,12 +661,32 @@ export async function handleToolsInvokeHttpRequest(
       }
 
       if (autoPayResult?.authorization || autoPayResult?.resumeToken) {
+        const authorizationToken = parsePaymentResumeTokenFromAuthorization(
+          autoPayResult.authorization,
+        );
+        let effectiveResumeToken = autoPayResult.resumeToken ?? authorizationToken;
+
+        if (autoPayResult.resumeToken && authorizationToken) {
+          if (!comparePaymentResumeTokenIdentity(autoPayResult.resumeToken, authorizationToken)) {
+            autoPayError = "autopay resume token mismatch between payload and authorization";
+            effectiveResumeToken = undefined;
+          }
+        }
+
+        if (effectiveResumeToken) {
+          const tokenValidation = validatePaymentResumeToken(effectiveResumeToken);
+          if (!tokenValidation.valid) {
+            autoPayError = tokenValidation.error;
+            effectiveResumeToken = undefined;
+          }
+        }
+
         const retryArgs = applyPaymentResumeToken({
           args: toolArgs,
           // oxlint-disable-next-line typescript/no-explicit-any
           toolSchema: (tool as any).parameters,
           authorization: autoPayResult.authorization,
-          resumeToken: autoPayResult.resumeToken,
+          resumeToken: effectiveResumeToken,
         });
 
         if (retryArgs) {

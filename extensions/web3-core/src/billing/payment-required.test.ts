@@ -256,6 +256,53 @@ describe("web3.billing.handlePaymentRequired", () => {
     expect(responder.result()?.payload).toMatchObject({ error: "E_EXPIRED" });
   });
 
+  it("does not reuse stale idempotency record after token expiry", async () => {
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-stale",
+      provider: "provider-stale",
+      chain: "evm",
+      asset: "ETH",
+      amount: "10",
+      payTo: "0x0000000000000000000000000000000000000010",
+      nonce: "nonce-stale",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-stale",
+    };
+
+    const firstResponder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: firstResponder.respond,
+    } as any);
+    expect(firstResponder.result()?.ok).toBe(true);
+
+    const record = store.getPaymentRequired("idem-stale");
+    expect(record).toBeDefined();
+    if (!record) {
+      return;
+    }
+    store.savePaymentRequired({
+      ...record,
+      resumeToken: {
+        ...record.resumeToken,
+        expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      },
+    });
+
+    const secondResponder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: secondResponder.respond,
+    } as any);
+
+    expect(secondResponder.result()?.ok).toBe(false);
+    expect(secondResponder.result()?.payload).toMatchObject({ error: "E_EXPIRED" });
+    expect(store.getPaymentRequired("idem-stale")).toBeUndefined();
+  });
+
   it("returns timeout error when autopay backend times out", async () => {
     mockCallGateway.mockResolvedValueOnce({ ok: false, error: "timeout" });
 

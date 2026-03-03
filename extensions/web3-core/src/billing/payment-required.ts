@@ -190,6 +190,15 @@ export function createBillingHandlePaymentRequiredHandler(
         return;
       }
 
+      if (Date.parse(invoice.expiresAt) <= Date.now()) {
+        store.removePaymentRequired(idempotencyKey);
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse("E_EXPIRED: invoice expired", ErrorCode.E_EXPIRED),
+        );
+        return;
+      }
+
       const invoiceHash = hashPayload(invoice);
       const existing = store.getPaymentRequired(idempotencyKey);
       if (existing) {
@@ -203,6 +212,16 @@ export function createBillingHandlePaymentRequiredHandler(
           );
           return;
         }
+
+        if (Date.parse(existing.resumeToken.expiresAt) <= Date.now()) {
+          store.removePaymentRequired(idempotencyKey);
+          respond(
+            false,
+            formatWeb3GatewayErrorResponse("E_EXPIRED: invoice expired", ErrorCode.E_EXPIRED),
+          );
+          return;
+        }
+
         respond(true, {
           idempotencyKey,
           invoiceId: invoice.invoiceId,
@@ -224,14 +243,6 @@ export function createBillingHandlePaymentRequiredHandler(
           }),
           reused: true,
         });
-        return;
-      }
-
-      if (Date.parse(invoice.expiresAt) <= Date.now()) {
-        respond(
-          false,
-          formatWeb3GatewayErrorResponse("E_EXPIRED: invoice expired", ErrorCode.E_EXPIRED),
-        );
         return;
       }
 

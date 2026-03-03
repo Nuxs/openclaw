@@ -65,6 +65,7 @@ export type X402AutopayStats = {
   failures: number;
   retryCount: number;
   circuitBreakerTrips: number;
+  lastCircuitBreakerTripAt?: string;
   updatedAt: string;
 };
 
@@ -504,6 +505,17 @@ export class Web3StateStore {
     writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
   }
 
+  removePaymentRequired(idempotencyKey: string): void {
+    if (!existsSync(this.paymentRequiredPath)) return;
+    const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
+      string,
+      PaymentRequiredRecord
+    >;
+    if (!(idempotencyKey in map)) return;
+    delete map[idempotencyKey];
+    writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
+  }
+
   getX402AutopayStats(): X402AutopayStats {
     if (!existsSync(this.x402AutopayStatsPath)) {
       return {
@@ -512,6 +524,7 @@ export class Web3StateStore {
         failures: 0,
         retryCount: 0,
         circuitBreakerTrips: 0,
+        lastCircuitBreakerTripAt: undefined,
         updatedAt: new Date(0).toISOString(),
       };
     }
@@ -530,6 +543,11 @@ export class Web3StateStore {
       circuitBreakerTrips: Number.isFinite(stored?.circuitBreakerTrips)
         ? Math.max(0, Math.floor(stored!.circuitBreakerTrips!))
         : 0,
+      lastCircuitBreakerTripAt:
+        typeof stored?.lastCircuitBreakerTripAt === "string" &&
+        stored.lastCircuitBreakerTripAt.length > 0
+          ? stored.lastCircuitBreakerTripAt
+          : undefined,
       updatedAt:
         typeof stored?.updatedAt === "string" && stored.updatedAt.length > 0
           ? stored.updatedAt
@@ -545,7 +563,12 @@ export class Web3StateStore {
     delta: Partial<
       Pick<
         X402AutopayStats,
-        "attempts" | "successes" | "failures" | "retryCount" | "circuitBreakerTrips"
+        | "attempts"
+        | "successes"
+        | "failures"
+        | "retryCount"
+        | "circuitBreakerTrips"
+        | "lastCircuitBreakerTripAt"
       >
     >,
   ): X402AutopayStats {
@@ -556,6 +579,7 @@ export class Web3StateStore {
       failures: current.failures + (delta.failures ?? 0),
       retryCount: current.retryCount + (delta.retryCount ?? 0),
       circuitBreakerTrips: current.circuitBreakerTrips + (delta.circuitBreakerTrips ?? 0),
+      lastCircuitBreakerTripAt: delta.lastCircuitBreakerTripAt ?? current.lastCircuitBreakerTripAt,
       updatedAt: new Date().toISOString(),
     };
     this.saveX402AutopayStats(next);

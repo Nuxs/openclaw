@@ -964,6 +964,44 @@ describe("POST /tools/invoke", () => {
     expect(paymentRequiredCallCount).toBe(2);
   });
 
+  it("rejects retry when autopay returns expired resume token", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+    };
+
+    mockCallGateway.mockResolvedValue({
+      ok: true,
+      result: {
+        resumeToken: {
+          ...PAYMENT_RESUME_TOKEN,
+          expiresAt: new Date(Date.now() - 5_000).toISOString(),
+        },
+      },
+    });
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+      headers: { "x-idempotency-key": "idem-expired-token" },
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error?.autoPayError).toBe("autopay resume token expired");
+    expect(paymentRequiredCallCount).toBe(1);
+  });
+
   it("returns 402 when callback fails after successful autopay", async () => {
     cfg = {
       ...cfg,

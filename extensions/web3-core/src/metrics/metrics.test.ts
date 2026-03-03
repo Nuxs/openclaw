@@ -74,6 +74,35 @@ describe("web3 metrics snapshot", () => {
     const payload = snapshotResponder.result()?.payload as Record<string, any>;
     expect(payload.x402.autopay.retry.count).toBe(2);
     expect(payload.x402.autopay.circuitBreaker.trips).toBe(1);
+    expect(payload.x402.autopay.circuitBreaker.lastTripAt).toBeTypeOf("string");
     expect(payload.x402.autopay.failure.count).toBe(1);
+  });
+
+  it("does not keep circuit-breaker alert active outside cooldown window", () => {
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const snapshotHandler = createWeb3MetricsSnapshotHandler(store, config);
+
+    const staleTripAt = new Date(Date.now() - 16 * 60 * 1000).toISOString();
+    store.saveX402AutopayStats({
+      attempts: 20,
+      successes: 10,
+      failures: 10,
+      retryCount: 5,
+      circuitBreakerTrips: 5,
+      lastCircuitBreakerTripAt: staleTripAt,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const responder = createResponder();
+    snapshotHandler({ respond: responder.respond } as any);
+
+    expect(responder.result()?.ok).toBe(true);
+    const payload = responder.result()?.payload as Record<string, any>;
+    const alerts = payload.alerts as Array<Record<string, any>>;
+    const breakerAlert = alerts.find(
+      (entry) => entry.rule === "x402_autopay_circuit_breaker_trips",
+    );
+    expect(breakerAlert?.triggered).toBe(false);
   });
 });

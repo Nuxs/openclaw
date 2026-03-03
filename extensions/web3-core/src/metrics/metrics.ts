@@ -20,6 +20,8 @@ type AlertSeverity = "p0" | "p1";
 
 type X402AutopayMetricEvent = "attempt" | "success" | "failure" | "retry" | "circuit_breaker_trip";
 
+const CIRCUIT_BREAKER_TRIP_ALERT_WINDOW_MS = 15 * 60 * 1000;
+
 function safeRate(numerator: number, denominator: number): number | null {
   if (denominator <= 0) {
     return null;
@@ -114,7 +116,14 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
   const autopayFailureCount = autopayStats.failures;
   const autopayRetryCount = autopayStats.retryCount;
   const autopayCircuitBreakerTrips = autopayStats.circuitBreakerTrips;
+  const autopayLastCircuitBreakerTripAt = autopayStats.lastCircuitBreakerTripAt;
   const autopaySuccessRate = safeRate(autopaySuccessCount, autopayAttemptCount);
+  const lastCircuitBreakerTripTs = autopayLastCircuitBreakerTripAt
+    ? Date.parse(autopayLastCircuitBreakerTripAt)
+    : Number.NaN;
+  const circuitBreakerTripRecentlyActive =
+    Number.isFinite(lastCircuitBreakerTripTs) &&
+    now - lastCircuitBreakerTripTs <= CIRCUIT_BREAKER_TRIP_ALERT_WINDOW_MS;
 
   const alerts: Array<{
     rule: string;
@@ -152,7 +161,7 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
     {
       rule: "x402_autopay_circuit_breaker_trips",
       severity: "p0",
-      triggered: autopayCircuitBreakerTrips >= 3,
+      triggered: autopayCircuitBreakerTrips >= 3 && circuitBreakerTripRecentlyActive,
       value: autopayCircuitBreakerTrips,
     },
   ];
@@ -188,6 +197,7 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
         },
         circuitBreaker: {
           trips: autopayCircuitBreakerTrips,
+          lastTripAt: autopayLastCircuitBreakerTripAt,
         },
       },
     },
@@ -233,7 +243,10 @@ export function createWeb3RecordX402AutopayMetricHandler(
         success: { successes: count },
         failure: { failures: count },
         retry: { retryCount: count },
-        circuit_breaker_trip: { circuitBreakerTrips: count },
+        circuit_breaker_trip: {
+          circuitBreakerTrips: count,
+          lastCircuitBreakerTripAt: new Date().toISOString(),
+        },
       };
       const stats = store.updateX402AutopayStats(deltaByEvent[event]);
       respond(true, { stats });
