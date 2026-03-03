@@ -366,6 +366,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
         thinkingSuggestions: CRON_THINKING_SUGGESTIONS,
         timezoneSuggestions: CRON_TIMEZONE_SUGGESTIONS,
         deliveryToSuggestions,
+        accountSuggestions: accountToSuggestions,
         onFormChange: (patch) => {
           state.cronForm = normalizeCronFormState({ ...state.cronForm, ...patch });
           state.cronFieldErrors = validateCronForm(state.cronForm);

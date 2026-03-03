@@ -467,6 +467,7 @@ const plugin: OpenClawPluginDefinition = {
         path: config.browserIngest.ingestPath,
         pluginId: plugin.id,
         source: "web3-browser-ingest",
+        auth: "plugin",
         handler: createBrowserIngestHandler(store, config),
       });
       api.logger.info(`Web3 browser ingest enabled at ${config.browserIngest.ingestPath}`);
@@ -483,36 +484,42 @@ const plugin: OpenClawPluginDefinition = {
         path: "/web3/resources/model/chat",
         pluginId: plugin.id,
         source: "web3-resources-model",
+        auth: "plugin",
         handler: modelHandler,
       });
       registerPluginHttpRoute({
         path: "/v1/chat/completions",
         pluginId: plugin.id,
         source: "web3-resources-model",
+        auth: "plugin",
         handler: modelHandler,
       });
       registerPluginHttpRoute({
         path: "/web3/resources/search/query",
         pluginId: plugin.id,
         source: "web3-resources-search",
+        auth: "plugin",
         handler: searchHandler,
       });
       registerPluginHttpRoute({
         path: "/web3/resources/storage/put",
         pluginId: plugin.id,
         source: "web3-resources-storage",
+        auth: "plugin",
         handler: storagePutHandler,
       });
       registerPluginHttpRoute({
         path: "/web3/resources/storage/get",
         pluginId: plugin.id,
         source: "web3-resources-storage",
+        auth: "plugin",
         handler: storageGetHandler,
       });
       registerPluginHttpRoute({
         path: "/web3/resources/storage/list",
         pluginId: plugin.id,
         source: "web3-resources-storage",
+        auth: "plugin",
         handler: storageListHandler,
       });
       api.logger.info("Web3 resource provider routes enabled");

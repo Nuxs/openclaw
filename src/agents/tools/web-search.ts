@@ -7,10 +7,7 @@ import { wrapWebContent } from "../../security/external-content.js";
 import { normalizeSecretInput } from "../../utils/normalize-secret-input.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult, readNumberParam, readStringParam } from "./common.js";
-import {
-  WEB_TOOLS_TRUSTED_NETWORK_SSRF_POLICY,
-  withWebToolsNetworkGuard,
-} from "./web-guarded-fetch.js";
+import { withTrustedWebToolsEndpoint } from "./web-guarded-fetch.js";
 import { resolveCitationRedirectUrl } from "./web-search-citation-redirect.js";
 import {
   describePrivateWebSearchProvider,
@@ -637,12 +634,11 @@ async function withTrustedWebSearchEndpoint<T>(
   },
   run: (response: Response) => Promise<T>,
 ): Promise<T> {
-  return withWebToolsNetworkGuard(
+  return withTrustedWebToolsEndpoint(
     {
       url: params.url,
       init: params.init,
       timeoutSeconds: params.timeoutSeconds,
-      policy: WEB_TOOLS_TRUSTED_NETWORK_SSRF_POLICY,
     },
     async ({ response }) => run(response),
   );
