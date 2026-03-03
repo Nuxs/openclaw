@@ -100,6 +100,32 @@ vi.mock("../agents/openclaw-tools.js", () => {
     return err;
   };
 
+  const createPaymentRequiredTool = () => ({
+    name: "tools_invoke_payment_required",
+    parameters: {
+      type: "object",
+      properties: {
+        headers: { type: "object" },
+      },
+    },
+    execute: async (_toolCallId: string, args: unknown) => {
+      paymentRequiredCallCount += 1;
+      lastPaymentRequiredArgs = (args ?? {}) as Record<string, unknown>;
+      if (paymentRequiredCallCount === 1) {
+        const err = new Error("payment required") as Error & {
+          status?: number;
+          headers?: Record<string, string>;
+        };
+        err.status = 402;
+        err.headers = {
+          "www-authenticate": `OpenClaw-PayFi realm="market", invoice="${PAYMENT_INVOICE_BASE64}"`,
+        };
+        throw err;
+      }
+      return { ok: true };
+    },
+  });
+
   const tools = [
     {
       name: "session_status",
@@ -158,31 +184,7 @@ vi.mock("../agents/openclaw-tools.js", () => {
         return { ok: true };
       },
     },
-    {
-      name: "tools_invoke_payment_required",
-      parameters: {
-        type: "object",
-        properties: {
-          headers: { type: "object" },
-        },
-      },
-      execute: async (_toolCallId: string, args: unknown) => {
-        paymentRequiredCallCount += 1;
-        lastPaymentRequiredArgs = (args ?? {}) as Record<string, unknown>;
-        if (paymentRequiredCallCount === 1) {
-          const err = new Error("payment required") as Error & {
-            status?: number;
-            headers?: Record<string, string>;
-          };
-          err.status = 402;
-          err.headers = {
-            "www-authenticate": `OpenClaw-PayFi realm="market", invoice="${PAYMENT_INVOICE_BASE64}"`,
-          };
-          throw err;
-        }
-        return { ok: true };
-      },
-    },
+    createPaymentRequiredTool(),
     {
       name: "diffs_compat_test",
       parameters: {
