@@ -115,6 +115,14 @@
 | 指标与告警接入            | 仪表盘/告警规则截图或导出：`x402.autopay.success.rate`、`x402.autopay.retry.count`、`x402.autopay.circuit_breaker.trips` | 指标可观测、阈值可告警、故障可定位           |
 | 故障注入回归              | 演练记录：invoice 过期、链上超时、支付成功回调失败                                                                       | 故障场景均可回滚或熔断，且审计链完整         |
 
+### 3.6 2026-03-03 对齐落地（P0/P1）
+
+- [x] **按 `invoice.chain` 路由自动支付**：`web3.billing.handlePaymentRequired` 调用 `agent-wallet.autopay` 时显式透传 `chain + value + amount`，并把钱包返回链路写回 `resumeToken.chain`。
+- [x] **统一回执契约**：billing 返回 `paymentReceipt`（`receiptId/chain/network/txHash/amount/confirmedAt/mode`），Gateway 在 402 重试成功路径透传 `payment`/`paymentTrace`。
+- [x] **链路参数兼容**：EVM autopay 兼容 `amount` 别名；TON autopay 兼容 `value` 别名；两端返回统一 `chain/network/policyAutoPayMaxRetries` 口径。
+- [x] **无人值守稳定性覆盖**：新增“连续 402 自动支付重试”回归用例，验证 `autoPay=true` 下多轮请求稳定重试。
+- [x] **高频小额策略准确性覆盖**：补充 EVM/TON autopay 高频小额（连续请求）用例，验证 Daily Cap 拦截准确（防误放/防误拦）。
+
 ---
 
 ## 📅 阶段四：发现网络对齐（仅 P0 / P1）
