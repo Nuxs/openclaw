@@ -7,7 +7,6 @@ read_when:
   - You want to use xAI Grok for web search
   - You want to use Gemini with Google Search grounding
   - You want to use Kimi for web search
-  - You want to use SearxNG for web search
 title: "Web Tools"
 ---
 
@@ -29,7 +28,6 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
   - **Grok**: returns AI-synthesized answers with citations via xAI Responses API.
   - **Gemini**: returns AI-synthesized answers grounded in Google Search with citations.
   - **Kimi**: returns AI-synthesized answers with citations from native $web_search.
-  - **SearxNG**: returns structured results from your self-hosted instance.
 - Results are cached by query for 15 minutes (configurable).
 - `web_fetch` does a plain HTTP GET and extracts readable content
   (HTML → markdown/text). It does **not** execute JavaScript.
@@ -46,7 +44,7 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 | **Kimi**            | Moonshot web search capability               | Requires Moonshot API key                | `KIMI_API_KEY` / `MOONSHOT_API_KEY`          |
 | **SearxNG**         | Self-hosted, open-source                     | You host and maintain it                 | Optional (`SEARXNG_API_KEY`)                 |
 
-See [Brave Search setup](/brave-search), [Perplexity Sonar](/perplexity), [Kimi](/kimi), and [SearxNG](/searxng) for provider-specific details.
+See [Brave Search setup](/brave-search), [Perplexity Sonar](/perplexity), and [Kimi](/kimi) for provider-specific details.
 
 ### Auto-detection
 
@@ -70,7 +68,7 @@ Set the provider in config:
   tools: {
     web: {
       search: {
-        provider: "brave", // or "perplexity" or "gemini" or "grok" or "kimi" or "searxng"
+        provider: "brave", // or "perplexity" or "gemini" or "grok" or "kimi"
       },
     },
   },
@@ -113,6 +111,11 @@ Example: use SearxNG (self-hosted):
   },
 }
 ```
+
+## Optional SearxNG extension (fork/advanced)
+
+If you run a self-hosted SearxNG service in this fork, set `provider: "searxng"` and configure `tools.web.search.searxng.baseUrl`.
+When SearxNG is configured, provider auto-detection can prioritize SearxNG before API-key providers.
 
 ## Optional SearxNG rerank (local service)
 
@@ -270,7 +273,8 @@ Search the web using your configured provider.
   - **Gemini**: `GEMINI_API_KEY` or `tools.web.search.gemini.apiKey`
   - **Grok**: `XAI_API_KEY` or `tools.web.search.grok.apiKey`
   - **Kimi**: `KIMI_API_KEY`, `MOONSHOT_API_KEY`, or `tools.web.search.kimi.apiKey`
-  - **SearxNG**: `tools.web.search.searxng.baseUrl` (and optional `tools.web.search.searxng.apiKey` or `SEARXNG_API_KEY`)
+
+For optional SearxNG support in this fork, see **Optional SearxNG extension (fork/advanced)** above.
 
 ### Config
 
