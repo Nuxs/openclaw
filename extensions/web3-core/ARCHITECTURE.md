@@ -37,6 +37,7 @@ extensions/web3-core/
 │   │
 │   ├── resources/            # 资源发布/租用/Provider 路由
 │   ├── market/               # market.* 代理与工具
+│   ├── discovery/            # MDL 去中心化发现层 (libp2p DHT/Rendezvous)
 │   ├── monitor/              # 监控与告警
 │   ├── metrics/              # 指标快照
 │   │
@@ -204,6 +205,12 @@ web3/
   1. 重试失败的归档上传 (`flushPendingArchives`)
   2. 重试失败的链上锚定 (`flushPendingAnchors`)
 
+- **ID**: `web3-discovery-service` (仅当 `config.discovery.enabled = true`)
+- **频率**: `config.discovery.rendezvousIntervalMs`（默认 30s）
+- **任务**:
+  1. 将本地资源索引发布到 DHT/Rendezvous (`publish`)
+  2. 发现远端 provider 资源并入库 (`discover` + `ingest`)
+
 ---
 
 ## ⚙️ 配置示例
@@ -244,6 +251,66 @@ web3/
   }
 }
 ```
+
+---
+
+## 🌐 Discovery 模块 (MDL — Market Discovery Layer)
+
+### 概述
+
+MDL 是基于 libp2p（KAD-DHT + Rendezvous）的去中心化资源发现层，作为 `web3-core` 内的可插拔发现后端。发现结果仅包含"可验证摘要 + peerId + reachability"，连接信息（endpoint/token）仅在 lease 签发后受控下发。
+
+**安全红线**: DiscoveryRecord **永远不含** endpoint、multiaddr、accessToken、meta、resources[].metadata。
+
+### 模块结构
+
+```
+extensions/web3-core/src/discovery/
+├── types.ts              # DiscoveryBackend 接口、DiscoveryRecord/Query 类型
+├── namespace.ts          # DHT key / Rendezvous namespace 构造工具
+├── signature-v2.ts       # v2 签名 payload 构建与 Ed25519 签名
+├── backend-static.ts     # 静态 no-op 后端（默认 fallback）
+├── backend-libp2p.ts     # libp2p DHT + Rendezvous + Relay 后端
+├── ingest.ts             # 发现结果 → store 的 ingest 管道
+└── factory.ts            # 后端工厂（根据配置创建后端实例）
+```
+
+### 数据流
+
+```
+Publish: web3.index.report → indexer 签名(v2) → store
+           → DiscoveryBackend.publish() → DHT putProvider + Rendezvous register
+
+Discover: Background Service → DiscoveryBackend.discover()
+           → DiscoveryRecord[] → ingest(验签+过滤) → upsert store
+           → web3.index.list 可见
+
+Connect:  Consumer → web3.index.list(peerId+reachability)
+           → web3.resources.lease → ConsumerLeaseAccess(connectionRef)
+           → relay/direct (future Slice B)
+```
+
+### 签名兼容方案
+
+- **v1 payload**: 现有字段集 (providerId/endpoint/resources/meta/updatedAt/expiresAt/lastHeartbeatAt) — 完全不改
+- **v2 payload**: v1 + { peerId, reachability, payloadVersion: 2 }
+- 验签入口通过 `signature.payloadVersion` 判断分支，v1 路径零修改
+
+### 配置
+
+```json
+{
+  "discovery": {
+    "enabled": false,
+    "backend": "static",
+    "bootstrapPeers": [],
+    "rendezvousIntervalMs": 30000,
+    "dhtKeyPrefix": "/openclaw/resource"
+  }
+}
+```
+
+默认 `enabled: false`，零影响现有行为。
 
 ---
 
