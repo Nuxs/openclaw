@@ -175,7 +175,10 @@ export function createLedgerAppendHandler(
           }
         }
       } catch (err) {
-        settlementReleaseError = err instanceof Error ? err.message : String(err);
+        const rawMsg = err instanceof Error ? err.message : String(err);
+        settlementReleaseError = rawMsg.startsWith("E_")
+          ? rawMsg
+          : "E_SETTLEMENT_RELEASE_FAILED: settlement release failed";
         if (settlement && settlement.strategy === "metered") {
           const downgraded: Settlement = { ...settlement, strategy: "one-shot" };
           store.saveSettlement(downgraded);
