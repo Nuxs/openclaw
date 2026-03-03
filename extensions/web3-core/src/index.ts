@@ -33,6 +33,9 @@ import {
 } from "./capabilities/handlers.js";
 import { resolveConfig } from "./config.js";
 import { createWeb3DashboardCommand } from "./dashboard/command.js";
+import { createDiscoveryBackend } from "./discovery/factory.js";
+import { ingestDiscoveryRecords } from "./discovery/ingest.js";
+import type { DiscoveryBackend, DiscoveryRecord } from "./discovery/types.js";
 import { formatWeb3GatewayErrorResponse } from "./errors.js";
 import {
   createBindWalletCommand,
@@ -582,6 +585,97 @@ const plugin: OpenClawPluginDefinition = {
         ctx.logger.info("Web3 anchor service stopped");
       },
     });
+
+    // ---- Background service: MDL discovery ----
+    if (config.discovery.enabled) {
+      api.registerService({
+        id: "web3-discovery-service",
+        async start(ctx) {
+          ctx.logger.info("Web3 MDL discovery service starting...");
+
+          const signingKey = store.getIndexSigningKey();
+          let backend: DiscoveryBackend;
+          try {
+            backend = await createDiscoveryBackend({
+              config: config.discovery,
+              privateKeyDer: signingKey.privateKey,
+              logger: (msg) => ctx.logger.info(msg),
+            });
+          } catch (err) {
+            ctx.logger.warn(`MDL discovery backend init failed: ${err}`);
+            return;
+          }
+
+          (ctx as any)._discoveryBackend = backend;
+
+          // Periodic publish + discover
+          const intervalMs = Math.max(config.discovery.rendezvousIntervalMs, 10_000);
+          const tick = async () => {
+            try {
+              // Publish local resources
+              const providerId = store.getProviderId();
+              if (providerId) {
+                const entries = store.getResourceIndex().filter((e) => e.providerId === providerId);
+                for (const entry of entries) {
+                  const record: DiscoveryRecord = {
+                    providerId: entry.providerId,
+                    peerId: entry.peerId ?? (backend as any).node?.peerId?.toString() ?? "",
+                    resources: entry.resources.map((r) => ({
+                      resourceId: r.resourceId,
+                      kind: r.kind,
+                      label: r.label,
+                      tags: r.tags,
+                      price: r.price,
+                      unit: r.unit,
+                    })),
+                    reachability: entry.reachability ?? "unknown",
+                    updatedAt: entry.updatedAt,
+                    expiresAt: entry.expiresAt,
+                    signature: entry.signature as DiscoveryRecord["signature"],
+                  };
+                  await backend.publish(record);
+                }
+              }
+            } catch (err) {
+              ctx.logger.warn(`MDL publish error: ${err}`);
+            }
+
+            try {
+              // Discover remote resources
+              const records = await backend.discover({});
+              if (records.length > 0) {
+                const result = ingestDiscoveryRecords(records, store, {
+                  logger: (msg) => ctx.logger.warn(msg),
+                });
+                if (result.accepted > 0) {
+                  ctx.logger.info(
+                    `MDL ingested ${result.accepted} records (${result.rejected} rejected)`,
+                  );
+                }
+              }
+            } catch (err) {
+              ctx.logger.warn(`MDL discover error: ${err}`);
+            }
+          };
+
+          // Initial tick, then periodic
+          void tick();
+          const interval = setInterval(tick, intervalMs);
+          (ctx as any)._discoveryInterval = interval;
+
+          ctx.logger.info(`Web3 MDL discovery service started (interval=${intervalMs}ms)`);
+        },
+        async stop(ctx) {
+          const interval = (ctx as any)._discoveryInterval;
+          if (interval) clearInterval(interval);
+          const backend = (ctx as any)._discoveryBackend as DiscoveryBackend | undefined;
+          if (backend) {
+            await backend.stop();
+          }
+          ctx.logger.info("Web3 MDL discovery service stopped");
+        },
+      });
+    }
 
     api.logger.info("Web3 Core plugin registered");
   },

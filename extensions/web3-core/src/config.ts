@@ -220,6 +220,25 @@ export type ResourceSharingConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Discovery (MDL — Market Discovery Layer)
+// ---------------------------------------------------------------------------
+
+export type DiscoveryBackendType = "libp2p" | "static";
+
+export type DiscoveryConfig = {
+  /** Master switch — default false. */
+  enabled: boolean;
+  /** Which backend to use. */
+  backend: DiscoveryBackendType;
+  /** Multiaddrs of bootstrap peers for libp2p. */
+  bootstrapPeers: string[];
+  /** Interval between periodic Rendezvous discover rounds (ms). */
+  rendezvousIntervalMs: number;
+  /** DHT key prefix (rarely customized). */
+  dhtKeyPrefix: string;
+};
+
+// ---------------------------------------------------------------------------
 // Top-level plugin config
 // ---------------------------------------------------------------------------
 
@@ -234,6 +253,7 @@ export type Web3PluginConfig = {
   resources: ResourceSharingConfig;
   browserIngest: BrowserIngestConfig;
   monitor: MonitorConfig;
+  discovery: DiscoveryConfig;
   rewards?: { enabled: boolean };
 };
 
@@ -322,6 +342,13 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
       channels: {},
     },
   },
+  discovery: {
+    enabled: false,
+    backend: "static",
+    bootstrapPeers: [],
+    rendezvousIntervalMs: 30_000,
+    dhtKeyPrefix: "/openclaw/resource",
+  },
 };
 
 /** Merge user-supplied partial config with defaults. */
@@ -342,5 +369,6 @@ export function resolveConfig(raw?: Record<string, unknown>): Web3PluginConfig {
     resources: merge(DEFAULT_CONFIG.resources, raw.resources),
     browserIngest: merge(DEFAULT_CONFIG.browserIngest, raw.browserIngest),
     monitor: merge(DEFAULT_CONFIG.monitor, raw.monitor),
+    discovery: merge(DEFAULT_CONFIG.discovery, raw.discovery),
   };
 }

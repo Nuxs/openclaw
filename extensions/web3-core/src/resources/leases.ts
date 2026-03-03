@@ -29,6 +29,8 @@ export type ConsumerLeaseAccess = {
   accessToken: string;
   expiresAt: string;
   providerEndpoint?: string;
+  /** MDL: libp2p peer ID for relay/direct connection (populated when discovered via DHT). */
+  connectionRef?: string;
 };
 
 const consumerLeaseCache = new Map<string, ConsumerLeaseAccess>();
