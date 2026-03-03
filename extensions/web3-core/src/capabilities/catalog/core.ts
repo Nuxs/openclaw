@@ -122,7 +122,7 @@ export function coreCapabilities(config: Web3PluginConfig): CapabilityDescriptor
     },
     {
       name: "web3.identity.resolveEns",
-      summary: "Resolve an ENS name to an Ethereum address.",
+      summary: "Resolve an ENS name to an Ethereum address (cached with safe fallback).",
       kind: "gateway",
       group: "identity",
       availability: availability(identityEnabled, "siwe disabled"),
@@ -149,7 +149,7 @@ export function coreCapabilities(config: Web3PluginConfig): CapabilityDescriptor
     },
     {
       name: "web3.identity.reverseEns",
-      summary: "Reverse-resolve an Ethereum address to an ENS name.",
+      summary: "Reverse-resolve an Ethereum address to an ENS name (cached with safe fallback).",
       kind: "gateway",
       group: "identity",
       availability: availability(identityEnabled, "siwe disabled"),
@@ -174,6 +174,115 @@ export function coreCapabilities(config: Web3PluginConfig): CapabilityDescriptor
           params: { address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045" },
         },
       ],
+    },
+    {
+      name: "web3.wallet.create",
+      summary: "Create or load the Agent Wallet identity.",
+      kind: "gateway",
+      group: "wallet",
+      availability: availability(true),
+      stability: "stable",
+      returns: "Wallet address and public key.",
+      risk: { level: "medium", notes: ["Creates persistent wallet credentials"] },
+    },
+    {
+      name: "web3.wallet.balance",
+      summary: "Query Agent Wallet balance.",
+      kind: "gateway",
+      group: "wallet",
+      availability: availability(true),
+      stability: "stable",
+      paramsSchema: {
+        type: "object",
+        properties: {
+          address: {
+            type: "string",
+            description: "Optional address override (defaults to agent wallet address)",
+            pattern: "^0x[a-fA-F0-9]{40}$",
+          },
+        },
+      },
+      returns: "Wallet balance and native token symbol.",
+      risk: { level: "low" },
+    },
+    {
+      name: "web3.wallet.sign",
+      summary: "Sign a message with Agent Wallet.",
+      kind: "gateway",
+      group: "wallet",
+      availability: availability(true),
+      stability: "stable",
+      paramsSchema: {
+        type: "object",
+        required: ["message"],
+        properties: {
+          message: { type: "string", description: "Plain text message to sign" },
+        },
+      },
+      returns: "Hex signature string.",
+      risk: { level: "high", notes: ["Cryptographic signature may authorize actions off-chain"] },
+    },
+    {
+      name: "web3.wallet.send",
+      summary: "Send an on-chain transaction from Agent Wallet.",
+      kind: "gateway",
+      group: "wallet",
+      availability: availability(true),
+      stability: "stable",
+      paramsSchema: {
+        type: "object",
+        required: ["to", "value"],
+        properties: {
+          to: {
+            type: "string",
+            description: "Destination address",
+            pattern: "^0x[a-fA-F0-9]{40}$",
+          },
+          value: {
+            type: "string",
+            description: "Amount in wei as integer string",
+            pattern: "^[0-9]+$",
+          },
+          data: {
+            type: "string",
+            description: "Optional calldata (hex string)",
+            pattern: "^0x[0-9a-fA-F]*$",
+          },
+        },
+      },
+      returns: "Transaction hash.",
+      risk: { level: "high", notes: ["Transfers on-chain assets"] },
+    },
+    {
+      name: "web3.wallet.autopay",
+      summary: "Execute policy-guarded autopay transaction from Agent Wallet.",
+      kind: "gateway",
+      group: "wallet",
+      availability: availability(true),
+      stability: "stable",
+      paramsSchema: {
+        type: "object",
+        required: ["to", "value"],
+        properties: {
+          to: {
+            type: "string",
+            description: "Destination address",
+            pattern: "^0x[a-fA-F0-9]{40}$",
+          },
+          value: {
+            type: "string",
+            description: "Amount in wei as integer string",
+            pattern: "^[0-9]+$",
+          },
+          data: {
+            type: "string",
+            description: "Optional calldata (hex string)",
+            pattern: "^0x[0-9a-fA-F]*$",
+          },
+        },
+      },
+      returns: "Autopay transaction hash.",
+      risk: { level: "high", notes: ["Automated payment execution"] },
     },
     {
       name: "web3.audit.query",

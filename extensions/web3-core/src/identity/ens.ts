@@ -54,9 +54,17 @@ class EnsCache {
       expiresAt: Date.now() + ttlMs,
     });
   }
+
+  clear(): void {
+    this.cache.clear();
+  }
 }
 
 const ensCache = new EnsCache();
+
+export function resetEnsCacheForTests(): void {
+  ensCache.clear();
+}
 
 /** Encode ENS name for ERC-137 resolve call. */
 function encodeEnsName(name: string): string {
@@ -92,15 +100,26 @@ function decodeEnsName(data: string): string | null {
   }
 }
 
+function isValidEnsName(name: string): boolean {
+  if (!name || name.length > 253 || !name.includes(".")) return false;
+  const labels = name.split(".");
+  if (labels.some((label) => label.length === 0 || label.length > 63)) return false;
+  return labels.every((label) => /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label));
+}
+
 /**
  * Resolve an ENS name to an Ethereum address.
  * Uses public RPC endpoint for resolution.
  */
 export async function resolveEnsName(name: string, rpcUrl?: string): Promise<EnsResolution | null> {
-  const cached = ensCache.get(`forward:${name}`);
-  if (cached) return cached;
+  if (!isValidEnsName(name)) {
+    return null;
+  }
 
   const providerRpc = rpcUrl ?? DEFAULT_RPC_URL;
+  const cacheKey = `forward:${providerRpc}:${name.toLowerCase()}`;
+  const cached = ensCache.get(cacheKey);
+  if (cached) return cached;
 
   try {
     // Use Ethereum JSON-RPC to resolve ENS name
@@ -145,7 +164,7 @@ export async function resolveEnsName(name: string, rpcUrl?: string): Promise<Ens
         resolvedAt: new Date().toISOString(),
       };
 
-      ensCache.set(`forward:${name}`, resolution, DEFAULT_CACHE_TTL_MS);
+      ensCache.set(cacheKey, resolution, DEFAULT_CACHE_TTL_MS);
       return resolution;
     } finally {
       await release();
@@ -166,11 +185,11 @@ export async function resolveEnsAddress(
     return null;
   }
 
-  const cached = ensCache.get(`reverse:${address.toLowerCase()}`);
-  if (cached) return cached;
-
   const providerRpc = rpcUrl ?? DEFAULT_RPC_URL;
   const addressLower = address.toLowerCase();
+  const cacheKey = `reverse:${providerRpc}:${addressLower}`;
+  const cached = ensCache.get(cacheKey);
+  if (cached) return cached;
 
   try {
     // Reverse resolution: hash address and query ENS resolver
@@ -221,7 +240,7 @@ export async function resolveEnsAddress(
         resolvedAt: new Date().toISOString(),
       };
 
-      ensCache.set(`reverse:${addressLower}`, resolution, DEFAULT_CACHE_TTL_MS);
+      ensCache.set(cacheKey, resolution, DEFAULT_CACHE_TTL_MS);
       return resolution;
     } finally {
       await release();

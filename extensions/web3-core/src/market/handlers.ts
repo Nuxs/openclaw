@@ -1,6 +1,7 @@
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
+import { resolveEnsAddress } from "../identity/ens.js";
 import type { Web3StateStore } from "../state/store.js";
 import { redactUnknown } from "../utils/redact.js";
 import { loadCallGateway, normalizeGatewayResult } from "./proxy-utils.js";
@@ -127,9 +128,64 @@ export function createMarketLedgerSummaryHandler(config: Web3PluginConfig): Gate
 }
 
 export function createMarketReputationSummaryHandler(
+  store: Web3StateStore,
   config: Web3PluginConfig,
 ): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.reputation.summary", { requireResources: false });
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      const callGateway = await loadCallGateway();
+      const response = await callGateway({
+        method: "market.reputation.summary",
+        params,
+        timeoutMs: config.brain.timeoutMs,
+      });
+      const normalized = normalizeGatewayResult(response);
+      if (!normalized.ok) {
+        respond(false, formatWeb3GatewayErrorResponse(normalized.error));
+        return;
+      }
+
+      const summary = (normalized.result ?? {}) as Record<string, unknown>;
+      const providerActorId =
+        typeof summary.providerActorId === "string" ? summary.providerActorId : undefined;
+
+      let ensName: string | null = null;
+      let ensSource: "binding" | "reverse" | "none" = "none";
+      let ensStatus: "ok" | "degraded" | "none" = "none";
+
+      if (providerActorId) {
+        const binding = store
+          .getBindings()
+          .find((entry) => entry.address.toLowerCase() === providerActorId.toLowerCase());
+        if (binding?.ensName) {
+          ensName = binding.ensName;
+          ensSource = "binding";
+          ensStatus = "ok";
+        } else {
+          const reverse = await resolveEnsAddress(providerActorId, config.chain.rpcUrl);
+          if (reverse?.name) {
+            ensName = reverse.name;
+            ensSource = "reverse";
+            ensStatus = "ok";
+          } else {
+            ensStatus = "degraded";
+          }
+        }
+      }
+
+      respond(true, {
+        ...summary,
+        identity: {
+          providerActorId: providerActorId ?? null,
+          ensName,
+          ensSource,
+          ensStatus,
+        },
+      });
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
 }
 
 export function createMarketTokenEconomySummaryHandler(

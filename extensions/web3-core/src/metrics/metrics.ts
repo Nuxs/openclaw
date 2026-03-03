@@ -265,27 +265,52 @@ export function createWeb3MonitorSnapshotHandler(
       const web3 = buildWeb3MetricsSnapshot(store, config);
       let market: unknown = null;
       let marketError: string | null = null;
+      let marketStatus: unknown = null;
+      let marketStatusError: string | null = null;
+
       try {
         const callGateway = await loadCallGateway();
-        const response = await callGateway({
+
+        const marketMetricsResponse = await callGateway({
           method: "market.metrics.snapshot",
           params: {},
           timeoutMs: config.brain.timeoutMs,
         });
-        const normalized = normalizeGatewayResult(response);
-        if (!normalized.ok) {
-          marketError = formatWeb3GatewayError(normalized.error ?? "market metrics unavailable");
+        const marketMetricsNormalized = normalizeGatewayResult(marketMetricsResponse);
+        if (!marketMetricsNormalized.ok) {
+          marketError = formatWeb3GatewayError(
+            marketMetricsNormalized.error ?? "market metrics unavailable",
+          );
         } else {
-          market = normalized.result ?? null;
+          market = marketMetricsNormalized.result ?? null;
+        }
+
+        const marketStatusResponse = await callGateway({
+          method: "market.status.summary",
+          params: {},
+          timeoutMs: config.brain.timeoutMs,
+        });
+        const marketStatusNormalized = normalizeGatewayResult(marketStatusResponse);
+        if (!marketStatusNormalized.ok) {
+          marketStatusError = formatWeb3GatewayError(
+            marketStatusNormalized.error ?? "market status unavailable",
+          );
+        } else {
+          marketStatus = marketStatusNormalized.result ?? null;
         }
       } catch (err) {
         marketError = formatWeb3GatewayError(err);
+        if (!marketStatusError) {
+          marketStatusError = marketError;
+        }
       }
 
       respond(true, {
         web3,
         market,
         marketError,
+        marketStatus,
+        marketStatusError,
       });
     } catch (err) {
       respond(false, formatWeb3GatewayErrorResponse(err));

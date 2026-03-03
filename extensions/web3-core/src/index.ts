@@ -146,6 +146,13 @@ import {
 } from "./rewards/handlers.js";
 import { Web3StateStore } from "./state/store.js";
 import { createWeb3StatusSummaryHandler } from "./status/summary-handler.js";
+import {
+  createWeb3WalletAutopayHandler,
+  createWeb3WalletBalanceHandler,
+  createWeb3WalletCreateHandler,
+  createWeb3WalletSendHandler,
+  createWeb3WalletSignHandler,
+} from "./wallet/handlers.js";
 
 const plugin: OpenClawPluginDefinition = {
   id: "web3-core",
@@ -274,6 +281,11 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("web3.siwe.verify", createSiweVerifyHandler(store, config));
     api.registerGatewayMethod("web3.identity.resolveEns", createEnsResolveHandler(store, config));
     api.registerGatewayMethod("web3.identity.reverseEns", createEnsReverseHandler(store, config));
+    api.registerGatewayMethod("web3.wallet.create", createWeb3WalletCreateHandler());
+    api.registerGatewayMethod("web3.wallet.balance", createWeb3WalletBalanceHandler());
+    api.registerGatewayMethod("web3.wallet.sign", createWeb3WalletSignHandler());
+    api.registerGatewayMethod("web3.wallet.send", createWeb3WalletSendHandler());
+    api.registerGatewayMethod("web3.wallet.autopay", createWeb3WalletAutopayHandler());
     api.registerGatewayMethod("web3.audit.query", createAuditQueryHandler(store));
     api.registerGatewayMethod("web3.billing.status", createBillingStatusHandler(store, config));
     api.registerGatewayMethod("web3.billing.summary", createBillingSummaryHandler(store, config));
@@ -342,7 +354,7 @@ const plugin: OpenClawPluginDefinition = {
     );
     api.registerGatewayMethod(
       "web3.market.reputation.summary",
-      createMarketReputationSummaryHandler(config),
+      createMarketReputationSummaryHandler(store, config),
     );
     api.registerGatewayMethod(
       "web3.market.tokenEconomy.summary",

@@ -45,7 +45,7 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
     },
     {
       name: "web3.market.reputation.summary",
-      summary: "Summarize provider reputation signals and anti-cheat indicators.",
+      summary: "Summarize provider reputation signals with ENS-enriched identity hints.",
       kind: "gateway",
       group: "market",
       availability: availability(true),
@@ -68,7 +68,8 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           },
         },
       },
-      returns: "Reputation summary with score, signals, lease/dispute counts, and ledger totals.",
+      returns:
+        "Reputation summary with score, signals, lease/dispute counts, ledger totals, and identity.ensName/ensStatus hints.",
       risk: { level: "low" },
     },
     {

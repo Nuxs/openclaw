@@ -8,6 +8,7 @@ export type CapabilityKind = "gateway" | "tool" | "http";
 export type CapabilityGroup =
   | "capabilities"
   | "identity"
+  | "wallet"
   | "audit"
   | "billing"
   | "status"
