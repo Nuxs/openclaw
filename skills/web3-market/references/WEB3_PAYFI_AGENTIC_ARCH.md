@@ -250,8 +250,9 @@ export type SettlementReleaseRequest = {
     - 支持多次 `release` 操作而不关闭结算单。
     - `releasedAmount` 必须单调递增且不超过 `amount`。
 3.  **x402 验收**：
-    - 必须处理幂等性（避免重复扣款）。
-    - 必须有最大重试次数熔断。
+    - 必须处理幂等性（避免重复扣款），缺失 `x-idempotency-key` 默认拒绝自动支付。
+    - 必须有最大重试次数熔断，且重试预算受 `WalletPolicy.autoPay.maxRetries` 约束。
+    - 必须暴露关键观测项：`x402.autopay.success.rate`、`x402.autopay.retry.count`、`x402.autopay.circuit_breaker.trips`。
 
 ---
 
