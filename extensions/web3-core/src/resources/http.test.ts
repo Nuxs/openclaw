@@ -971,6 +971,55 @@ describe("model chat ledger (appendModelLedger)", () => {
     );
   });
 
+  it("uses usage.total_tokens from upstream json body when header is missing", async () => {
+    const config = makeModelConfig();
+    validateLeaseAccessMock.mockResolvedValue({ ok: true, lease: mockLease });
+
+    const body = JSON.stringify({ choices: [], usage: { total_tokens: 42 } });
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(body));
+        controller.close();
+      },
+    });
+    const mockFetchResponse = new Response(stream, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse));
+
+    const handler = createResourceModelChatHandler(config);
+    const req = createRequest({
+      method: "POST",
+      headers: {
+        authorization: "Bearer tok_test",
+        "x-openclaw-lease": "lease-model-1",
+        "content-type": "application/json",
+      },
+    });
+    const res = createWritableResponse();
+
+    const promise = handler(req, res);
+    req.end(JSON.stringify({ messages: [{ role: "user", content: "hello" }] }));
+    await promise;
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(callGatewayMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "market.ledger.append",
+        params: expect.objectContaining({
+          entry: expect.objectContaining({
+            kind: "model",
+            unit: "token",
+            quantity: "42",
+            cost: "42",
+          }),
+        }),
+      }),
+    );
+  });
+
   it("uses fallback quantity '1' when x-usage-tokens header missing", async () => {
     const config = makeModelConfig();
     validateLeaseAccessMock.mockResolvedValue({ ok: true, lease: mockLease });

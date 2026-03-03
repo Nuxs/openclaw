@@ -241,6 +241,27 @@ describe("web3.status.summary handler", () => {
     const { payload } = invoke(store, config);
     expect((payload.brain as any).source).toBe("web3/decentralized");
   });
+
+  it("does not leak endpoint or secret-like values in summary payload", () => {
+    const store = makeStore();
+    const config = resolveConfig({
+      brain: {
+        enabled: true,
+        providerId: "provider-safe",
+        defaultModel: "model-safe",
+        endpoint: "https://api.secret.example.com/v1?token=sk_live_secret",
+        protocol: "openai-compat",
+        allowlist: [],
+      },
+    });
+
+    const { payload } = invoke(store, config);
+    const serialized = JSON.stringify(payload);
+
+    expect(serialized).not.toContain("api.secret.example.com");
+    expect(serialized).not.toContain("sk_live_secret");
+    expect(serialized).not.toContain("endpoint");
+  });
 });
 
 describe("resolveBrainAvailability", () => {

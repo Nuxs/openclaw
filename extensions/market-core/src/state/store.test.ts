@@ -220,4 +220,82 @@ describe("MarketStateStore.runInTransaction", () => {
       expect(store.getOffer("offer-nested")).toBeTruthy();
     });
   });
+
+  it("propagates nested transaction errors and rolls back outer writes", async () => {
+    await withStoreModes(async ({ store }) => {
+      const now = new Date().toISOString();
+      const offer = {
+        offerId: "offer-nested-error",
+        sellerId: "seller-1",
+        assetId: "asset-1",
+        assetType: "data" as const,
+        assetMeta: {},
+        price: 10,
+        currency: "USD",
+        usageScope: { purpose: "research" },
+        deliveryType: "download" as const,
+        status: "offer_published" as const,
+        offerHash: "hash-nested-error",
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await expect(
+        store.runInTransaction(async () => {
+          store.saveOffer(offer);
+          await store.runInTransaction(() => {
+            throw new Error("nested tx failure");
+          });
+        }),
+      ).rejects.toThrow("nested tx failure");
+
+      expect(store.getOffer("offer-nested-error")).toBeUndefined();
+    });
+  });
+
+  it("file mode serializes concurrent runInTransaction calls", async () => {
+    const modeDir = path.join(tempDir, "file-serial");
+    await fs.mkdir(modeDir, { recursive: true });
+    const config = resolveConfig({
+      store: { mode: "file" },
+      access: { mode: "open", requireActor: true, requireActorMatch: true },
+    });
+    const store = new MarketStateStore(modeDir, config);
+    const now = new Date().toISOString();
+    const timeline: string[] = [];
+
+    const firstTx = store.runInTransaction(async () => {
+      timeline.push("tx1-start");
+      store.saveOffer({
+        offerId: "offer-serial",
+        sellerId: "seller-1",
+        assetId: "asset-1",
+        assetType: "data",
+        assetMeta: {},
+        price: 10,
+        currency: "USD",
+        usageScope: { purpose: "research" },
+        deliveryType: "download",
+        status: "offer_published",
+        offerHash: "hash-serial",
+        createdAt: now,
+        updatedAt: now,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      timeline.push("tx1-end");
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const secondTx = store.runInTransaction(() => {
+      timeline.push("tx2-start");
+      expect(store.getOffer("offer-serial")).toBeTruthy();
+      timeline.push("tx2-end");
+    });
+
+    await Promise.all([firstTx, secondTx]);
+
+    expect(timeline.indexOf("tx2-start")).toBeGreaterThan(timeline.indexOf("tx1-end"));
+    expect(store.getOffer("offer-serial")).toBeTruthy();
+  });
 });

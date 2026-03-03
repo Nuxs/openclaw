@@ -255,10 +255,18 @@ describe("market-core e2e flow", () => {
         disputes?: { total?: number };
         leases?: { total?: number };
         settlements?: { total?: number };
+        ops?: {
+          expireSweep?: { last24h?: number };
+          repairRetry?: { candidates?: number };
+          revocationRetry?: { last24h?: number };
+        };
       };
       expect(payload.disputes?.total ?? 0).toBeGreaterThan(0);
       expect(payload.leases?.total ?? 0).toBeGreaterThan(0);
       expect(payload.settlements?.total ?? 0).toBeGreaterThan(0);
+      expect(typeof payload.ops?.expireSweep?.last24h).toBe("number");
+      expect(typeof payload.ops?.repairRetry?.candidates).toBe("number");
+      expect(typeof payload.ops?.revocationRetry?.last24h).toBe("number");
     });
   });
 

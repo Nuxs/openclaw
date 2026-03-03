@@ -818,6 +818,8 @@ describe("market-core handlers", () => {
       } as any);
       expect(sweep.result()?.ok).toBe(true);
       expect(sweep.result()?.payload.expired).toBeGreaterThanOrEqual(1);
+      expect(sweep.result()?.payload.pending).toBe(0);
+      expect(sweep.result()?.payload.dryRun).toBe(false);
 
       // Verify lease is now expired
       const getAfter = createResponder();

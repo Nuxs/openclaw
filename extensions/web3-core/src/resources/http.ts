@@ -474,6 +474,42 @@ async function appendModelLedger(params: {
   }
 }
 
+async function resolveModelUsageTokens(upstream: Response): Promise<number | undefined> {
+  const usageHeader = upstream.headers.get("x-usage-tokens");
+  const headerTokens = usageHeader ? Number.parseInt(usageHeader, 10) : Number.NaN;
+  if (Number.isFinite(headerTokens) && headerTokens > 0) {
+    return headerTokens;
+  }
+
+  if (!upstream.body) {
+    return undefined;
+  }
+
+  const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.includes("application/json")) {
+    return undefined;
+  }
+
+  try {
+    const text = await upstream.clone().text();
+    const payload = JSON.parse(text) as { usage?: { total_tokens?: unknown } };
+    const totalTokensRaw = payload?.usage?.total_tokens;
+    const totalTokens =
+      typeof totalTokensRaw === "number"
+        ? Math.trunc(totalTokensRaw)
+        : typeof totalTokensRaw === "string"
+          ? Number.parseInt(totalTokensRaw, 10)
+          : Number.NaN;
+    if (Number.isFinite(totalTokens) && totalTokens > 0) {
+      return totalTokens;
+    }
+  } catch {
+    // ignore usage parse errors and fall back to default quantity
+  }
+
+  return undefined;
+}
+
 export function createResourceModelChatHandler(config: Web3PluginConfig) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     if (req.method !== "POST") {
@@ -583,6 +619,8 @@ export function createResourceModelChatHandler(config: Web3PluginConfig) {
           return;
         }
 
+        const usageTokensPromise = resolveModelUsageTokens(upstream);
+
         res.statusCode = upstream.status;
         const contentType = upstream.headers.get("content-type");
         if (contentType) {
@@ -591,23 +629,23 @@ export function createResourceModelChatHandler(config: Web3PluginConfig) {
 
         if (!upstream.body) {
           res.end();
+          const usageTokens = await usageTokensPromise;
           // Fire-and-forget ledger append even for empty body
-          appendModelLedger({ config, lease: leaseResult.lease, offer }).catch(() => {});
+          appendModelLedger({ config, lease: leaseResult.lease, offer, usageTokens }).catch(
+            () => {},
+          );
           return;
         }
 
         await pipeline(Readable.fromWeb(upstream.body as any), res);
-
-        // Extract usage tokens from upstream response headers if available
-        const usageHeader = upstream.headers.get("x-usage-tokens");
-        const usageTokens = usageHeader ? Number.parseInt(usageHeader, 10) : undefined;
+        const usageTokens = await usageTokensPromise;
 
         // Fire-and-forget: write Provider authority ledger after streaming completes
         appendModelLedger({
           config,
           lease: leaseResult.lease,
           offer,
-          usageTokens: Number.isFinite(usageTokens) ? usageTokens : undefined,
+          usageTokens,
         }).catch(() => {});
       } finally {
         await releaseUpstream();

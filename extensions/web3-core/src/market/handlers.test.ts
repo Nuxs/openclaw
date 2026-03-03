@@ -7,12 +7,23 @@ import { Web3StateStore } from "../state/store.js";
 
 // Mock callGateway to avoid real gateway calls
 const mockCallGateway = vi.fn();
+const resolveEnsAddressMock = vi.fn();
+
 vi.mock("../../../../src/gateway/call.ts", () => ({
   callGateway: (...args: unknown[]) => mockCallGateway(...args),
 }));
 
+vi.mock("../identity/ens.js", async () => {
+  const actual = await vi.importActual<typeof import("../identity/ens.js")>("../identity/ens.js");
+  return {
+    ...actual,
+    resolveEnsAddress: (...args: unknown[]) => resolveEnsAddressMock(...args),
+  };
+});
+
 // Dynamically import after mocks are established
-const { createMarketReconciliationSummaryHandler } = await import("./handlers.js");
+const { createMarketReconciliationSummaryHandler, createMarketReputationSummaryHandler } =
+  await import("./handlers.js");
 
 type HandlerResult = { ok: boolean; payload: Record<string, unknown> } | undefined;
 
@@ -38,6 +49,7 @@ beforeEach(() => {
     brain: { timeoutMs: 5000 },
   });
   mockCallGateway.mockReset();
+  resolveEnsAddressMock.mockReset();
 });
 
 afterEach(() => {
@@ -269,5 +281,79 @@ describe("market.reconciliation.summary", () => {
     expect(summary.orderId).toBe("order-4");
     expect(summary.settlementId).toBe("settle-4");
     expect(summary.paymentReceipt.txHash).toBe("0xdef");
+  });
+});
+
+describe("market.reputation.summary", () => {
+  it("enriches reputation payload with ENS from reverse lookup", async () => {
+    mockCallGateway.mockResolvedValue({
+      ok: true,
+      result: {
+        providerActorId: "0x00000000000000000000000000000000000000a1",
+        score: 88,
+        signals: ["stable"],
+      },
+    });
+    resolveEnsAddressMock.mockResolvedValue({
+      name: "provider.eth",
+      address: "0x00000000000000000000000000000000000000a1",
+      resolver: "0xresolver",
+      resolvedAt: "2026-03-03T00:00:00.000Z",
+    });
+
+    const handler = createMarketReputationSummaryHandler(store, config);
+    const r = createResponder();
+    await handler({ params: {}, respond: r.respond } as any);
+
+    expect(r.result()!.ok).toBe(true);
+    const payload = r.result()!.payload as any;
+    expect(payload.identity.ensName).toBe("provider.eth");
+    expect(payload.identity.ensSource).toBe("reverse");
+    expect(payload.identity.ensStatus).toBe("ok");
+  });
+
+  it("uses binding ENS before reverse lookup and degrades when unavailable", async () => {
+    store.addBinding({
+      address: "0x00000000000000000000000000000000000000a2",
+      chainId: 1,
+      verifiedAt: "2026-03-03T00:00:00.000Z",
+      ensName: "bound.eth",
+    });
+
+    mockCallGateway.mockResolvedValue({
+      ok: true,
+      result: {
+        providerActorId: "0x00000000000000000000000000000000000000a2",
+        score: 70,
+        signals: ["insufficient_data"],
+      },
+    });
+
+    const handler = createMarketReputationSummaryHandler(store, config);
+    const r = createResponder();
+    await handler({ params: {}, respond: r.respond } as any);
+
+    expect(r.result()!.ok).toBe(true);
+    const payload = r.result()!.payload as any;
+    expect(payload.identity.ensName).toBe("bound.eth");
+    expect(payload.identity.ensSource).toBe("binding");
+    expect(resolveEnsAddressMock).not.toHaveBeenCalled();
+
+    mockCallGateway.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        providerActorId: "0x00000000000000000000000000000000000000b1",
+        score: 55,
+        signals: ["high_dispute_rate"],
+      },
+    });
+    resolveEnsAddressMock.mockResolvedValueOnce(null);
+    const degraded = createResponder();
+    await handler({ params: {}, respond: degraded.respond } as any);
+
+    expect(degraded.result()!.ok).toBe(true);
+    const degradedPayload = degraded.result()!.payload as any;
+    expect(degradedPayload.identity.ensName).toBeNull();
+    expect(degradedPayload.identity.ensStatus).toBe("degraded");
   });
 });

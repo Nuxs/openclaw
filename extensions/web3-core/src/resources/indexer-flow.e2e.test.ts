@@ -85,6 +85,11 @@ describe("web3 resource index flow", () => {
     const entries = (list.result()?.payload.entries as ResourceIndexEntry[]) ?? [];
     expect(entries).toHaveLength(1);
     expect(entries[0]?.resources?.[0]?.resourceId).toBe("model-1");
+    expect(entries[0]?.endpoint).toBeUndefined();
+
+    const storedEntry = store.getResourceIndex().find((entry) => entry.providerId === "provider-1");
+    expect(storedEntry?.signature?.scheme).toBe("ed25519");
+    expect(storedEntry?.signature?.payloadHash).toMatch(/^[a-f0-9]{64}$/);
 
     const stats = createResponder();
     await statsHandler({ respond: stats.respond } as any);
