@@ -47,6 +47,7 @@ export const RESOURCE_PRICE_UNITS: Record<
   model: ["token", "call"],
   search: ["query"],
   storage: ["gb_day", "put", "get"],
+  service: ["call"],
 };
 
 // ---- Error formatting ----

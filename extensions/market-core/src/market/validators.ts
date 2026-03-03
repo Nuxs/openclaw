@@ -1,6 +1,18 @@
 import { normalizeTonAddress } from "@openclaw/blockchain-adapter";
 import { getAddress } from "viem";
-import type { AssetType, DeliveryPayload, DeliveryType, UsageScope } from "./types.js";
+import type { ServiceSchema } from "./resources.js";
+import {
+  requireOptionalPositiveInt,
+  requireOptionalStringArray,
+  requireStringArray,
+} from "./resources/validators.js";
+import type {
+  AssetType,
+  DeliveryPayload,
+  DeliveryType,
+  ExecutionProof,
+  UsageScope,
+} from "./types.js";
 
 export function requireString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -81,6 +93,104 @@ export function requireDeliveryPayload(
     return { type: "service", serviceQuota: input.serviceQuota, ticketId: input.ticketId };
   }
   return undefined;
+}
+
+export function requireIsoTimestamp(params: Record<string, unknown>, key: string): string {
+  const raw = params[key];
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    throw new Error(`${key} must be an ISO timestamp`);
+  }
+  const parsed = Date.parse(raw);
+  if (Number.isNaN(parsed)) {
+    throw new Error(`${key} must be an ISO timestamp`);
+  }
+  return raw;
+}
+
+export function requireExecutionProof(input: unknown): ExecutionProof {
+  if (!input || typeof input !== "object") {
+    throw new Error("proof is required");
+  }
+  const proof = input as Record<string, unknown>;
+  const type = requireString(proof.type, "proof.type");
+  if (type !== "tlsnotary") {
+    throw new Error("proof.type must be tlsnotary");
+  }
+  const artifactHash = requireString(proof.artifactHash, "proof.artifactHash");
+  if (!/^sha256:[a-f0-9]{64}$/i.test(artifactHash)) {
+    throw new Error("proof.artifactHash must be sha256:<hex>");
+  }
+  const issuedAt = requireIsoTimestamp(proof, "proof.issuedAt");
+  const redactedFields = requireOptionalStringArray(proof, "proof.redactedFields", {
+    maxItems: 64,
+    maxLen: 64,
+    unique: true,
+  });
+  const verifier = requireString(proof.verifier, "proof.verifier");
+  return {
+    type: "tlsnotary",
+    artifactHash,
+    issuedAt,
+    redactedFields,
+    verifier,
+  };
+}
+
+export function requireServiceSchema(input: unknown): ServiceSchema {
+  if (!input || typeof input !== "object") {
+    throw new Error("serviceSchema is required");
+  }
+  const schema = input as Record<string, unknown>;
+  const inputs = requireStringArray(schema, "inputs", { maxItems: 32, maxLen: 80, unique: true });
+  const outputs = requireStringArray(schema, "outputs", { maxItems: 32, maxLen: 80, unique: true });
+  const slaInput = schema.sla;
+  const sla =
+    slaInput && typeof slaInput === "object"
+      ? {
+          maxLatencySec: requireOptionalPositiveInt(
+            slaInput as Record<string, unknown>,
+            "maxLatencySec",
+            {
+              min: 1,
+              max: 60 * 60,
+            },
+          ),
+          deliveryWindowSec: requireOptionalPositiveInt(
+            slaInput as Record<string, unknown>,
+            "deliveryWindowSec",
+            { min: 1, max: 7 * 24 * 60 * 60 },
+          ),
+        }
+      : undefined;
+  const proofRequirementsInput = schema.proofRequirements as unknown;
+  let proofRequirements: ServiceSchema["proofRequirements"];
+  if (proofRequirementsInput !== undefined) {
+    if (!Array.isArray(proofRequirementsInput)) {
+      throw new Error("serviceSchema.proofRequirements must be an array");
+    }
+    if (proofRequirementsInput.length === 0) {
+      throw new Error("serviceSchema.proofRequirements must not be empty");
+    }
+    proofRequirements = proofRequirementsInput.map((entry, index) => {
+      if (!entry || typeof entry !== "object") {
+        throw new Error(`serviceSchema.proofRequirements[${index}] must be an object`);
+      }
+      const record = entry as Record<string, unknown>;
+      const type = requireString(record.type, `serviceSchema.proofRequirements[${index}].type`);
+      if (type !== "tlsnotary") {
+        throw new Error("serviceSchema.proofRequirements.type must be tlsnotary");
+      }
+      const required = typeof record.required === "boolean" ? record.required : undefined;
+      return { type: "tlsnotary", required };
+    });
+  }
+  const normalizedSchema: ServiceSchema = {
+    inputs,
+    outputs,
+    sla,
+    proofRequirements,
+  };
+  return normalizedSchema;
 }
 
 export * from "./resources/validators.js";

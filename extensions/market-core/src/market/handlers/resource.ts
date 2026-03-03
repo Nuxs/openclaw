@@ -13,6 +13,7 @@ import {
   requireOptionalEnum,
   requireOptionalPositiveInt,
   requireOptionalStringArray,
+  requireServiceSchema,
   requireString,
   requireUsageScope,
 } from "../validators.js";
@@ -45,7 +46,7 @@ export function createResourcePublishHandler(
       }
 
       const resourceInput = (input.resource ?? {}) as Record<string, unknown>;
-      const kind = requireEnum(resourceInput, "kind", ["model", "search", "storage"]);
+      const kind = requireEnum(resourceInput, "kind", ["model", "search", "storage", "service"]);
       const label = requireString(resourceInput.label, "label");
       if (label.length > 80) {
         throw new Error("E_INVALID_ARGUMENT: label too long");
@@ -101,6 +102,13 @@ export function createResourcePublishHandler(
         }
       }
 
+      let serviceSchema: MarketResource["serviceSchema"] | undefined;
+      if (kind === "service") {
+        serviceSchema = requireServiceSchema(resourceInput.serviceSchema);
+      } else if (resourceInput.serviceSchema !== undefined) {
+        throw new Error("E_INVALID_ARGUMENT: serviceSchema only applies to service resources");
+      }
+
       const offerInput = (resourceInput.offer ?? {}) as Record<string, unknown>;
       const assetId = requireString(offerInput.assetId, "assetId");
       const assetType = requireAssetType(offerInput.assetType);
@@ -110,6 +118,14 @@ export function createResourcePublishHandler(
       }
       const usageScope = requireUsageScope(offerInput.usageScope);
       const deliveryType = requireDeliveryType(offerInput.deliveryType);
+      if (kind === "service") {
+        if (assetType !== "service") {
+          throw new Error("E_INVALID_ARGUMENT: offer.assetType must be service");
+        }
+        if (deliveryType !== "service") {
+          throw new Error("E_INVALID_ARGUMENT: offer.deliveryType must be service");
+        }
+      }
       const assetMeta = (offerInput.assetMeta ?? {}) as Offer["assetMeta"];
 
       const requestedResourceId =
@@ -170,6 +186,7 @@ export function createResourcePublishHandler(
         tags,
         price: { unit, amount, currency, tokenAddress },
         policy,
+        serviceSchema,
         version,
         createdAt: existingResource?.createdAt ?? now,
         updatedAt: now,
@@ -193,6 +210,7 @@ export function createResourcePublishHandler(
         tags,
         price: resource.price,
         policy,
+        serviceSchema,
         version,
       });
       await recordAuditWithAnchor({
@@ -289,7 +307,7 @@ export function createResourceListHandler(
     try {
       assertAccess(opts, config, "read");
       const input = (params ?? {}) as Record<string, unknown>;
-      const kind = requireOptionalEnum(input, "kind", ["model", "search", "storage"]);
+      const kind = requireOptionalEnum(input, "kind", ["model", "search", "storage", "service"]);
       const status = requireOptionalEnum(input, "status", [
         "resource_draft",
         "resource_published",

@@ -1,4 +1,4 @@
-export type MarketResourceKind = "model" | "search" | "storage";
+export type MarketResourceKind = "model" | "search" | "storage" | "service";
 
 export type MarketResourceStatus = "resource_draft" | "resource_published" | "resource_unpublished";
 
@@ -17,6 +17,16 @@ export type MarketResourcePolicy = {
   allowMime?: string[];
 };
 
+export type ServiceSchema = {
+  inputs: string[];
+  outputs: string[];
+  sla?: {
+    maxLatencySec?: number;
+    deliveryWindowSec?: number;
+  };
+  proofRequirements?: Array<{ type: "tlsnotary"; required?: boolean }>;
+};
+
 export type MarketResource = {
   resourceId: string;
   kind: MarketResourceKind;
@@ -29,6 +39,7 @@ export type MarketResource = {
   tags?: string[];
   price: MarketPrice;
   policy?: MarketResourcePolicy;
+  serviceSchema?: ServiceSchema;
   version: number;
   createdAt: string;
   updatedAt: string;
