@@ -9,7 +9,7 @@ import { getAddress } from "viem";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
 import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";
-import { addDailySpent, readDailySpent } from "./state.js";
+import { addDailySpent, readDailySpent, reserveDailyBudget } from "./state.js";
 import { loadOrCreateWallet } from "./wallet.js";
 
 const CHAIN_IDS: Record<string, number> = {
@@ -78,22 +78,52 @@ async function resolveProvider(
 async function enforcePolicy(
   config: AgentWalletConfig,
   intent: PolicyIntent,
-): Promise<{ commitUsage: () => Promise<void> }> {
+): Promise<{ commitUsage: () => Promise<void>; rollbackUsage: () => Promise<void> }> {
   if (!config.policy.enabled) {
     return {
       commitUsage: async () => undefined,
+      rollbackUsage: async () => undefined,
     };
   }
 
-  const dailySpent =
-    typeof intent.amount === "bigint"
-      ? await readDailySpent({
-          config: config.policy,
-          chainKey: config.chain.network,
-        })
-      : undefined;
-
   const loadedPolicy = await loadPolicy(config.policy);
+
+  // Pre-flight: check non-budget policy conditions first (scope, perTxCap, ttl, etc.)
+  // to avoid unnecessary file-lock operations when the request would be rejected anyway.
+  const preCheck = checkPolicy(loadedPolicy.policy, intent, { dailySpent: 0n });
+  if (preCheck.result === "rejected" && preCheck.reasonCode !== "budget_daily_exceeded") {
+    try {
+      await appendPolicyDecisionLog(config.policy.decisionLogPath, preCheck);
+    } catch {
+      // Audit log failure does not change the policy decision.
+    }
+    throw new Error(`POLICY_REJECTED:${preCheck.reasonCode}`);
+  }
+
+  // For intents with an amount and a dailyCap configured, use atomic reservation
+  // to eliminate the TOCTOU race between read and commit.
+  let dailySpent: bigint | undefined;
+  let rollback: (() => Promise<void>) | undefined;
+
+  if (typeof intent.amount === "bigint" && loadedPolicy.policy?.budget?.dailyCap) {
+    const dailyCap = BigInt(loadedPolicy.policy.budget.dailyCap);
+    // reserveDailyBudget atomically: lock → read → check → pre-commit
+    // Throws POLICY_REJECTED:budget_daily_exceeded if over cap.
+    const reservation = await reserveDailyBudget({
+      config: config.policy,
+      chainKey: config.chain.network,
+      amount: intent.amount,
+      dailyCap,
+    });
+    dailySpent = reservation.dailySpent;
+    rollback = reservation.rollback;
+  } else if (typeof intent.amount === "bigint") {
+    dailySpent = await readDailySpent({
+      config: config.policy,
+      chainKey: config.chain.network,
+    });
+  }
+
   const decision = checkPolicy(loadedPolicy.policy, intent, {
     dailySpent,
   });
@@ -105,20 +135,17 @@ async function enforcePolicy(
   }
 
   if (decision.result === "rejected") {
+    if (rollback) {
+      await rollback();
+    }
     throw new Error(`POLICY_REJECTED:${decision.reasonCode}`);
   }
 
   return {
     commitUsage: async () => {
-      if (typeof intent.amount !== "bigint") {
-        return;
-      }
-      await addDailySpent({
-        config: config.policy,
-        chainKey: config.chain.network,
-        amount: intent.amount,
-      });
+      // Budget already pre-committed in reserveDailyBudget, nothing more to do.
     },
+    rollbackUsage: rollback ?? (async () => undefined),
   };
 }
 
@@ -200,11 +227,16 @@ export function createAgentWalletSendHandler(config: AgentWalletConfig): Gateway
         method: parseMethodSelector(data),
       });
 
-      const wallet = await loadOrCreateWallet(config);
-      const provider = await resolveProvider(config, wallet.privateKey);
-      const txHash = await provider.sendTransaction({ to, value, data });
-      await enforcement.commitUsage();
-      respond(true, { txHash });
+      try {
+        const wallet = await loadOrCreateWallet(config);
+        const provider = await resolveProvider(config, wallet.privateKey);
+        const txHash = await provider.sendTransaction({ to, value, data });
+        await enforcement.commitUsage();
+        respond(true, { txHash });
+      } catch (txErr) {
+        await enforcement.rollbackUsage();
+        throw txErr;
+      }
     } catch (err) {
       respondError(respond, err);
     }
@@ -228,11 +260,16 @@ export function createAgentWalletAutopayHandler(config: AgentWalletConfig): Gate
         method: parseMethodSelector(data),
       });
 
-      const wallet = await loadOrCreateWallet(config);
-      const provider = await resolveProvider(config, wallet.privateKey);
-      const txHash = await provider.sendTransaction({ to, value, data });
-      await enforcement.commitUsage();
-      respond(true, { txHash });
+      try {
+        const wallet = await loadOrCreateWallet(config);
+        const provider = await resolveProvider(config, wallet.privateKey);
+        const txHash = await provider.sendTransaction({ to, value, data });
+        await enforcement.commitUsage();
+        respond(true, { txHash });
+      } catch (txErr) {
+        await enforcement.rollbackUsage();
+        throw txErr;
+      }
     } catch (err) {
       respondError(respond, err);
     }

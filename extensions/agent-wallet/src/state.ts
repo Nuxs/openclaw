@@ -20,10 +20,9 @@ type PolicyBudgetState = {
   totals: Record<string, string>;
 };
 
-const EMPTY_STATE: PolicyBudgetState = {
-  version: 1,
-  totals: {},
-};
+function emptyState(): PolicyBudgetState {
+  return { version: 1, totals: {} };
+}
 
 function resolveStatePath(config: WalletPolicyConfig): string {
   if (config.statePath && config.statePath.trim().length > 0) {
@@ -45,7 +44,7 @@ async function loadState(target: string): Promise<PolicyBudgetState> {
     const raw = await fs.readFile(target, "utf8");
     const parsed = JSON.parse(raw) as Partial<PolicyBudgetState>;
     if (!parsed || typeof parsed !== "object" || parsed.version !== 1) {
-      return { ...EMPTY_STATE };
+      return emptyState();
     }
     const totals: Record<string, string> = {};
     for (const [key, value] of Object.entries(parsed.totals ?? {})) {
@@ -56,7 +55,7 @@ async function loadState(target: string): Promise<PolicyBudgetState> {
     return { version: 1, totals };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return { ...EMPTY_STATE };
+      return emptyState();
     }
     throw err;
   }
@@ -76,6 +75,51 @@ export async function readDailySpent(params: {
   const key = buildDailyBudgetKey(params.now ?? new Date(), params.chainKey);
   const state = await loadState(target);
   return BigInt(state.totals[key] ?? "0");
+}
+
+/**
+ * Atomically reserve daily budget: read current spent, check against cap,
+ * and pre-commit the amount — all within a single file lock.
+ * Returns a rollback function to undo the reservation if the transaction fails.
+ */
+export async function reserveDailyBudget(params: {
+  config: WalletPolicyConfig;
+  chainKey: string;
+  amount: bigint;
+  dailyCap: bigint;
+  now?: Date;
+}): Promise<{ dailySpent: bigint; rollback: () => Promise<void> }> {
+  const target = resolveStatePath(params.config);
+  const now = params.now ?? new Date();
+
+  return withFileLock(target, DEFAULT_LOCK_OPTIONS, async () => {
+    const state = await loadState(target);
+    const key = buildDailyBudgetKey(now, params.chainKey);
+    const current = BigInt(state.totals[key] ?? "0");
+
+    if (current + params.amount > params.dailyCap) {
+      throw new Error("POLICY_REJECTED:budget_daily_exceeded");
+    }
+
+    // Pre-commit: reserve the amount before the transaction executes
+    const reserved = current + params.amount;
+    state.totals[key] = reserved.toString();
+    await saveState(target, state);
+
+    return {
+      dailySpent: current,
+      rollback: async () => {
+        // Undo the reservation if the transaction fails
+        await withFileLock(target, DEFAULT_LOCK_OPTIONS, async () => {
+          const s = await loadState(target);
+          const cur = BigInt(s.totals[key] ?? "0");
+          const reverted = cur >= params.amount ? cur - params.amount : 0n;
+          s.totals[key] = reverted.toString();
+          await saveState(target, s);
+        });
+      },
+    };
+  });
 }
 
 export async function addDailySpent(params: {
