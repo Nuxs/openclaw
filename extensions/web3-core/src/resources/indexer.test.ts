@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveConfig } from "../config.js";
 import { Web3StateStore, type IndexedResource, type ResourceIndexEntry } from "../state/store.js";
 import { createResourceIndexListHandler, createResourceIndexReportHandler } from "./indexer.js";
@@ -108,5 +108,46 @@ describe("web3 resource index", () => {
     expect(list.result()?.ok).toBe(true);
     const entries = (list.result()?.payload.entries as ResourceIndexEntry[]) ?? [];
     expect(entries).toHaveLength(0);
+  });
+
+  it("invokes onReportAccepted when report succeeds", async () => {
+    const { store, config } = createTestContext(tempDir);
+    const onReportAccepted = vi.fn();
+    const reportHandler = createResourceIndexReportHandler(store, config, {
+      onReportAccepted,
+    });
+
+    const report = createResponder();
+    await reportHandler({
+      params: {
+        providerId: "provider-hook",
+        resources: [{ resourceId: "res-1", kind: "model" }],
+      },
+      respond: report.respond,
+    } as any);
+
+    expect(report.result()?.ok).toBe(true);
+    expect(onReportAccepted).toHaveBeenCalledTimes(1);
+    expect(onReportAccepted.mock.calls[0]?.[0]?.providerId).toBe("provider-hook");
+  });
+
+  it("keeps report success when onReportAccepted throws", async () => {
+    const { store, config } = createTestContext(tempDir);
+    const reportHandler = createResourceIndexReportHandler(store, config, {
+      onReportAccepted: () => {
+        throw new Error("publish failed");
+      },
+    });
+
+    const report = createResponder();
+    await reportHandler({
+      params: {
+        providerId: "provider-isolated",
+        resources: [{ resourceId: "res-1", kind: "search" }],
+      },
+      respond: report.respond,
+    } as any);
+
+    expect(report.result()?.ok).toBe(true);
   });
 });

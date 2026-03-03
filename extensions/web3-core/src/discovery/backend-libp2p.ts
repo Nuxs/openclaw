@@ -1,21 +1,13 @@
 /**
  * Libp2p-based discovery backend (MDL).
  *
- * Uses KAD-DHT for provider record publish/lookup, and TCP transport
- * with Noise encryption + Yamux multiplexing. Circuit Relay v2 is
- * enabled for NAT traversal.
- *
- * Lifecycle:
- *   - Lazy-init: the libp2p node is created on the first publish/discover call.
- *   - Graceful shutdown: stop() tears down the node.
- *
- * Security: DiscoveryRecords propagated via this backend NEVER contain
- * endpoint, multiaddr, accessToken, meta, or resources[].metadata.
+ * Uses KAD-DHT for provider publish/lookup, plus optional DHT record value
+ * exchange and Rendezvous namespace registration/discovery.
  */
 
 import { createHash } from "node:crypto";
 import type { IndexedResourceKind } from "../state/store.js";
-import { buildRendezvousNs } from "./namespace.js";
+import { buildDhtKey, buildRendezvousNs } from "./namespace.js";
 import type {
   DiscoveryBackend,
   DiscoveryConfig,
@@ -23,11 +15,6 @@ import type {
   DiscoveryRecord,
 } from "./types.js";
 
-// ---------------------------------------------------------------------------
-// Libp2p module type stubs (dynamic imports at runtime)
-// ---------------------------------------------------------------------------
-
-/** Minimal subset of the libp2p node interface we use. */
 interface Libp2pNode {
   peerId: { toString(): string };
   start(): Promise<void>;
@@ -39,26 +26,29 @@ interface Libp2pNode {
       options?: Record<string, unknown>,
     ): AsyncIterable<{ id: { toString(): string }; multiaddrs: unknown[] }>;
   };
-  register(ns: string, options?: Record<string, unknown>): Promise<void>;
-  unregister(ns: string): Promise<void>;
+  services?: {
+    dht?: {
+      put?(key: Uint8Array, value: Uint8Array): Promise<void>;
+      get?(key: Uint8Array): AsyncIterable<unknown>;
+    };
+  };
+  register?(ns: string, options?: Record<string, unknown>): Promise<void>;
+  unregister?(ns: string): Promise<void>;
+  discover?(
+    ns: string,
+    options?: Record<string, unknown>,
+  ): AsyncIterable<{ id?: { toString(): string }; peerId?: { toString(): string } }>;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Build CID-compatible DHT key bytes from a namespace string. */
-function dhtKeyBytes(ns: string): Uint8Array {
-  const hash = createHash("sha256").update(ns).digest();
+function routingKeyBytes(rawKey: string): Uint8Array {
+  const hash = createHash("sha256").update(rawKey).digest();
   return new Uint8Array(hash);
 }
 
-/** Encode a DiscoveryRecord for DHT value storage. */
 function encodeRecord(record: DiscoveryRecord): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(record));
 }
 
-/** Decode a DiscoveryRecord from DHT value storage. */
 function decodeRecord(data: Uint8Array): DiscoveryRecord | null {
   try {
     return JSON.parse(new TextDecoder().decode(data)) as DiscoveryRecord;
@@ -67,21 +57,27 @@ function decodeRecord(data: Uint8Array): DiscoveryRecord | null {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Libp2p backend options
-// ---------------------------------------------------------------------------
+function extractRecordPayload(candidate: unknown): Uint8Array | null {
+  if (candidate instanceof Uint8Array) return candidate;
+  if (!candidate || typeof candidate !== "object") return null;
+  const record = candidate as Record<string, unknown>;
+  if (record.value instanceof Uint8Array) return record.value;
+  const nestedRecord = record.record;
+  if (
+    nestedRecord &&
+    typeof nestedRecord === "object" &&
+    (nestedRecord as Record<string, unknown>).value instanceof Uint8Array
+  ) {
+    return (nestedRecord as Record<string, unknown>).value as Uint8Array;
+  }
+  return null;
+}
 
 export type Libp2pBackendOptions = {
   config: DiscoveryConfig;
-  /** Ed25519 private key in PKCS#8 DER format (base64). Used as libp2p node identity. */
   privateKeyDer?: string;
-  /** Logger for debug/info/warn messages. */
   logger?: (msg: string) => void;
 };
-
-// ---------------------------------------------------------------------------
-// Libp2p discovery backend
-// ---------------------------------------------------------------------------
 
 export class Libp2pDiscoveryBackend implements DiscoveryBackend {
   private node: Libp2pNode | null = null;
@@ -90,11 +86,9 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
   private readonly privateKeyDer?: string;
   private starting: Promise<void> | null = null;
 
-  /** In-memory cache: providerId → DiscoveryRecord (TTL = expiresAt). */
   private readonly cache = new Map<string, { record: DiscoveryRecord; expiresAt: number }>();
-
-  /** Published namespace registrations (for cleanup on stop). */
   private readonly registeredNamespaces = new Set<string>();
+  private readonly knownResourceKeys = new Map<IndexedResourceKind, Set<string>>();
 
   constructor(options: Libp2pBackendOptions) {
     this.config = options.config;
@@ -102,12 +96,8 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
     this.privateKeyDer = options.privateKeyDer;
   }
 
-  // ---- Lazy init ---------------------------------------------------------
-
   private async ensureNode(): Promise<Libp2pNode> {
     if (this.node) return this.node;
-
-    // Prevent concurrent init
     if (this.starting) {
       await this.starting;
       return this.node!;
@@ -122,16 +112,8 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
   private async initNode(): Promise<void> {
     this.logger("[mdl:libp2p] Initializing libp2p node...");
 
-    try {
-      // Dynamic imports — tree-shaken when discovery is disabled
-      const [
-        { createLibp2p },
-        { tcp },
-        { noise },
-        { yamux },
-        { kadDHT },
-        { circuitRelayTransport },
-      ] = await Promise.all([
+    const [{ createLibp2p }, { tcp }, { noise }, { yamux }, { kadDHT }, { circuitRelayTransport }] =
+      await Promise.all([
         import("libp2p"),
         import("@libp2p/tcp"),
         import("@chainsafe/libp2p-noise"),
@@ -140,90 +122,141 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
         import("@libp2p/circuit-relay-v2"),
       ]);
 
-      const node = await createLibp2p({
-        transports: [tcp(), circuitRelayTransport()],
-        connectionEncrypters: [noise()],
-        streamMuxers: [yamux()],
-        services: {
-          dht: kadDHT({
-            // Client mode — we don't serve records, just use the DHT for queries
-            clientMode: true,
-          }),
-        },
-        connectionManager: {
-          maxConnections: 50,
-          minConnections: 5,
-        },
-      });
+    const node = await (createLibp2p as any)({
+      transports: [tcp(), circuitRelayTransport()],
+      connectionEncrypters: [noise()],
+      streamMuxers: [yamux()],
+      services: {
+        dht: kadDHT({
+          clientMode: true,
+        }),
+      },
+      connectionManager: {
+        maxConnections: 50,
+      },
+    });
 
-      await node.start();
-      this.node = node as unknown as Libp2pNode;
+    await node.start();
+    this.node = node as unknown as Libp2pNode;
+    this.logger(`[mdl:libp2p] Node started — peerId=${this.node.peerId.toString()}`);
 
-      this.logger(`[mdl:libp2p] Node started — peerId=${this.node.peerId.toString()}`);
+    if (this.config.bootstrapPeers.length === 0) return;
 
-      // Connect to bootstrap peers
-      if (this.config.bootstrapPeers.length > 0) {
+    this.logger(
+      `[mdl:libp2p] Connecting to ${this.config.bootstrapPeers.length} bootstrap peers...`,
+    );
+    for (const addr of this.config.bootstrapPeers) {
+      try {
+        const { multiaddr } = await import("@multiformats/multiaddr");
+        await (node as any).dial(multiaddr(addr));
+      } catch (err) {
         this.logger(
-          `[mdl:libp2p] Connecting to ${this.config.bootstrapPeers.length} bootstrap peers...`,
+          `[mdl:libp2p] Failed to connect to bootstrap peer ${addr}: ${err instanceof Error ? err.message : String(err)}`,
         );
-        // Bootstrap connection is best-effort — don't block on failures
-        for (const addr of this.config.bootstrapPeers) {
-          try {
-            const { multiaddr } = await import("@multiformats/multiaddr");
-            const ma = multiaddr(addr);
-            await (node as any).dial(ma);
-          } catch (err) {
-            this.logger(
-              `[mdl:libp2p] Failed to connect to bootstrap peer ${addr}: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        }
       }
-    } catch (err) {
-      this.logger(
-        `[mdl:libp2p] Failed to initialize node: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      throw err;
     }
   }
 
-  // ---- DiscoveryBackend interface ----------------------------------------
+  private rememberResourceKey(kind: IndexedResourceKind, key: string): void {
+    const existing = this.knownResourceKeys.get(kind) ?? new Set<string>();
+    existing.add(key);
+    this.knownResourceKeys.set(kind, existing);
+  }
+
+  private getKindRoutingKey(kind: IndexedResourceKind): string {
+    return buildRendezvousNs(kind);
+  }
+
+  private async putRecordValue(
+    node: Libp2pNode,
+    key: string,
+    record: DiscoveryRecord,
+  ): Promise<void> {
+    const dht = node.services?.dht;
+    if (!dht?.put) return;
+    try {
+      await dht.put(routingKeyBytes(key), encodeRecord(record));
+    } catch (err) {
+      this.logger(
+        `[mdl:libp2p] DHT put(record) failed for key=${key}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  private async readRecordsFromDht(
+    node: Libp2pNode,
+    key: string,
+    limit: number,
+  ): Promise<DiscoveryRecord[]> {
+    const dht = node.services?.dht;
+    if (!dht?.get) return [];
+
+    const results: DiscoveryRecord[] = [];
+    try {
+      for await (const candidate of dht.get(routingKeyBytes(key))) {
+        if (results.length >= limit) break;
+        const payload = extractRecordPayload(candidate);
+        if (!payload) continue;
+        const record = decodeRecord(payload);
+        if (record) results.push(record);
+      }
+    } catch (err) {
+      this.logger(
+        `[mdl:libp2p] DHT get(record) failed for key=${key}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    return results;
+  }
 
   async publish(record: DiscoveryRecord): Promise<void> {
     const node = await this.ensureNode();
 
-    // Publish as DHT provider for each resource kind
-    const kinds = new Set(record.resources.map((r) => r.kind));
+    const kinds = new Set<IndexedResourceKind>(record.resources.map((resource) => resource.kind));
 
-    for (const kind of kinds) {
-      const ns = buildRendezvousNs(kind);
-      const key = dhtKeyBytes(ns);
+    for (const resource of record.resources) {
+      const resourceDhtKey = buildDhtKey(
+        resource.kind,
+        resource.resourceId,
+        this.config.dhtKeyPrefix,
+      );
+      this.rememberResourceKey(resource.kind, resourceDhtKey);
 
       try {
-        // DHT: advertise as provider
-        await node.contentRouting.provide(key);
-        this.logger(`[mdl:libp2p] Published DHT provider record for kind=${kind}`);
+        await node.contentRouting.provide(routingKeyBytes(resourceDhtKey));
       } catch (err) {
         this.logger(
-          `[mdl:libp2p] DHT provide failed for kind=${kind}: ${err instanceof Error ? err.message : String(err)}`,
+          `[mdl:libp2p] DHT provide failed for resource key=${resourceDhtKey}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
 
+      await this.putRecordValue(node, resourceDhtKey, record);
+    }
+
+    for (const kind of kinds) {
+      const kindKey = this.getKindRoutingKey(kind);
       try {
-        // Rendezvous: register namespace
-        if (typeof node.register === "function") {
-          await node.register(ns);
-          this.registeredNamespaces.add(ns);
-          this.logger(`[mdl:libp2p] Registered rendezvous namespace: ${ns}`);
-        }
+        await node.contentRouting.provide(routingKeyBytes(kindKey));
       } catch (err) {
         this.logger(
-          `[mdl:libp2p] Rendezvous register failed for ${ns}: ${err instanceof Error ? err.message : String(err)}`,
+          `[mdl:libp2p] DHT provide failed for kind key=${kindKey}: ${err instanceof Error ? err.message : String(err)}`,
         );
+      }
+      await this.putRecordValue(node, kindKey, record);
+
+      const ns = buildRendezvousNs(kind);
+      if (typeof node.register === "function") {
+        try {
+          await node.register(ns);
+          this.registeredNamespaces.add(ns);
+        } catch (err) {
+          this.logger(
+            `[mdl:libp2p] Rendezvous register failed for ${ns}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
     }
 
-    // Cache locally
     const expiresAt = record.expiresAt ? Date.parse(record.expiresAt) : Date.now() + 3_600_000;
     this.cache.set(record.providerId, { record, expiresAt });
   }
@@ -232,37 +265,91 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
     const node = await this.ensureNode();
 
     const kinds: IndexedResourceKind[] = query.kind ? [query.kind] : ["model", "search", "storage"];
-    const limit = query.limit ?? 20;
+    const limit = Math.max(1, query.limit ?? 20);
+
     const results: DiscoveryRecord[] = [];
-    const seen = new Set<string>();
+    const seenProviderIds = new Set<string>();
+    const seenPeerIds = new Set<string>();
+
+    const pushRecord = (record: DiscoveryRecord) => {
+      if (results.length >= limit) return;
+      if (seenProviderIds.has(record.providerId)) return;
+      if (!matchesQuery(record, query)) return;
+      results.push(record);
+      seenProviderIds.add(record.providerId);
+      seenPeerIds.add(record.peerId);
+    };
 
     for (const kind of kinds) {
       if (results.length >= limit) break;
 
-      const ns = buildRendezvousNs(kind);
-      const key = dhtKeyBytes(ns);
-
+      const kindKey = this.getKindRoutingKey(kind);
       try {
-        // DHT findProviders
-        for await (const provider of node.contentRouting.findProviders(key)) {
+        for await (const provider of node.contentRouting.findProviders(routingKeyBytes(kindKey))) {
           if (results.length >= limit) break;
-          const peerId = provider.id.toString();
-          if (seen.has(peerId)) continue;
-          seen.add(peerId);
-
-          // Check local cache for full record
-          for (const [, cached] of this.cache) {
-            if (cached.record.peerId === peerId && cached.expiresAt > Date.now()) {
-              if (!matchesQuery(cached.record, query)) continue;
-              results.push(cached.record);
-              break;
-            }
-          }
+          seenPeerIds.add(provider.id.toString());
         }
       } catch (err) {
         this.logger(
-          `[mdl:libp2p] DHT findProviders failed for kind=${kind}: ${err instanceof Error ? err.message : String(err)}`,
+          `[mdl:libp2p] DHT findProviders failed for kind key=${kindKey}: ${err instanceof Error ? err.message : String(err)}`,
         );
+      }
+
+      const recordsByKind = await this.readRecordsFromDht(node, kindKey, limit - results.length);
+      for (const record of recordsByKind) {
+        pushRecord(record);
+      }
+
+      const resourceKeys = this.knownResourceKeys.get(kind) ?? new Set<string>();
+      for (const resourceKey of resourceKeys) {
+        if (results.length >= limit) break;
+
+        try {
+          for await (const provider of node.contentRouting.findProviders(
+            routingKeyBytes(resourceKey),
+          )) {
+            if (results.length >= limit) break;
+            seenPeerIds.add(provider.id.toString());
+          }
+        } catch (err) {
+          this.logger(
+            `[mdl:libp2p] DHT findProviders failed for resource key=${resourceKey}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        const recordsByResource = await this.readRecordsFromDht(
+          node,
+          resourceKey,
+          limit - results.length,
+        );
+        for (const record of recordsByResource) {
+          pushRecord(record);
+        }
+      }
+
+      const ns = buildRendezvousNs(kind);
+      if (typeof node.discover === "function") {
+        try {
+          for await (const peer of node.discover(ns, { limit: limit - results.length })) {
+            if (results.length >= limit) break;
+            const peerId = peer.id?.toString() ?? peer.peerId?.toString();
+            if (peerId) seenPeerIds.add(peerId);
+          }
+        } catch (err) {
+          this.logger(
+            `[mdl:libp2p] Rendezvous discover failed for ${ns}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    }
+
+    if (results.length < limit) {
+      for (const { record, expiresAt } of this.cache.values()) {
+        if (results.length >= limit) break;
+        if (expiresAt <= Date.now()) continue;
+        if (seenProviderIds.has(record.providerId)) continue;
+        if (seenPeerIds.size > 0 && !seenPeerIds.has(record.peerId)) continue;
+        pushRecord(record);
       }
     }
 
@@ -272,16 +359,12 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
   async stop(): Promise<void> {
     if (!this.node) return;
 
-    this.logger("[mdl:libp2p] Shutting down...");
-
-    // Unregister rendezvous namespaces
     for (const ns of this.registeredNamespaces) {
+      if (typeof this.node.unregister !== "function") continue;
       try {
-        if (typeof this.node.unregister === "function") {
-          await this.node.unregister(ns);
-        }
+        await this.node.unregister(ns);
       } catch {
-        // Best-effort cleanup
+        // Best-effort cleanup.
       }
     }
     this.registeredNamespaces.clear();
@@ -296,20 +379,18 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
 
     this.node = null;
     this.cache.clear();
-    this.logger("[mdl:libp2p] Node stopped.");
+    this.knownResourceKeys.clear();
   }
 }
 
-// ---------------------------------------------------------------------------
-// Query matching helper
-// ---------------------------------------------------------------------------
-
 function matchesQuery(record: DiscoveryRecord, query: DiscoveryQuery): boolean {
-  if (query.kind && !record.resources.some((r) => r.kind === query.kind)) {
+  if (query.kind && !record.resources.some((resource) => resource.kind === query.kind)) {
     return false;
   }
   if (query.tags && query.tags.length > 0) {
-    const hasTags = record.resources.some((r) => r.tags?.some((t) => query.tags!.includes(t)));
+    const hasTags = record.resources.some((resource) =>
+      resource.tags?.some((tag) => query.tags!.includes(tag)),
+    );
     if (!hasTags) return false;
   }
   return true;

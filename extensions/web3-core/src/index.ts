@@ -147,7 +147,7 @@ import {
   createWeb3RewardListHandler,
   createWeb3RewardUpdateStatusHandler,
 } from "./rewards/handlers.js";
-import { Web3StateStore } from "./state/store.js";
+import { type ResourceIndexEntry, Web3StateStore } from "./state/store.js";
 import { createWeb3StatusSummaryHandler } from "./status/summary-handler.js";
 import {
   createWeb3WalletAutopayHandler,
@@ -168,6 +168,7 @@ const plugin: OpenClawPluginDefinition = {
     const config = resolveConfig(api.pluginConfig);
     const stateDir = api.runtime.state.resolveStateDir();
     const store = new Web3StateStore(stateDir);
+    let discoveryBackend: DiscoveryBackend | undefined;
 
     // ---- Commands ----
     api.registerCommand({
@@ -414,7 +415,17 @@ const plugin: OpenClawPluginDefinition = {
       "web3.market.dispute.reject",
       createMarketDisputeRejectHandler(config),
     );
-    api.registerGatewayMethod("web3.index.report", createResourceIndexReportHandler(store, config));
+    api.registerGatewayMethod(
+      "web3.index.report",
+      createResourceIndexReportHandler(store, config, {
+        onReportAccepted: async (entry) => {
+          if (!config.discovery.enabled) return;
+          if (!discoveryBackend) return;
+          const record = toDiscoveryRecord(entry, discoveryBackend);
+          await discoveryBackend.publish(record);
+        },
+      }),
+    );
     api.registerGatewayMethod("web3.index.list", createResourceIndexListHandler(store, config));
     api.registerGatewayMethod("web3.index.gossip", createResourceIndexGossipHandler(store, config));
     api.registerGatewayMethod(
@@ -606,6 +617,7 @@ const plugin: OpenClawPluginDefinition = {
             return;
           }
 
+          discoveryBackend = backend;
           (ctx as any)._discoveryBackend = backend;
 
           // Periodic publish + discover
@@ -617,23 +629,7 @@ const plugin: OpenClawPluginDefinition = {
               if (providerId) {
                 const entries = store.getResourceIndex().filter((e) => e.providerId === providerId);
                 for (const entry of entries) {
-                  const record: DiscoveryRecord = {
-                    providerId: entry.providerId,
-                    peerId: entry.peerId ?? (backend as any).node?.peerId?.toString() ?? "",
-                    resources: entry.resources.map((r) => ({
-                      resourceId: r.resourceId,
-                      kind: r.kind,
-                      label: r.label,
-                      tags: r.tags,
-                      price: r.price,
-                      unit: r.unit,
-                    })),
-                    reachability: entry.reachability ?? "unknown",
-                    updatedAt: entry.updatedAt,
-                    expiresAt: entry.expiresAt,
-                    signature: entry.signature as DiscoveryRecord["signature"],
-                  };
-                  await backend.publish(record);
+                  await backend.publish(toDiscoveryRecord(entry, backend));
                 }
               }
             } catch (err) {
@@ -672,6 +668,7 @@ const plugin: OpenClawPluginDefinition = {
           if (backend) {
             await backend.stop();
           }
+          discoveryBackend = undefined;
           ctx.logger.info("Web3 MDL discovery service stopped");
         },
       });
@@ -682,6 +679,25 @@ const plugin: OpenClawPluginDefinition = {
 };
 
 // ---- Gateway handler helpers ----
+
+function toDiscoveryRecord(entry: ResourceIndexEntry, backend: DiscoveryBackend): DiscoveryRecord {
+  return {
+    providerId: entry.providerId,
+    peerId: entry.peerId ?? (backend as any).node?.peerId?.toString() ?? "",
+    resources: entry.resources.map((resource) => ({
+      resourceId: resource.resourceId,
+      kind: resource.kind,
+      label: resource.label,
+      tags: resource.tags,
+      price: resource.price,
+      unit: resource.unit,
+    })),
+    reachability: entry.reachability ?? "unknown",
+    updatedAt: entry.updatedAt,
+    expiresAt: entry.expiresAt,
+    signature: entry.signature as DiscoveryRecord["signature"],
+  };
+}
 
 function createAuditQueryHandler(store: Web3StateStore): GatewayRequestHandler {
   return ({ params, respond }: GatewayRequestHandlerOptions) => {

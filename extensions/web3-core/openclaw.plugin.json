@@ -107,6 +107,28 @@
       "label": "Max Ingest Payload (bytes)",
       "placeholder": "65536",
       "help": "Maximum payload size accepted from the browser extension"
+    },
+    "discovery.enabled": {
+      "label": "Enable MDL Discovery",
+      "help": "Enable decentralized discovery publish/discover pipeline"
+    },
+    "discovery.backend": {
+      "label": "Discovery Backend",
+      "help": "Discovery backend type: static (no-op) or libp2p"
+    },
+    "discovery.bootstrapPeers": {
+      "label": "Discovery Bootstrap Peers",
+      "help": "libp2p bootstrap multiaddrs used for discovery network join"
+    },
+    "discovery.rendezvousIntervalMs": {
+      "label": "Discovery Interval (ms)",
+      "placeholder": "30000",
+      "help": "Periodic discover/republish interval"
+    },
+    "discovery.dhtKeyPrefix": {
+      "label": "Discovery DHT Key Prefix",
+      "placeholder": "/openclaw/resource",
+      "help": "DHT key prefix used for resource-granular publish"
     }
   },
   "configSchema": {
@@ -199,6 +221,25 @@
           "token": { "type": "string" },
           "allowLoopback": { "type": "boolean", "default": true },
           "maxBodyBytes": { "type": "number", "default": 65536 }
+        }
+      },
+      "discovery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "backend": {
+            "type": "string",
+            "enum": ["libp2p", "static"],
+            "default": "static"
+          },
+          "bootstrapPeers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          },
+          "rendezvousIntervalMs": { "type": "number", "default": 30000 },
+          "dhtKeyPrefix": { "type": "string", "default": "/openclaw/resource" }
         }
       }
     }

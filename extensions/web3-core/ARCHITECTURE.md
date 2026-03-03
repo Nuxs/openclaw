@@ -208,8 +208,10 @@ web3/
 - **ID**: `web3-discovery-service` (仅当 `config.discovery.enabled = true`)
 - **频率**: `config.discovery.rendezvousIntervalMs`（默认 30s）
 - **任务**:
-  1. 将本地资源索引发布到 DHT/Rendezvous (`publish`)
-  2. 发现远端 provider 资源并入库 (`discover` + `ingest`)
+  1. 周期发现远端 provider 资源并入库 (`discover` + `ingest`)
+  2. 周期执行兜底重发布（避免仅依赖事件触发导致公告丢失）
+
+> 说明：主发布触发点是 `web3.index.report` 成功回调；后台周期发布仅作为容错补偿。
 
 ---
 
@@ -278,12 +280,14 @@ extensions/web3-core/src/discovery/
 ### 数据流
 
 ```
-Publish: web3.index.report → indexer 签名(v2) → store
-           → DiscoveryBackend.publish() → DHT putProvider + Rendezvous register
+Publish: web3.index.report(success) → indexer 签名(v2) → store
+           → onReportAccepted hook → DiscoveryBackend.publish()
+           → DHT putProvider(按资源粒度 key) + Rendezvous register
 
 Discover: Background Service → DiscoveryBackend.discover()
-           → DiscoveryRecord[] → ingest(验签+过滤) → upsert store
-           → web3.index.list 可见
+           → DHT findProviders(资源粒度 key) + Rendezvous discover(按 kind)
+           → 远端记录交换/聚合 → DiscoveryRecord[]
+           → ingest(验签+过滤) → upsert store → web3.index.list 可见
 
 Connect:  Consumer → web3.index.list(peerId+reachability)
            → web3.resources.lease → ConsumerLeaseAccess(connectionRef)

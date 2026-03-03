@@ -174,9 +174,14 @@ function buildEntry(params: {
   };
 }
 
+export type ResourceIndexReportHandlerOptions = {
+  onReportAccepted?: (entry: ResourceIndexEntry) => Promise<void> | void;
+};
+
 export function createResourceIndexReportHandler(
   store: Web3StateStore,
   config: Web3PluginConfig,
+  options: ResourceIndexReportHandlerOptions = {},
 ): GatewayRequestHandler {
   return async ({ params, respond }: GatewayRequestHandlerOptions) => {
     try {
@@ -202,6 +207,15 @@ export function createResourceIndexReportHandler(
         buildEntry({ providerId, endpoint, resources: resolvedResources, ttlMs, meta }),
       );
       store.upsertResourceIndex(entry);
+
+      if (options.onReportAccepted) {
+        try {
+          await options.onReportAccepted(entry);
+        } catch {
+          // Keep report handler success path isolated from discovery publish failures.
+        }
+      }
+
       respond(true, { providerId, updatedAt: entry.updatedAt, expiresAt: entry.expiresAt });
     } catch (err) {
       respond(false, formatWeb3GatewayErrorResponse(err));
