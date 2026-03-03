@@ -2,15 +2,19 @@
  * Index signature verification utilities.
  * Consumer-side verification of provider-signed index entries.
  *
+ * Supports both v1 (original) and v2 (MDL — includes peerId/reachability) payloads.
+ *
  * @see docs/plugins/web3-core-dev.md#index-signing
  */
 
 import { createHash, createPublicKey, verify } from "node:crypto";
+import { buildSignaturePayloadV2 } from "../discovery/signature-v2.js";
+import type { Reachability } from "../discovery/types.js";
 import type { IndexSignature, ResourceIndexEntry } from "../state/store.js";
 
 /**
- * Build stable signature payload from index entry.
- * Must match the payload generation logic in indexer.ts
+ * Build stable signature payload from index entry (v1 — original schema).
+ * Must match the payload generation logic in indexer.ts.
  */
 function buildSignaturePayload(entry: Omit<ResourceIndexEntry, "signature">): string {
   function stableStringify(value: unknown): string {
@@ -87,9 +91,19 @@ export function verifyIndexSignature(entry: ResourceIndexEntry): IndexSignatureV
   }
 
   try {
-    // 3. Rebuild payload from entry
+    // 3. Rebuild payload from entry (v1 or v2 depending on payloadVersion)
     const { signature: _, ...entryWithoutSig } = entry;
-    const payload = buildSignaturePayload(entryWithoutSig);
+    let payload: string;
+    if (sig.payloadVersion === 2 && entryWithoutSig.peerId) {
+      payload = buildSignaturePayloadV2(
+        entryWithoutSig as Omit<ResourceIndexEntry, "signature"> & {
+          peerId: string;
+          reachability: Reachability;
+        },
+      );
+    } else {
+      payload = buildSignaturePayload(entryWithoutSig);
+    }
 
     // 4. Verify payload hash matches
     const computedHash = createHash("sha256").update(payload).digest("hex");

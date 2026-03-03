@@ -88,6 +88,10 @@ export type ResourceIndexEntry = {
   lastHeartbeatAt?: string;
   meta?: Record<string, unknown>;
   signature?: IndexSignature;
+  /** MDL: libp2p peer identifier (present when discovered via DHT/Rendezvous) */
+  peerId?: string;
+  /** MDL: how the provider can be reached */
+  reachability?: "direct" | "relay" | "unknown";
 };
 
 export type IndexSignature = {
@@ -96,6 +100,8 @@ export type IndexSignature = {
   signature: string;
   payloadHash: string;
   signedAt: string;
+  /** MDL: signature payload version (2 = includes peerId/reachability) */
+  payloadVersion?: number;
 };
 
 export type IndexSigningKey = {
