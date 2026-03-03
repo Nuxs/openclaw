@@ -6,7 +6,7 @@ import { resolveConfig, type MarketPluginConfig } from "../../config.js";
 import { MarketStateStore } from "../../state/store.js";
 import type { MarketLease, MarketResource } from "../resources.js";
 import type { Delivery, Order } from "../types.js";
-import { createMarketRepairRetryHandler } from "./repair.js";
+import { createMarketRepairRetryHandler, createMarketRevocationRetryHandler } from "./repair.js";
 
 vi.mock("viem", async () => {
   const actual = await vi.importActual<typeof import("viem")>("viem");
@@ -116,11 +116,11 @@ describe("market.repair.retry", () => {
     expect(payload.failed).toBe(0);
   });
 
-  it("repairs expired leases", () => {
+  it("repairs expired leases", async () => {
     seedExpiredLease();
     const handler = createMarketRepairRetryHandler(store, config);
     const r = createResponder();
-    handler({
+    await handler({
       params: {},
       respond: r.respond,
       client: createClient(),
@@ -129,17 +129,20 @@ describe("market.repair.retry", () => {
     const payload = r.result()!.payload as any;
     expect(payload.processed).toBe(1);
     expect(payload.succeeded).toBe(1);
+    expect(payload.actions.expiredFixed).toBe(1);
+    expect(payload.actions.orphanRevoked).toBe(0);
+    expect(payload.actions.deliveryRevoked).toBe(0);
 
     // Verify the lease was expired
     const lease = store.getLease("lease-expired-1");
     expect(lease?.status).toBe("lease_expired");
   });
 
-  it("dry run does not mutate state", () => {
+  it("dry run does not mutate state", async () => {
     seedExpiredLease();
     const handler = createMarketRepairRetryHandler(store, config);
     const r = createResponder();
-    handler({
+    await handler({
       params: { dryRun: true },
       respond: r.respond,
       client: createClient(),
@@ -147,17 +150,18 @@ describe("market.repair.retry", () => {
     expect(r.result()!.ok).toBe(true);
     const payload = r.result()!.payload as any;
     expect(payload.processed).toBe(1);
+    expect(payload.dryRun).toBe(true);
 
     // Lease should still be active
     const lease = store.getLease("lease-expired-1");
     expect(lease?.status).toBe("lease_active");
   });
 
-  it("respects limit parameter", () => {
+  it("respects limit parameter", async () => {
     seedExpiredLease();
     const handler = createMarketRepairRetryHandler(store, config);
     const r = createResponder();
-    handler({
+    await handler({
       params: { limit: 0 },
       respond: r.respond,
       client: createClient(),
@@ -165,5 +169,38 @@ describe("market.repair.retry", () => {
     expect(r.result()!.ok).toBe(true);
     const payload = r.result()!.payload as any;
     expect(payload.processed).toBe(0);
+  });
+});
+
+describe("market.revocation.retry", () => {
+  it("reports remaining pending jobs after processing", async () => {
+    const now = new Date().toISOString();
+    store.saveRevocation({
+      jobId: "job-missing-delivery",
+      deliveryId: "delivery-missing",
+      payloadHash: "payload-hash-1",
+      attempts: 0,
+      status: "pending",
+      nextAttemptAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const handler = createMarketRevocationRetryHandler(store, config);
+    const r = createResponder();
+    await handler({
+      params: { limit: 10 },
+      respond: r.respond,
+      client: createClient(),
+    } as any);
+
+    expect(r.result()!.ok).toBe(true);
+    const payload = r.result()!.payload as any;
+    expect(payload.processed).toBe(1);
+    expect(payload.failed).toBe(1);
+    expect(payload.retried).toBe(0);
+    expect(payload.pending).toBe(0);
+    // limit is clamped to maxAttempts (default 3)
+    expect(payload.limit).toBe(3);
   });
 });

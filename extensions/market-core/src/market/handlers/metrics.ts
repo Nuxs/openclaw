@@ -20,6 +20,20 @@ function safeRate(numerator: number, denominator: number) {
   return numerator / denominator;
 }
 
+function countRecentAuditByKind(
+  auditEvents: Array<{ kind?: string; timestamp?: string }>,
+  kinds: string[],
+  windowMs: number,
+  nowMs: number,
+): number {
+  const allow = new Set(kinds);
+  return auditEvents.filter((event) => {
+    if (!event.kind || !allow.has(event.kind)) return false;
+    const ts = Date.parse(event.timestamp ?? "");
+    return Number.isFinite(ts) && nowMs - ts <= windowMs;
+  }).length;
+}
+
 export function createMarketMetricsSnapshotHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
@@ -72,6 +86,41 @@ export function createMarketMetricsSnapshotHandler(
         return now - openedAt > 24 * 60 * 60 * 1000;
       }).length;
 
+      const repairCandidates = leases.filter((lease) => {
+        const expired = lease.status === "lease_active" && Date.parse(lease.expiresAt) <= now;
+        if (expired) return true;
+        const resource = store.getResource(lease.resourceId);
+        const order = store.getOrder(lease.orderId);
+        const delivery = lease.deliveryId ? store.getDelivery(lease.deliveryId) : undefined;
+        return !resource || !order || (lease.deliveryId ? !delivery : false);
+      }).length;
+
+      const window24hMs = 24 * 60 * 60 * 1000;
+      const ops = {
+        expireSweep: {
+          last24h: countRecentAuditByKind(auditEvents, ["lease_expired"], window24hMs, now),
+        },
+        repairRetry: {
+          last24h: countRecentAuditByKind(auditEvents, ["repair_retry"], window24hMs, now),
+          candidates: repairCandidates,
+        },
+        revocationRetry: {
+          last24h: countRecentAuditByKind(auditEvents, ["revocation_retry"], window24hMs, now),
+          failedLast24h: countRecentAuditByKind(
+            auditEvents,
+            ["revocation_failed"],
+            window24hMs,
+            now,
+          ),
+          succeededLast24h: countRecentAuditByKind(
+            auditEvents,
+            ["revocation_succeeded"],
+            window24hMs,
+            now,
+          ),
+        },
+      };
+
       const alerts: Array<{
         rule: string;
         severity: AlertSeverity;
@@ -95,6 +144,12 @@ export function createMarketMetricsSnapshotHandler(
           severity: "p0",
           triggered: disputeOver24h > 0,
           value: disputeOver24h,
+        },
+        {
+          rule: "repair_candidates",
+          severity: "p1",
+          triggered: repairCandidates > 0,
+          value: repairCandidates,
         },
         {
           rule: "revocation_failed",
@@ -149,6 +204,7 @@ export function createMarketMetricsSnapshotHandler(
           events: auditEvents.length,
           anchorPending,
         },
+        ops,
         alerts,
       });
     } catch (err) {

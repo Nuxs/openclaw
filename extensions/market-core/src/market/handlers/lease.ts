@@ -393,7 +393,7 @@ export function createLeaseExpireSweepHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
 ): GatewayRequestHandler {
-  return (opts: GatewayRequestHandlerOptions) => {
+  return async (opts: GatewayRequestHandlerOptions) => {
     const { params, respond } = opts;
     try {
       assertAccess(opts, config, "write");
@@ -403,10 +403,10 @@ export function createLeaseExpireSweepHandler(
       const dryRun = input.dryRun === true;
       const limit = requireLimit(input, "limit", 200, 1000);
 
-      const activeLeases = store
+      const candidates = store
         .listLeases({ status: "lease_active" })
-        .filter((lease) => Date.parse(lease.expiresAt) <= now)
-        .slice(0, limit);
+        .filter((lease) => Date.parse(lease.expiresAt) <= now);
+      const activeLeases = candidates.slice(0, limit);
 
       let processed = 0;
       let expired = 0;
@@ -417,22 +417,37 @@ export function createLeaseExpireSweepHandler(
         processed += 1;
         try {
           if (!dryRun) {
-            assertLeaseTransition(lease.status, "lease_expired");
-            lease.status = "lease_expired";
-            store.saveLease(lease);
+            await store.runInTransaction(() => {
+              assertLeaseTransition(lease.status, "lease_expired");
+              lease.status = "lease_expired";
+              store.saveLease(lease);
+              recordAudit(store, "lease_expired", lease.leaseId, lease.accessTokenHash, undefined, {
+                resourceId: lease.resourceId,
+                dryRun,
+              });
+            });
+          } else {
+            recordAudit(store, "lease_expired", lease.leaseId, lease.accessTokenHash, undefined, {
+              resourceId: lease.resourceId,
+              dryRun,
+            });
           }
           expired += 1;
-          recordAudit(store, "lease_expired", lease.leaseId, lease.accessTokenHash, undefined, {
-            resourceId: lease.resourceId,
-            dryRun,
-          });
         } catch {
           errors += 1;
           skipped += 1;
         }
       }
 
-      respond(true, { processed, expired, skipped, errors });
+      respond(true, {
+        processed,
+        expired,
+        skipped,
+        errors,
+        pending: Math.max(candidates.length - processed, 0),
+        dryRun,
+        limit,
+      });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }

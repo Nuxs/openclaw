@@ -123,7 +123,19 @@ export function createLedgerAppendHandler(
         runId,
         entryHash,
       };
+      // maxCost check + append must be atomic to prevent TOCTOU races
       await store.runInTransaction(() => {
+        if (lease.maxCost) {
+          const maxCost = parseIntString(lease.maxCost, "lease.maxCost");
+          const currentCost = parseIntString(
+            store.summarizeLedger({ leaseId }).totalCost,
+            "ledger.totalCost",
+          );
+          const appendCost = parseIntString(cost, "entry.cost");
+          if (currentCost + appendCost > maxCost) {
+            throw new Error("E_QUOTA_EXCEEDED: lease maxCost exceeded");
+          }
+        }
         store.appendLedger(entry);
         recordAudit(store, "ledger_appended", entry.ledgerId, entryHash, actorId, {
           leaseId,

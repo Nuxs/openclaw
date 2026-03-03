@@ -294,4 +294,117 @@ describe("market-core ledger -> metered settlement release", () => {
       },
     );
   });
+
+  it("rejects ledger append when lease maxCost would be exceeded", async () => {
+    await withStoreModes(tempDir, async ({ store, config }) => {
+      const now = new Date().toISOString();
+      const providerActorId = "0x0000000000000000000000000000000000000001";
+      const consumerActorId = "0x0000000000000000000000000000000000000002";
+
+      store.saveOffer({
+        offerId: "offer-max-cost",
+        sellerId: providerActorId,
+        assetId: "asset-max-cost",
+        assetType: "service",
+        assetMeta: {},
+        price: 1,
+        currency: "USDC",
+        usageScope: { purpose: "compute" },
+        deliveryType: "service",
+        status: "offer_published",
+        offerHash: "offer-max-cost-hash",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveOrder({
+        orderId: "order-max-cost",
+        offerId: "offer-max-cost",
+        buyerId: consumerActorId,
+        quantity: 1,
+        status: "delivery_completed",
+        orderHash: "order-max-cost-hash",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveResource({
+        resourceId: "resource-max-cost",
+        kind: "model",
+        status: "resource_published",
+        providerActorId,
+        offerId: "offer-max-cost",
+        label: "model",
+        price: {
+          unit: "token",
+          amount: "1",
+          currency: "USDC",
+        },
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveLease({
+        leaseId: "lease-max-cost",
+        resourceId: "resource-max-cost",
+        kind: "model",
+        providerActorId,
+        consumerActorId,
+        orderId: "order-max-cost",
+        status: "lease_active",
+        issuedAt: now,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        maxCost: "100",
+      });
+
+      const append = createLedgerAppendHandler(store, config);
+
+      const first = createResponder();
+      await append({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId: "lease-max-cost",
+            resourceId: "resource-max-cost",
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "80",
+            cost: "80",
+            currency: "USDC",
+          },
+        },
+        respond: first.respond,
+      } as any);
+      expect(first.result()?.ok).toBe(true);
+
+      const second = createResponder();
+      await append({
+        params: {
+          actorId: providerActorId,
+          entry: {
+            leaseId: "lease-max-cost",
+            resourceId: "resource-max-cost",
+            kind: "model",
+            providerActorId,
+            consumerActorId,
+            unit: "token",
+            quantity: "30",
+            cost: "30",
+            currency: "USDC",
+          },
+        },
+        respond: second.respond,
+      } as any);
+
+      expect(second.result()?.ok).toBe(false);
+      expect(String(second.result()?.payload.error)).toContain("E_QUOTA_EXCEEDED");
+
+      const entries = store.listLedger({ leaseId: "lease-max-cost" });
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.cost).toBe("80");
+    });
+  });
 });

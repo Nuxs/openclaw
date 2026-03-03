@@ -19,7 +19,7 @@ export function createMarketRepairRetryHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
 ): GatewayRequestHandler {
-  return (opts: GatewayRequestHandlerOptions) => {
+  return async (opts: GatewayRequestHandlerOptions) => {
     const { params, respond } = opts;
     try {
       assertAccess(opts, config, "write");
@@ -48,6 +48,9 @@ export function createMarketRepairRetryHandler(
       let processed = 0;
       let succeeded = 0;
       let failed = 0;
+      let expiredFixed = 0;
+      let orphanRevoked = 0;
+      let deliveryRevoked = 0;
       const slice = candidates.slice(0, Math.max(0, attemptLimit));
 
       for (const lease of slice) {
@@ -59,36 +62,49 @@ export function createMarketRepairRetryHandler(
           const expired = Date.parse(lease.expiresAt) <= Date.now();
           const orphan = !resource || !order || (lease.deliveryId ? !delivery : false);
 
-          if (!dryRun) {
-            if (expired && lease.status === "lease_active") {
-              assertLeaseTransition(lease.status, "lease_expired");
-              lease.status = "lease_expired";
-              store.saveLease(lease);
-            } else if (orphan && lease.status !== "lease_revoked") {
-              assertLeaseTransition(lease.status, "lease_revoked");
-              lease.status = "lease_revoked";
-              lease.revokedAt = nowIso();
-              store.saveLease(lease);
-            }
+          let leaseExpiredApplied = false;
+          let leaseRevokedApplied = false;
+          let deliveryRevokedApplied = false;
 
-            if (
-              delivery &&
-              delivery.status !== "delivery_completed" &&
-              delivery.status !== "delivery_revoked"
-            ) {
-              assertDeliveryTransition(delivery.status, "delivery_revoked");
-              delivery.status = "delivery_revoked";
-              delivery.revokedAt = nowIso();
-              delivery.revokeReason = "repair_orphan";
-              delivery.revokeHash = hashCanonical({
-                deliveryId: delivery.deliveryId,
-                orderId: delivery.orderId,
-                revokedAt: delivery.revokedAt,
-                reason: delivery.revokeReason,
-              });
-              store.saveDelivery(delivery);
-            }
+          if (!dryRun) {
+            await store.runInTransaction(() => {
+              if (expired && lease.status === "lease_active") {
+                assertLeaseTransition(lease.status, "lease_expired");
+                lease.status = "lease_expired";
+                store.saveLease(lease);
+                leaseExpiredApplied = true;
+              } else if (orphan && lease.status !== "lease_revoked") {
+                assertLeaseTransition(lease.status, "lease_revoked");
+                lease.status = "lease_revoked";
+                lease.revokedAt = nowIso();
+                store.saveLease(lease);
+                leaseRevokedApplied = true;
+              }
+
+              if (
+                delivery &&
+                delivery.status !== "delivery_completed" &&
+                delivery.status !== "delivery_revoked"
+              ) {
+                assertDeliveryTransition(delivery.status, "delivery_revoked");
+                delivery.status = "delivery_revoked";
+                delivery.revokedAt = nowIso();
+                delivery.revokeReason = "repair_orphan";
+                delivery.revokeHash = hashCanonical({
+                  deliveryId: delivery.deliveryId,
+                  orderId: delivery.orderId,
+                  revokedAt: delivery.revokedAt,
+                  reason: delivery.revokeReason,
+                });
+                store.saveDelivery(delivery);
+                deliveryRevokedApplied = true;
+              }
+            });
           }
+
+          if (leaseExpiredApplied) expiredFixed += 1;
+          if (leaseRevokedApplied) orphanRevoked += 1;
+          if (deliveryRevokedApplied) deliveryRevoked += 1;
 
           recordAudit(store, "repair_retry", lease.leaseId, lease.accessTokenHash, undefined, {
             resourceId: lease.resourceId,
@@ -105,7 +121,18 @@ export function createMarketRepairRetryHandler(
       }
 
       const pending = Math.max(0, candidates.length - processed);
-      respond(true, { processed, succeeded, failed, pending });
+      respond(true, {
+        processed,
+        succeeded,
+        failed,
+        pending,
+        dryRun,
+        actions: {
+          expiredFixed,
+          orphanRevoked,
+          deliveryRevoked,
+        },
+      });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }
@@ -120,15 +147,19 @@ export function createMarketRevocationRetryHandler(
     const { respond } = opts;
     try {
       assertAccess(opts, config, "write");
+      const input = (opts.params ?? {}) as Record<string, unknown>;
       const now = Date.now();
-      const limit = maxAttempts(config);
+      const maxRetryAttempts = maxAttempts(config);
+      const limit = requireLimit(input, "limit", maxRetryAttempts, maxRetryAttempts);
       const pending = store
         .listRevocations()
-        .filter((job) => job.status === "pending" && Date.parse(job.nextAttemptAt) <= now);
+        .filter((job) => job.status === "pending" && Date.parse(job.nextAttemptAt) <= now)
+        .slice(0, limit);
 
       let processed = 0;
       let succeeded = 0;
       let failed = 0;
+      let retried = 0;
 
       for (const job of pending) {
         processed += 1;
@@ -170,7 +201,7 @@ export function createMarketRevocationRetryHandler(
         job.attempts += 1;
         job.lastError = result.error;
         job.updatedAt = nowIso();
-        if (job.attempts >= limit) {
+        if (job.attempts >= maxRetryAttempts) {
           job.status = "failed";
           store.saveRevocation(job);
           recordAudit(store, "revocation_failed", job.jobId, job.payloadHash, undefined, {
@@ -188,9 +219,13 @@ export function createMarketRevocationRetryHandler(
           nextAttemptAt: job.nextAttemptAt,
           lastError: job.lastError,
         });
+        retried += 1;
       }
 
-      respond(true, { processed, succeeded, failed, pending: pending.length });
+      const pendingRemaining = store
+        .listRevocations()
+        .filter((job) => job.status === "pending" && Date.parse(job.nextAttemptAt) <= now).length;
+      respond(true, { processed, succeeded, failed, retried, pending: pendingRemaining, limit });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }
