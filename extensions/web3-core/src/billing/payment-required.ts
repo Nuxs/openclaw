@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import { hashPayload } from "../audit/canonicalize.js";
 import type { Web3PluginConfig } from "../config.js";
@@ -31,6 +31,12 @@ type PaymentRequiredInput = {
   idempotencyKey?: unknown;
   requestId?: unknown;
   tool?: unknown;
+};
+
+type PaymentConsumeInput = {
+  idempotencyKey?: unknown;
+  authorization?: unknown;
+  resumeToken?: unknown;
 };
 
 function requireString(value: unknown, field: string): string {
@@ -89,9 +95,93 @@ function parseInvoice(encoded: string): PaymentRequiredInvoice {
   };
 }
 
+const OPENCLAW_PAYFI_PREFIX = "OpenClaw-PayFi ";
+
+type PaymentResumeTokenValidationError =
+  | "E_EXPIRED: invoice expired"
+  | "E_FORBIDDEN: resume token tampered"
+  | "E_FORBIDDEN: resume token timeline is invalid";
+
+type PaymentResumeTokenValidationResult =
+  | { ok: true }
+  | { ok: false; error: PaymentResumeTokenValidationError };
+
+function resolveResumeTokenSigningSecret(store: Web3StateStore): string {
+  return store.getIndexSigningKey().privateKey;
+}
+
+function buildResumeTokenSigningInput(resumeToken: PaymentResumeToken): string {
+  return JSON.stringify({
+    invoiceId: resumeToken.invoiceId,
+    paymentReceiptId: resumeToken.paymentReceiptId,
+    txHash: resumeToken.txHash,
+    chain: resumeToken.chain,
+    issuedAt: resumeToken.issuedAt,
+    expiresAt: resumeToken.expiresAt,
+    tokenVersion: resumeToken.tokenVersion ?? 1,
+    nonce: resumeToken.nonce,
+  });
+}
+
+function signResumeToken(resumeToken: PaymentResumeToken, secret: string): string {
+  return createHmac("sha256", secret)
+    .update(buildResumeTokenSigningInput(resumeToken))
+    .digest("base64url");
+}
+
+function verifyResumeTokenSignature(resumeToken: PaymentResumeToken, secret: string): boolean {
+  if (typeof resumeToken.signature !== "string" || resumeToken.signature.length === 0) {
+    return false;
+  }
+  const expected = signResumeToken(resumeToken, secret);
+  const actualBuffer = Buffer.from(resumeToken.signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function validateResumeTokenLifecycle(params: {
+  resumeToken: PaymentResumeToken;
+  signingSecret: string;
+  nowMs?: number;
+}): PaymentResumeTokenValidationResult {
+  const { resumeToken, signingSecret, nowMs = Date.now() } = params;
+  const issuedAtMs = Date.parse(resumeToken.issuedAt);
+  const expiresAtMs = Date.parse(resumeToken.expiresAt);
+  if (Number.isNaN(issuedAtMs) || Number.isNaN(expiresAtMs) || issuedAtMs > expiresAtMs) {
+    return { ok: false, error: "E_FORBIDDEN: resume token timeline is invalid" };
+  }
+  if (expiresAtMs <= nowMs) {
+    return { ok: false, error: "E_EXPIRED: invoice expired" };
+  }
+  if (!verifyResumeTokenSignature(resumeToken, signingSecret)) {
+    return { ok: false, error: "E_FORBIDDEN: resume token tampered" };
+  }
+  return { ok: true };
+}
+
+function parseResumeTokenFromAuthorization(authorization?: string): PaymentResumeToken | undefined {
+  if (typeof authorization !== "string" || !authorization.startsWith(OPENCLAW_PAYFI_PREFIX)) {
+    return undefined;
+  }
+  const encoded = authorization.slice(OPENCLAW_PAYFI_PREFIX.length).trim();
+  if (!encoded) {
+    return undefined;
+  }
+  try {
+    const raw = Buffer.from(encoded, "base64").toString("utf8");
+    const payload = JSON.parse(raw) as PaymentResumeToken;
+    return payload && typeof payload === "object" ? payload : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildPaymentAuthorization(resumeToken: PaymentResumeToken): string {
   const encoded = Buffer.from(JSON.stringify(resumeToken)).toString("base64");
-  return `OpenClaw-PayFi ${encoded}`;
+  return `${OPENCLAW_PAYFI_PREFIX}${encoded}`;
 }
 
 function nowIso(): string {
@@ -155,6 +245,14 @@ function buildBillingPaymentReceipt(params: {
   };
 }
 
+function isSameResumeTokenIdentity(left: PaymentResumeToken, right: PaymentResumeToken): boolean {
+  return (
+    left.invoiceId === right.invoiceId &&
+    left.paymentReceiptId === right.paymentReceiptId &&
+    left.chain === right.chain
+  );
+}
+
 export function createBillingHandlePaymentRequiredHandler(
   store: Web3StateStore,
   config: Web3PluginConfig,
@@ -199,6 +297,7 @@ export function createBillingHandlePaymentRequiredHandler(
         return;
       }
 
+      const signingSecret = resolveResumeTokenSigningSecret(store);
       const invoiceHash = hashPayload(invoice);
       const existing = store.getPaymentRequired(idempotencyKey);
       if (existing) {
@@ -213,11 +312,31 @@ export function createBillingHandlePaymentRequiredHandler(
           return;
         }
 
-        if (Date.parse(existing.resumeToken.expiresAt) <= Date.now()) {
+        const tokenValidation = validateResumeTokenLifecycle({
+          resumeToken: existing.resumeToken,
+          signingSecret,
+        });
+        if (!tokenValidation.ok) {
           store.removePaymentRequired(idempotencyKey);
           respond(
             false,
-            formatWeb3GatewayErrorResponse("E_EXPIRED: invoice expired", ErrorCode.E_EXPIRED),
+            formatWeb3GatewayErrorResponse(
+              tokenValidation.error,
+              tokenValidation.error.startsWith("E_EXPIRED")
+                ? ErrorCode.E_EXPIRED
+                : ErrorCode.E_FORBIDDEN,
+            ),
+          );
+          return;
+        }
+
+        if (existing.consumedAt) {
+          respond(
+            false,
+            formatWeb3GatewayErrorResponse(
+              "E_CONFLICT: payment authorization already consumed",
+              ErrorCode.E_CONFLICT,
+            ),
           );
           return;
         }
@@ -279,7 +398,10 @@ export function createBillingHandlePaymentRequiredHandler(
         chain: resolvedChain,
         issuedAt,
         expiresAt: invoice.expiresAt,
+        tokenVersion: 2,
+        nonce: randomUUID(),
       };
+      resumeToken.signature = signResumeToken(resumeToken, signingSecret);
 
       store.savePaymentRequired({
         idempotencyKey,
@@ -312,6 +434,99 @@ export function createBillingHandlePaymentRequiredHandler(
           createdAt: issuedAt,
         }),
         reused: false,
+      });
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
+}
+
+export function createBillingConsumePaymentRequiredHandler(
+  store: Web3StateStore,
+): GatewayRequestHandler {
+  return ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      const input = (params ?? {}) as PaymentConsumeInput;
+      const idempotencyKey = requireString(input.idempotencyKey, "idempotencyKey");
+      const record = store.getPaymentRequired(idempotencyKey);
+      if (!record) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse("E_NOT_FOUND: payment-required record missing"),
+        );
+        return;
+      }
+
+      if (record.consumedAt) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse(
+            "E_CONFLICT: payment authorization already consumed",
+            ErrorCode.E_CONFLICT,
+          ),
+        );
+        return;
+      }
+
+      const tokenFromAuth = parseResumeTokenFromAuthorization(optionalString(input.authorization));
+      const tokenFromInput =
+        input.resumeToken &&
+        typeof input.resumeToken === "object" &&
+        !Array.isArray(input.resumeToken)
+          ? (input.resumeToken as PaymentResumeToken)
+          : undefined;
+      const effectiveToken = tokenFromInput ?? tokenFromAuth;
+      if (!effectiveToken) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse(
+            "E_INVALID_ARGUMENT: resume token is required",
+            ErrorCode.E_INVALID_ARGUMENT,
+          ),
+        );
+        return;
+      }
+
+      if (!isSameResumeTokenIdentity(record.resumeToken, effectiveToken)) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse(
+            "E_FORBIDDEN: resume token mismatch",
+            ErrorCode.E_FORBIDDEN,
+          ),
+        );
+        return;
+      }
+
+      const signingSecret = resolveResumeTokenSigningSecret(store);
+      const tokenValidation = validateResumeTokenLifecycle({
+        resumeToken: effectiveToken,
+        signingSecret,
+      });
+      if (!tokenValidation.ok) {
+        store.removePaymentRequired(idempotencyKey);
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse(
+            tokenValidation.error,
+            tokenValidation.error.startsWith("E_EXPIRED")
+              ? ErrorCode.E_EXPIRED
+              : ErrorCode.E_FORBIDDEN,
+          ),
+        );
+        return;
+      }
+
+      store.savePaymentRequired({
+        ...record,
+        consumedAt: nowIso(),
+      });
+
+      respond(true, {
+        idempotencyKey,
+        consumed: true,
+        resumeToken: record.resumeToken,
+        authorization: buildPaymentAuthorization(record.resumeToken),
       });
     } catch (err) {
       respond(false, formatWeb3GatewayErrorResponse(err));

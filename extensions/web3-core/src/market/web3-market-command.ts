@@ -49,6 +49,8 @@ function summarizeConfig(cfg: OpenClawConfig | undefined): {
   allow: string[];
   web3Enabled: boolean;
   marketEnabled: boolean;
+  agentWalletEnabled: boolean;
+  agentWalletPolicyEnabled: boolean;
 } {
   const pluginsEnabled = cfg?.plugins?.enabled !== false;
   const allow = Array.isArray(cfg?.plugins?.allow)
@@ -56,12 +58,25 @@ function summarizeConfig(cfg: OpenClawConfig | undefined): {
     : [];
   const web3Enabled = cfg?.plugins?.entries?.["web3-core"]?.enabled === true;
   const marketEnabled = cfg?.plugins?.entries?.["market-core"]?.enabled === true;
-  return { pluginsEnabled, allow, web3Enabled, marketEnabled };
+  const agentWalletEnabled = cfg?.plugins?.entries?.["agent-wallet"]?.enabled === true;
+  const policyRaw = cfg?.plugins?.entries?.["agent-wallet"]?.config?.policy;
+  const agentWalletPolicyEnabled =
+    Boolean(policyRaw) &&
+    typeof policyRaw === "object" &&
+    (policyRaw as Record<string, unknown>).enabled === true;
+  return {
+    pluginsEnabled,
+    allow,
+    web3Enabled,
+    marketEnabled,
+    agentWalletEnabled,
+    agentWalletPolicyEnabled,
+  };
 }
 
 function formatEnableInstructions(cfg: OpenClawConfig | undefined): string {
   const summary = summarizeConfig(cfg);
-  const required = ["web3-core", "market-core"];
+  const required = ["web3-core", "market-core", "agent-wallet"];
   const allowSet = new Set(summary.allow);
   for (const pluginId of required) {
     allowSet.add(pluginId);
@@ -70,7 +85,7 @@ function formatEnableInstructions(cfg: OpenClawConfig | undefined): string {
 
   const lines: string[] = [];
   lines.push(
-    `⚙️ Web3 市场配置概览：plugins=${summary.pluginsEnabled ? "enabled" : "disabled"}，web3-core=${summary.web3Enabled ? "enabled" : "disabled"}，market-core=${summary.marketEnabled ? "enabled" : "disabled"}`,
+    `⚙️ Web3 市场配置概览：plugins=${summary.pluginsEnabled ? "enabled" : "disabled"}，web3-core=${summary.web3Enabled ? "enabled" : "disabled"}，market-core=${summary.marketEnabled ? "enabled" : "disabled"}，agent-wallet=${summary.agentWalletEnabled ? "enabled" : "disabled"}，policy=${summary.agentWalletPolicyEnabled ? "enabled" : "disabled"}`,
   );
   lines.push("");
   lines.push("下一步（按需执行，需 owner/authorized + configWrites）：");
@@ -86,6 +101,12 @@ function formatEnableInstructions(cfg: OpenClawConfig | undefined): string {
   }
   if (!summary.marketEnabled) {
     lines.push("4) /config set plugins.entries.market-core.enabled=true");
+  }
+  if (!summary.agentWalletEnabled) {
+    lines.push("5) /config set plugins.entries.agent-wallet.enabled=true");
+  }
+  if (!summary.agentWalletPolicyEnabled) {
+    lines.push("6) /config set plugins.entries.agent-wallet.config.policy.enabled=true");
   }
 
   lines.push("");
@@ -174,10 +195,12 @@ async function enableWeb3MarketConfig(ctx: {
   const allowSet = new Set(allow);
   allowSet.add("web3-core");
   allowSet.add("market-core");
+  allowSet.add("agent-wallet");
   setConfigValueAtPath(next, ["plugins", "enabled"], true);
   setConfigValueAtPath(next, ["plugins", "allow"], Array.from(allowSet));
   setConfigValueAtPath(next, ["plugins", "entries", "web3-core", "enabled"], true);
   setConfigValueAtPath(next, ["plugins", "entries", "market-core", "enabled"], true);
+  setConfigValueAtPath(next, ["plugins", "entries", "agent-wallet", "enabled"], true);
 
   setConfigValueAtPath(
     next,
@@ -222,6 +245,101 @@ async function enableWeb3MarketConfig(ctx: {
     );
   }
 
+  setConfigValueAtPath(
+    next,
+    ["plugins", "entries", "agent-wallet", "config", "policy", "enabled"],
+    true,
+  );
+  setIfMissing(
+    next,
+    ["plugins", "entries", "agent-wallet", "config", "policy", "inlinePolicy", "version"],
+    "v1",
+  );
+  setIfMissing(
+    next,
+    [
+      "plugins",
+      "entries",
+      "agent-wallet",
+      "config",
+      "policy",
+      "inlinePolicy",
+      "autoPay",
+      "enabled",
+    ],
+    true,
+  );
+  setIfMissing(
+    next,
+    [
+      "plugins",
+      "entries",
+      "agent-wallet",
+      "config",
+      "policy",
+      "inlinePolicy",
+      "autoPay",
+      "maxRetries",
+    ],
+    1,
+  );
+  setIfMissing(
+    next,
+    [
+      "plugins",
+      "entries",
+      "agent-wallet",
+      "config",
+      "policy",
+      "inlinePolicy",
+      "autoPay",
+      "maxAutoPayPerRequest",
+    ],
+    "100000000000000000",
+  );
+  setIfMissing(
+    next,
+    [
+      "plugins",
+      "entries",
+      "agent-wallet",
+      "config",
+      "policy",
+      "inlinePolicy",
+      "budget",
+      "perTxCap",
+    ],
+    "100000000000000000",
+  );
+  setIfMissing(
+    next,
+    [
+      "plugins",
+      "entries",
+      "agent-wallet",
+      "config",
+      "policy",
+      "inlinePolicy",
+      "budget",
+      "dailyCap",
+    ],
+    "1000000000000000000",
+  );
+  setIfMissing(
+    next,
+    [
+      "plugins",
+      "entries",
+      "agent-wallet",
+      "config",
+      "policy",
+      "inlinePolicy",
+      "budget",
+      "currency",
+    ],
+    "NATIVE",
+  );
+
   const validated = validateConfigObjectWithPlugins(next);
   if (!validated.ok) {
     const issue = validated.issues[0];
@@ -234,6 +352,7 @@ async function enableWeb3MarketConfig(ctx: {
   return {
     text: [
       "已提交 Web3 市场启用配置。",
+      "已为生产基线补齐 agent-wallet policy.enabled 与 maxAutoPayPerRequest/perTxCap/dailyCap 默认值。",
       "下一步：请在 web3-core 配置里补齐模型 offer，然后重启 Gateway。",
     ].join("\n"),
   };

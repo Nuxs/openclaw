@@ -4,7 +4,10 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveConfig } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
-import { createBillingHandlePaymentRequiredHandler } from "./payment-required.js";
+import {
+  createBillingConsumePaymentRequiredHandler,
+  createBillingHandlePaymentRequiredHandler,
+} from "./payment-required.js";
 
 type BillingGatewayResponse =
   | {
@@ -298,9 +301,102 @@ describe("web3.billing.handlePaymentRequired", () => {
       respond: secondResponder.respond,
     } as any);
 
-    expect(secondResponder.result()?.ok).toBe(false);
-    expect(secondResponder.result()?.payload).toMatchObject({ error: "E_EXPIRED" });
-    expect(store.getPaymentRequired("idem-stale")).toBeUndefined();
+    expect(secondResponder.result()?.ok).toBe(true);
+    expect(secondResponder.result()?.payload).toMatchObject({ reused: false });
+    expect(store.getPaymentRequired("idem-stale")).toBeDefined();
+  });
+
+  it("issues signed v2 token and enforces one-time consume", async () => {
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const handlePaymentRequired = createBillingHandlePaymentRequiredHandler(store, config);
+    const consumePaymentRequired = createBillingConsumePaymentRequiredHandler(store);
+    const invoice: Invoice = {
+      invoiceId: "inv-consume-1",
+      provider: "provider-consume-1",
+      chain: "evm",
+      asset: "ETH",
+      amount: "10",
+      payTo: "0x0000000000000000000000000000000000000011",
+      nonce: "nonce-consume-1",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-consume-1",
+    };
+
+    const issueResponder = createResponder();
+    await handlePaymentRequired({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: issueResponder.respond,
+    } as any);
+
+    expect(issueResponder.result()?.ok).toBe(true);
+    const issuePayload = issueResponder.result()?.payload ?? {};
+    const resumeToken = issuePayload.resumeToken as Record<string, unknown>;
+    expect(resumeToken.tokenVersion).toBe(2);
+    expect(typeof resumeToken.nonce).toBe("string");
+    expect(typeof resumeToken.signature).toBe("string");
+
+    const consumeResponder = createResponder();
+    await consumePaymentRequired({
+      params: {
+        idempotencyKey: "idem-consume-1",
+        authorization: issuePayload.authorization,
+        resumeToken: issuePayload.resumeToken,
+      },
+      respond: consumeResponder.respond,
+    } as any);
+    expect(consumeResponder.result()?.ok).toBe(true);
+
+    const replayResponder = createResponder();
+    await consumePaymentRequired({
+      params: {
+        idempotencyKey: "idem-consume-1",
+        authorization: issuePayload.authorization,
+        resumeToken: issuePayload.resumeToken,
+      },
+      respond: replayResponder.respond,
+    } as any);
+
+    expect(replayResponder.result()?.ok).toBe(false);
+    expect(replayResponder.result()?.payload).toMatchObject({ error: "E_CONFLICT" });
+  });
+
+  it("prunes payment-required records by TTL and max entries", () => {
+    const store = new Web3StateStore(tempDir);
+    const now = new Date();
+
+    store.savePaymentRequired({
+      idempotencyKey: "idem-ttl-expired",
+      invoiceHash: "hash-ttl-expired",
+      resumeToken: {
+        invoiceId: "inv-ttl-expired",
+        paymentReceiptId: "receipt-ttl-expired",
+        chain: "evm",
+        issuedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+      },
+      createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    for (let index = 0; index < 520; index += 1) {
+      const createdAt = new Date(now.getTime() - index * 1_000).toISOString();
+      store.savePaymentRequired({
+        idempotencyKey: `idem-cap-${index}`,
+        invoiceHash: `hash-cap-${index}`,
+        resumeToken: {
+          invoiceId: `inv-cap-${index}`,
+          paymentReceiptId: `receipt-cap-${index}`,
+          chain: "evm",
+          issuedAt: createdAt,
+          expiresAt: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+        },
+        createdAt,
+      });
+    }
+
+    const records = store.listPaymentRequiredRecords();
+    expect(records.length).toBeLessThanOrEqual(500);
+    expect(store.getPaymentRequired("idem-ttl-expired")).toBeUndefined();
   });
 
   it("returns timeout error when autopay backend times out", async () => {

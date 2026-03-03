@@ -31,9 +31,11 @@ extensions/web3-core/
 │   │   └── canonicalize.ts   # 规范化与哈希
 │   │
 │   ├── billing/              # 计费保护模块
-│   │   ├── types.ts          # 配额记录类型
+│   │   ├── types.ts          # 配额记录与 resumeToken 类型
 │   │   ├── commands.ts       # /credits, /pay_status
-│   │   └── guard.ts          # before_tool_call 配额检查
+│   │   ├── guard.ts          # before_tool_call 配额检查
+│   │   ├── payment-required.ts # x402 invoice 处理、签名令牌发放与一次性消费
+│   │   └── payment-trace.ts  # 支付追踪查询
 │   │
 │   ├── resources/            # 资源发布/租用/Provider 路由
 │   ├── market/               # market.* 代理与工具
@@ -108,7 +110,7 @@ Hook: session_end
   • 链上查询: Etherscan/Basescan
 ```
 
-### 3️⃣ 计费保护流程
+### 3️⃣ 计费保护流程（含 x402 自动支付）
 
 ```
 LLM 或工具调用前
@@ -118,7 +120,27 @@ Hook: before_tool_call
   → 计算成本 (costPerLlmCall / costPerToolCall)
   → 检查剩余配额
   → 如不足，拒绝调用并提示充值
+
+当工具返回 402 payment-required 时
   ↓
+Gateway: /tools/invoke
+  → 解析 invoice + idempotencyKey
+  → 调用 web3.billing.handlePaymentRequired
+  → agent-wallet.autopay 支付成功后，签发带签名 resumeToken (tokenVersion=2, nonce, signature)
+  → 落盘 payment-required 记录
+  ↓
+Gateway 重试前
+  → 强制校验 resumeToken.expiresAt / timeline
+  → 调用 web3.billing.consumePaymentRequired 一次性消费（防重放）
+  → 注入 Authorization / paymentResumeToken 回调目标工具
+  ↓
+工具执行成功
+  → 返回 paymentReceipt + paymentTrace
+
+异常/降级
+  → x402 指标按滑窗统计（非全量累计）
+  → 失败率越阈值进入冷却期，冷却后自动恢复
+
 调用完成后
   ↓
 Hook: llm_output
@@ -145,6 +167,8 @@ web3/
 ├── usage.json              # 配额记录 (sessionIdHash → UsageRecord)
 ├── pending-archive.json    # 待归档队列 (重试)
 ├── pending-tx.json         # 待锚定交易队列 (重试)
+├── payment-required.json   # x402 idempotency + resumeToken（TTL + 容量上限治理）
+├── x402-autopay-stats.json # x402 自动支付滑窗指标/冷却状态
 ├── anchor-receipts.json    # 链上锚定回执 (anchorId → receipt)
 ├── archive-receipt.json    # 最近归档回执 (CID/URI)
 └── archive-key.json        # 归档加密密钥 (AES-256 key)
@@ -182,20 +206,24 @@ web3/
 
 ### Gateway API (RPC 方法)
 
-| 方法                    | 参数                       | 返回                          | 描述                                   |
-| ----------------------- | -------------------------- | ----------------------------- | -------------------------------------- |
-| `web3.siwe.challenge`   | `{ address, chainId }`     | `{ message, nonce }`          | 生成 SIWE 挑战                         |
-| `web3.siwe.verify`      | `{ message, signature }`   | `{ ok, address }`             | 验证 SIWE 签名                         |
-| `web3.audit.query`      | `{ limit? }`               | `{ events }`                  | 查询审计日志                           |
-| `web3.billing.status`   | `{ sessionIdHash }`        | `{ usage }`                   | 查询计费状态                           |
-| `web3.billing.summary`  | `{ sessionKey, senderId }` | `{ usage }`                   | 计费汇总                               |
-| `web3.status.summary`   | -                          | `{ auditStats, anchorStats }` | Web3 整体状态                          |
-| `web3.resources.*`      | 各方法参数                 | 各方法返回                    | 资源发布/租用/状态（对外编排入口）     |
-| `web3.market.*`         | 各方法参数                 | 各方法返回                    | 市场代理（资源/租约/账本/桥接/争议等） |
-| `web3.index.*`          | 各方法参数                 | 各方法返回                    | 资源索引上报/查询                      |
-| `web3.monitor.*`        | 各方法参数                 | 各方法返回                    | 监控与告警                             |
-| `web3.market.dispute.*` | 各方法参数                 | 各方法返回                    | 争议（对外单入口）                     |
-| `web3.capabilities.*`   | 各方法参数                 | 各方法返回                    | 能力自描述（供 UI/Agent 构造调用）     |
+| 方法                                  | 参数                                               | 返回                                                    | 描述                                   |
+| ------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- | -------------------------------------- |
+| `web3.siwe.challenge`                 | `{ address, chainId }`                             | `{ message, nonce }`                                    | 生成 SIWE 挑战                         |
+| `web3.siwe.verify`                    | `{ message, signature }`                           | `{ ok, address }`                                       | 验证 SIWE 签名                         |
+| `web3.audit.query`                    | `{ limit? }`                                       | `{ events }`                                            | 查询审计日志                           |
+| `web3.billing.status`                 | `{ sessionIdHash }`                                | `{ usage }`                                             | 查询计费状态                           |
+| `web3.billing.summary`                | `{ sessionKey, senderId }`                         | `{ usage }`                                             | 计费汇总                               |
+| `web3.billing.handlePaymentRequired`  | `{ invoice, idempotencyKey, requestId?, tool? }`   | `{ authorization, resumeToken, paymentReceipt, trace }` | x402 支付处理与签名令牌发放            |
+| `web3.billing.consumePaymentRequired` | `{ idempotencyKey, authorization?, resumeToken? }` | `{ consumed }`                                          | x402 令牌一次性消费（防重放）          |
+| `web3.metrics.recordX402Autopay`      | `{ event, count? }`                                | `{ stats }`                                             | 记录 x402 尝试/失败/重试/熔断指标      |
+| `web3.metrics.snapshot`               | `{}`                                               | `{ x402, alerts, ... }`                                 | 滑窗失败率与冷却状态快照               |
+| `web3.status.summary`                 | -                                                  | `{ auditStats, anchorStats }`                           | Web3 整体状态                          |
+| `web3.resources.*`                    | 各方法参数                                         | 各方法返回                                              | 资源发布/租用/状态（对外编排入口）     |
+| `web3.market.*`                       | 各方法参数                                         | 各方法返回                                              | 市场代理（资源/租约/账本/桥接/争议等） |
+| `web3.index.*`                        | 各方法参数                                         | 各方法返回                                              | 资源索引上报/查询                      |
+| `web3.monitor.*`                      | 各方法参数                                         | 各方法返回                                              | 监控与告警                             |
+| `web3.market.dispute.*`               | 各方法参数                                         | 各方法返回                                              | 争议（对外单入口）                     |
+| `web3.capabilities.*`                 | 各方法参数                                         | 各方法返回                                              | 能力自描述（供 UI/Agent 构造调用）     |
 
 ### 后台服务 (Background Service)
 
@@ -253,6 +281,17 @@ web3/
   }
 }
 ```
+
+### 生产运维基线（x402 自动支付）
+
+生产环境建议强制：
+
+- `plugins.entries.agent-wallet.config.policy.enabled=true`
+- `plugins.entries.agent-wallet.config.policy.inlinePolicy.autoPay.maxAutoPayPerRequest` 为正整数字符串
+- `plugins.entries.agent-wallet.config.policy.inlinePolicy.budget.perTxCap` 为正整数字符串
+- `plugins.entries.agent-wallet.config.policy.inlinePolicy.budget.dailyCap` 为正整数字符串
+
+网关在 `NODE_ENV=production` 下会拒绝不满足以上基线的 x402 autopay 尝试。
 
 ---
 

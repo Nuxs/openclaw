@@ -20,7 +20,10 @@ type AlertSeverity = "p0" | "p1";
 
 type X402AutopayMetricEvent = "attempt" | "success" | "failure" | "retry" | "circuit_breaker_trip";
 
-const CIRCUIT_BREAKER_TRIP_ALERT_WINDOW_MS = 15 * 60 * 1000;
+const AUTOPAY_SLIDING_WINDOW_MS = 10 * 60 * 1000;
+const AUTOPAY_FAILURE_RATE_THRESHOLD = 0.5;
+const AUTOPAY_MIN_ATTEMPTS_IN_WINDOW = 5;
+const AUTOPAY_COOLDOWN_MS = 5 * 60 * 1000;
 
 function safeRate(numerator: number, denominator: number): number | null {
   if (denominator <= 0) {
@@ -118,12 +121,24 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
   const autopayCircuitBreakerTrips = autopayStats.circuitBreakerTrips;
   const autopayLastCircuitBreakerTripAt = autopayStats.lastCircuitBreakerTripAt;
   const autopaySuccessRate = safeRate(autopaySuccessCount, autopayAttemptCount);
-  const lastCircuitBreakerTripTs = autopayLastCircuitBreakerTripAt
-    ? Date.parse(autopayLastCircuitBreakerTripAt)
+
+  const windowStart = now - AUTOPAY_SLIDING_WINDOW_MS;
+  const attemptInWindow = autopayStats.attemptEvents.filter((entry) => {
+    const ts = Date.parse(entry);
+    return !Number.isNaN(ts) && ts >= windowStart;
+  }).length;
+  const failureInWindow = autopayStats.failureEvents.filter((entry) => {
+    const ts = Date.parse(entry);
+    return !Number.isNaN(ts) && ts >= windowStart;
+  }).length;
+  const failureRateInWindow = safeRate(failureInWindow, attemptInWindow) ?? 0;
+  const cooldownUntilTs = autopayStats.cooldownUntil
+    ? Date.parse(autopayStats.cooldownUntil)
     : Number.NaN;
-  const circuitBreakerTripRecentlyActive =
-    Number.isFinite(lastCircuitBreakerTripTs) &&
-    now - lastCircuitBreakerTripTs <= CIRCUIT_BREAKER_TRIP_ALERT_WINDOW_MS;
+  const cooldownActive = Number.isFinite(cooldownUntilTs) && cooldownUntilTs > now;
+  const breakerRateTriggered =
+    attemptInWindow >= AUTOPAY_MIN_ATTEMPTS_IN_WINDOW &&
+    failureRateInWindow >= AUTOPAY_FAILURE_RATE_THRESHOLD;
 
   const alerts: Array<{
     rule: string;
@@ -152,17 +167,14 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
     {
       rule: "x402_autopay_failure_rate",
       severity: "p1",
-      triggered:
-        autopayAttemptCount > 0 && autopaySuccessRate !== null
-          ? 1 - autopaySuccessRate > 0.2
-          : false,
-      value: autopayAttemptCount > 0 && autopaySuccessRate !== null ? 1 - autopaySuccessRate : 0,
+      triggered: breakerRateTriggered,
+      value: failureRateInWindow,
     },
     {
       rule: "x402_autopay_circuit_breaker_trips",
       severity: "p0",
-      triggered: autopayCircuitBreakerTrips >= 3 && circuitBreakerTripRecentlyActive,
-      value: autopayCircuitBreakerTrips,
+      triggered: cooldownActive,
+      value: cooldownActive ? Math.max(0, cooldownUntilTs - now) : 0,
     },
   ];
 
@@ -198,6 +210,16 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
         circuitBreaker: {
           trips: autopayCircuitBreakerTrips,
           lastTripAt: autopayLastCircuitBreakerTripAt,
+          cooldownUntil: autopayStats.cooldownUntil,
+          cooldownActive,
+        },
+        window: {
+          windowMs: AUTOPAY_SLIDING_WINDOW_MS,
+          attempts: attemptInWindow,
+          failures: failureInWindow,
+          failureRate: failureRateInWindow,
+          minAttempts: AUTOPAY_MIN_ATTEMPTS_IN_WINDOW,
+          threshold: AUTOPAY_FAILURE_RATE_THRESHOLD,
         },
       },
     },
@@ -235,21 +257,49 @@ export function createWeb3RecordX402AutopayMetricHandler(
       const rawCount =
         typeof input.count === "number" && Number.isFinite(input.count) ? input.count : 1;
       const count = Math.max(1, Math.floor(rawCount));
+      const eventAt = new Date().toISOString();
       const deltaByEvent: Record<
         X402AutopayMetricEvent,
         Parameters<Web3StateStore["updateX402AutopayStats"]>[0]
       > = {
-        attempt: { attempts: count },
+        attempt: { attempts: count, attemptEventAt: eventAt },
         success: { successes: count },
-        failure: { failures: count },
+        failure: { failures: count, failureEventAt: eventAt },
         retry: { retryCount: count },
         circuit_breaker_trip: {
           circuitBreakerTrips: count,
-          lastCircuitBreakerTripAt: new Date().toISOString(),
+          lastCircuitBreakerTripAt: eventAt,
+          cooldownUntil: new Date(Date.now() + AUTOPAY_COOLDOWN_MS).toISOString(),
         },
       };
       const stats = store.updateX402AutopayStats(deltaByEvent[event]);
-      respond(true, { stats });
+
+      const now = Date.now();
+      const windowStart = now - AUTOPAY_SLIDING_WINDOW_MS;
+      const attemptsInWindow = stats.attemptEvents.filter((entry) => {
+        const ts = Date.parse(entry);
+        return !Number.isNaN(ts) && ts >= windowStart;
+      }).length;
+      const failuresInWindow = stats.failureEvents.filter((entry) => {
+        const ts = Date.parse(entry);
+        return !Number.isNaN(ts) && ts >= windowStart;
+      }).length;
+      const failureRate = safeRate(failuresInWindow, attemptsInWindow) ?? 0;
+
+      let nextStats = stats;
+      const cooldownUntilTs = stats.cooldownUntil ? Date.parse(stats.cooldownUntil) : Number.NaN;
+      if (
+        attemptsInWindow >= AUTOPAY_MIN_ATTEMPTS_IN_WINDOW &&
+        failureRate >= AUTOPAY_FAILURE_RATE_THRESHOLD
+      ) {
+        nextStats = store.updateX402AutopayStats({
+          cooldownUntil: new Date(now + AUTOPAY_COOLDOWN_MS).toISOString(),
+        });
+      } else if (Number.isFinite(cooldownUntilTs) && cooldownUntilTs <= now) {
+        nextStats = store.updateX402AutopayStats({ cooldownUntil: undefined });
+      }
+
+      respond(true, { stats: nextStats });
     } catch (err) {
       respond(false, formatWeb3GatewayErrorResponse(err));
     }

@@ -5,6 +5,9 @@ export type PaymentResumeToken = {
   chain: "evm" | "ton";
   issuedAt: string;
   expiresAt: string;
+  tokenVersion?: 1 | 2;
+  nonce?: string;
+  signature?: string;
 };
 
 const OPENCLAW_PAYFI_PREFIX = "OpenClaw-PayFi ";
@@ -40,6 +43,10 @@ export function parsePaymentResumeTokenFromAuthorization(
     }
 
     const txHash = isNonEmptyString(payload.txHash) ? payload.txHash : undefined;
+    const tokenVersion =
+      payload.tokenVersion === 2 || payload.tokenVersion === 1 ? payload.tokenVersion : undefined;
+    const nonce = isNonEmptyString(payload.nonce) ? payload.nonce : undefined;
+    const signature = isNonEmptyString(payload.signature) ? payload.signature : undefined;
     return {
       invoiceId: payload.invoiceId,
       paymentReceiptId: payload.paymentReceiptId,
@@ -47,6 +54,9 @@ export function parsePaymentResumeTokenFromAuthorization(
       chain: payload.chain,
       issuedAt: payload.issuedAt,
       expiresAt: payload.expiresAt,
+      tokenVersion,
+      nonce,
+      signature,
     };
   } catch {
     return undefined;
@@ -81,6 +91,12 @@ export function validatePaymentResumeToken(
   }
   if (issuedAtMs > expiresAtMs) {
     return { valid: false, error: "autopay resume token timeline is invalid" };
+  }
+  if (
+    token.tokenVersion === 2 &&
+    (!isNonEmptyString(token.nonce) || !isNonEmptyString(token.signature))
+  ) {
+    return { valid: false, error: "autopay resume token signature payload is invalid" };
   }
   return { valid: true };
 }

@@ -86,6 +86,32 @@ To help group policies resolve context, you can optionally set:
 - `x-openclaw-message-channel: <channel>` (example: `slack`, `telegram`)
 - `x-openclaw-account-id: <accountId>` (when multiple accounts exist)
 
+## x402 autopay behavior (payment-required)
+
+When a tool returns HTTP `402` with `WWW-Authenticate` invoice metadata, `/tools/invoke` may run the autopay flow if enabled.
+
+Required header:
+
+- `x-idempotency-key: <stable-request-key>`
+
+Security/robustness guarantees in the autopay path:
+
+- Resume authorization includes a signed `resumeToken` payload (`tokenVersion=2`, `nonce`, `signature`).
+- Gateway validates token timeline (`issuedAt` / `expiresAt`) before retrying.
+- Gateway calls `web3.billing.consumePaymentRequired` for one-time token consumption (anti-replay).
+- Replayed/consumed authorization is rejected with `E_CONFLICT`.
+- `payment-required.json` records are lazily pruned by TTL and capped in size.
+- Health guard uses sliding-window failure rate + cooldown recovery (not lifetime cumulative counters).
+
+Production baseline (`NODE_ENV=production`):
+
+- `plugins.entries.agent-wallet.config.policy.enabled=true`
+- `policy.inlinePolicy.autoPay.maxAutoPayPerRequest` > 0
+- `policy.inlinePolicy.budget.perTxCap` > 0
+- `policy.inlinePolicy.budget.dailyCap` > 0
+
+If baseline is missing, `/tools/invoke` returns `402` with `autoPayError` explaining the violation.
+
 ## Responses
 
 - `200` → `{ ok: true, result }`

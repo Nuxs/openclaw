@@ -56,6 +56,9 @@ export type PaymentResumeToken = {
   chain: "evm" | "ton";
   issuedAt: string;
   expiresAt: string;
+  tokenVersion?: 1 | 2;
+  nonce?: string;
+  signature?: string;
 };
 
 export type BillingPaymentReceipt = {

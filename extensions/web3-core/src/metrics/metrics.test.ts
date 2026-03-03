@@ -91,6 +91,9 @@ describe("web3 metrics snapshot", () => {
       retryCount: 5,
       circuitBreakerTrips: 5,
       lastCircuitBreakerTripAt: staleTripAt,
+      attemptEvents: [staleTripAt],
+      failureEvents: [staleTripAt],
+      cooldownUntil: new Date(Date.now() - 1_000).toISOString(),
       updatedAt: new Date().toISOString(),
     });
 

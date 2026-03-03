@@ -55,6 +55,7 @@ export type PaymentRequiredRecord = {
   resumeToken: PaymentResumeToken;
   createdAt: string;
   maxRetries?: number;
+  consumedAt?: string;
   /** Network identifier from the wallet response (e.g. "base", "ton-testnet"). */
   network?: string;
 };
@@ -66,6 +67,9 @@ export type X402AutopayStats = {
   retryCount: number;
   circuitBreakerTrips: number;
   lastCircuitBreakerTripAt?: string;
+  attemptEvents: string[];
+  failureEvents: string[];
+  cooldownUntil?: string;
   updatedAt: string;
 };
 
@@ -459,22 +463,65 @@ export class Web3StateStore {
     return join(this.dir, "x402-autopay-stats.json");
   }
 
-  getPaymentRequired(idempotencyKey: string): PaymentRequiredRecord | undefined {
-    if (!existsSync(this.paymentRequiredPath)) return undefined;
+  private loadPaymentRequiredMap(opts?: {
+    prune?: boolean;
+  }): Record<string, PaymentRequiredRecord> {
+    if (!existsSync(this.paymentRequiredPath)) {
+      return {};
+    }
     const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
       string,
       PaymentRequiredRecord
     >;
+    if (!opts?.prune) {
+      return map;
+    }
+    return this.prunePaymentRequiredMap(map).map;
+  }
+
+  private savePaymentRequiredMap(map: Record<string, PaymentRequiredRecord>): void {
+    writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
+  }
+
+  private prunePaymentRequiredMap(
+    map: Record<string, PaymentRequiredRecord>,
+    nowMs = Date.now(),
+  ): { map: Record<string, PaymentRequiredRecord>; removed: number } {
+    const MAX_RECORDS = 500;
+    const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+    const entries = Object.entries(map);
+    const retained: Array<[string, PaymentRequiredRecord]> = [];
+
+    for (const [key, record] of entries) {
+      const expiresAt = Date.parse(record.resumeToken.expiresAt);
+      const createdAt = Date.parse(record.createdAt);
+      const expiredByToken = Number.isNaN(expiresAt) || expiresAt <= nowMs;
+      const expiredByTtl = Number.isNaN(createdAt) || nowMs - createdAt > MAX_AGE_MS;
+      if (expiredByToken || expiredByTtl) {
+        continue;
+      }
+      retained.push([key, record]);
+    }
+
+    retained.sort((left, right) => right[1].createdAt.localeCompare(left[1].createdAt));
+    const capped = retained.slice(0, MAX_RECORDS);
+    const nextMap = Object.fromEntries(capped);
+    const removed = entries.length - capped.length;
+
+    if (removed > 0) {
+      this.savePaymentRequiredMap(nextMap);
+    }
+
+    return { map: nextMap, removed };
+  }
+
+  getPaymentRequired(idempotencyKey: string): PaymentRequiredRecord | undefined {
+    const map = this.loadPaymentRequiredMap({ prune: true });
     return map[idempotencyKey];
   }
 
   listPaymentRequiredRecords(): PaymentRequiredRecord[] {
-    if (!existsSync(this.paymentRequiredPath)) return [];
-    const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
-      string,
-      PaymentRequiredRecord
-    >;
-    return Object.values(map);
+    return Object.values(this.loadPaymentRequiredMap({ prune: true }));
   }
 
   listPaymentTraceRefs(limit = 50): PaymentTraceRef[] {
@@ -494,26 +541,17 @@ export class Web3StateStore {
   }
 
   savePaymentRequired(record: PaymentRequiredRecord): void {
-    let map: Record<string, PaymentRequiredRecord> = {};
-    if (existsSync(this.paymentRequiredPath)) {
-      map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
-        string,
-        PaymentRequiredRecord
-      >;
-    }
+    const map = this.loadPaymentRequiredMap({ prune: true });
     map[record.idempotencyKey] = record;
-    writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
+    const next = this.prunePaymentRequiredMap(map).map;
+    this.savePaymentRequiredMap(next);
   }
 
   removePaymentRequired(idempotencyKey: string): void {
-    if (!existsSync(this.paymentRequiredPath)) return;
-    const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
-      string,
-      PaymentRequiredRecord
-    >;
+    const map = this.loadPaymentRequiredMap();
     if (!(idempotencyKey in map)) return;
     delete map[idempotencyKey];
-    writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
+    this.savePaymentRequiredMap(map);
   }
 
   getX402AutopayStats(): X402AutopayStats {
@@ -525,6 +563,9 @@ export class Web3StateStore {
         retryCount: 0,
         circuitBreakerTrips: 0,
         lastCircuitBreakerTripAt: undefined,
+        attemptEvents: [],
+        failureEvents: [],
+        cooldownUntil: undefined,
         updatedAt: new Date(0).toISOString(),
       };
     }
@@ -548,6 +589,16 @@ export class Web3StateStore {
         stored.lastCircuitBreakerTripAt.length > 0
           ? stored.lastCircuitBreakerTripAt
           : undefined,
+      attemptEvents: Array.isArray(stored?.attemptEvents)
+        ? stored!.attemptEvents!.filter((entry): entry is string => typeof entry === "string")
+        : [],
+      failureEvents: Array.isArray(stored?.failureEvents)
+        ? stored!.failureEvents!.filter((entry): entry is string => typeof entry === "string")
+        : [],
+      cooldownUntil:
+        typeof stored?.cooldownUntil === "string" && stored.cooldownUntil.length > 0
+          ? stored.cooldownUntil
+          : undefined,
       updatedAt:
         typeof stored?.updatedAt === "string" && stored.updatedAt.length > 0
           ? stored.updatedAt
@@ -569,10 +620,32 @@ export class Web3StateStore {
         | "retryCount"
         | "circuitBreakerTrips"
         | "lastCircuitBreakerTripAt"
+        | "cooldownUntil"
       >
-    >,
+    > & {
+      attemptEventAt?: string;
+      failureEventAt?: string;
+    },
   ): X402AutopayStats {
     const current = this.getX402AutopayStats();
+    const nowIso = new Date().toISOString();
+    const historyCutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const pruneEvents = (events: string[]): string[] =>
+      events.filter((entry) => {
+        const ts = Date.parse(entry);
+        return !Number.isNaN(ts) && ts >= historyCutoff;
+      });
+
+    const attemptEvents = pruneEvents(current.attemptEvents);
+    if (typeof delta.attemptEventAt === "string") {
+      attemptEvents.push(delta.attemptEventAt);
+    }
+
+    const failureEvents = pruneEvents(current.failureEvents);
+    if (typeof delta.failureEventAt === "string") {
+      failureEvents.push(delta.failureEventAt);
+    }
+
     const next: X402AutopayStats = {
       attempts: current.attempts + (delta.attempts ?? 0),
       successes: current.successes + (delta.successes ?? 0),
@@ -580,7 +653,10 @@ export class Web3StateStore {
       retryCount: current.retryCount + (delta.retryCount ?? 0),
       circuitBreakerTrips: current.circuitBreakerTrips + (delta.circuitBreakerTrips ?? 0),
       lastCircuitBreakerTripAt: delta.lastCircuitBreakerTripAt ?? current.lastCircuitBreakerTripAt,
-      updatedAt: new Date().toISOString(),
+      attemptEvents: attemptEvents.slice(-1024),
+      failureEvents: failureEvents.slice(-1024),
+      cooldownUntil: "cooldownUntil" in delta ? delta.cooldownUntil : current.cooldownUntil,
+      updatedAt: nowIso,
     };
     this.saveX402AutopayStats(next);
     return next;
