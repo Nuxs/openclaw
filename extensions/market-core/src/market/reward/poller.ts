@@ -38,11 +38,11 @@ export async function flushPendingRewards(
             },
             updatedAt: now,
           };
-        } else if (receipt.status === "failure") {
+        } else if (receipt.status === "failure" || receipt.status === "reverted") {
           updated = {
             ...reward,
             status: "onchain_failed",
-            lastError: "transaction failed on-chain",
+            lastError: `transaction ${receipt.status} on-chain`,
             updatedAt: now,
           };
         }
