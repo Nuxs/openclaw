@@ -111,6 +111,33 @@ export type Delivery = {
   payloadRef?: DeliveryPayloadRef;
 };
 
+export type ExecutionProof = {
+  type: "tlsnotary";
+  artifactHash: string;
+  issuedAt: string;
+  redactedFields?: string[];
+  verifier: string;
+};
+
+export type ServiceProofStatus = "proof_submitted";
+
+export type ServiceProof = {
+  proofId: string;
+  orderId: string;
+  leaseId?: string;
+  deliveryId?: string;
+  actorId: string;
+  proof: ExecutionProof;
+  proofHash: string;
+  submittedAt: string;
+  status: ServiceProofStatus;
+};
+
+export type ServiceProofFilter = {
+  orderId?: string;
+  limit?: number;
+};
+
 export type SettlementStrategy = "one-shot" | "metered";
 
 export type Settlement = {
@@ -146,6 +173,7 @@ export type AuditEventKind =
   | "delivery_issued"
   | "delivery_revoked"
   | "delivery_completed"
+  | "service_proof_submitted"
   | "lease_issued"
   | "lease_revoked"
   | "lease_expired"
@@ -421,6 +449,12 @@ export type ReconciliationSummary = {
     totalCost: string;
   };
   disputes?: { total: number; byStatus: Record<string, number> };
+  serviceProofs?: {
+    total: number;
+    byStatus: Record<string, number>;
+    latestSubmittedAt?: string;
+    artifactHashes: string[];
+  };
   archiveReceipt?: { cid?: string; uri?: string; updatedAt?: string };
   anchorReceipt?: { tx?: string; network?: string; block?: number; updatedAt?: string };
 };

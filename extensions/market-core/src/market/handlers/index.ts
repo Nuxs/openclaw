@@ -32,6 +32,11 @@ export {
   createDeliveryCompleteHandler,
 } from "./delivery.js";
 export {
+  createServiceProofSubmitHandler,
+  createServiceProofGetHandler,
+  createServiceProofListHandler,
+} from "./service-proof.js";
+export {
   createResourcePublishHandler,
   createResourceUnpublishHandler,
   createResourceGetHandler,
