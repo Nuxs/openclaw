@@ -61,13 +61,24 @@ vi.mock("./auth.js", () => ({
   authorizeHttpGatewayConnect: async () => ({ ok: true }),
 }));
 
-const mockCallGateway = vi.fn(async (..._args: unknown[]) => ({
-  ok: true,
+type PaymentRequiredGatewayResponse = {
+  ok: true;
   result: {
-    resumeToken: PAYMENT_RESUME_TOKEN,
-    authorization: PAYMENT_AUTHORIZATION,
-  },
-}));
+    resumeToken: typeof PAYMENT_RESUME_TOKEN;
+    authorization: string;
+    maxRetries?: number;
+  };
+};
+
+const mockCallGateway = vi.fn<(..._args: unknown[]) => Promise<PaymentRequiredGatewayResponse>>(
+  async (..._args: unknown[]) => ({
+    ok: true,
+    result: {
+      resumeToken: PAYMENT_RESUME_TOKEN,
+      authorization: PAYMENT_AUTHORIZATION,
+    },
+  }),
+);
 
 vi.mock("../logger.js", () => ({
   logWarn: () => {},
@@ -110,7 +121,8 @@ vi.mock("../agents/openclaw-tools.js", () => {
     },
     execute: async (_toolCallId: string, args: unknown) => {
       paymentRequiredCallCount += 1;
-      lastPaymentRequiredArgs = (args ?? {}) as Record<string, unknown>;
+      const input = (args ?? {}) as Record<string, unknown>;
+      lastPaymentRequiredArgs = input;
       if (paymentRequiredCallCount === 1) {
         const err = new Error("payment required") as Error & {
           status?: number;
@@ -121,6 +133,9 @@ vi.mock("../agents/openclaw-tools.js", () => {
           "www-authenticate": `OpenClaw-PayFi realm="market", invoice="${PAYMENT_INVOICE_BASE64}"`,
         };
         throw err;
+      }
+      if (input.forceRetryFailure === true) {
+        throw new Error("post-pay callback failed");
       }
       return { ok: true };
     },
@@ -700,6 +715,34 @@ describe("POST /tools/invoke", () => {
     expect(body.error?.autoPayError).toBe("autopay disabled by config");
   });
 
+  it("rejects autopay when idempotency key header is missing", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+    };
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(paymentRequiredCallCount).toBe(1);
+    expect(mockCallGateway).not.toHaveBeenCalled();
+    expect(body.error?.autoPayError).toBe("idempotency key required for autopay");
+  });
+
   it("honors maxRetries=0 for x402 autopay", async () => {
     cfg = {
       ...cfg,
@@ -725,6 +768,7 @@ describe("POST /tools/invoke", () => {
       tool: "tools_invoke_payment_required",
       args: { headers: {} },
       sessionKey: "main",
+      headers: { "x-idempotency-key": "idem-request-2" },
     });
 
     expect(res.status).toBe(402);
@@ -733,6 +777,84 @@ describe("POST /tools/invoke", () => {
     expect(paymentRequiredCallCount).toBe(1);
     expect(mockCallGateway).toHaveBeenCalled();
     expect(body.error?.authorization).toBe(PAYMENT_AUTHORIZATION);
+  });
+
+  it("prefers wallet policy retry budget from payment-required response", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+      plugins: {
+        entries: {
+          "web3-core": {
+            config: { x402: { autopay: { maxRetries: 0 } } },
+          },
+        },
+      },
+    };
+
+    mockCallGateway.mockResolvedValue({
+      ok: true,
+      result: {
+        resumeToken: PAYMENT_RESUME_TOKEN,
+        authorization: PAYMENT_AUTHORIZATION,
+        maxRetries: 1,
+      },
+    });
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+      headers: { "x-idempotency-key": "idem-request-3" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(paymentRequiredCallCount).toBe(2);
+  });
+
+  it("returns 402 when callback fails after successful autopay", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+      plugins: {
+        entries: {
+          "web3-core": {
+            config: { x402: { autopay: { maxRetries: 1 } } },
+          },
+        },
+      },
+    };
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {}, forceRetryFailure: true },
+      sessionKey: "main",
+      headers: { "x-idempotency-key": "idem-request-callback-fail" },
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error?.autoPayError).toContain("post-pay callback failed");
+    expect(mockCallGateway).toHaveBeenCalled();
   });
 
   it("maps tool input/auth errors to 400/403 and unexpected execution errors to 500", async () => {

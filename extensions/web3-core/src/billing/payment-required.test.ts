@@ -6,7 +6,20 @@ import { resolveConfig } from "../config.js";
 import { Web3StateStore } from "../state/store.js";
 import { createBillingHandlePaymentRequiredHandler } from "./payment-required.js";
 
-const mockCallGateway = vi.fn(async () => ({
+type BillingGatewayResponse =
+  | {
+      ok: true;
+      result: {
+        txHash: string;
+        policyAutoPayMaxRetries?: number;
+      };
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+const mockCallGateway = vi.fn<() => Promise<BillingGatewayResponse>>(async () => ({
   ok: true,
   result: { txHash: "0xtxhash" },
 }));
@@ -123,6 +136,100 @@ describe("web3.billing.handlePaymentRequired", () => {
     expect(responder.result()?.ok).toBe(false);
     expect(responder.result()?.payload).toMatchObject({ error: "E_FORBIDDEN" });
     expect(mockCallGateway).not.toHaveBeenCalled();
+  });
+
+  it("rejects expired invoice", async () => {
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-expired",
+      provider: "provider-expired",
+      chain: "evm",
+      asset: "ETH",
+      amount: "10",
+      payTo: "0x0000000000000000000000000000000000000009",
+      nonce: "nonce-expired",
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      idempotencyKey: "idem-expired",
+    };
+
+    const responder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: responder.respond,
+    } as any);
+
+    expect(responder.result()?.ok).toBe(false);
+    expect(responder.result()?.payload).toMatchObject({ error: "E_EXPIRED" });
+  });
+
+  it("returns timeout error when autopay backend times out", async () => {
+    mockCallGateway.mockResolvedValueOnce({ ok: false, error: "timeout" });
+
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-timeout",
+      provider: "provider-timeout",
+      chain: "evm",
+      asset: "ETH",
+      amount: "10",
+      payTo: "0x0000000000000000000000000000000000000008",
+      nonce: "nonce-timeout",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-timeout",
+    };
+
+    const responder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: responder.respond,
+    } as any);
+
+    expect(responder.result()?.ok).toBe(false);
+    expect(responder.result()?.payload).toMatchObject({ error: "E_TIMEOUT" });
+  });
+
+  it("returns wallet policy retry budget in payment-required response", async () => {
+    mockCallGateway.mockResolvedValueOnce({
+      ok: true,
+      result: { txHash: "0xtxhash", policyAutoPayMaxRetries: 2 },
+    });
+
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-3",
+      provider: "provider-3",
+      chain: "evm",
+      asset: "ETH",
+      amount: "10",
+      payTo: "0x0000000000000000000000000000000000000004",
+      nonce: "nonce-3",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-3",
+    };
+
+    const firstResponder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: firstResponder.respond,
+    } as any);
+
+    expect(firstResponder.result()?.ok).toBe(true);
+    expect(firstResponder.result()?.payload).toMatchObject({ maxRetries: 2, reused: false });
+
+    const secondResponder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: secondResponder.respond,
+    } as any);
+
+    expect(secondResponder.result()?.ok).toBe(true);
+    expect(secondResponder.result()?.payload).toMatchObject({ maxRetries: 2, reused: true });
   });
 
   it("rejects idempotency key reuse with different invoice", async () => {

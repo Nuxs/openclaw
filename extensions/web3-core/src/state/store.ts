@@ -52,6 +52,16 @@ export type PaymentRequiredRecord = {
   invoiceHash: string;
   resumeToken: PaymentResumeToken;
   createdAt: string;
+  maxRetries?: number;
+};
+
+export type X402AutopayStats = {
+  attempts: number;
+  successes: number;
+  failures: number;
+  retryCount: number;
+  circuitBreakerTrips: number;
+  updatedAt: string;
 };
 
 export type IndexedResourceKind = "model" | "search" | "storage";
@@ -434,6 +444,10 @@ export class Web3StateStore {
     return join(this.dir, "payment-required.json");
   }
 
+  private get x402AutopayStatsPath() {
+    return join(this.dir, "x402-autopay-stats.json");
+  }
+
   getPaymentRequired(idempotencyKey: string): PaymentRequiredRecord | undefined {
     if (!existsSync(this.paymentRequiredPath)) return undefined;
     const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
@@ -441,6 +455,15 @@ export class Web3StateStore {
       PaymentRequiredRecord
     >;
     return map[idempotencyKey];
+  }
+
+  listPaymentRequiredRecords(): PaymentRequiredRecord[] {
+    if (!existsSync(this.paymentRequiredPath)) return [];
+    const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
+      string,
+      PaymentRequiredRecord
+    >;
+    return Object.values(map);
   }
 
   savePaymentRequired(record: PaymentRequiredRecord): void {
@@ -453,6 +476,64 @@ export class Web3StateStore {
     }
     map[record.idempotencyKey] = record;
     writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
+  }
+
+  getX402AutopayStats(): X402AutopayStats {
+    if (!existsSync(this.x402AutopayStatsPath)) {
+      return {
+        attempts: 0,
+        successes: 0,
+        failures: 0,
+        retryCount: 0,
+        circuitBreakerTrips: 0,
+        updatedAt: new Date(0).toISOString(),
+      };
+    }
+    const stored = JSON.parse(readFileSync(this.x402AutopayStatsPath, "utf-8")) as
+      | Partial<X402AutopayStats>
+      | undefined;
+    return {
+      attempts: Number.isFinite(stored?.attempts) ? Math.max(0, Math.floor(stored!.attempts!)) : 0,
+      successes: Number.isFinite(stored?.successes)
+        ? Math.max(0, Math.floor(stored!.successes!))
+        : 0,
+      failures: Number.isFinite(stored?.failures) ? Math.max(0, Math.floor(stored!.failures!)) : 0,
+      retryCount: Number.isFinite(stored?.retryCount)
+        ? Math.max(0, Math.floor(stored!.retryCount!))
+        : 0,
+      circuitBreakerTrips: Number.isFinite(stored?.circuitBreakerTrips)
+        ? Math.max(0, Math.floor(stored!.circuitBreakerTrips!))
+        : 0,
+      updatedAt:
+        typeof stored?.updatedAt === "string" && stored.updatedAt.length > 0
+          ? stored.updatedAt
+          : new Date(0).toISOString(),
+    };
+  }
+
+  saveX402AutopayStats(stats: X402AutopayStats): void {
+    writeFileSync(this.x402AutopayStatsPath, JSON.stringify(stats, null, 2));
+  }
+
+  updateX402AutopayStats(
+    delta: Partial<
+      Pick<
+        X402AutopayStats,
+        "attempts" | "successes" | "failures" | "retryCount" | "circuitBreakerTrips"
+      >
+    >,
+  ): X402AutopayStats {
+    const current = this.getX402AutopayStats();
+    const next: X402AutopayStats = {
+      attempts: current.attempts + (delta.attempts ?? 0),
+      successes: current.successes + (delta.successes ?? 0),
+      failures: current.failures + (delta.failures ?? 0),
+      retryCount: current.retryCount + (delta.retryCount ?? 0),
+      circuitBreakerTrips: current.circuitBreakerTrips + (delta.circuitBreakerTrips ?? 0),
+      updatedAt: new Date().toISOString(),
+    };
+    this.saveX402AutopayStats(next);
+    return next;
   }
 
   // ---- Pending archives (retry queue) ----

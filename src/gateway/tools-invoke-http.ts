@@ -151,6 +151,7 @@ type PaymentRequiredResult = {
   authorization?: string;
   resumeToken?: PaymentResumeToken;
   reused?: boolean;
+  maxRetries?: number;
 };
 
 type GatewayCallResult = {
@@ -275,6 +276,17 @@ function resolveX402AutopayConfig(cfg: ReturnType<typeof loadConfig>): X402Autop
   return { enabled, maxRetries };
 }
 
+function resolveAutoPayMaxRetries(params: {
+  configRetries: number;
+  paymentRequiredRetries?: number;
+}): number {
+  const { paymentRequiredRetries, configRetries } = params;
+  if (typeof paymentRequiredRetries === "number" && Number.isFinite(paymentRequiredRetries)) {
+    return Math.max(0, Math.floor(paymentRequiredRetries));
+  }
+  return configRetries;
+}
+
 function extractInvoiceFromAuthenticate(header: string): string | undefined {
   const match = header.match(/\binvoice\s*=\s*"([^"]+)"/i);
   if (match?.[1]) {
@@ -338,6 +350,20 @@ async function tryAutoPay(params: {
     return { result: payload };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function recordX402AutopayMetric(event: {
+  event: "attempt" | "success" | "failure" | "retry" | "circuit_breaker_trip";
+  count?: number;
+}): Promise<void> {
+  try {
+    await callGateway({
+      method: "web3.metrics.recordX402Autopay",
+      params: event,
+    });
+  } catch {
+    // Metrics emission must not block tool execution.
   }
 }
 
@@ -550,9 +576,16 @@ export async function handleToolsInvokeHttpRequest(
       const autoPayConfig = resolveX402AutopayConfig(cfg);
       let autoPayError: string | undefined;
       let autoPayResult: PaymentRequiredResult | undefined;
+      let autoPayAttempted = false;
+      let autoPaySucceeded = false;
+      let retryExhausted = false;
       if (!autoPayConfig.enabled) {
         autoPayError = "autopay disabled by config";
+      } else if (!idempotencyKey) {
+        autoPayError = "idempotency key required for autopay";
       } else if (invoice) {
+        autoPayAttempted = true;
+        await recordX402AutopayMetric({ event: "attempt" });
         const attempt = await tryAutoPay({ invoice, toolName, idempotencyKey });
         autoPayError = attempt.error;
         autoPayResult = attempt.result;
@@ -568,18 +601,32 @@ export async function handleToolsInvokeHttpRequest(
         });
 
         if (retryArgs) {
-          const maxRetries = autoPayConfig.maxRetries;
+          const maxRetries = resolveAutoPayMaxRetries({
+            configRetries: autoPayConfig.maxRetries,
+            paymentRequiredRetries: autoPayResult.maxRetries,
+          });
           for (let attemptIndex = 0; attemptIndex < maxRetries; attemptIndex += 1) {
             try {
               // oxlint-disable-next-line typescript/no-explicit-any
               const retryResult = await (tool as any).execute?.(`http-${Date.now()}`, retryArgs);
+              autoPaySucceeded = true;
+              await recordX402AutopayMetric({ event: "success" });
               sendJson(res, 200, { ok: true, result: retryResult });
               return true;
             } catch (retryErr) {
               autoPayError = getErrorMessage(retryErr) || autoPayError;
+              await recordX402AutopayMetric({ event: "retry" });
             }
           }
+          retryExhausted = maxRetries > 0;
         }
+      }
+
+      if (autoPayAttempted && !autoPaySucceeded) {
+        await recordX402AutopayMetric({ event: "failure" });
+      }
+      if (retryExhausted && !autoPaySucceeded) {
+        await recordX402AutopayMetric({ event: "circuit_breaker_trip" });
       }
 
       sendJson(res, 402, {

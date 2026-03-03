@@ -92,6 +92,13 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function normalizeRetryBudget(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  return Math.max(0, Math.floor(value));
+}
+
 export function createBillingHandlePaymentRequiredHandler(
   store: Web3StateStore,
   config: Web3PluginConfig,
@@ -143,6 +150,7 @@ export function createBillingHandlePaymentRequiredHandler(
           invoiceId: invoice.invoiceId,
           resumeToken: existing.resumeToken,
           authorization: buildPaymentAuthorization(existing.resumeToken),
+          maxRetries: normalizeRetryBudget(existing.maxRetries),
           reused: true,
         });
         return;
@@ -173,6 +181,7 @@ export function createBillingHandlePaymentRequiredHandler(
 
       const payload = (normalized.result ?? {}) as Record<string, unknown>;
       const txHash = typeof payload.txHash === "string" ? payload.txHash : undefined;
+      const maxRetries = normalizeRetryBudget(payload.policyAutoPayMaxRetries);
       const issuedAt = nowIso();
       const resumeToken: PaymentResumeToken = {
         invoiceId: invoice.invoiceId,
@@ -188,6 +197,7 @@ export function createBillingHandlePaymentRequiredHandler(
         invoiceHash,
         resumeToken,
         createdAt: issuedAt,
+        maxRetries,
       });
 
       respond(true, {
@@ -195,6 +205,7 @@ export function createBillingHandlePaymentRequiredHandler(
         invoiceId: invoice.invoiceId,
         resumeToken,
         authorization: buildPaymentAuthorization(resumeToken),
+        maxRetries,
         reused: false,
       });
     } catch (err) {

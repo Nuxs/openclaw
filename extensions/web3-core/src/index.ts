@@ -82,6 +82,7 @@ import { createWeb3MarketStatusTool } from "./market/web3-market-status-tool.js"
 import {
   createWeb3MetricsSnapshotHandler,
   createWeb3MonitorSnapshotHandler,
+  createWeb3RecordX402AutopayMetricHandler,
 } from "./metrics/metrics.js";
 import {
   createAlertsCommand,
@@ -409,6 +410,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod(
       "web3.metrics.snapshot",
       createWeb3MetricsSnapshotHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "web3.metrics.recordX402Autopay",
+      createWeb3RecordX402AutopayMetricHandler(store),
     );
     api.registerGatewayMethod(
       "web3.monitor.snapshot",

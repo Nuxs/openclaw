@@ -203,6 +203,47 @@ describe("market-core settlement handlers", () => {
     });
   });
 
+  it("records settlement_over_release_blocked audit event on over release", async () => {
+    await withStoreModes(tempDir, async ({ store, config }) => {
+      const offer = createOffer({ offerId: "offer-over-release", sellerId: "seller-1" });
+      const order = createOrder({
+        orderId: "order-over-release",
+        offerId: offer.offerId,
+        buyerId: "buyer-4",
+        status: "delivery_completed",
+      });
+      const settlement: Settlement = {
+        settlementId: "settlement-over-release",
+        orderId: order.orderId,
+        status: "settlement_locked",
+        amount: "100",
+        releasedAmount: "80",
+        strategy: "metered",
+        lockedAt: new Date().toISOString(),
+      };
+
+      store.saveOffer(offer);
+      store.saveOrder(order);
+      store.saveSettlement(settlement);
+
+      const handler = createSettlementReleaseHandler(store, config);
+      const responder = createResponder();
+      await handler({
+        params: {
+          actorId: offer.sellerId,
+          orderId: order.orderId,
+          amount: "30",
+          payees: [{ address: "0x0000000000000000000000000000000000000002", amount: "30" }],
+        },
+        respond: responder.respond,
+      } as any);
+
+      expect(responder.result()?.ok).toBe(false);
+      const events = store.readAuditEvents(100);
+      expect(events.some((event) => event.kind === "settlement_over_release_blocked")).toBe(true);
+    });
+  });
+
   it("refunds settlement and records reason", async () => {
     await withStoreModes(tempDir, async ({ store, config }) => {
       const offer = createOffer({ offerId: "offer-refund", sellerId: "seller-1" });
