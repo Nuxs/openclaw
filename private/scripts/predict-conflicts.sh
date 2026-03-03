@@ -95,10 +95,10 @@ if [[ -z "$BASE" ]]; then
   exit 1
 fi
 
-# 尝试 Git 2.38+ 的 merge-tree --write-tree，不支持时 fallback 到旧语法
+# 尝试 Git 2.38+ 的 merge-tree --write-tree；仅在能力缺失时 fallback 到近似预测
 merge_tree_output=""
-if git merge-tree --write-tree --messages --name-only HEAD "$TARGET_REF" >/dev/null 2>&1; then
-  # 新语法可用（注意：有冲突时可能返回非 0）
+if git merge-tree -h 2>&1 | grep -q -- '--write-tree'; then
+  # 注意：有冲突时命令可能返回非 0，但这不代表功能不可用
   merge_tree_output="$(git merge-tree --write-tree --messages --name-only HEAD "$TARGET_REF" 2>/dev/null || true)"
   printf '%s\n' "$merge_tree_output" \
     | sed -n 's/^CONFLICT .*: Merge conflict in //p' \
@@ -114,7 +114,7 @@ else
   rm -f "$ours_changed" "$theirs_changed"
 
   if [[ -s "$conflicts_tmp" && "$OUTPUT_MODE" == "text" ]]; then
-    echo "⚠️  Git 版本较旧（$(git --version)），冲突预测为近似结果（双方都修改的文件）。"
+    echo "⚠️  当前 Git 不支持 merge-tree --write-tree（$(git --version)），冲突预测为近似结果（双方都修改的文件）。"
   fi
 fi
 

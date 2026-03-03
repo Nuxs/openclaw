@@ -25,8 +25,14 @@ description: 维护 OpenClaw 私有化 fork（overlay-first），降低与 upstr
 ### 1) 同步上游前先预测冲突
 
 - `bash private/scripts/predict-conflicts.sh`
+- 如只关心预测结果、避免 fetch 日志噪音：`bash private/scripts/predict-conflicts.sh --no-fetch`
 
 输出会按“品牌相关/非品牌”分组。优先把“品牌相关”继续迁移到运行时（减少改源码）。
+
+预测准确性说明：
+
+- 优先使用 `git merge-tree --write-tree` 做精确预测。
+- 仅当当前 Git 不支持该能力时，才回退到“双方都改过文件”的近似预测（可能偏多）。
 
 ### 2) 同步上游（merge 或 rebase）
 
@@ -74,3 +80,4 @@ description: 维护 OpenClaw 私有化 fork（overlay-first），降低与 upstr
 - **把 token 写进 `private/env/prod.env` 并提交**：禁止。请用 `prod.env.local` 或 Secret。
 - **品牌化通过改 `src/`**：会导致每次合流都冲突；优先改运行时品牌入口。
 - **提交 `pnpm-workspace.yaml` 的裁剪改动**：除非你非常确定，否则不要把“裁剪 workspace 包”的变更进主线。
+- **把 `git fetch` 输出（如 `[new tag] ...`）当成“冲突文件”**：这些是远端更新提示，不是冲突集合。冲突集合只看脚本分组列表。
