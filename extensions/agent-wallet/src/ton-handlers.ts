@@ -52,7 +52,11 @@ function parseAmount(value: unknown, label: string): bigint {
 async function enforcePolicy(
   config: AgentWalletConfig,
   intent: PolicyIntent,
-): Promise<{ commitUsage: () => Promise<void>; rollbackUsage: () => Promise<void> }> {
+): Promise<{
+  commitUsage: () => Promise<void>;
+  rollbackUsage: () => Promise<void>;
+  autoPayMaxRetries?: number;
+}> {
   if (!config.policy.enabled) {
     return {
       commitUsage: async () => undefined,
@@ -111,11 +115,18 @@ async function enforcePolicy(
     throw new Error(`POLICY_REJECTED:${decision.reasonCode}`);
   }
 
+  const autoPayMaxRetriesRaw = loadedPolicy.policy?.autoPay?.maxRetries;
+  const autoPayMaxRetries =
+    typeof autoPayMaxRetriesRaw === "number" && Number.isFinite(autoPayMaxRetriesRaw)
+      ? Math.max(0, Math.floor(autoPayMaxRetriesRaw))
+      : undefined;
+
   return {
     commitUsage: async () => {
       // Budget already pre-committed in reserveDailyBudget, nothing more to do.
     },
     rollbackUsage: rollback ?? (async () => undefined),
+    autoPayMaxRetries,
   };
 }
 
@@ -237,7 +248,11 @@ export function createTonWalletAutopayHandler(config: AgentWalletConfig): Gatewa
         const { provider } = await ensureTonConnected(config);
         const txHash = await provider.transfer(to, amount);
         await enforcement.commitUsage();
-        respond(true, { txHash, chain: "ton" });
+        respond(true, {
+          txHash,
+          chain: "ton",
+          policyAutoPayMaxRetries: enforcement.autoPayMaxRetries,
+        });
       } catch (txErr) {
         await enforcement.rollbackUsage();
         throw txErr;

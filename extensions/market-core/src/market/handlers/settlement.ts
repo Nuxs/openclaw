@@ -318,6 +318,15 @@ export function createSettlementReleaseHandler(
         completed: result.completed,
       });
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("SETTLEMENT_OVER_RELEASE")) {
+        const input = (params ?? {}) as Record<string, unknown>;
+        const orderId = typeof input.orderId === "string" ? input.orderId : "unknown";
+        const actorId = typeof input.actorId === "string" ? input.actorId : undefined;
+        recordAudit(store, "settlement_over_release_blocked", orderId, undefined, actorId, {
+          reason: "SETTLEMENT_OVER_RELEASE",
+        });
+      }
       respond(false, formatGatewayErrorResponse(err));
     }
   };

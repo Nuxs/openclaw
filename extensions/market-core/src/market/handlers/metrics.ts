@@ -54,6 +54,12 @@ export function createMarketMetricsSnapshotHandler(
       const anchorPending = auditEvents.filter(
         (event) => event.details && typeof event.details.anchorError === "string",
       ).length;
+      const settlementPartialReleaseCount = auditEvents.filter(
+        (event) => event.kind === "settlement_released" && event.details?.completed === false,
+      ).length;
+      const settlementOverReleaseBlockedCount = auditEvents.filter(
+        (event) => event.kind === "settlement_over_release_blocked",
+      ).length;
 
       const now = Date.now();
       const unresolvedDisputes = disputes.filter(
@@ -102,6 +108,12 @@ export function createMarketMetricsSnapshotHandler(
           triggered: revocationPending > 20,
           value: revocationPending,
         },
+        {
+          rule: "settlement_over_release_blocked",
+          severity: "p1",
+          triggered: settlementOverReleaseBlockedCount > 0,
+          value: settlementOverReleaseBlockedCount,
+        },
       ];
 
       respond(true, {
@@ -111,6 +123,8 @@ export function createMarketMetricsSnapshotHandler(
           total: settlements.length,
           byStatus: countByStatus(settlements),
           failureRate: settlementFailureRate,
+          partialReleaseCount: settlementPartialReleaseCount,
+          overReleaseBlockedCount: settlementOverReleaseBlockedCount,
         },
         leases: {
           total: leases.length,

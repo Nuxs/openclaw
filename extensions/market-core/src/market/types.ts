@@ -180,6 +180,7 @@ export type AuditEventKind =
   | "ledger_appended"
   | "settlement_released"
   | "settlement_refunded"
+  | "settlement_over_release_blocked"
   | "dispute_opened"
   | "dispute_evidence_submitted"
   | "dispute_resolved"
