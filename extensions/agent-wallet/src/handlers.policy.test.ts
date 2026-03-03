@@ -30,35 +30,6 @@ vi.mock("./wallet.js", () => ({
   loadOrCreateWallet: vi.fn(async () => mockWallet),
 }));
 
-function buildConfig(overrides?: Partial<AgentWalletConfig>): AgentWalletConfig {
-  return {
-    enabled: true,
-    chain: { network: "base" },
-    policy: {
-      enabled: true,
-      inlinePolicy: {
-        version: "v1",
-        budget: {
-          dailyCap: "1000",
-          perTxCap: "500",
-          currency: "USDC",
-        },
-        scope: {
-          allowedContracts: [mockWallet.address],
-          allowedMethods: ["0xa9059cbb", "sign_message"],
-          allowedTools: ["agent-wallet.send", "agent-wallet.sign"],
-          allowedChains: ["evm"],
-        },
-        autoPay: {
-          enabled: false,
-          maxRetries: 1,
-        },
-      },
-    },
-    ...overrides,
-  };
-}
-
 function buildHandlerOptions(
   params: Record<string, unknown>,
   respond: GatewayRequestHandlerOptions["respond"],
@@ -81,6 +52,36 @@ function buildHandlerOptions(
 
 describe("agent-wallet handlers policy guard", () => {
   let tmpDir: string;
+
+  function buildConfig(overrides?: Partial<AgentWalletConfig>): AgentWalletConfig {
+    return {
+      enabled: true,
+      chain: { network: "base" },
+      policy: {
+        enabled: true,
+        statePath: path.join(tmpDir, "policy-state.json"),
+        inlinePolicy: {
+          version: "v1",
+          budget: {
+            dailyCap: "1000",
+            perTxCap: "500",
+            currency: "USDC",
+          },
+          scope: {
+            allowedContracts: [mockWallet.address],
+            allowedMethods: ["0xa9059cbb", "sign_message"],
+            allowedTools: ["agent-wallet.send", "agent-wallet.sign"],
+            allowedChains: ["evm"],
+          },
+          autoPay: {
+            enabled: false,
+            maxRetries: 1,
+          },
+        },
+      },
+      ...overrides,
+    };
+  }
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -118,15 +119,7 @@ describe("agent-wallet handlers policy guard", () => {
 
   it("allows send when request matches policy", async () => {
     const { createAgentWalletSendHandler } = await import("./handlers.js");
-    const baseConfig = buildConfig();
-    const handler = createAgentWalletSendHandler(
-      buildConfig({
-        policy: {
-          ...baseConfig.policy,
-          statePath: path.join(tmpDir, "policy-state.json"),
-        },
-      }),
-    );
+    const handler = createAgentWalletSendHandler(buildConfig());
 
     let ok = false;
     let payload: unknown;
@@ -157,7 +150,6 @@ describe("agent-wallet handlers policy guard", () => {
       buildConfig({
         policy: {
           ...baseConfig.policy,
-          statePath: path.join(tmpDir, "policy-state.json"),
           inlinePolicy: {
             ...basePolicy,
             budget: {

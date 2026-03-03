@@ -29,35 +29,6 @@ vi.mock("./ton-wallet.js", () => ({
   loadOrCreateTonWallet: vi.fn(async () => mockTonWallet),
 }));
 
-function buildConfig(overrides?: Partial<AgentWalletConfig>): AgentWalletConfig {
-  return {
-    enabled: true,
-    chain: { network: "ton-testnet" },
-    policy: {
-      enabled: true,
-      inlinePolicy: {
-        version: "v1",
-        budget: {
-          dailyCap: "1000",
-          perTxCap: "300",
-          currency: "TON",
-        },
-        scope: {
-          allowedContracts: [mockTonWallet.address],
-          allowedMethods: ["ton_transfer"],
-          allowedTools: ["agent-wallet.send"],
-          allowedChains: ["ton"],
-        },
-        autoPay: {
-          enabled: false,
-          maxRetries: 1,
-        },
-      },
-    },
-    ...overrides,
-  };
-}
-
 function buildHandlerOptions(
   params: Record<string, unknown>,
   respond: GatewayRequestHandlerOptions["respond"],
@@ -80,6 +51,36 @@ function buildHandlerOptions(
 
 describe("ton handlers policy guard", () => {
   let tmpDir: string;
+
+  function buildConfig(overrides?: Partial<AgentWalletConfig>): AgentWalletConfig {
+    return {
+      enabled: true,
+      chain: { network: "ton-testnet" },
+      policy: {
+        enabled: true,
+        statePath: path.join(tmpDir, "policy-state.json"),
+        inlinePolicy: {
+          version: "v1",
+          budget: {
+            dailyCap: "1000",
+            perTxCap: "300",
+            currency: "TON",
+          },
+          scope: {
+            allowedContracts: [mockTonWallet.address],
+            allowedMethods: ["ton_transfer"],
+            allowedTools: ["agent-wallet.send"],
+            allowedChains: ["ton"],
+          },
+          autoPay: {
+            enabled: false,
+            maxRetries: 1,
+          },
+        },
+      },
+      ...overrides,
+    };
+  }
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -116,15 +117,7 @@ describe("ton handlers policy guard", () => {
 
   it("allows send for valid amount", async () => {
     const { createTonWalletSendHandler } = await import("./ton-handlers.js");
-    const baseConfig = buildConfig();
-    const handler = createTonWalletSendHandler(
-      buildConfig({
-        policy: {
-          ...baseConfig.policy,
-          statePath: path.join(tmpDir, "policy-state.json"),
-        },
-      }),
-    );
+    const handler = createTonWalletSendHandler(buildConfig());
 
     let ok = false;
     let payload: unknown;
@@ -154,7 +147,6 @@ describe("ton handlers policy guard", () => {
       buildConfig({
         policy: {
           ...baseConfig.policy,
-          statePath: path.join(tmpDir, "policy-state.json"),
           inlinePolicy: {
             ...basePolicy,
             budget: {
