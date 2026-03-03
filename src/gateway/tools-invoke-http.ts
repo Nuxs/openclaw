@@ -147,11 +147,31 @@ type PaymentResumeToken = {
   expiresAt: string;
 };
 
+type PaymentTraceRef = {
+  requestId?: string;
+  idempotencyKey: string;
+  invoiceId: string;
+  paymentReceiptId: string;
+  txHash?: string;
+  toolName?: string;
+  createdAt: string;
+};
+
 type PaymentRequiredResult = {
   authorization?: string;
   resumeToken?: PaymentResumeToken;
   reused?: boolean;
   maxRetries?: number;
+  trace?: PaymentTraceRef;
+};
+
+type X402AutopayAlert = {
+  rule?: unknown;
+  triggered?: unknown;
+};
+
+type X402MetricsSnapshotResult = {
+  alerts?: unknown;
 };
 
 type GatewayCallResult = {
@@ -299,6 +319,10 @@ function extractInvoiceFromAuthenticate(header: string): string | undefined {
   return undefined;
 }
 
+function resolveRequestIdHeader(req: IncomingMessage): string | undefined {
+  return getHeader(req, "x-openclaw-request-id")?.trim() || getHeader(req, "x-request-id")?.trim();
+}
+
 function applyPaymentResumeToken(params: {
   args: Record<string, unknown>;
   toolSchema: unknown;
@@ -332,6 +356,7 @@ async function tryAutoPay(params: {
   invoice: string;
   toolName: string;
   idempotencyKey?: string;
+  requestId?: string;
 }): Promise<{ result?: PaymentRequiredResult; error?: string }> {
   try {
     const response = await callGateway({
@@ -340,6 +365,7 @@ async function tryAutoPay(params: {
         invoice: params.invoice,
         tool: params.toolName,
         idempotencyKey: params.idempotencyKey,
+        requestId: params.requestId,
       },
     });
     const normalized = normalizeGatewayResult(response);
@@ -364,6 +390,34 @@ async function recordX402AutopayMetric(event: {
     });
   } catch {
     // Metrics emission must not block tool execution.
+  }
+}
+
+async function shouldDegradeX402AutopayByHealth(): Promise<boolean> {
+  try {
+    const response = await callGateway({ method: "web3.metrics.snapshot", params: {} });
+    const normalized = normalizeGatewayResult(response);
+    if (!normalized.ok || !normalized.result || typeof normalized.result !== "object") {
+      return false;
+    }
+    const snapshot = normalized.result as X402MetricsSnapshotResult;
+    const alertsRaw = snapshot.alerts;
+    if (!Array.isArray(alertsRaw)) {
+      return false;
+    }
+
+    // Guardrail: degrade autopay when key x402 alerts are actively triggered.
+    return alertsRaw.some((entry) => {
+      const alert = entry as X402AutopayAlert;
+      const rule = typeof alert.rule === "string" ? alert.rule : "";
+      const triggered = alert.triggered === true;
+      if (!triggered) {
+        return false;
+      }
+      return rule === "x402_autopay_failure_rate" || rule === "x402_autopay_circuit_breaker_trips";
+    });
+  } catch {
+    return false;
   }
 }
 
@@ -452,6 +506,7 @@ export async function handleToolsInvokeHttpRequest(
   const agentTo = getHeader(req, "x-openclaw-message-to")?.trim() || undefined;
   const agentThreadId = getHeader(req, "x-openclaw-thread-id")?.trim() || undefined;
   const idempotencyKey = getHeader(req, "x-idempotency-key")?.trim() || undefined;
+  const requestId = resolveRequestIdHeader(req);
 
   const {
     agentId,
@@ -584,11 +639,16 @@ export async function handleToolsInvokeHttpRequest(
       } else if (!idempotencyKey) {
         autoPayError = "idempotency key required for autopay";
       } else if (invoice) {
-        autoPayAttempted = true;
-        await recordX402AutopayMetric({ event: "attempt" });
-        const attempt = await tryAutoPay({ invoice, toolName, idempotencyKey });
-        autoPayError = attempt.error;
-        autoPayResult = attempt.result;
+        const healthGuardTriggered = await shouldDegradeX402AutopayByHealth();
+        if (healthGuardTriggered) {
+          autoPayError = "autopay degraded by health guard";
+        } else {
+          autoPayAttempted = true;
+          await recordX402AutopayMetric({ event: "attempt" });
+          const attempt = await tryAutoPay({ invoice, toolName, idempotencyKey, requestId });
+          autoPayError = attempt.error;
+          autoPayResult = attempt.result;
+        }
       }
 
       if (autoPayResult?.authorization || autoPayResult?.resumeToken) {
@@ -635,8 +695,10 @@ export async function handleToolsInvokeHttpRequest(
           type: "payment_required",
           message: "payment required",
           invoice,
+          requestId,
           authorization: autoPayResult?.authorization,
           resumeToken: autoPayResult?.resumeToken,
+          trace: autoPayResult?.trace,
           autoPayError,
         },
       });

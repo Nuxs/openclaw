@@ -17,7 +17,7 @@ import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AuditEvent } from "../audit/types.js";
-import type { PaymentResumeToken, UsageRecord } from "../billing/types.js";
+import type { PaymentResumeToken, PaymentTraceRef, UsageRecord } from "../billing/types.js";
 import type { SiweChallenge, WalletBinding } from "../identity/types.js";
 import type { AlertEvent } from "../monitor/types.js";
 
@@ -49,6 +49,8 @@ export type PendingSettlement = {
 
 export type PaymentRequiredRecord = {
   idempotencyKey: string;
+  requestId?: string;
+  toolName?: string;
   invoiceHash: string;
   resumeToken: PaymentResumeToken;
   createdAt: string;
@@ -464,6 +466,22 @@ export class Web3StateStore {
       PaymentRequiredRecord
     >;
     return Object.values(map);
+  }
+
+  listPaymentTraceRefs(limit = 50): PaymentTraceRef[] {
+    const records = this.listPaymentRequiredRecords();
+    return records
+      .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, Math.max(1, Math.floor(limit)))
+      .map((record) => ({
+        requestId: record.requestId,
+        idempotencyKey: record.idempotencyKey,
+        invoiceId: record.resumeToken.invoiceId,
+        paymentReceiptId: record.resumeToken.paymentReceiptId,
+        txHash: record.resumeToken.txHash,
+        toolName: record.toolName,
+        createdAt: record.createdAt,
+      }));
   }
 
   savePaymentRequired(record: PaymentRequiredRecord): void {

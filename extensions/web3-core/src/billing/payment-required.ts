@@ -6,7 +6,7 @@ import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode } from "../errors/codes.js";
 import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.js";
 import type { Web3StateStore } from "../state/store.js";
-import type { PaymentRequiredInvoice, PaymentResumeToken } from "./types.js";
+import type { PaymentRequiredInvoice, PaymentResumeToken, PaymentTraceRef } from "./types.js";
 
 export class PaymentRequiredError extends Error {
   readonly status = 402;
@@ -24,6 +24,7 @@ export class PaymentRequiredError extends Error {
 type PaymentRequiredInput = {
   invoice?: unknown;
   idempotencyKey?: unknown;
+  requestId?: unknown;
   tool?: unknown;
 };
 
@@ -92,11 +93,37 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function optionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function normalizeRetryBudget(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return undefined;
   }
   return Math.max(0, Math.floor(value));
+}
+
+function buildPaymentTraceRef(params: {
+  requestId?: string;
+  idempotencyKey: string;
+  resumeToken: PaymentResumeToken;
+  toolName?: string;
+  createdAt: string;
+}): PaymentTraceRef {
+  return {
+    requestId: params.requestId,
+    idempotencyKey: params.idempotencyKey,
+    invoiceId: params.resumeToken.invoiceId,
+    paymentReceiptId: params.resumeToken.paymentReceiptId,
+    txHash: params.resumeToken.txHash,
+    toolName: params.toolName,
+    createdAt: params.createdAt,
+  };
 }
 
 export function createBillingHandlePaymentRequiredHandler(
@@ -108,6 +135,8 @@ export function createBillingHandlePaymentRequiredHandler(
       const input = (params ?? {}) as PaymentRequiredInput;
       const invoiceRaw = requireString(input.invoice, "invoice");
       const invoice = parseInvoice(invoiceRaw);
+      const requestId = optionalString(input.requestId);
+      const toolName = optionalString(input.tool);
       const idempotencyKey =
         typeof input.idempotencyKey === "string" && input.idempotencyKey.trim().length > 0
           ? input.idempotencyKey.trim()
@@ -151,6 +180,13 @@ export function createBillingHandlePaymentRequiredHandler(
           resumeToken: existing.resumeToken,
           authorization: buildPaymentAuthorization(existing.resumeToken),
           maxRetries: normalizeRetryBudget(existing.maxRetries),
+          trace: buildPaymentTraceRef({
+            requestId: existing.requestId ?? requestId,
+            idempotencyKey,
+            resumeToken: existing.resumeToken,
+            toolName: existing.toolName,
+            createdAt: existing.createdAt,
+          }),
           reused: true,
         });
         return;
@@ -170,7 +206,7 @@ export function createBillingHandlePaymentRequiredHandler(
         params: {
           to: invoice.payTo,
           value: invoice.amount,
-          tool: input.tool,
+          tool: toolName,
         },
         timeoutMs: config.brain.timeoutMs,
       });
@@ -194,6 +230,8 @@ export function createBillingHandlePaymentRequiredHandler(
 
       store.savePaymentRequired({
         idempotencyKey,
+        requestId,
+        toolName,
         invoiceHash,
         resumeToken,
         createdAt: issuedAt,
@@ -206,6 +244,13 @@ export function createBillingHandlePaymentRequiredHandler(
         resumeToken,
         authorization: buildPaymentAuthorization(resumeToken),
         maxRetries,
+        trace: buildPaymentTraceRef({
+          requestId,
+          idempotencyKey,
+          resumeToken,
+          toolName,
+          createdAt: issuedAt,
+        }),
         reused: false,
       });
     } catch (err) {

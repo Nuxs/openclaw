@@ -47,6 +47,7 @@ export const WEB3_READ_METHODS: readonly string[] = [
   "web3.monitor.snapshot",
   "web3.billing.status",
   "web3.billing.summary",
+  "web3.billing.paymentTrace.query",
   "web3.audit.query",
   "web3.market.reconciliation.summary",
 ] as const;

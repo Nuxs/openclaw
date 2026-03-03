@@ -57,3 +57,13 @@ export type PaymentResumeToken = {
   issuedAt: string;
   expiresAt: string;
 };
+
+export type PaymentTraceRef = {
+  requestId?: string;
+  idempotencyKey: string;
+  invoiceId: string;
+  paymentReceiptId: string;
+  txHash?: string;
+  toolName?: string;
+  createdAt: string;
+};
