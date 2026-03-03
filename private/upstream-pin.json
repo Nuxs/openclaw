@@ -2,12 +2,22 @@
   "upstream": {
     "remote": "upstream",
     "ref": "upstream/main",
-    "sha": "097a6a83a0184e0977ec6836177f930a01305337"
+    "sha": "b1b41eb44323ac7eda111eafe28f29e1f1593e3b"
   },
   "sync": {
-    "beforeSha": "75d16272f1627cafc1956934444341f76d18db02",
-    "afterSha": "75d16272f1627cafc1956934444341f76d18db02",
-    "at": "2026-02-24T09:47:42.725Z",
+    "beforeSha": "6dd8017841273d73a8e94c33e51633226e9e7963",
+    "afterSha": "65beb40166a5e69c13a7fa7376c68de58dd55194",
+    "at": "2026-03-03T07:09:29Z",
     "strategy": "merge"
+  },
+  "conflicts": {
+    "predicted": {
+      "total": 2,
+      "brand": 0,
+      "other": 2,
+      "files": ["CHANGELOG.md", "src/plugin-sdk/index.ts"],
+      "brandFiles": [],
+      "otherFiles": ["CHANGELOG.md", "src/plugin-sdk/index.ts"]
+    }
   }
 }
