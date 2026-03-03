@@ -70,8 +70,8 @@ export class BlockchainError extends Error {
  * EVM 特定错误
  */
 export class EvmError extends BlockchainError {
-  constructor(message: string, details?: unknown) {
-    super(message, ErrorCode.UNKNOWN, "evm", details);
+  constructor(message: string, code: ErrorCode = ErrorCode.UNKNOWN, details?: unknown) {
+    super(message, code, "evm", details);
     this.name = "EvmError";
   }
 
