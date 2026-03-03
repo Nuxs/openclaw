@@ -198,10 +198,8 @@ export class EVMProvider implements IProviderEVM {
     TTypes extends Record<string, { name: string; type: string }[]>,
     TValues extends Record<string, unknown>,
   >(domain: TDomain, types: TTypes, value: TValues): Promise<`0x${string}`> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { name: _domainName, ...domainWithoutName } = domain;
     return this.walletClient.signTypedData(
-      domainWithoutName as any,
+      domain as any,
       types as any,
       value as any,
     ) as Promise<`0x${string}`>;

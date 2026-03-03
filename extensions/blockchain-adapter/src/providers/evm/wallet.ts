@@ -13,6 +13,7 @@ import {
   createPublicClient,
   http,
   hashMessage,
+  hashTypedData,
   type WalletClient,
   type PublicClient,
   type Hash,
@@ -259,54 +260,48 @@ export class EvmWallet {
     },
     TTypes extends Record<string, { name: string; type: string }[]>,
     TValues extends Record<string, unknown>,
-  >(domain: TDomain, types: TTypes, value: TValues): Promise<`0x${string}`> {
+  >(domain: TDomain, types: TTypes, value: TValues, primaryType?: string): Promise<`0x${string}`> {
     if (!this._address) {
       throw new NotConnectedError("evm");
     }
 
-    // 移除 EIP-712 Domain 类型名称 (viem 要求)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { name: _domainName, ...domainWithoutName } = domain;
+    const resolvedPrimaryType = primaryType ?? Object.keys(types)[0];
 
     switch (this.signerMode.type) {
       case "private-key": {
-        // 使用 WalletClient 签名 (已绑定 account)
         if (!this.walletClient) {
           throw new NotConnectedError("evm");
         }
         // @ts-expect-error viem 2.x signTypedData 类型复杂，运行时绑定
         return this.walletClient.signTypedData({
-          domain: domainWithoutName as never,
+          domain: domain as never,
           types: types as never,
-          primaryType: Object.keys(types)[0] as never,
+          primaryType: resolvedPrimaryType as never,
           message: value as never,
         });
       }
 
       case "browser-wallet": {
-        // 浏览器钱包签名 - 通过外部 provider
         if (!this.walletClient) {
           throw new NotConnectedError("evm");
         }
         // @ts-expect-error viem 2.x signTypedData 类型复杂，运行时绑定
         return this.walletClient.signTypedData({
-          domain: domainWithoutName as never,
+          domain: domain as never,
           types: types as never,
-          primaryType: Object.keys(types)[0] as never,
+          primaryType: resolvedPrimaryType as never,
           message: value as never,
         });
       }
 
       case "remote-signature": {
-        // 远程签名需要构建完整的 EIP-712 消息
-        const typedData = {
-          domain: domainWithoutName,
-          types,
-          primaryType: Object.keys(types)[0],
-          message: value,
-        };
-        // 这里返回空实现，实际需要构建 EIP-712 哈希
-        const messageHash = hashMessage(JSON.stringify(typedData));
+        // EIP-712: 使用 hashTypedData 生成正确的结构化哈希
+        const messageHash = hashTypedData({
+          domain: domain as any,
+          types: types as any,
+          primaryType: resolvedPrimaryType,
+          message: value as any,
+        });
         return this.signerMode.signFn(messageHash);
       }
 
