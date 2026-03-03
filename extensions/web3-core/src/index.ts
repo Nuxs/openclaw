@@ -35,6 +35,7 @@ import { resolveConfig } from "./config.js";
 import { createWeb3DashboardCommand } from "./dashboard/command.js";
 import { createDiscoveryBackend } from "./discovery/factory.js";
 import { ingestDiscoveryRecords } from "./discovery/ingest.js";
+import { buildSignedDiscoveryRecord } from "./discovery/publish-record.js";
 import type { DiscoveryBackend, DiscoveryRecord } from "./discovery/types.js";
 import { formatWeb3GatewayErrorResponse } from "./errors.js";
 import {
@@ -421,7 +422,7 @@ const plugin: OpenClawPluginDefinition = {
         onReportAccepted: async (entry) => {
           if (!config.discovery.enabled) return;
           if (!discoveryBackend) return;
-          const record = toDiscoveryRecord(entry, discoveryBackend);
+          const record = toDiscoveryRecord(entry, discoveryBackend, store.getIndexSigningKey());
           await discoveryBackend.publish(record);
         },
       }),
@@ -629,7 +630,9 @@ const plugin: OpenClawPluginDefinition = {
               if (providerId) {
                 const entries = store.getResourceIndex().filter((e) => e.providerId === providerId);
                 for (const entry of entries) {
-                  await backend.publish(toDiscoveryRecord(entry, backend));
+                  await backend.publish(
+                    toDiscoveryRecord(entry, backend, store.getIndexSigningKey()),
+                  );
                 }
               }
             } catch (err) {
@@ -680,23 +683,18 @@ const plugin: OpenClawPluginDefinition = {
 
 // ---- Gateway handler helpers ----
 
-function toDiscoveryRecord(entry: ResourceIndexEntry, backend: DiscoveryBackend): DiscoveryRecord {
-  return {
-    providerId: entry.providerId,
-    peerId: entry.peerId ?? (backend as any).node?.peerId?.toString() ?? "",
-    resources: entry.resources.map((resource) => ({
-      resourceId: resource.resourceId,
-      kind: resource.kind,
-      label: resource.label,
-      tags: resource.tags,
-      price: resource.price,
-      unit: resource.unit,
-    })),
+function toDiscoveryRecord(
+  entry: ResourceIndexEntry,
+  backend: DiscoveryBackend,
+  signingKey: ReturnType<Web3StateStore["getIndexSigningKey"]>,
+): DiscoveryRecord {
+  const peerId = entry.peerId ?? (backend as any).node?.peerId?.toString() ?? "";
+  return buildSignedDiscoveryRecord({
+    entry,
+    peerId,
     reachability: entry.reachability ?? "unknown",
-    updatedAt: entry.updatedAt,
-    expiresAt: entry.expiresAt,
-    signature: entry.signature as DiscoveryRecord["signature"],
-  };
+    signingKey,
+  });
 }
 
 function createAuditQueryHandler(store: Web3StateStore): GatewayRequestHandler {

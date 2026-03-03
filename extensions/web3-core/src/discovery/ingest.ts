@@ -53,6 +53,19 @@ function isExpired(record: DiscoveryRecord, now: number): boolean {
   return expiresMs <= now;
 }
 
+function getSignatureRejectionReason(record: DiscoveryRecord): string | undefined {
+  if (!record.signature) {
+    return "signature missing";
+  }
+  if (record.signature.payloadVersion !== 2) {
+    return `payloadVersion must be 2 (got ${record.signature.payloadVersion ?? "missing"})`;
+  }
+  if (!record.peerId || record.peerId.trim().length === 0) {
+    return "peerId missing";
+  }
+  return undefined;
+}
+
 /**
  * Convert a verified DiscoveryRecord into a ResourceIndexEntry.
  *
@@ -139,8 +152,16 @@ export function ingestDiscoveryRecords(
       continue;
     }
 
-    // 2. Signature verification
+    // 2. Signature version gate + cryptographic verification
     if (!skip) {
+      const signatureError = getSignatureRejectionReason(record);
+      if (signatureError) {
+        result.rejected++;
+        result.rejections[pid] = `signature: ${signatureError}`;
+        logger(`[mdl:ingest] Signature verification failed for ${pid}: ${signatureError}`);
+        continue;
+      }
+
       // Build a temporary ResourceIndexEntry for verification
       const tempEntry = toResourceIndexEntry(record);
       const verification = verifyIndexSignature(tempEntry);

@@ -280,14 +280,17 @@ extensions/web3-core/src/discovery/
 ### 数据流
 
 ```
-Publish: web3.index.report(success) → indexer 签名(v2) → store
-           → onReportAccepted hook → DiscoveryBackend.publish()
+Publish: web3.index.report(success) → indexer 本地签名(v1, 保持兼容) → store
+           → onReportAccepted hook / 周期 publish
+           → buildSignedDiscoveryRecord(按 Discovery 摘要重签 v2)
+           → DiscoveryBackend.publish()
            → DHT putProvider(按资源粒度 key) + Rendezvous register
 
 Discover: Background Service → DiscoveryBackend.discover()
            → DHT findProviders(资源粒度 key) + Rendezvous discover(按 kind)
            → 远端记录交换/聚合 → DiscoveryRecord[]
-           → ingest(验签+过滤) → upsert store → web3.index.list 可见
+           → ingest(payloadVersion=2 强校验 + 验签 + 过滤)
+           → upsert store → web3.index.list 可见
 
 Connect:  Consumer → web3.index.list(peerId+reachability)
            → web3.resources.lease → ConsumerLeaseAccess(connectionRef)
@@ -296,9 +299,10 @@ Connect:  Consumer → web3.index.list(peerId+reachability)
 
 ### 签名兼容方案
 
-- **v1 payload**: 现有字段集 (providerId/endpoint/resources/meta/updatedAt/expiresAt/lastHeartbeatAt) — 完全不改
-- **v2 payload**: v1 + { peerId, reachability, payloadVersion: 2 }
-- 验签入口通过 `signature.payloadVersion` 判断分支，v1 路径零修改
+- **v1 payload**: 现有字段集 (providerId/endpoint/resources/meta/updatedAt/expiresAt/lastHeartbeatAt) — 本地索引链路保持不变
+- **v2 payload**: Discovery 摘要语义 + { peerId, reachability, payloadVersion: 2 }，在发布前由 `buildSignedDiscoveryRecord` 重签
+- **ingest 准入**: discovery 入库要求 `signature.payloadVersion === 2`，否则拒绝；通过后再做 Ed25519 验签
+- 验签入口仍兼容 v1（用于非 discovery 的历史/本地数据）
 
 ### 配置
 

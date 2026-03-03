@@ -205,6 +205,19 @@ describe("ingestDiscoveryRecords", () => {
     expect(result.rejections["provider-test"]).toContain("signature:");
   });
 
+  it("rejects records signed without payloadVersion=2", () => {
+    const store = createMockStore();
+    const record = makeSignedRecord();
+    if (record.signature) {
+      delete (record.signature as { payloadVersion?: number }).payloadVersion;
+    }
+
+    const result = ingestDiscoveryRecords([record], store as any, { logger, now });
+    expect(result.accepted).toBe(0);
+    expect(result.rejected).toBe(1);
+    expect(result.rejections["provider-test"]).toContain("payloadVersion must be 2");
+  });
+
   it("upserts same providerId — second record overwrites first", () => {
     const keys = genKeys();
     const store = createMockStore();
