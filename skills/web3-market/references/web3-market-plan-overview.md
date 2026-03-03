@@ -111,6 +111,7 @@ OpenClaw Web3 Market 让你的 **AI 管家**可以安全地**发现、租用与�
 - **Phase 4：去中心化索引与产品化 UI 进阶**
   - **产出**：DHT/去中心化索引传输层；用户与管理台分层体验。
   - **验收**：索引可去中心化迁移，用户/运维界面各自清晰。
+  - **MDL 实施计划**（⏳ 执行中）：`skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`
 
 ### **Phase 1 上线硬 Gate（必须全部通过）**
 

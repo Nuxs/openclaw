@@ -106,17 +106,26 @@
 
 ---
 
-## 4. 下一步（与 Week3-5 路线图对齐）
+## 4. 下一步
 
-- PayFi 演进路线图：`skills/web3-market/internal/WEB3_DEV_PLAN_PAYFI.md` (NEW)
+### 4.1 MDL（Market Discovery Layer）— ⏳ 执行中
+
+- **目标**：基于 libp2p（DHT + Rendezvous）实现去中心化资源发现层，替代"局域网 + 配置"模式
+- **实施计划**：`skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`
+- **执行切片**：A(类型+NS) → B(签名v2) → C(ingest+静态后端) → D(libp2p后端) → E(插件集成) → F(文档)
+- **安全约束**：发现不暴露 endpoint/token、market.lease.issue 零改动、默认 disabled
+
+### 4.2 既有路线图
+
+- PayFi 演进路线图：`skills/web3-market/internal/WEB3_DEV_PLAN_PAYFI.md`
 - 路线图：`skills/web3-market/internal/WEB3_WEEK3_5_ROADMAP.md`
-
 - 5 周执行计划：`skills/web3-market/internal/WEB3_DEV_PLAN_5_WEEKS.md`
 - 走查差距报告：`skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
 
-相关入口：
+### 相关入口
 
 - Web3 Market Dev：[/reference/web3-market-dev](/reference/web3-market-dev)
 - 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
 - AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 插件文档：[/plugins/web3-core](/plugins/web3-core)、[/plugins/market-core](/plugins/market-core)
+- MDL 实施计划：`skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`

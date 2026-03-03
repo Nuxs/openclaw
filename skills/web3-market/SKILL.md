@@ -37,6 +37,7 @@ Read these files as needed:
 - `skills/web3-market/references/web3-market-resource-implementation-checklist.md`
 - `skills/web3-market/references/web3-market-tools-commands-evolution.md`
 - `skills/web3-market/references/web3-market-assessment-2026-02-19.md`
+- `skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md` ← **MDL（Market Discovery Layer）：基于 libp2p 的去中心化发现层实施计划（可量化追溯）**
 
 ## Docs
 
