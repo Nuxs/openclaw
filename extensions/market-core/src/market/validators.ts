@@ -120,7 +120,7 @@ export function requireExecutionProof(input: unknown): ExecutionProof {
   if (!/^sha256:[a-f0-9]{64}$/i.test(artifactHash)) {
     throw new Error("proof.artifactHash must be sha256:<hex>");
   }
-  const issuedAt = requireIsoTimestamp(proof, "proof.issuedAt");
+  const issuedAt = requireIsoTimestamp(proof, "issuedAt");
   const redactedFields = requireOptionalStringArray(proof, "proof.redactedFields", {
     maxItems: 64,
     maxLen: 64,
