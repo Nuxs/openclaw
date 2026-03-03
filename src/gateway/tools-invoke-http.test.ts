@@ -29,6 +29,14 @@ const PAYMENT_RESUME_TOKEN = {
   issuedAt: new Date().toISOString(),
   expiresAt: PAYMENT_INVOICE.expiresAt,
 };
+const PAYMENT_RECEIPT = {
+  receiptId: PAYMENT_RESUME_TOKEN.paymentReceiptId,
+  chain: "evm",
+  txHash: "0xtxhash",
+  amount: PAYMENT_INVOICE.amount,
+  confirmedAt: PAYMENT_RESUME_TOKEN.issuedAt,
+  mode: "live",
+};
 
 // Perf: keep this suite pure unit. Mock heavyweight config/session modules.
 vi.mock("../config/config.js", () => ({
@@ -64,7 +72,14 @@ vi.mock("./auth.js", () => ({
 type GatewayResponse =
   | {
       ok: true;
-      result: Record<string, unknown>;
+      result: {
+        resumeToken?: Record<string, unknown>;
+        authorization?: string;
+        paymentReceipt?: Record<string, unknown>;
+        maxRetries?: number;
+        trace?: Record<string, unknown>;
+        [key: string]: unknown;
+      };
     }
   | {
       ok: false;
@@ -77,6 +92,7 @@ const mockCallGateway = vi.fn<(..._args: unknown[]) => Promise<GatewayResponse>>
     result: {
       resumeToken: PAYMENT_RESUME_TOKEN,
       authorization: PAYMENT_AUTHORIZATION,
+      paymentReceipt: PAYMENT_RECEIPT,
     },
   }),
 );
@@ -124,7 +140,13 @@ vi.mock("../agents/openclaw-tools.js", () => {
       paymentRequiredCallCount += 1;
       const input = (args ?? {}) as Record<string, unknown>;
       lastPaymentRequiredArgs = input;
-      if (paymentRequiredCallCount === 1) {
+      const headers =
+        input.headers && typeof input.headers === "object" && !Array.isArray(input.headers)
+          ? (input.headers as Record<string, unknown>)
+          : {};
+      const hasAuthorization =
+        typeof headers.authorization === "string" || typeof headers.Authorization === "string";
+      if (!hasAuthorization) {
         const err = new Error("payment required") as Error & {
           status?: number;
           headers?: Record<string, string>;
@@ -292,6 +314,7 @@ beforeEach(() => {
     result: {
       resumeToken: PAYMENT_RESUME_TOKEN,
       authorization: PAYMENT_AUTHORIZATION,
+      paymentReceipt: PAYMENT_RECEIPT,
     },
   });
 });
@@ -671,6 +694,7 @@ describe("POST /tools/invoke", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
+    expect(body.payment).toMatchObject(PAYMENT_RECEIPT);
     expect(paymentRequiredCallCount).toBe(2);
     expect(mockCallGateway).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -680,6 +704,47 @@ describe("POST /tools/invoke", () => {
     );
     const headers = (lastPaymentRequiredArgs?.headers ?? {}) as Record<string, unknown>;
     expect(headers.authorization).toBe(PAYMENT_AUTHORIZATION);
+  });
+
+  it("stays stable under continuous 402 autopay retries", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+      plugins: {
+        entries: {
+          "web3-core": {
+            config: { x402: { autopay: { enabled: true, maxRetries: 1 } } },
+          },
+        },
+      },
+    };
+
+    const rounds = 12;
+    for (let index = 0; index < rounds; index += 1) {
+      const res = await invokeToolAuthed({
+        tool: "tools_invoke_payment_required",
+        args: { headers: {} },
+        sessionKey: "main",
+        headers: {
+          "x-idempotency-key": `idem-round-${index}`,
+          "x-openclaw-request-id": `req-round-${index}`,
+        },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(body.payment).toMatchObject(PAYMENT_RECEIPT);
+    }
+
+    expect(paymentRequiredCallCount).toBe(rounds * 2);
   });
 
   it("skips autopay when disabled in web3-core config", async () => {

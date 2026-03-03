@@ -192,4 +192,119 @@ describe("ton handlers policy guard", () => {
     expect(secondPayload).toMatchObject({ error: "E_FORBIDDEN" });
     expect(mockTonProvider.transfer).toHaveBeenCalledTimes(1);
   });
+
+  it("enforces TON autopay policy under high-frequency small payments", async () => {
+    const { createTonWalletAutopayHandler } = await import("./ton-handlers.js");
+    const baseConfig = buildConfig();
+    const basePolicy = baseConfig.policy.inlinePolicy!;
+    const handler = createTonWalletAutopayHandler(
+      buildConfig({
+        policy: {
+          ...baseConfig.policy,
+          inlinePolicy: {
+            ...basePolicy,
+            budget: {
+              ...basePolicy.budget,
+              dailyCap: "100",
+              perTxCap: "100",
+            },
+            scope: {
+              ...basePolicy.scope,
+              allowedTools: ["agent-wallet.autopay"],
+            },
+            autoPay: {
+              enabled: true,
+              maxRetries: 2,
+            },
+          },
+        },
+      }),
+    );
+
+    let firstOk = false;
+    let firstPayload: unknown;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockTonWallet.address,
+          amount: "60",
+        },
+        (resultOk, resultPayload) => {
+          firstOk = resultOk;
+          firstPayload = resultPayload;
+        },
+      ),
+    );
+
+    let secondOk = true;
+    let secondPayload: unknown;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockTonWallet.address,
+          amount: "60",
+        },
+        (resultOk, resultPayload) => {
+          secondOk = resultOk;
+          secondPayload = resultPayload;
+        },
+      ),
+    );
+
+    expect(firstOk).toBe(true);
+    expect(firstPayload).toMatchObject({
+      txHash: "0xtonhash",
+      chain: "ton",
+      policyAutoPayMaxRetries: 2,
+    });
+    expect(secondOk).toBe(false);
+    expect(secondPayload).toMatchObject({ error: "E_FORBIDDEN" });
+    expect(mockTonProvider.transfer).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts value alias for TON autopay", async () => {
+    const { createTonWalletAutopayHandler } = await import("./ton-handlers.js");
+    const baseConfig = buildConfig();
+    const basePolicy = baseConfig.policy.inlinePolicy!;
+    const handler = createTonWalletAutopayHandler(
+      buildConfig({
+        policy: {
+          ...baseConfig.policy,
+          inlinePolicy: {
+            ...basePolicy,
+            scope: {
+              ...basePolicy.scope,
+              allowedTools: ["agent-wallet.autopay"],
+            },
+            autoPay: {
+              enabled: true,
+              maxRetries: 1,
+            },
+          },
+        },
+      }),
+    );
+
+    let ok = false;
+    let payload: unknown;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockTonWallet.address,
+          value: "50",
+        },
+        (resultOk, resultPayload) => {
+          ok = resultOk;
+          payload = resultPayload;
+        },
+      ),
+    );
+
+    expect(ok).toBe(true);
+    expect(payload).toMatchObject({
+      txHash: "0xtonhash",
+      chain: "ton",
+      policyAutoPayMaxRetries: 1,
+    });
+  });
 });

@@ -198,6 +198,120 @@ describe("agent-wallet handlers policy guard", () => {
     expect(mockProvider.sendTransaction).toHaveBeenCalledTimes(1);
   });
 
+  it("enforces autopay policy under high-frequency small payments", async () => {
+    const { createAgentWalletAutopayHandler } = await import("./handlers.js");
+    const baseConfig = buildConfig();
+    const basePolicy = baseConfig.policy.inlinePolicy!;
+    const handler = createAgentWalletAutopayHandler(
+      buildConfig({
+        policy: {
+          ...baseConfig.policy,
+          inlinePolicy: {
+            ...basePolicy,
+            budget: {
+              ...basePolicy.budget,
+              dailyCap: "100",
+              perTxCap: "100",
+            },
+            scope: {
+              ...basePolicy.scope,
+              allowedTools: ["agent-wallet.autopay"],
+            },
+            autoPay: {
+              enabled: true,
+              maxRetries: 3,
+            },
+          },
+        },
+      }),
+    );
+
+    let firstOk = false;
+    let firstPayload: unknown;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockWallet.address,
+          value: "60",
+          data: "0xa9059cbb0000000000000000000000000000000000000000000000000000000000000001",
+        },
+        (resultOk, resultPayload) => {
+          firstOk = resultOk;
+          firstPayload = resultPayload;
+        },
+      ),
+    );
+
+    let secondOk = true;
+    let secondPayload: unknown;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockWallet.address,
+          value: "60",
+          data: "0xa9059cbb0000000000000000000000000000000000000000000000000000000000000001",
+        },
+        (resultOk, resultPayload) => {
+          secondOk = resultOk;
+          secondPayload = resultPayload;
+        },
+      ),
+    );
+
+    expect(firstOk).toBe(true);
+    expect(firstPayload).toMatchObject({
+      txHash: "0xtxhash",
+      chain: "evm",
+      policyAutoPayMaxRetries: 3,
+    });
+    expect(secondOk).toBe(false);
+    expect(secondPayload).toMatchObject({ error: "E_FORBIDDEN" });
+    expect(mockProvider.sendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts amount alias for EVM autopay", async () => {
+    const { createAgentWalletAutopayHandler } = await import("./handlers.js");
+    const baseConfig = buildConfig();
+    const basePolicy = baseConfig.policy.inlinePolicy!;
+    const handler = createAgentWalletAutopayHandler(
+      buildConfig({
+        policy: {
+          ...baseConfig.policy,
+          inlinePolicy: {
+            ...basePolicy,
+            scope: {
+              ...basePolicy.scope,
+              allowedTools: ["agent-wallet.autopay"],
+            },
+            autoPay: {
+              enabled: true,
+              maxRetries: 2,
+            },
+          },
+        },
+      }),
+    );
+
+    let ok = false;
+    let payload: unknown;
+    await handler(
+      buildHandlerOptions(
+        {
+          to: mockWallet.address,
+          amount: "50",
+          data: "0xa9059cbb0000000000000000000000000000000000000000000000000000000000000001",
+        },
+        (resultOk, resultPayload) => {
+          ok = resultOk;
+          payload = resultPayload;
+        },
+      ),
+    );
+
+    expect(ok).toBe(true);
+    expect(payload).toMatchObject({ txHash: "0xtxhash", chain: "evm", policyAutoPayMaxRetries: 2 });
+  });
+
   it("allows sign when policy permits sign_message", async () => {
     const { createAgentWalletSignHandler } = await import("./handlers.js");
     const handler = createAgentWalletSignHandler(buildConfig());

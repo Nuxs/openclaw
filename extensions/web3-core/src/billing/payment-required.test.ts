@@ -11,6 +11,8 @@ type BillingGatewayResponse =
       ok: true;
       result: {
         txHash: string;
+        chain?: "evm" | "ton";
+        network?: string;
         policyAutoPayMaxRetries?: number;
       };
     }
@@ -101,12 +103,86 @@ describe("web3.billing.handlePaymentRequired", () => {
     expect(firstResponder.result()?.ok).toBe(true);
     const firstPayload = firstResponder.result()?.payload ?? {};
     expect(firstPayload.reused).toBe(false);
-    expect(firstPayload.resumeToken).toMatchObject({ invoiceId: "inv-1" });
+    expect(firstPayload.resumeToken).toMatchObject({ invoiceId: "inv-1", chain: "evm" });
+    expect(firstPayload.paymentReceipt).toMatchObject({
+      chain: "evm",
+      mode: "live",
+      txHash: "0xtxhash",
+      amount: "10",
+    });
     expect(firstPayload.trace).toMatchObject({
       requestId: "req-store-1",
       idempotencyKey: "idem-1",
       invoiceId: "inv-1",
       toolName: "tools_invoke_payment_required",
+    });
+    expect(mockCallGateway).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "agent-wallet.autopay",
+        params: expect.objectContaining({
+          chain: "evm",
+          value: "10",
+          amount: "10",
+        }),
+      }),
+    );
+
+    const secondResponder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: secondResponder.respond,
+    } as any);
+
+    expect(secondResponder.result()?.ok).toBe(true);
+    const secondPayload = secondResponder.result()?.payload ?? {};
+    expect(secondPayload.reused).toBe(true);
+    expect(secondPayload.resumeToken).toMatchObject({ invoiceId: "inv-1", chain: "evm" });
+    expect(secondPayload.paymentReceipt).toMatchObject({
+      chain: "evm",
+      mode: "live",
+      txHash: "0xtxhash",
+      amount: "10",
+    });
+    expect(secondPayload.trace).toMatchObject({
+      requestId: "req-store-1",
+      idempotencyKey: "idem-1",
+      invoiceId: "inv-1",
+      toolName: "tools_invoke_payment_required",
+    });
+  });
+
+  it("preserves network in reused payment receipt for TON invoice", async () => {
+    mockCallGateway.mockResolvedValueOnce({
+      ok: true,
+      result: { txHash: "0xtonhash", chain: "ton", network: "ton-testnet" },
+    });
+
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-reuse-net",
+      provider: "provider-reuse-net",
+      chain: "ton",
+      asset: "TON",
+      amount: "7",
+      payTo: "EQC_REUSE_ADDRESS",
+      nonce: "nonce-reuse-net",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-reuse-net",
+    };
+
+    const firstResponder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: firstResponder.respond,
+    } as any);
+
+    expect(firstResponder.result()?.ok).toBe(true);
+    const firstPayload = firstResponder.result()?.payload ?? {};
+    expect(firstPayload.paymentReceipt).toMatchObject({
+      chain: "ton",
+      network: "ton-testnet",
     });
 
     const secondResponder = createResponder();
@@ -118,12 +194,12 @@ describe("web3.billing.handlePaymentRequired", () => {
     expect(secondResponder.result()?.ok).toBe(true);
     const secondPayload = secondResponder.result()?.payload ?? {};
     expect(secondPayload.reused).toBe(true);
-    expect(secondPayload.resumeToken).toMatchObject({ invoiceId: "inv-1" });
-    expect(secondPayload.trace).toMatchObject({
-      requestId: "req-store-1",
-      idempotencyKey: "idem-1",
-      invoiceId: "inv-1",
-      toolName: "tools_invoke_payment_required",
+    expect(secondPayload.paymentReceipt).toMatchObject({
+      chain: "ton",
+      network: "ton-testnet",
+      txHash: "0xtonhash",
+      amount: "7",
+      mode: "live",
     });
   });
 
@@ -246,6 +322,57 @@ describe("web3.billing.handlePaymentRequired", () => {
 
     expect(secondResponder.result()?.ok).toBe(true);
     expect(secondResponder.result()?.payload).toMatchObject({ maxRetries: 2, reused: true });
+  });
+
+  it("routes TON invoice to autopay with chain and amount alias", async () => {
+    mockCallGateway.mockResolvedValueOnce({
+      ok: true,
+      result: { txHash: "0xtonhash", chain: "ton", network: "ton-testnet" },
+    });
+
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({});
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-ton-1",
+      provider: "provider-ton",
+      chain: "ton",
+      asset: "TON",
+      amount: "12",
+      payTo: "EQC_TON_TEST_ADDRESS",
+      nonce: "nonce-ton-1",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-ton-1",
+    };
+
+    const responder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: responder.respond,
+    } as any);
+
+    expect(responder.result()?.ok).toBe(true);
+    expect(responder.result()?.payload).toMatchObject({
+      reused: false,
+      resumeToken: { chain: "ton" },
+      paymentReceipt: {
+        chain: "ton",
+        network: "ton-testnet",
+        txHash: "0xtonhash",
+        amount: "12",
+        mode: "live",
+      },
+    });
+    expect(mockCallGateway).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "agent-wallet.autopay",
+        params: expect.objectContaining({
+          chain: "ton",
+          value: "12",
+          amount: "12",
+        }),
+      }),
+    );
   });
 
   it("rejects idempotency key reuse with different invoice", async () => {
