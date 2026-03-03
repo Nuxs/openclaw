@@ -100,7 +100,13 @@ export class EscrowAdapter {
     return provider;
   }
 
-  async lock(orderId: string, payer: string, amount: string, _payee?: string): Promise<string> {
+  async lock(
+    orderId: string,
+    payer: string,
+    amount: string,
+    _payee?: string,
+    _options?: { idempotencyKey?: string },
+  ): Promise<string> {
     const provider = await this.loadEvmProvider();
     const data = encodeFunctionData({
       abi: ESCROW_ABI,
@@ -139,7 +145,11 @@ export class EscrowAdapter {
     });
   }
 
-  async refund(orderId: string, payer: string): Promise<string> {
+  async refund(
+    orderId: string,
+    payer: string,
+    _options?: { idempotencyKey?: string },
+  ): Promise<string> {
     const provider = await this.loadEvmProvider();
     const data = encodeFunctionData({
       abi: ESCROW_ABI,

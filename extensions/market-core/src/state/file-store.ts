@@ -31,6 +31,8 @@ import type {
   ServiceProof,
   ServiceProofFilter,
   Settlement,
+  SettlementOperation,
+  SettlementOperationFilter,
   TokenEconomyState,
 } from "../market/types.js";
 import { runFileStoreTransaction } from "./file-store-transaction.js";
@@ -192,6 +194,47 @@ export class MarketFileStore implements MarketStore {
     const map = this.readMap<Settlement>(this.settlementsPath);
     map[settlement.settlementId] = settlement;
     this.writeMap(this.settlementsPath, map);
+  }
+
+  private get settlementOperationsPath() {
+    return "settlement-operations.json";
+  }
+
+  listSettlementOperations(filter?: SettlementOperationFilter): SettlementOperation[] {
+    let operations = Object.values(
+      this.readMap<SettlementOperation>(this.settlementOperationsPath),
+    ).sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt));
+
+    if (filter?.orderId) {
+      operations = operations.filter((entry) => entry.orderId === filter.orderId);
+    }
+    if (filter?.status) {
+      operations = operations.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.dueBefore) {
+      const dueBefore = Date.parse(filter.dueBefore);
+      if (!Number.isNaN(dueBefore)) {
+        operations = operations.filter((entry) => Date.parse(entry.nextAttemptAt) <= dueBefore);
+      }
+    }
+    if (filter?.limit !== undefined) {
+      operations = operations.slice(0, Math.max(0, filter.limit));
+    }
+    return operations;
+  }
+
+  getSettlementOperation(operationId: string): SettlementOperation | undefined {
+    return this.readMap<SettlementOperation>(this.settlementOperationsPath)[operationId];
+  }
+
+  getSettlementOperationByIdempotencyKey(idempotencyKey: string): SettlementOperation | undefined {
+    return this.listSettlementOperations().find((entry) => entry.idempotencyKey === idempotencyKey);
+  }
+
+  saveSettlementOperation(operation: SettlementOperation): void {
+    const map = this.readMap<SettlementOperation>(this.settlementOperationsPath);
+    map[operation.operationId] = operation;
+    this.writeMap(this.settlementOperationsPath, map);
   }
 
   private get disputesPath() {
@@ -489,6 +532,7 @@ export class MarketFileStore implements MarketStore {
       this.listConsents().length > 0 ||
       this.listDeliveries().length > 0 ||
       this.listSettlements().length > 0 ||
+      this.listSettlementOperations({ limit: 1 }).length > 0 ||
       this.listDisputes().length > 0 ||
       this.listServiceProofs({ limit: 1 }).length > 0 ||
       this.listLeases().length > 0 ||

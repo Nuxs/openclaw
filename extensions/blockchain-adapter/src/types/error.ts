@@ -41,6 +41,10 @@ export const ErrorCode = {
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
+function isErrorCode(value: string): value is ErrorCode {
+  return Object.values(ErrorCode).includes(value as ErrorCode);
+}
+
 /**
  * 区块链基础错误
  */
@@ -105,8 +109,26 @@ export class EvmError extends BlockchainError {
  * TON 特定错误
  */
 export class TonError extends BlockchainError {
-  constructor(message: string, details?: unknown) {
-    super(message, ErrorCode.UNKNOWN, "ton", details);
+  constructor(message: string, codeOrDetails?: ErrorCode | unknown, details?: unknown) {
+    let resolvedCode: ErrorCode = ErrorCode.UNKNOWN;
+    let resolvedDetails: unknown;
+
+    if (typeof codeOrDetails === "string" && isErrorCode(codeOrDetails)) {
+      resolvedCode = codeOrDetails;
+      resolvedDetails = details;
+    } else {
+      resolvedDetails = codeOrDetails;
+      if (
+        resolvedDetails &&
+        typeof resolvedDetails === "object" &&
+        "code" in (resolvedDetails as Record<string, unknown>) &&
+        typeof (resolvedDetails as Record<string, unknown>).code === "string"
+      ) {
+        resolvedCode = (resolvedDetails as { code: ErrorCode }).code;
+      }
+    }
+
+    super(message, resolvedCode, "ton", resolvedDetails);
     this.name = "TonError";
   }
 }

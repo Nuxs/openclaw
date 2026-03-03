@@ -22,6 +22,8 @@ import type {
   ServiceProof,
   ServiceProofFilter,
   Settlement,
+  SettlementOperation,
+  SettlementOperationFilter,
   TokenEconomyState,
 } from "../market/types.js";
 
@@ -45,6 +47,12 @@ export type MarketStore = {
   getSettlement: (settlementId: string) => Settlement | undefined;
   getSettlementByOrder: (orderId: string) => Settlement | undefined;
   saveSettlement: (settlement: Settlement) => void;
+  listSettlementOperations: (filter?: SettlementOperationFilter) => SettlementOperation[];
+  getSettlementOperation: (operationId: string) => SettlementOperation | undefined;
+  getSettlementOperationByIdempotencyKey: (
+    idempotencyKey: string,
+  ) => SettlementOperation | undefined;
+  saveSettlementOperation: (operation: SettlementOperation) => void;
   listDisputes: () => Dispute[];
   getDispute: (disputeId: string) => Dispute | undefined;
   getDisputeByOrder: (orderId: string) => Dispute | undefined;

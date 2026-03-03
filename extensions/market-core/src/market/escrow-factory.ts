@@ -10,11 +10,25 @@ import type { ChainConfig, SettlementConfig } from "../config.js";
 import { TonEscrowAdapter } from "./escrow-ton.js";
 import { EscrowAdapter } from "./escrow.js";
 
+export type EscrowTxOptions = {
+  idempotencyKey?: string;
+};
+
 /** Minimal interface shared by both EVM and TON escrow adapters. */
 export interface IEscrowAdapter {
-  lock(orderId: string, payer: string, amount: string, payee?: string): Promise<string>;
-  release(orderId: string, payees: { address: string; amount: string }[]): Promise<string>;
-  refund(orderId: string, payer: string): Promise<string>;
+  lock(
+    orderId: string,
+    payer: string,
+    amount: string,
+    payee?: string,
+    options?: EscrowTxOptions,
+  ): Promise<string>;
+  release(
+    orderId: string,
+    payees: { address: string; amount: string }[],
+    options?: EscrowTxOptions,
+  ): Promise<string>;
+  refund(orderId: string, payer: string, options?: EscrowTxOptions): Promise<string>;
 }
 
 /**

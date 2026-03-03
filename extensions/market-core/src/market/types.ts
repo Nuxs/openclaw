@@ -156,6 +156,8 @@ export type Settlement = {
   releaseTxHash?: string;
   refundTxHash?: string;
   settlementHash?: string;
+  revision?: number;
+  updatedAt?: string;
 };
 
 export type AuditEventKind =
@@ -213,6 +215,40 @@ export type AuditEvent = {
   actor?: string;
   timestamp: string;
   details?: Record<string, unknown>;
+};
+
+export type SettlementOperationKind = "lock" | "release" | "refund";
+
+export type SettlementOperationStatus =
+  | "pending"
+  | "running"
+  | "retry_wait"
+  | "succeeded"
+  | "failed";
+
+export type SettlementOperation = {
+  operationId: string;
+  orderId: string;
+  settlementId?: string;
+  kind: SettlementOperationKind;
+  status: SettlementOperationStatus;
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+  response?: Record<string, unknown>;
+  txHash?: string;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: string;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SettlementOperationFilter = {
+  orderId?: string;
+  status?: SettlementOperationStatus;
+  dueBefore?: string;
+  limit?: number;
 };
 
 export type RevocationJobStatus = "pending" | "succeeded" | "failed";

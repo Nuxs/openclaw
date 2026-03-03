@@ -26,6 +26,8 @@ import type {
   ServiceProof,
   ServiceProofFilter,
   Settlement,
+  SettlementOperation,
+  SettlementOperationFilter,
   TokenEconomyState,
 } from "../market/types.js";
 import { MarketFileStore } from "./file-store.js";
@@ -73,6 +75,8 @@ export class MarketSqliteStore implements MarketStore {
         "CREATE INDEX IF NOT EXISTS ledger_ts ON ledger(timestamp);" +
         "CREATE INDEX IF NOT EXISTS audit_ts ON audit(timestamp);" +
         "CREATE INDEX IF NOT EXISTS disputes_order ON disputes(order_id);" +
+        "CREATE INDEX IF NOT EXISTS settlement_ops_order ON settlement_operations(order_id);" +
+        "CREATE INDEX IF NOT EXISTS settlement_ops_status_due ON settlement_operations(status, next_attempt_at);" +
         "CREATE INDEX IF NOT EXISTS service_proofs_order ON service_proofs(order_id);" +
         "CREATE INDEX IF NOT EXISTS bridge_order ON bridge_transfers(order_id);" +
         "CREATE INDEX IF NOT EXISTS bridge_settlement ON bridge_transfers(settlement_id);" +
@@ -95,6 +99,7 @@ export class MarketSqliteStore implements MarketStore {
       this.countRows("consents") === 0 &&
       this.countRows("deliveries") === 0 &&
       this.countRows("settlements") === 0 &&
+      this.countRows("settlement_operations") === 0 &&
       this.countRows("disputes") === 0 &&
       this.countRows("service_proofs") === 0 &&
       this.countRows("leases") === 0 &&
@@ -119,6 +124,9 @@ export class MarketSqliteStore implements MarketStore {
     for (const consent of fileStore.listConsents()) this.saveConsent(consent);
     for (const delivery of fileStore.listDeliveries()) this.saveDelivery(delivery);
     for (const settlement of fileStore.listSettlements()) this.saveSettlement(settlement);
+    for (const operation of fileStore.listSettlementOperations({ limit: 1_000_000 })) {
+      this.saveSettlementOperation(operation);
+    }
     for (const dispute of fileStore.listDisputes()) this.saveDispute(dispute);
     for (const proof of fileStore.listServiceProofs({ limit: 1_000_000 })) {
       this.saveServiceProof(proof);
@@ -246,6 +254,61 @@ export class MarketSqliteStore implements MarketStore {
 
   saveSettlement(settlement: Settlement): void {
     this.saveTo("settlements", settlement.settlementId, settlement);
+  }
+
+  listSettlementOperations(filter?: SettlementOperationFilter): SettlementOperation[] {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filter?.orderId) {
+      conditions.push("order_id = ?");
+      params.push(filter.orderId);
+    }
+    if (filter?.status) {
+      conditions.push("status = ?");
+      params.push(filter.status);
+    }
+    if (filter?.dueBefore) {
+      conditions.push("next_attempt_at <= ?");
+      params.push(filter.dueBefore);
+    }
+
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+    const sql = `SELECT data FROM settlement_operations${where} ORDER BY updated_at ASC`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = this.db.prepare(sql).all(...(params as any[])) as Array<{ data: string }>;
+    let operations = rows.map((row) => JSON.parse(row.data) as SettlementOperation);
+    if (filter?.limit !== undefined) {
+      operations = operations.slice(0, Math.max(0, filter.limit));
+    }
+    return operations;
+  }
+
+  getSettlementOperation(operationId: string): SettlementOperation | undefined {
+    return this.getFrom<SettlementOperation>("settlement_operations", operationId);
+  }
+
+  getSettlementOperationByIdempotencyKey(idempotencyKey: string): SettlementOperation | undefined {
+    const row = this.db
+      .prepare("SELECT data FROM settlement_operations WHERE idempotency_key = ?")
+      .get(idempotencyKey) as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as SettlementOperation) : undefined;
+  }
+
+  saveSettlementOperation(operation: SettlementOperation): void {
+    this.db
+      .prepare(
+        "INSERT OR REPLACE INTO settlement_operations (id, order_id, status, next_attempt_at, idempotency_key, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        operation.operationId,
+        operation.orderId,
+        operation.status,
+        operation.nextAttemptAt,
+        operation.idempotencyKey,
+        operation.updatedAt,
+        JSON.stringify(operation),
+      );
   }
 
   listDisputes(): Dispute[] {

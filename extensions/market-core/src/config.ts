@@ -34,6 +34,12 @@ export type SettlementMode = "contract" | "anchor_only";
 export type SettlementConfig = {
   mode: SettlementMode;
   tokenAddress?: string;
+  confirmations?: number;
+  confirmationTimeoutMs?: number;
+  transferTimeoutMs?: number;
+  maxRetries?: number;
+  retryBaseDelayMs?: number;
+  retryMaxDelayMs?: number;
 };
 
 export type RevocationMode = "none" | "webhook";
@@ -101,6 +107,12 @@ export const DEFAULT_CONFIG: MarketPluginConfig = {
   },
   settlement: {
     mode: "contract",
+    confirmations: 1,
+    confirmationTimeoutMs: 60_000,
+    transferTimeoutMs: 30_000,
+    maxRetries: 2,
+    retryBaseDelayMs: 1_000,
+    retryMaxDelayMs: 8_000,
   },
   revocation: {
     mode: "none",

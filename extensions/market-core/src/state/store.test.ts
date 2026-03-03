@@ -298,4 +298,34 @@ describe("MarketStateStore.runInTransaction", () => {
     expect(timeline.indexOf("tx2-start")).toBeGreaterThan(timeline.indexOf("tx1-end"));
     expect(store.getOffer("offer-serial")).toBeTruthy();
   });
+
+  it("persists settlement operations and supports idempotency lookup (both modes)", async () => {
+    await withStoreModes(async ({ store }) => {
+      const now = new Date().toISOString();
+      const operation = {
+        operationId: "op-1",
+        orderId: "order-1",
+        settlementId: "settlement-1",
+        kind: "release" as const,
+        status: "pending" as const,
+        idempotencyKey: "idem:order-1:release",
+        payload: { releaseAmount: "100" },
+        attempts: 0,
+        maxAttempts: 3,
+        nextAttemptAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      store.saveSettlementOperation(operation);
+
+      expect(store.getSettlementOperation("op-1")?.idempotencyKey).toBe("idem:order-1:release");
+      expect(
+        store.getSettlementOperationByIdempotencyKey("idem:order-1:release")?.operationId,
+      ).toBe("op-1");
+      expect(store.listSettlementOperations({ status: "pending" }).length).toBeGreaterThanOrEqual(
+        1,
+      );
+    });
+  });
 });

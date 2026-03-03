@@ -23,6 +23,8 @@ import type {
   ServiceProof,
   ServiceProofFilter,
   Settlement,
+  SettlementOperation,
+  SettlementOperationFilter,
   TokenEconomyState,
 } from "../market/types.js";
 import { MarketFileStore } from "./file-store.js";
@@ -125,6 +127,22 @@ export class MarketStateStore {
 
   saveSettlement(settlement: Settlement): void {
     this.store.saveSettlement(settlement);
+  }
+
+  listSettlementOperations(filter?: SettlementOperationFilter): SettlementOperation[] {
+    return this.store.listSettlementOperations(filter);
+  }
+
+  getSettlementOperation(operationId: string): SettlementOperation | undefined {
+    return this.store.getSettlementOperation(operationId);
+  }
+
+  getSettlementOperationByIdempotencyKey(idempotencyKey: string): SettlementOperation | undefined {
+    return this.store.getSettlementOperationByIdempotencyKey(idempotencyKey);
+  }
+
+  saveSettlementOperation(operation: SettlementOperation): void {
+    this.store.saveSettlementOperation(operation);
   }
 
   listDisputes(): Dispute[] {

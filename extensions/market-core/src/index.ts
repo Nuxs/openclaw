@@ -75,6 +75,7 @@ import {
   createSettlementStatusHandler,
 } from "./market/handlers/index.js";
 import { flushPendingRewards } from "./market/reward/poller.js";
+import { flushPendingSettlementOperations } from "./market/settlement/poller.js";
 import { MarketStateStore } from "./state/store.js";
 
 // Re-export facade types for web3-core to use (optional inter-plugin API)
@@ -263,6 +264,26 @@ const plugin: OpenClawPluginDefinition = {
         const interval = (ctx as any)._rewardInterval;
         if (interval) clearInterval(interval);
         ctx.logger.info("Market reward poller service stopped");
+      },
+    });
+
+    api.registerService({
+      id: "market-settlement-poller",
+      async start(ctx) {
+        ctx.logger.info("Market settlement poller service started");
+        const interval = setInterval(async () => {
+          try {
+            await flushPendingSettlementOperations(store, config);
+          } catch (err) {
+            ctx.logger.warn(`Settlement poll error: ${err}`);
+          }
+        }, 30_000);
+        (ctx as any)._settlementInterval = interval;
+      },
+      stop(ctx) {
+        const interval = (ctx as any)._settlementInterval;
+        if (interval) clearInterval(interval);
+        ctx.logger.info("Market settlement poller service stopped");
       },
     });
 
