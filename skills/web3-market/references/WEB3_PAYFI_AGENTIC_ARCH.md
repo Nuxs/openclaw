@@ -1,6 +1,6 @@
 # OpenClaw Web3 Agentic PayFi 架构蓝图 (2026)
 
-> **版本**：v1.0 (Draft)  
+> **版本**：v1.1 (Aligned with execution plan)  
 > **适用范围**：Web3 Market（支付、结算、代理身份）  
 > **核心目标**：实现“支付即协议”(PayFi) 与“策略驱动代理”(Agentic Commerce) 的融合。
 
@@ -90,7 +90,7 @@ export type Settlement = {
     - 检查 `WalletPolicy.autoPay`。
     - 检查 `Invoice` 是否在 `budget` 内。
 4.  **Payment**：
-    - 调用 `web3.billing.pay(invoice)`。
+    - 调用 `web3.billing.handlePaymentRequired(invoice)`（统一主口径；历史别名 `web3.billing.pay` 仅用于兼容说明）。
     - 等待 `PaymentReceipt`。
 5.  **Retry**：携带 `PaymentReceipt` (or Token) 重试 `search_tool`。
 6.  **Result**：Agent 获得结果，全程无感。
@@ -213,8 +213,9 @@ export type SettlementReleaseRequest = {
 ### 5.2 幂等规则
 
 - `autopay` 与 `settlement.release` 必须支持 `idempotencyKey`。
+- 传输层使用请求头 `x-idempotency-key`，业务层映射为 `idempotencyKey` 字段；两者必须一一对应。
 - 同一 `idempotencyKey` 的重复请求必须返回同一业务结果，不得二次扣款。
-- Gateway 对单次请求最多执行一次自动支付重试（`maxRetries` 默认 1）。
+- Gateway 对单次请求最多执行一次自动支付重试（默认 1，且受 `WalletPolicy.autoPay.maxRetries` 约束）。
 
 ### 5.3 On-chain / Off-chain 责任边界
 
@@ -234,7 +235,7 @@ export type SettlementReleaseRequest = {
 
 ### 6.2 回滚策略
 
-- 任一阶段出现异常扣款或重试风暴：立即关闭 `autoPay.enabled`（全局 kill switch）。
+- 任一阶段出现异常扣款或重试风暴：立即关闭 `web3.x402.autopay.enabled`（全局 kill switch）。
 - `metered` 结算异常时可降级到 `one-shot` 策略，保证结算可用性优先。
 - 回滚后必须保留 `PolicyDecision` 与支付链路审计记录，供追溯。
 

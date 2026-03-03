@@ -1,8 +1,9 @@
 # OpenClaw Web3 Market：Week 3–5 路线图（里程碑 + 验收证据）
 
-> **状态**：执行中  
-> **更新日期**：2026-02-23  
-> **适用范围**：Web3 Market（看板 + 管家代办 + 可分享自由市场）
+> **状态**：Week3-5 已完成（历史里程碑）  
+> **更新日期**：2026-03-03  
+> **适用范围**：Web3 Market（看板 + 管家代办 + 可分享自由市场）  
+> **边界说明**：本文件仅记录 Week3-5 里程碑，不作为 Week6+（KYA/PayFi/x402）实施状态口径；Week6+ 以 `WEB3_DEV_PLAN_PAYFI.md` 为准。
 
 本路线图的写法强调"可验收"：每个里程碑都要能用**明确的 UI 画面、RPC 方法、或可复制粘贴的脱敏输出**来证明完成。
 
@@ -66,6 +67,15 @@
 - ✅ UI Overlay 同步：`ui/src/ui/types-web3.ts` 已补齐 `PaymentIntent`/`PaymentReceipt`/`FXQuote`/`PayoutPreference`/`ReconciliationSummary`，消除前后端契约 GAP。
 
 ---
+
+## Week 6+ 衔接里程碑（指向 PayFi 主计划）
+
+- **Week 6-6.5（KYA）**：策略拦截与 Daily Cap 状态持久化（完成状态与证据见 `WEB3_DEV_PLAN_PAYFI.md`）。
+- **Week 7（PayFi）**：增量结算与 Ledger 驱动释放（完成状态与证据见 `WEB3_DEV_PLAN_PAYFI.md`）。
+- **Week 8（x402）**：自动支付闭环已形成，当前进入发布前收尾（`maxRetries`/指标告警/故障注入）。
+- **Week 9+（Advanced）**：流支付工程化、动态策略、DID 与信用层推进。
+
+> **状态来源优先级**：`WEB3_DEV_PLAN_PAYFI.md`（主） > `WEB3_OVERALL_PROGRESS.md`（公告） > 本文件（历史里程碑）。
 
 ## 相关文档
 

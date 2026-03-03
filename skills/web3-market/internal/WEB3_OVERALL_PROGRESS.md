@@ -71,28 +71,32 @@
 
 ---
 
-## 3. 已定义但仍属规划（需要明确里程碑）
+## 3. PayFi Agentic Commerce（按主计划推进）
 
-### 3.1 PayFi Agentic Commerce（2026 新战略）
+### 3.1 当前实施状态（以主计划勾选为准）
 
-> 详情见：`skills/web3-market/references/WEB3_PAYFI_AGENTIC_ARCH.md`
+> 主计划：`skills/web3-market/internal/WEB3_DEV_PLAN_PAYFI.md`  
+> 架构口径：`skills/web3-market/references/WEB3_PAYFI_AGENTIC_ARCH.md`
 
-- **KYA (Know Your Agent)**：计划 Week 6 落地 WalletPolicy 策略引擎（预算/白名单），收回 Agent 上帝权限。
-- **PayFi (Streaming Settlement)**：计划 Week 7 落地 Ledger 驱动的增量释放（Incremental Release），实现分段结算。
-- **x402 (Auto-Pay Loop)**：计划 Week 8 落地 Gateway Interceptor，实现机器对机器的自动支付闭环。
+- **KYA (Know Your Agent)**：✅ 核心能力已落地（策略拦截 + 状态持久化）。
+- **PayFi (Streaming Settlement / Incremental Release)**：✅ 核心能力已落地（`releasedAmount/strategy` + 部分释放 + Ledger 驱动）；测试全量门禁仍在收尾。
+- **x402 (Auto-Pay Loop)**：🟡 核心闭环已落地（402 捕获、自动支付、重试、熔断）；发布前收尾项仍待完成（`maxRetries` 策略接入、指标告警与故障注入验证）。
 
-#### 3.1.1 治理就绪状态（2026-03-02）
+#### 3.1.1 治理就绪状态（2026-03-03）
 
-- **技术评审**：✅ 已完成（`references/WEB3_TECH_STACK_REVIEW.md` 论证了自研必要性）。
-- **文档治理**：✅ 已完成（架构契约、测试矩阵、灰度门禁、DoD、回滚策略已固化）。
-- **代码实现**：⏳ 未开始（KYA/PayFi/x402 仍处于实施前状态）。
-- **执行口径**：`WEB3_PAYFI_AGENTIC_ARCH.md` + `WEB3_DEV_PLAN_PAYFI.md` 为后续开发唯一执行规范。
+- **技术评审**：✅ 已完成（`references/WEB3_TECH_STACK_REVIEW.md`）。
+- **文档治理**：🟡 进行中（已形成架构/计划/进度三层文档，术语与状态正在统一到主计划口径）。
+- **代码实现**：🟡 进行中（核心路径已具备，发布门禁项尚未全部闭合）。
+- **执行口径**：`WEB3_DEV_PLAN_PAYFI.md` 为单一执行真相源；其余文档同步对齐。
 
 #### 3.1.2 阻断分级结论（严格审计）
 
 - **不阻断当前能力迭代**：Week3-5 已完成能力可继续迭代与优化。
-- **阻断新能力上线**：KYA、PayFi metered release、x402 auto-pay 未代码落地前，不可宣称上线。
-- **上线前硬门禁**：必须满足 `WEB3_DEV_PLAN_PAYFI.md` 的可勾选 DoD 与灰度门禁。
+- **阻断新能力全量上线**：以下任一未完成即阻断全量：
+  1. Phase 3 收尾（`autoPay.maxRetries` 策略接入 + 故障注入验证）
+  2. 关键可观测性接入（`x402.autopay.*` 与 `settlement.*`）
+  3. 发布前回滚演练与说明文档
+- **上线前硬门禁**：必须满足 `WEB3_DEV_PLAN_PAYFI.md` 的 DoD、灰度门禁与证据索引。
 
 ### 3.2 其他规划
 
