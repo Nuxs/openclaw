@@ -16,7 +16,6 @@ Use this skill when working on:
 - `market-core` extensions: `resources` / `leases` / `ledger`
 - `web3-core` orchestration: publish/list/lease/revoke, Provider HTTP routes, consumer tools
 - Token handling, auditing, and settlement/ledger alignment
-- **Discovery Network (New Phase 4)**: P2P resource discovery, DHT/Gossip integration (collaborative dev with ally agent)
 
 ## References (source of truth)
 
