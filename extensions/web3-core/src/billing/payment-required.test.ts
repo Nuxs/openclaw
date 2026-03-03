@@ -90,7 +90,11 @@ describe("web3.billing.handlePaymentRequired", () => {
 
     const firstResponder = createResponder();
     await handler({
-      params: { invoice: encodeInvoice(invoice) },
+      params: {
+        invoice: encodeInvoice(invoice),
+        requestId: "req-store-1",
+        tool: "tools_invoke_payment_required",
+      },
       respond: firstResponder.respond,
     } as any);
 
@@ -98,6 +102,12 @@ describe("web3.billing.handlePaymentRequired", () => {
     const firstPayload = firstResponder.result()?.payload ?? {};
     expect(firstPayload.reused).toBe(false);
     expect(firstPayload.resumeToken).toMatchObject({ invoiceId: "inv-1" });
+    expect(firstPayload.trace).toMatchObject({
+      requestId: "req-store-1",
+      idempotencyKey: "idem-1",
+      invoiceId: "inv-1",
+      toolName: "tools_invoke_payment_required",
+    });
 
     const secondResponder = createResponder();
     await handler({
@@ -109,6 +119,12 @@ describe("web3.billing.handlePaymentRequired", () => {
     const secondPayload = secondResponder.result()?.payload ?? {};
     expect(secondPayload.reused).toBe(true);
     expect(secondPayload.resumeToken).toMatchObject({ invoiceId: "inv-1" });
+    expect(secondPayload.trace).toMatchObject({
+      requestId: "req-store-1",
+      idempotencyKey: "idem-1",
+      invoiceId: "inv-1",
+      toolName: "tools_invoke_payment_required",
+    });
   });
 
   it("blocks autopay when x402 kill switch is disabled", async () => {

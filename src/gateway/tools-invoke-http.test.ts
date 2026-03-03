@@ -61,16 +61,17 @@ vi.mock("./auth.js", () => ({
   authorizeHttpGatewayConnect: async () => ({ ok: true }),
 }));
 
-type PaymentRequiredGatewayResponse = {
-  ok: true;
-  result: {
-    resumeToken: typeof PAYMENT_RESUME_TOKEN;
-    authorization: string;
-    maxRetries?: number;
-  };
-};
+type GatewayResponse =
+  | {
+      ok: true;
+      result: Record<string, unknown>;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
 
-const mockCallGateway = vi.fn<(..._args: unknown[]) => Promise<PaymentRequiredGatewayResponse>>(
+const mockCallGateway = vi.fn<(..._args: unknown[]) => Promise<GatewayResponse>>(
   async (..._args: unknown[]) => ({
     ok: true,
     result: {
@@ -659,11 +660,12 @@ describe("POST /tools/invoke", () => {
     };
 
     const idempotencyKey = "idem-request-1";
+    const requestId = "req-001";
     const res = await invokeToolAuthed({
       tool: "tools_invoke_payment_required",
       args: { headers: {} },
       sessionKey: "main",
-      headers: { "x-idempotency-key": idempotencyKey },
+      headers: { "x-idempotency-key": idempotencyKey, "x-openclaw-request-id": requestId },
     });
 
     expect(res.status).toBe(200);
@@ -673,7 +675,7 @@ describe("POST /tools/invoke", () => {
     expect(mockCallGateway).toHaveBeenCalledWith(
       expect.objectContaining({
         method: "web3.billing.handlePaymentRequired",
-        params: expect.objectContaining({ idempotencyKey }),
+        params: expect.objectContaining({ idempotencyKey, requestId }),
       }),
     );
     const headers = (lastPaymentRequiredArgs?.headers ?? {}) as Record<string, unknown>;
@@ -743,6 +745,61 @@ describe("POST /tools/invoke", () => {
     expect(body.error?.autoPayError).toBe("idempotency key required for autopay");
   });
 
+  it("degrades autopay when x402 health guard is triggered", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+    };
+
+    mockCallGateway.mockImplementation(async (input: unknown) => {
+      const method = (input as { method?: unknown })?.method;
+      if (method === "web3.metrics.snapshot") {
+        return {
+          ok: true,
+          result: {
+            alerts: [
+              {
+                rule: "x402_autopay_failure_rate",
+                triggered: true,
+              },
+            ],
+          },
+        };
+      }
+      return {
+        ok: true,
+        result: {
+          resumeToken: PAYMENT_RESUME_TOKEN,
+          authorization: PAYMENT_AUTHORIZATION,
+        },
+      };
+    });
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+      headers: { "x-idempotency-key": "idem-health-guard" },
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(paymentRequiredCallCount).toBe(1);
+    expect(body.error?.autoPayError).toBe("autopay degraded by health guard");
+    expect(mockCallGateway).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: "web3.billing.handlePaymentRequired" }),
+    );
+  });
+
   it("honors maxRetries=0 for x402 autopay", async () => {
     cfg = {
       ...cfg,
@@ -764,11 +821,29 @@ describe("POST /tools/invoke", () => {
       },
     };
 
+    mockCallGateway.mockResolvedValue({
+      ok: true,
+      result: {
+        resumeToken: PAYMENT_RESUME_TOKEN,
+        authorization: PAYMENT_AUTHORIZATION,
+        trace: {
+          requestId: "req-retry-0",
+          idempotencyKey: "idem-request-2",
+          invoiceId: PAYMENT_INVOICE.invoiceId,
+          paymentReceiptId: PAYMENT_RESUME_TOKEN.paymentReceiptId,
+          createdAt: PAYMENT_RESUME_TOKEN.issuedAt,
+        },
+      },
+    });
+
     const res = await invokeToolAuthed({
       tool: "tools_invoke_payment_required",
       args: { headers: {} },
       sessionKey: "main",
-      headers: { "x-idempotency-key": "idem-request-2" },
+      headers: {
+        "x-idempotency-key": "idem-request-2",
+        "x-openclaw-request-id": "req-retry-0",
+      },
     });
 
     expect(res.status).toBe(402);
@@ -776,7 +851,9 @@ describe("POST /tools/invoke", () => {
     expect(body.ok).toBe(false);
     expect(paymentRequiredCallCount).toBe(1);
     expect(mockCallGateway).toHaveBeenCalled();
+    expect(body.error?.requestId).toBe("req-retry-0");
     expect(body.error?.authorization).toBe(PAYMENT_AUTHORIZATION);
+    expect(body.error?.trace?.idempotencyKey).toBe("idem-request-2");
   });
 
   it("prefers wallet policy retry budget from payment-required response", async () => {
