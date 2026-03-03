@@ -1,5 +1,5 @@
 ---
-summary: "Web search + fetch tools (Brave Search API, Perplexity direct/OpenRouter, xAI Grok, Gemini Google Search grounding, Kimi, SearxNG self-hosted)"
+summary: "Web search + fetch tools (Brave, Perplexity, Gemini, Grok, Kimi, and optional self-hosted SearxNG)"
 read_when:
   - You want to enable web_search or web_fetch
   - You need Brave Search API key setup
@@ -15,7 +15,7 @@ title: "Web Tools"
 
 OpenClaw ships two lightweight web tools:
 
-- `web_search` — Search the web via Brave Search API (default), Perplexity Sonar (direct or via OpenRouter), xAI Grok, Gemini with Google Search grounding, Kimi, or SearxNG (self-hosted).
+- `web_search` — Search the web via Brave Search API (default), Perplexity Sonar, Gemini with Google Search grounding, Grok, Kimi, or SearxNG (self-hosted).
 - `web_fetch` — HTTP fetch + readable extraction (HTML → markdown/text).
 
 These are **not** browser automation. For JS-heavy sites or logins, use the
@@ -43,21 +43,21 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 | **Perplexity**      | AI-synthesized answers, citations, real-time | Requires Perplexity or OpenRouter access | `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` |
 | **Grok**            | AI-synthesized answers, citations            | Requires xAI API access                  | `XAI_API_KEY`                                |
 | **Gemini**          | Google Search grounding, AI-synthesized      | Requires Gemini API key                  | `GEMINI_API_KEY`                             |
-| **Kimi**            | AI-synthesized answers, citations            | Requires Moonshot API access             | `KIMI_API_KEY` or `MOONSHOT_API_KEY`         |
+| **Kimi**            | Moonshot web search capability               | Requires Moonshot API key                | `KIMI_API_KEY` / `MOONSHOT_API_KEY`          |
 | **SearxNG**         | Self-hosted, open-source                     | You host and maintain it                 | Optional (`SEARXNG_API_KEY`)                 |
 
-See [Brave Search setup](/brave-search), [Perplexity Sonar](/perplexity), [SearxNG](/searxng) for provider-specific details.
+See [Brave Search setup](/brave-search), [Perplexity Sonar](/perplexity), [Kimi](/kimi), and [SearxNG](/searxng) for provider-specific details.
 
 ### Auto-detection
 
 If no `provider` is explicitly set, OpenClaw auto-detects which provider to use based on configured SearxNG base URL (if present) or available API keys, checking in this order:
 
-1. **SearxNG** — `search.searxng.baseUrl` config
-2. **Brave** — `BRAVE_API_KEY` env var or `search.apiKey` config
-3. **Gemini** — `GEMINI_API_KEY` env var or `search.gemini.apiKey` config
-4. **Kimi** — `KIMI_API_KEY` / `MOONSHOT_API_KEY` env var or `search.kimi.apiKey` config
-5. **Perplexity** — `PERPLEXITY_API_KEY` / `OPENROUTER_API_KEY` env var or `search.perplexity.apiKey` config
-6. **Grok** — `XAI_API_KEY` env var or `search.grok.apiKey` config
+1. **SearxNG** — `tools.web.search.searxng.baseUrl` config
+2. **Brave** — `BRAVE_API_KEY` env var or `tools.web.search.apiKey` config
+3. **Gemini** — `GEMINI_API_KEY` env var or `tools.web.search.gemini.apiKey` config
+4. **Kimi** — `KIMI_API_KEY` / `MOONSHOT_API_KEY` env var or `tools.web.search.kimi.apiKey` config
+5. **Perplexity** — `PERPLEXITY_API_KEY` / `OPENROUTER_API_KEY` env var or `tools.web.search.perplexity.apiKey` config
+6. **Grok** — `XAI_API_KEY` env var or `tools.web.search.grok.apiKey` config
 
 If no keys are found, it falls back to Brave (you'll get a missing-key error prompting you to configure one).
 
@@ -70,7 +70,7 @@ Set the provider in config:
   tools: {
     web: {
       search: {
-        provider: "brave", // or "perplexity", "grok", "gemini", "kimi", or "searxng"
+        provider: "brave", // or "perplexity" or "gemini" or "grok" or "kimi" or "searxng"
       },
     },
   },
@@ -267,7 +267,9 @@ Search the web using your configured provider.
 - API key or base URL for your chosen provider:
   - **Brave**: `BRAVE_API_KEY` or `tools.web.search.apiKey`
   - **Perplexity**: `OPENROUTER_API_KEY`, `PERPLEXITY_API_KEY`, or `tools.web.search.perplexity.apiKey`
+  - **Gemini**: `GEMINI_API_KEY` or `tools.web.search.gemini.apiKey`
   - **Grok**: `XAI_API_KEY` or `tools.web.search.grok.apiKey`
+  - **Kimi**: `KIMI_API_KEY`, `MOONSHOT_API_KEY`, or `tools.web.search.kimi.apiKey`
   - **SearxNG**: `tools.web.search.searxng.baseUrl` (and optional `tools.web.search.searxng.apiKey` or `SEARXNG_API_KEY`)
 
 ### Config

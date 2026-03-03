@@ -69,8 +69,8 @@ function resolveSlackSendContext(params: {
   cfg: Parameters<typeof resolveSlackAccount>[0]["cfg"];
   accountId?: string;
   deps?: { sendSlack?: SlackSendFn };
-  replyToId?: string | null;
-  threadId?: string | null;
+  replyToId?: string | number | null;
+  threadId?: string | number | null;
 }) {
   const send = params.deps?.sendSlack ?? getSlackRuntime().channel.slack.sendMessageSlack;
   const account = resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });

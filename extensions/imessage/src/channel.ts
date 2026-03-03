@@ -182,13 +182,14 @@ export const imessagePlugin: ChannelPlugin<ResolvedIMessageAccount> = {
         accountId,
         name: input.name,
       });
-      const next =
+      const next = (
         accountId !== DEFAULT_ACCOUNT_ID
           ? migrateBaseNameToDefaultAccount({
               cfg: namedConfig,
               channelKey: "imessage",
             })
-          : namedConfig;
+          : namedConfig
+      ) as typeof cfg;
       if (accountId === DEFAULT_ACCOUNT_ID) {
         return {
           ...next,
@@ -200,7 +201,7 @@ export const imessagePlugin: ChannelPlugin<ResolvedIMessageAccount> = {
               ...buildIMessageSetupPatch(input),
             },
           },
-        };
+        } as typeof cfg;
       }
       return {
         ...next,
@@ -219,7 +220,7 @@ export const imessagePlugin: ChannelPlugin<ResolvedIMessageAccount> = {
             },
           },
         },
-      };
+      } as typeof cfg;
     },
   },
   outbound: {
