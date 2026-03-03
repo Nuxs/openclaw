@@ -301,6 +301,8 @@ bootstrap_openclaw_config() {
   # Set standard container dev defaults.
   pnpm -s openclaw config set gateway.mode local
   pnpm -s openclaw config set agents.defaults.workspace "$OPENCLAW_WORKSPACE_DIR"
+  # Allow Control UI to work when accessed via AnyDev non-localhost domains
+  pnpm -s openclaw config set gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback true
 
   popd >/dev/null
 }
