@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createOpenClawTools } from "../agents/openclaw-tools.js";
 import {
@@ -316,6 +317,66 @@ function resolveAutoPayMaxRetries(params: {
   return configRetries;
 }
 
+function isPositiveIntegerString(value: unknown): boolean {
+  return typeof value === "string" && /^\d+$/.test(value.trim()) && BigInt(value) > 0n;
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+async function readJsonObjectFile(path: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    const raw = await readFile(path, "utf8");
+    return asObject(JSON.parse(raw) as unknown);
+  } catch {
+    return undefined;
+  }
+}
+
+async function validateAgentWalletProductionBaseline(
+  cfg: ReturnType<typeof loadConfig>,
+): Promise<string | undefined> {
+  if (process.env.NODE_ENV !== "production") {
+    return undefined;
+  }
+  const agentWalletEntry = asObject(cfg.plugins?.entries?.["agent-wallet"]);
+  const agentWalletConfig = asObject(agentWalletEntry?.config);
+  const policyConfig = asObject(agentWalletConfig?.policy);
+
+  if (!policyConfig || policyConfig.enabled !== true) {
+    return "agent-wallet policy must be enabled in production";
+  }
+
+  let effectivePolicy = asObject(policyConfig.inlinePolicy);
+  if (!effectivePolicy) {
+    const policyPath =
+      typeof policyConfig.policyPath === "string" ? policyConfig.policyPath.trim() : "";
+    if (policyPath.length > 0) {
+      effectivePolicy = await readJsonObjectFile(policyPath);
+    }
+  }
+
+  if (!effectivePolicy) {
+    return "agent-wallet policy must provide inlinePolicy or policyPath in production";
+  }
+
+  const autoPay = asObject(effectivePolicy.autoPay);
+  const budget = asObject(effectivePolicy.budget);
+
+  if (
+    !isPositiveIntegerString(autoPay?.maxAutoPayPerRequest) ||
+    !isPositiveIntegerString(budget?.perTxCap) ||
+    !isPositiveIntegerString(budget?.dailyCap)
+  ) {
+    return "agent-wallet policy caps must be positive integer strings in production";
+  }
+
+  return undefined;
+}
+
 function extractInvoiceFromAuthenticate(header: string): string | undefined {
   const match = header.match(/\binvoice\s*=\s*"([^"]+)"/i);
   if (match?.[1]) {
@@ -385,6 +446,30 @@ async function tryAutoPay(params: {
     return { result: payload };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function consumePaymentRequiredAuthorization(params: {
+  idempotencyKey: string;
+  authorization?: string;
+  resumeToken?: PaymentResumeToken;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const response = await callGateway({
+      method: "web3.billing.consumePaymentRequired",
+      params: {
+        idempotencyKey: params.idempotencyKey,
+        authorization: params.authorization,
+        resumeToken: params.resumeToken,
+      },
+    });
+    const normalized = normalizeGatewayResult(response);
+    if (!normalized.ok) {
+      return { ok: false, error: normalized.error ?? "consume payment authorization failed" };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -642,12 +727,18 @@ export async function handleToolsInvokeHttpRequest(
       let autoPayResult: PaymentRequiredResult | undefined;
       let autoPayAttempted = false;
       let autoPaySucceeded = false;
-      let retryExhausted = false;
       if (!autoPayConfig.enabled) {
         autoPayError = "autopay disabled by config";
       } else if (!idempotencyKey) {
         autoPayError = "idempotency key required for autopay";
-      } else if (invoice) {
+      } else {
+        const productionBaselineError = await validateAgentWalletProductionBaseline(cfg);
+        if (productionBaselineError) {
+          autoPayError = productionBaselineError;
+        }
+      }
+
+      if (!autoPayError && invoice) {
         const healthGuardTriggered = await shouldDegradeX402AutopayByHealth();
         if (healthGuardTriggered) {
           autoPayError = "autopay degraded by health guard";
@@ -661,14 +752,14 @@ export async function handleToolsInvokeHttpRequest(
       }
 
       if (autoPayResult?.authorization || autoPayResult?.resumeToken) {
-        const authorizationToken = parsePaymentResumeTokenFromAuthorization(
-          autoPayResult.authorization,
-        );
+        let effectiveAuthorization = autoPayResult.authorization;
+        const authorizationToken = parsePaymentResumeTokenFromAuthorization(effectiveAuthorization);
         let effectiveResumeToken = autoPayResult.resumeToken ?? authorizationToken;
 
         if (autoPayResult.resumeToken && authorizationToken) {
           if (!comparePaymentResumeTokenIdentity(autoPayResult.resumeToken, authorizationToken)) {
             autoPayError = "autopay resume token mismatch between payload and authorization";
+            effectiveAuthorization = undefined;
             effectiveResumeToken = undefined;
           }
         }
@@ -677,23 +768,46 @@ export async function handleToolsInvokeHttpRequest(
           const tokenValidation = validatePaymentResumeToken(effectiveResumeToken);
           if (!tokenValidation.valid) {
             autoPayError = tokenValidation.error;
+            effectiveAuthorization = undefined;
             effectiveResumeToken = undefined;
           }
         }
+
+        if (effectiveResumeToken && idempotencyKey) {
+          const consumeResult = await consumePaymentRequiredAuthorization({
+            idempotencyKey,
+            authorization: effectiveAuthorization,
+            resumeToken: effectiveResumeToken,
+          });
+          if (!consumeResult.ok) {
+            autoPayError = consumeResult.error;
+            effectiveAuthorization = undefined;
+            effectiveResumeToken = undefined;
+          }
+        }
+
+        autoPayResult = {
+          ...autoPayResult,
+          authorization: effectiveAuthorization,
+          resumeToken: effectiveResumeToken,
+        };
 
         const retryArgs = applyPaymentResumeToken({
           args: toolArgs,
           // oxlint-disable-next-line typescript/no-explicit-any
           toolSchema: (tool as any).parameters,
-          authorization: autoPayResult.authorization,
+          authorization: effectiveAuthorization,
           resumeToken: effectiveResumeToken,
         });
 
         if (retryArgs) {
-          const maxRetries = resolveAutoPayMaxRetries({
-            configRetries: autoPayConfig.maxRetries,
-            paymentRequiredRetries: autoPayResult.maxRetries,
-          });
+          const maxRetries = Math.min(
+            1,
+            resolveAutoPayMaxRetries({
+              configRetries: autoPayConfig.maxRetries,
+              paymentRequiredRetries: autoPayResult.maxRetries,
+            }),
+          );
           for (let attemptIndex = 0; attemptIndex < maxRetries; attemptIndex += 1) {
             try {
               // oxlint-disable-next-line typescript/no-explicit-any
@@ -712,15 +826,11 @@ export async function handleToolsInvokeHttpRequest(
               await recordX402AutopayMetric({ event: "retry" });
             }
           }
-          retryExhausted = maxRetries > 0;
         }
       }
 
       if (autoPayAttempted && !autoPaySucceeded) {
         await recordX402AutopayMetric({ event: "failure" });
-      }
-      if (retryExhausted && !autoPaySucceeded) {
-        await recordX402AutopayMetric({ event: "circuit_breaker_trip" });
       }
 
       sendJson(res, 402, {

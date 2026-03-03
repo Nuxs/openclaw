@@ -21,7 +21,6 @@ const PAYMENT_INVOICE = {
   idempotencyKey: "idem-1",
 };
 const PAYMENT_INVOICE_BASE64 = Buffer.from(JSON.stringify(PAYMENT_INVOICE)).toString("base64");
-const PAYMENT_AUTHORIZATION = "OpenClaw-PayFi dGVzdC1yZXN1bWU=";
 const PAYMENT_RESUME_TOKEN = {
   invoiceId: PAYMENT_INVOICE.invoiceId,
   paymentReceiptId: "receipt-1",
@@ -29,6 +28,9 @@ const PAYMENT_RESUME_TOKEN = {
   issuedAt: new Date().toISOString(),
   expiresAt: PAYMENT_INVOICE.expiresAt,
 };
+const PAYMENT_AUTHORIZATION = `OpenClaw-PayFi ${Buffer.from(
+  JSON.stringify(PAYMENT_RESUME_TOKEN),
+).toString("base64")}`;
 const PAYMENT_RECEIPT = {
   receiptId: PAYMENT_RESUME_TOKEN.paymentReceiptId,
   chain: "evm",
@@ -702,8 +704,68 @@ describe("POST /tools/invoke", () => {
         params: expect.objectContaining({ idempotencyKey, requestId }),
       }),
     );
+    expect(mockCallGateway).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "web3.billing.consumePaymentRequired",
+        params: expect.objectContaining({ idempotencyKey }),
+      }),
+    );
     const headers = (lastPaymentRequiredArgs?.headers ?? {}) as Record<string, unknown>;
     expect(headers.authorization).toBe(PAYMENT_AUTHORIZATION);
+  });
+
+  it("does not retry tool when payment authorization consume fails", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+    };
+
+    mockCallGateway.mockImplementation(async (input: unknown) => {
+      const method = (input as { method?: unknown })?.method;
+      if (method === "web3.metrics.snapshot") {
+        return { ok: true, result: { alerts: [] } };
+      }
+      if (method === "web3.billing.handlePaymentRequired") {
+        return {
+          ok: true,
+          result: {
+            resumeToken: PAYMENT_RESUME_TOKEN,
+            authorization: PAYMENT_AUTHORIZATION,
+            paymentReceipt: PAYMENT_RECEIPT,
+          },
+        };
+      }
+      if (method === "web3.billing.consumePaymentRequired") {
+        return {
+          ok: false,
+          error: "E_CONFLICT: payment authorization already consumed",
+        };
+      }
+      return { ok: true, result: {} };
+    });
+
+    const res = await invokeToolAuthed({
+      tool: "tools_invoke_payment_required",
+      args: { headers: {} },
+      sessionKey: "main",
+      headers: { "x-idempotency-key": "idem-consume-fail" },
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error?.autoPayError).toBe("E_CONFLICT: payment authorization already consumed");
+    expect(paymentRequiredCallCount).toBe(1);
+    const headers = (lastPaymentRequiredArgs?.headers ?? {}) as Record<string, unknown>;
+    expect(headers.authorization).toBeUndefined();
   });
 
   it("stays stable under continuous 402 autopay retries", async () => {
@@ -808,6 +870,131 @@ describe("POST /tools/invoke", () => {
     expect(paymentRequiredCallCount).toBe(1);
     expect(mockCallGateway).not.toHaveBeenCalled();
     expect(body.error?.autoPayError).toBe("idempotency key required for autopay");
+  });
+
+  it("rejects autopay in production when agent-wallet policy baseline is missing", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+      plugins: {
+        entries: {
+          "web3-core": {
+            config: { x402: { autopay: { enabled: true } } },
+          },
+          "agent-wallet": {
+            config: {
+              policy: {
+                enabled: false,
+              },
+            },
+          },
+        },
+      },
+    };
+
+    try {
+      const res = await invokeToolAuthed({
+        tool: "tools_invoke_payment_required",
+        args: { headers: {} },
+        sessionKey: "main",
+        headers: { "x-idempotency-key": "idem-prod-baseline-missing" },
+      });
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body.ok).toBe(false);
+      expect(body.error?.autoPayError).toBe("agent-wallet policy must be enabled in production");
+      expect(paymentRequiredCallCount).toBe(1);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it("accepts production baseline when policyPath provides required caps", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const tempDir = await mkdtemp(join(tmpdir(), "openclaw-policy-"));
+    const policyPath = join(tempDir, "policy.json");
+
+    await writeFile(
+      policyPath,
+      JSON.stringify({
+        version: "v1",
+        budget: {
+          dailyCap: "1000000000000000000",
+          perTxCap: "100000000000000000",
+          currency: "NATIVE",
+        },
+        scope: {},
+        autoPay: {
+          enabled: true,
+          maxRetries: 1,
+          maxAutoPayPerRequest: "100000000000000000",
+        },
+      }),
+      "utf8",
+    );
+
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: { allow: ["tools_invoke_payment_required"] },
+          },
+        ],
+      },
+      plugins: {
+        entries: {
+          "web3-core": {
+            config: { x402: { autopay: { enabled: true } } },
+          },
+          "agent-wallet": {
+            config: {
+              policy: {
+                enabled: true,
+                policyPath,
+              },
+            },
+          },
+        },
+      },
+    };
+
+    try {
+      const res = await invokeToolAuthed({
+        tool: "tools_invoke_payment_required",
+        args: { headers: {} },
+        sessionKey: "main",
+        headers: { "x-idempotency-key": "idem-prod-policy-path" },
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(mockCallGateway).toHaveBeenCalledWith(
+        expect.objectContaining({ method: "web3.billing.handlePaymentRequired" }),
+      );
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it("degrades autopay when x402 health guard is triggered", async () => {
