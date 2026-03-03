@@ -100,6 +100,24 @@ export function createMarketLeaseExpireSweepHandler(
   return createMarketProxyHandler(config, "market.lease.expireSweep");
 }
 
+export function createMarketServiceProofSubmitHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.service.proof.submit");
+}
+
+export function createMarketServiceProofGetHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.service.proof.get", { requireResources: false });
+}
+
+export function createMarketServiceProofListHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.service.proof.list", { requireResources: false });
+}
+
 export function createMarketLedgerListHandler(config: Web3PluginConfig): GatewayRequestHandler {
   return createMarketProxyHandler(config, "market.ledger.list", { requireResources: false });
 }
@@ -198,6 +216,39 @@ function countByStatus(items: Array<{ status?: string }>): Record<string, number
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
+}
+
+type ServiceProofSummaryInput = {
+  status?: string;
+  submittedAt?: string;
+  proof?: { artifactHash?: string };
+};
+
+function summarizeServiceProofs(
+  proofs: ServiceProofSummaryInput[],
+): ReconciliationSummary["serviceProofs"] | undefined {
+  if (proofs.length === 0) return undefined;
+  const byStatus = countByStatus(proofs);
+  const latestSubmittedAt = proofs.reduce<string | undefined>((latest, entry) => {
+    if (typeof entry.submittedAt !== "string") return latest;
+    if (!latest || entry.submittedAt > latest) return entry.submittedAt;
+    return latest;
+  }, undefined);
+  const artifactHashes = [
+    ...new Set(
+      proofs
+        .map((entry) =>
+          typeof entry.proof?.artifactHash === "string" ? entry.proof.artifactHash : undefined,
+        )
+        .filter((hash): hash is string => Boolean(hash)),
+    ),
+  ].slice(0, 5);
+  return {
+    total: proofs.length,
+    byStatus,
+    latestSubmittedAt,
+    artifactHashes,
+  };
 }
 
 function resolvePaymentReceipt(params: {
@@ -299,6 +350,21 @@ export function createMarketReconciliationSummaryHandler(
         }
       }
 
+      let serviceProofSummary: ReconciliationSummary["serviceProofs"];
+      const serviceProofResponse = await callGateway({
+        method: "market.service.proof.list",
+        params: { orderId: resolvedOrderId, limit: 200 },
+        timeoutMs: config.brain.timeoutMs,
+      });
+      const serviceProofResult = normalizeGatewayResult(serviceProofResponse);
+      if (serviceProofResult.ok) {
+        const payload = (serviceProofResult.result ?? {}) as {
+          proofs?: ServiceProofSummaryInput[];
+        };
+        const proofs = Array.isArray(payload.proofs) ? payload.proofs : [];
+        serviceProofSummary = summarizeServiceProofs(proofs);
+      }
+
       let ledgerSummary: ReconciliationSummary["ledgerSummary"];
       if (includeLedger && leaseId) {
         const ledgerResponse = await callGateway({
@@ -385,6 +451,7 @@ export function createMarketReconciliationSummaryHandler(
         },
         ledgerSummary,
         disputes: disputeSummary,
+        serviceProofs: serviceProofSummary,
         archiveReceipt: archiveReceipt
           ? {
               cid: archiveReceipt.cid,

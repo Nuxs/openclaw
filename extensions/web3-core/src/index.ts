@@ -66,6 +66,9 @@ import {
   createMarketResourceListHandler,
   createMarketResourcePublishHandler,
   createMarketResourceUnpublishHandler,
+  createMarketServiceProofSubmitHandler,
+  createMarketServiceProofGetHandler,
+  createMarketServiceProofListHandler,
   createMarketStatusSummaryHandler,
   createMarketDisputeGetHandler,
   createMarketDisputeListHandler,
@@ -313,6 +316,18 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod(
       "web3.market.lease.expireSweep",
       createMarketLeaseExpireSweepHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.service.proof.submit",
+      createMarketServiceProofSubmitHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.service.proof.get",
+      createMarketServiceProofGetHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.service.proof.list",
+      createMarketServiceProofListHandler(config),
     );
     api.registerGatewayMethod("web3.market.ledger.list", createMarketLedgerListHandler(config));
     api.registerGatewayMethod(

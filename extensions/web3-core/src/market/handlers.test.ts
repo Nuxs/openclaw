@@ -162,6 +162,65 @@ describe("market.reconciliation.summary", () => {
     expect(summary.disputes.byStatus.dispute_resolved).toBe(1);
   });
 
+  it("includes service proof summary in reconciliation payload", async () => {
+    mockCallGateway.mockImplementation(async (opts: { method: string }) => {
+      if (opts.method === "market.settlement.status") {
+        return {
+          ok: true,
+          result: {
+            orderId: "order-proof-1",
+            settlementId: "settle-proof-1",
+            status: "settlement_locked",
+            amount: "120",
+          },
+        };
+      }
+      if (opts.method === "market.dispute.list") {
+        return { ok: true, result: { disputes: [] } };
+      }
+      if (opts.method === "market.service.proof.list") {
+        return {
+          ok: true,
+          result: {
+            proofs: [
+              {
+                status: "proof_submitted",
+                submittedAt: "2026-03-01T00:00:00.000Z",
+                proof: {
+                  artifactHash:
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                },
+              },
+              {
+                status: "proof_submitted",
+                submittedAt: "2026-03-02T00:00:00.000Z",
+                proof: {
+                  artifactHash:
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                },
+              },
+            ],
+          },
+        };
+      }
+      return { ok: true, result: {} };
+    });
+
+    const handler = createMarketReconciliationSummaryHandler(store, config);
+    const r = createResponder();
+    await handler({
+      params: { orderId: "order-proof-1" },
+      respond: r.respond,
+    } as any);
+
+    expect(r.result()!.ok).toBe(true);
+    const summary = r.result()!.payload as any;
+    expect(summary.serviceProofs.total).toBe(2);
+    expect(summary.serviceProofs.byStatus.proof_submitted).toBe(2);
+    expect(summary.serviceProofs.latestSubmittedAt).toBe("2026-03-02T00:00:00.000Z");
+    expect(summary.serviceProofs.artifactHashes).toHaveLength(2);
+  });
+
   it("handles settlement.status gateway failure", async () => {
     mockCallGateway.mockImplementation(async () => ({
       ok: false,

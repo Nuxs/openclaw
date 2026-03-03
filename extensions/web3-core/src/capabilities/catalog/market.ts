@@ -39,7 +39,8 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           includeDisputes: { type: "boolean", description: "Include dispute summary" },
         },
       },
-      returns: "Reconciliation summary payload with payment receipt and ledger/dispute overview.",
+      returns:
+        "Reconciliation summary payload with payment receipt, ledger/dispute overview, and service proof summary.",
       risk: { level: "low" },
     },
     {
@@ -328,7 +329,7 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
               kind: {
                 type: "string",
                 description: "Resource kind",
-                enum: ["model", "search", "storage"],
+                enum: ["model", "search", "storage", "service"],
                 example: "storage",
               },
               label: {
@@ -388,6 +389,44 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
                   maxBytes: { type: "number", minimum: 1, maximum: 1073741824 },
                   allowTools: { type: "boolean" },
                   allowMime: { type: "array", items: { type: "string" }, maxItems: 64 },
+                },
+              },
+              serviceSchema: {
+                type: "object",
+                description: "Service schema (required when kind=service)",
+                required: ["inputs", "outputs"],
+                properties: {
+                  inputs: {
+                    type: "array",
+                    items: { type: "string" },
+                    minItems: 1,
+                    maxItems: 32,
+                  },
+                  outputs: {
+                    type: "array",
+                    items: { type: "string" },
+                    minItems: 1,
+                    maxItems: 32,
+                  },
+                  sla: {
+                    type: "object",
+                    properties: {
+                      maxLatencySec: { type: "number", minimum: 1, maximum: 3600 },
+                      deliveryWindowSec: { type: "number", minimum: 1, maximum: 604800 },
+                    },
+                  },
+                  proofRequirements: {
+                    type: "array",
+                    minItems: 1,
+                    items: {
+                      type: "object",
+                      required: ["type"],
+                      properties: {
+                        type: { type: "string", enum: ["tlsnotary"] },
+                        required: { type: "boolean" },
+                      },
+                    },
+                  },
                 },
               },
               offer: {
@@ -487,7 +526,7 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           kind: {
             type: "string",
             description: "Filter by resource kind (optional)",
-            enum: ["model", "search", "storage"],
+            enum: ["model", "search", "storage", "service"],
           },
           providerActorId: {
             type: "string",
@@ -622,6 +661,71 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         },
       },
       returns: "Expiration sweep summary.",
+    },
+    {
+      name: "web3.market.service.proof.submit",
+      summary: "Submit execution proof for a service order (proxy to market-core).",
+      kind: "gateway",
+      group: "market",
+      availability: availability(resourcesEnabled, "resources disabled"),
+      paramsSchema: {
+        type: "object",
+        required: ["actorId", "orderId", "proof"],
+        properties: {
+          actorId: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$" },
+          orderId: { type: "string" },
+          leaseId: { type: "string" },
+          deliveryId: { type: "string" },
+          proof: {
+            type: "object",
+            required: ["type", "artifactHash", "issuedAt", "verifier"],
+            properties: {
+              type: { type: "string", enum: ["tlsnotary"] },
+              artifactHash: { type: "string", pattern: "^sha256:[a-fA-F0-9]{64}$" },
+              issuedAt: { type: "string" },
+              redactedFields: { type: "array", items: { type: "string" }, maxItems: 64 },
+              verifier: { type: "string" },
+            },
+          },
+        },
+      },
+      returns:
+        "Service proof submission result with proofId/proofHash and order/settlement status snapshot.",
+      risk: { level: "medium" },
+    },
+    {
+      name: "web3.market.service.proof.get",
+      summary: "Get service proof by proofId (proxy to market-core).",
+      kind: "gateway",
+      group: "market",
+      availability: availability(resourcesEnabled, "resources disabled"),
+      paramsSchema: {
+        type: "object",
+        required: ["proofId"],
+        properties: {
+          actorId: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$" },
+          proofId: { type: "string" },
+        },
+      },
+      returns: "Service proof payload for the given proofId.",
+      risk: { level: "low" },
+    },
+    {
+      name: "web3.market.service.proof.list",
+      summary: "List service proofs (proxy to market-core).",
+      kind: "gateway",
+      group: "market",
+      availability: availability(resourcesEnabled, "resources disabled"),
+      paramsSchema: {
+        type: "object",
+        properties: {
+          actorId: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$" },
+          orderId: { type: "string" },
+          limit: { type: "number", minimum: 1, maximum: 200 },
+        },
+      },
+      returns: "Service proof list response with count.",
+      risk: { level: "low" },
     },
     // ── Ledger ──────────────────────────────────────────
     {
