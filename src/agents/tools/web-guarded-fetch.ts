@@ -7,7 +7,7 @@ import {
 } from "../../infra/net/fetch-guard.js";
 import type { SsrFPolicy } from "../../infra/net/ssrf.js";
 
-const WEB_TOOLS_TRUSTED_NETWORK_SSRF_POLICY: SsrFPolicy = {
+export const WEB_TOOLS_TRUSTED_NETWORK_SSRF_POLICY: SsrFPolicy = {
   dangerouslyAllowPrivateNetwork: true,
   allowRfc2544BenchmarkRange: true,
 };
@@ -49,7 +49,7 @@ export async function fetchWithWebToolsNetworkGuard(
   );
 }
 
-async function withWebToolsNetworkGuard<T>(
+export async function withWebToolsNetworkGuard<T>(
   params: WebToolGuardedFetchOptions,
   run: (result: { response: Response; finalUrl: string }) => Promise<T>,
 ): Promise<T> {

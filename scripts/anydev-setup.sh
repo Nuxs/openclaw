@@ -240,11 +240,15 @@ configure_pnpm_dirs() {
 }
 
 install_node_via_pnpm() {
-  # If we're already running on Node (repo-bundled or base image), don't force-download another Node.
-  # Some AnyDev environments block outbound downloads, which would fail here.
-  if want_cmd node; then
+  # Check if current node version is sufficient (>= 22)
+  local current_ver
+  current_ver=$(node -v 2>/dev/null || echo "v0.0.0")
+  if [[ "$current_ver" =~ ^v2[2-9] ]] || [[ "$current_ver" =~ ^v[3-9][0-9] ]]; then
+    say "Node $current_ver is sufficient."
     return
   fi
+
+  say "Current Node $current_ver is too old. Ensuring Node 22.12.0 is installed via pnpm..."
 
   say "Ensuring Node 22.12.0 is installed under $PNPM_HOME via pnpm env"
   pnpm env use -g 22.12.0 >/dev/null
