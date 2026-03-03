@@ -35,14 +35,14 @@ These are **not** browser automation. For JS-heavy sites or logins, use the
 
 ## Choosing a search provider
 
-| Provider            | Pros                                         | Cons                                     | API Key                                      |
-| ------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
-| **Brave** (default) | Fast, structured results, free tier          | Traditional search results               | `BRAVE_API_KEY`                              |
-| **Perplexity**      | AI-synthesized answers, citations, real-time | Requires Perplexity or OpenRouter access | `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` |
-| **Grok**            | AI-synthesized answers, citations            | Requires xAI API access                  | `XAI_API_KEY`                                |
-| **Gemini**          | Google Search grounding, AI-synthesized      | Requires Gemini API key                  | `GEMINI_API_KEY`                             |
-| **Kimi**            | Moonshot web search capability               | Requires Moonshot API key                | `KIMI_API_KEY` / `MOONSHOT_API_KEY`          |
-| **SearxNG**         | Self-hosted, open-source                     | You host and maintain it                 | Optional (`SEARXNG_API_KEY`)                 |
+| Provider            | Pros                                         | Cons                                           | API Key                                      |
+| ------------------- | -------------------------------------------- | ---------------------------------------------- | -------------------------------------------- |
+| **Brave** (default) | Fast, structured results                     | Traditional search results; AI-use terms apply | `BRAVE_API_KEY`                              |
+| **Perplexity**      | AI-synthesized answers, citations, real-time | Requires Perplexity or OpenRouter access       | `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` |
+| **Gemini**          | Google Search grounding, AI-synthesized      | Requires Gemini API key                        | `GEMINI_API_KEY`                             |
+| **Grok**            | xAI web-grounded responses                   | Requires xAI API key                           | `XAI_API_KEY`                                |
+| **Kimi**            | Moonshot web search capability               | Requires Moonshot API key                      | `KIMI_API_KEY` / `MOONSHOT_API_KEY`          |
+| **SearxNG**         | Self-hosted, open-source                     | You host and maintain it                       | Optional (`SEARXNG_API_KEY`)                 |
 
 See [Brave Search setup](/brave-search), [Perplexity Sonar](/perplexity), and [Kimi](/kimi) for provider-specific details.
 
@@ -153,8 +153,12 @@ by default (with optional GPU acceleration).
 2. In the dashboard, choose the **Data for Search** plan (not “Data for AI”) and generate an API key.
 3. Run `openclaw configure --section web` to store the key in config (recommended), or set `BRAVE_API_KEY` in your environment.
 
-Brave provides a free tier plus paid plans; check the Brave API portal for the
+Brave provides paid plans; check the Brave API portal for the
 current limits and pricing.
+
+Brave Terms include restrictions on some AI-related uses of Search Results.
+Review the Brave Terms of Service and confirm your intended use is compliant.
+For legal questions, consult your counsel.
 
 ### Where to set the key (recommended)
 
