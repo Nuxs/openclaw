@@ -87,7 +87,7 @@ function seedServiceOrder(
   return { offer, order, settlement };
 }
 
-function submitProof(
+async function submitProof(
   store: MarketStateStore,
   config: MarketPluginConfig,
   orderId: string,
@@ -95,7 +95,7 @@ function submitProof(
 ) {
   const handler = createServiceProofSubmitHandler(store, config);
   const r = createResponder();
-  handler({
+  await handler({
     params: {
       actorId,
       orderId,
@@ -129,7 +129,7 @@ afterEach(async () => {
 describe("service proof handlers", () => {
   it("submits proof when order/settlement preconditions pass", async () => {
     const seeded = seedServiceOrder(store);
-    const result = submitProof(store, config, seeded.order.orderId);
+    const result = await submitProof(store, config, seeded.order.orderId);
     expect(result.ok).toBe(true);
     expect((result.payload as any).orderStatus).toBe("delivery_completed");
     expect((result.payload as any).settlementStatus).toBe("settlement_locked");
@@ -137,21 +137,21 @@ describe("service proof handlers", () => {
 
   it("rejects submit when order status is not delivery_completed/settlement_completed", async () => {
     const seeded = seedServiceOrder(store, { status: "payment_locked" });
-    const result = submitProof(store, config, seeded.order.orderId);
+    const result = await submitProof(store, config, seeded.order.orderId);
     expect(result.ok).toBe(false);
-    expect((result.payload as any).error).toContain("order.status");
+    expect((result.payload as any).error).toBe("E_CONFLICT");
   });
 
   it("rejects submit when settlement is refunded", async () => {
     const seeded = seedServiceOrder(store, { settlementStatus: "settlement_refunded" });
-    const result = submitProof(store, config, seeded.order.orderId);
+    const result = await submitProof(store, config, seeded.order.orderId);
     expect(result.ok).toBe(false);
-    expect((result.payload as any).error).toContain("settlement already refunded");
+    expect((result.payload as any).error).toBe("E_CONFLICT");
   });
 
   it("gets service proof by proofId", async () => {
     const seeded = seedServiceOrder(store);
-    const submit = submitProof(store, config, seeded.order.orderId);
+    const submit = await submitProof(store, config, seeded.order.orderId);
     expect(submit.ok).toBe(true);
 
     const handler = createServiceProofGetHandler(store, config);
@@ -169,8 +169,8 @@ describe("service proof handlers", () => {
   it("lists service proofs by orderId", async () => {
     const a = seedServiceOrder(store, { orderId: "order-a", offerId: "offer-a" });
     const b = seedServiceOrder(store, { orderId: "order-b", offerId: "offer-b" });
-    expect(submitProof(store, config, a.order.orderId).ok).toBe(true);
-    expect(submitProof(store, config, b.order.orderId).ok).toBe(true);
+    expect((await submitProof(store, config, a.order.orderId)).ok).toBe(true);
+    expect((await submitProof(store, config, b.order.orderId)).ok).toBe(true);
 
     const handler = createServiceProofListHandler(store, config);
     const r = createResponder();
