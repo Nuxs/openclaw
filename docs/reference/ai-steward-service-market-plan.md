@@ -40,6 +40,28 @@ OpenClaw 已具备 Web3 Market 的资源共享与结算底座，但当前能力�
 - **可降级**：证明与结算不可用时不阻断核心调用，只降级提示。
 - **可审计**：所有关键动作可追溯，且输出可分享。
 
+## AI 管家体验最短路径与架构调整（提案）
+
+### 最短路径（AI 视角的一次性闭环）
+
+1. **选择与确认**：`web3.market.resource.list` → 过滤 `kind=service` → 生成“可执行摘要 + 风险提示”，明确预算上限与可撤销条件。
+2. **租约与访问**：`web3.market.lease.issue` 返回一次性 `accessToken` 与 `orderId`，在本地会话内短时持有。
+3. **执行与证明**：调用 Provider 服务 → 生成 `ExecutionProof` → `web3.market.service.proof.submit` 仅写入 hash 元数据。
+4. **结算与争议**：进入争议窗口，默认 `release`；若失败则 `web3.market.dispute.*` 进入裁决。
+5. **可分享对账**：输出仅含 hash/摘要的 `ReconciliationSummary`，不含 endpoint/token/真实路径。
+
+### 架构调整方向（AI 体验优先）
+
+- **统一体验层入口**：对外只保留 `web3.market.*` 作为服务与争议入口，避免在 `web3.*` 之外出现多套体验路径。
+- **补齐任务导向入口**：新增“任务型编排”语义（例如 `web3.task.request`/`web3.task.fulfill`），由内部映射到 `market-core` 的资源、租约、证明与结算。
+- **预算与自动化决策收敛**：将 `agent-wallet` 与 `x402` 统一到同一决策树，避免在调用层出现多套预算逻辑。
+
+### 技术选型调整（面向可验证与可降级）
+
+- **证明后端可插拔**：首期 `tlsnotary`，后续允许接入 `Rekor` 或 TEE 证明，但保持 `ExecutionProof` 字段稳定。
+- **索引先安全后去中心化**：默认输出不含 endpoint，优先补齐验签与信任策略，再考虑 DHT 迁移。
+- **争议最小语义优先**：保持 `market-core` 权威裁决与账本一致，避免在体验层做状态机分叉。
+
 ## 关键数据结构
 
 ### ServiceSchema
@@ -65,9 +87,11 @@ OpenClaw 已具备 Web3 Market 的资源共享与结算底座，但当前能力�
 
 ### 新增或扩展的入口
 
-- **资源发布**：`market.resource.publish` 增加 `kind: service` 与 `serviceSchema`。
-- **证明提交**：新增 `market.service.proof.submit`（写入证明摘要，关联订单）。
-- **争议关联**：复用 `market.dispute.*`，允许证明作为争议证据来源。
+- **资源发布**：`web3.market.resource.publish` 增加 `kind: service` 与 `serviceSchema`。
+- **证明提交**：新增 `web3.market.service.proof.submit`（写入证明摘要，关联订单）。
+- **争议关联**：复用 `web3.market.dispute.*`，允许证明作为争议证据来源。
+
+> 说明：对外统一以 `web3.market.*` 为体验入口，内部映射到 `market-core` 的 `market.*` 能力。
 
 ### 最小执行流程
 
@@ -78,12 +102,12 @@ sequenceDiagram
   participant P as Provider
   participant N as TLSNotary
 
-  C->>M: market.resource.list (kind=service)
-  C->>M: market.lease.issue
+  C->>M: web3.market.resource.list (kind=service)
+  C->>M: web3.market.lease.issue
   M-->>C: leaseId + accessToken (一次性)
   C->>P: 执行任务 (Bearer token)
   P->>N: 生成执行证明
-  P->>M: market.service.proof.submit (artifactHash)
+  P->>M: web3.market.service.proof.submit (artifactHash)
   M->>M: 结算与账本追加
   M-->>C: 对账摘要 (脱敏)
 ```
@@ -158,25 +182,25 @@ sequenceDiagram
 
 #### 证明与结算绑定（最小语义）
 
-- `market.service.proof.submit` 仅写入摘要，不回显敏感字段。
+- `web3.market.service.proof.submit` 仅写入摘要，不回显敏感字段。
 - 证明提交成功后进入“待释放”状态，需等待争议窗口结束再 `release`。
 - 证明无效或过期时进入争议流程，默认回滚为 `refund` 或进入人工裁决。
 
 #### 争议证据最小映射
 
-- 证明作为 `market.dispute.*` 的 `evidence` 载体时，至少包含 `proofType`、`artifactHash`、`issuedAt`。
+- 证明作为 `web3.market.dispute.*` 的 `evidence` 载体时，至少包含 `proofType`、`artifactHash`、`issuedAt`。
 
 ## 接口定义草案（Q2）
 
 ### 资源发布扩展
 
-- **方法**：`market.resource.publish`
+- **方法**：`web3.market.resource.publish`
 - **新增字段**：`resource.kind = "service"`，`resource.serviceSchema`
 - **最小请求示例**（脱敏）：
 
 ```json
 {
-  "method": "market.resource.publish",
+  "method": "web3.market.resource.publish",
   "params": {
     "actorId": "0x...",
     "resource": {
@@ -196,12 +220,12 @@ sequenceDiagram
 
 ### 证明提交
 
-- **方法**：`market.service.proof.submit`
+- **方法**：`web3.market.service.proof.submit`
 - **最小请求示例**（脱敏）：
 
 ```json
 {
-  "method": "market.service.proof.submit",
+  "method": "web3.market.service.proof.submit",
   "params": {
     "actorId": "0x...",
     "orderId": "order_...",
