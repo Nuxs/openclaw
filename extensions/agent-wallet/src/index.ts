@@ -1,7 +1,7 @@
 import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
+import { createAutopayRouterHandler } from "./autopay-router.js";
 import type { AgentWalletConfig } from "./config.js";
-import { isEVMNetwork, isTONNetwork, resolveConfig } from "./config.js";
-import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
+import { isTONNetwork, resolveConfig } from "./config.js";
 import {
   createAgentWalletAutopayHandler,
   createAgentWalletBalanceHandler,
@@ -62,63 +62,14 @@ const plugin: OpenClawPluginDefinition = {
     );
     const evmAutopayHandler = createAgentWalletAutopayHandler(config);
     const tonAutopayHandler = createTonWalletAutopayHandler(config);
-    /**
-     * Autopay dispatcher: routes to EVM or TON handler based on the `chain`
-     * parameter from the billing invoice.
-     *
-     * Current assumption: a single node is configured for ONE network family
-     * (either EVM or TON, never both simultaneously). If future multi-network
-     * support is needed, `resolveConfig` and this dispatcher must be split
-     * into per-family config/handler pairs.
-     */
-    api.registerGatewayMethod("agent-wallet.autopay", async (options) => {
-      const input = (options.params ?? {}) as Record<string, unknown>;
-      const chain = typeof input.chain === "string" ? input.chain.trim().toLowerCase() : undefined;
-      if (chain === "evm") {
-        if (!isEVMNetwork(config.chain.network)) {
-          options.respond(
-            false,
-            formatAgentWalletGatewayErrorResponse(
-              new Error(
-                `E_INVALID_ARGUMENT: evm autopay is not supported on ${config.chain.network}`,
-              ),
-            ),
-          );
-          return;
-        }
-        await evmAutopayHandler(options);
-        return;
-      }
-      if (chain === "ton") {
-        if (!isTONNetwork(config.chain.network)) {
-          options.respond(
-            false,
-            formatAgentWalletGatewayErrorResponse(
-              new Error(
-                `E_INVALID_ARGUMENT: ton autopay is not supported on ${config.chain.network}`,
-              ),
-            ),
-          );
-          return;
-        }
-        await tonAutopayHandler(options);
-        return;
-      }
-      if (chain) {
-        options.respond(
-          false,
-          formatAgentWalletGatewayErrorResponse(
-            new Error(`E_INVALID_ARGUMENT: unsupported chain ${chain} for autopay`),
-          ),
-        );
-        return;
-      }
-      if (tonMode) {
-        await tonAutopayHandler(options);
-        return;
-      }
-      await evmAutopayHandler(options);
-    });
+    api.registerGatewayMethod(
+      "agent-wallet.autopay",
+      createAutopayRouterHandler({
+        config,
+        evmAutopayHandler,
+        tonAutopayHandler,
+      }),
+    );
 
     // EVM-only: sign (TON signing requires TonConnect, not yet supported)
     if (!tonMode) {

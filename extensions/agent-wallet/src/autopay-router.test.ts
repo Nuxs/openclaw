@@ -1,22 +1,11 @@
 /**
- * Tests for the autopay dispatcher routing logic in `index.ts`.
- *
- * Covers 4 dispatch paths:
- *   1. chain="evm" → EVM handler (with network compat check)
- *   2. chain="ton" → TON handler (with network compat check)
- *   3. chain=<unknown> → rejected with E_INVALID_ARGUMENT
- *   4. chain=undefined → fallback to tonMode config inference
- * Plus:
- *   5. chain="evm" on a TON-configured node → E_INVALID_ARGUMENT
- *   6. chain="ton" on an EVM-configured node → E_INVALID_ARGUMENT
+ * Tests for the autopay dispatcher routing logic in `autopay-router.ts`.
  */
 
 import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { isEVMNetwork, isTONNetwork, resolveConfig } from "./config.js";
-import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
-
-// ---- Minimal stubs to avoid importing real blockchain / wallet code ----
+import { createAutopayRouterDispatcher } from "./autopay-router.js";
+import { resolveConfig } from "./config.js";
 
 type HandlerResult = { ok: boolean; payload: unknown } | undefined;
 
@@ -47,13 +36,8 @@ function buildOptions(
   } as GatewayRequestHandlerOptions;
 }
 
-/**
- * Re-implement the autopay dispatcher inline so we test the routing logic
- * in isolation, without pulling in real blockchain adapters or wallets.
- */
 function createAutopayDispatcher(networkConfig: string) {
   const config = resolveConfig({ chain: { network: networkConfig } });
-  const tonMode = isTONNetwork(config.chain.network);
 
   const evmHandler = vi.fn(async ({ respond }: GatewayRequestHandlerOptions) => {
     respond(true, { handler: "evm" });
@@ -62,54 +46,11 @@ function createAutopayDispatcher(networkConfig: string) {
     respond(true, { handler: "ton" });
   });
 
-  const dispatch = async (options: GatewayRequestHandlerOptions) => {
-    const input = (options.params ?? {}) as Record<string, unknown>;
-    const chain = typeof input.chain === "string" ? input.chain.trim().toLowerCase() : undefined;
-    if (chain === "evm") {
-      if (!isEVMNetwork(config.chain.network)) {
-        options.respond(
-          false,
-          formatAgentWalletGatewayErrorResponse(
-            new Error(
-              `E_INVALID_ARGUMENT: evm autopay is not supported on ${config.chain.network}`,
-            ),
-          ),
-        );
-        return;
-      }
-      await evmHandler(options);
-      return;
-    }
-    if (chain === "ton") {
-      if (!isTONNetwork(config.chain.network)) {
-        options.respond(
-          false,
-          formatAgentWalletGatewayErrorResponse(
-            new Error(
-              `E_INVALID_ARGUMENT: ton autopay is not supported on ${config.chain.network}`,
-            ),
-          ),
-        );
-        return;
-      }
-      await tonHandler(options);
-      return;
-    }
-    if (chain) {
-      options.respond(
-        false,
-        formatAgentWalletGatewayErrorResponse(
-          new Error(`E_INVALID_ARGUMENT: unsupported chain ${chain} for autopay`),
-        ),
-      );
-      return;
-    }
-    if (tonMode) {
-      await tonHandler(options);
-      return;
-    }
-    await evmHandler(options);
-  };
+  const dispatch = createAutopayRouterDispatcher({
+    config,
+    evmAutopayHandler: evmHandler,
+    tonAutopayHandler: tonHandler,
+  });
 
   return { dispatch, evmHandler, tonHandler };
 }

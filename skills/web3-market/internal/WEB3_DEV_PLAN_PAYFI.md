@@ -347,6 +347,7 @@
 - [x] Gateway 可识别 402 并受控触发自动支付。
 - [x] 自动支付严格受 `WalletPolicy` 约束。
 - [x] 幂等键生效，重复请求不重复扣款。
+- [x] 自动支付路由已模块化（`autopay-router.ts`），入口文件仅负责注册。
 - [x] 熔断与 kill switch 验证通过。
 
 ### Phase 5 (GA Readiness)
