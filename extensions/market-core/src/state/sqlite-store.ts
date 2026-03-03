@@ -23,6 +23,8 @@ import type {
   RevocationJob,
   RewardGrant,
   RewardNonceRecord,
+  ServiceProof,
+  ServiceProofFilter,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -59,6 +61,7 @@ export class MarketSqliteStore implements MarketStore {
         "CREATE TABLE IF NOT EXISTS deliveries (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS settlements (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS disputes (id TEXT PRIMARY KEY, order_id TEXT, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS service_proofs (id TEXT PRIMARY KEY, order_id TEXT, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS leases (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS revocations (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS ledger (id TEXT PRIMARY KEY, timestamp TEXT NOT NULL, data TEXT NOT NULL);" +
@@ -70,6 +73,7 @@ export class MarketSqliteStore implements MarketStore {
         "CREATE INDEX IF NOT EXISTS ledger_ts ON ledger(timestamp);" +
         "CREATE INDEX IF NOT EXISTS audit_ts ON audit(timestamp);" +
         "CREATE INDEX IF NOT EXISTS disputes_order ON disputes(order_id);" +
+        "CREATE INDEX IF NOT EXISTS service_proofs_order ON service_proofs(order_id);" +
         "CREATE INDEX IF NOT EXISTS bridge_order ON bridge_transfers(order_id);" +
         "CREATE INDEX IF NOT EXISTS bridge_settlement ON bridge_transfers(settlement_id);" +
         "CREATE INDEX IF NOT EXISTS bridge_status ON bridge_transfers(status);",
@@ -92,6 +96,7 @@ export class MarketSqliteStore implements MarketStore {
       this.countRows("deliveries") === 0 &&
       this.countRows("settlements") === 0 &&
       this.countRows("disputes") === 0 &&
+      this.countRows("service_proofs") === 0 &&
       this.countRows("leases") === 0 &&
       this.countRows("revocations") === 0 &&
       this.countRows("ledger") === 0 &&
@@ -115,6 +120,9 @@ export class MarketSqliteStore implements MarketStore {
     for (const delivery of fileStore.listDeliveries()) this.saveDelivery(delivery);
     for (const settlement of fileStore.listSettlements()) this.saveSettlement(settlement);
     for (const dispute of fileStore.listDisputes()) this.saveDispute(dispute);
+    for (const proof of fileStore.listServiceProofs({ limit: 1_000_000 })) {
+      this.saveServiceProof(proof);
+    }
     for (const lease of fileStore.listLeases()) this.saveLease(lease);
     for (const entry of fileStore.listLedger({ limit: 1_000_000 })) this.appendLedger(entry);
     for (const revocation of fileStore.listRevocations()) this.saveRevocation(revocation);
@@ -259,6 +267,34 @@ export class MarketSqliteStore implements MarketStore {
     this.db
       .prepare("INSERT OR REPLACE INTO disputes (id, order_id, data) VALUES (?, ?, ?)")
       .run(dispute.disputeId, dispute.orderId, JSON.stringify(dispute));
+  }
+
+  listServiceProofs(filter?: ServiceProofFilter): ServiceProof[] {
+    let proofs = this.listFrom<ServiceProof>("service_proofs");
+    if (filter?.orderId) {
+      proofs = proofs.filter((entry) => entry.orderId === filter.orderId);
+    }
+    if (filter?.limit !== undefined) {
+      proofs = proofs.slice(0, Math.max(0, filter.limit));
+    }
+    return proofs;
+  }
+
+  getServiceProof(proofId: string): ServiceProof | undefined {
+    return this.getFrom<ServiceProof>("service_proofs", proofId);
+  }
+
+  getServiceProofByOrder(orderId: string): ServiceProof | undefined {
+    const row = this.db
+      .prepare("SELECT data FROM service_proofs WHERE order_id = ?")
+      .get(orderId) as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as ServiceProof) : undefined;
+  }
+
+  saveServiceProof(proof: ServiceProof): void {
+    this.db
+      .prepare("INSERT OR REPLACE INTO service_proofs (id, order_id, data) VALUES (?, ?, ?)")
+      .run(proof.proofId, proof.orderId, JSON.stringify(proof));
   }
 
   listLeases(filter?: MarketLeaseFilter): MarketLease[] {

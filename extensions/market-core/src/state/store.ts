@@ -20,6 +20,8 @@ import type {
   RevocationJob,
   RewardGrant,
   RewardNonceRecord,
+  ServiceProof,
+  ServiceProofFilter,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -139,6 +141,22 @@ export class MarketStateStore {
 
   saveDispute(dispute: Dispute): void {
     this.store.saveDispute(dispute);
+  }
+
+  listServiceProofs(filter?: ServiceProofFilter): ServiceProof[] {
+    return this.store.listServiceProofs(filter);
+  }
+
+  getServiceProof(proofId: string): ServiceProof | undefined {
+    return this.store.getServiceProof(proofId);
+  }
+
+  getServiceProofByOrder(orderId: string): ServiceProof | undefined {
+    return this.store.getServiceProofByOrder(orderId);
+  }
+
+  saveServiceProof(proof: ServiceProof): void {
+    this.store.saveServiceProof(proof);
   }
 
   listLeases(filter?: MarketLeaseFilter): MarketLease[] {

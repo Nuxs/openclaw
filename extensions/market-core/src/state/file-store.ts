@@ -28,6 +28,8 @@ import type {
   RevocationJob,
   RewardGrant,
   RewardNonceRecord,
+  ServiceProof,
+  ServiceProofFilter,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -212,6 +214,35 @@ export class MarketFileStore implements MarketStore {
     const map = this.readMap<Dispute>(this.disputesPath);
     map[dispute.disputeId] = dispute;
     this.writeMap(this.disputesPath, map);
+  }
+
+  private get serviceProofsPath() {
+    return "service-proofs.json";
+  }
+
+  listServiceProofs(filter?: ServiceProofFilter): ServiceProof[] {
+    let proofs = Object.values(this.readMap<ServiceProof>(this.serviceProofsPath));
+    if (filter?.orderId) {
+      proofs = proofs.filter((entry) => entry.orderId === filter.orderId);
+    }
+    if (filter?.limit !== undefined) {
+      proofs = proofs.slice(0, Math.max(0, filter.limit));
+    }
+    return proofs;
+  }
+
+  getServiceProof(proofId: string): ServiceProof | undefined {
+    return this.readMap<ServiceProof>(this.serviceProofsPath)[proofId];
+  }
+
+  getServiceProofByOrder(orderId: string): ServiceProof | undefined {
+    return this.listServiceProofs({ orderId }).at(0);
+  }
+
+  saveServiceProof(proof: ServiceProof): void {
+    const map = this.readMap<ServiceProof>(this.serviceProofsPath);
+    map[proof.proofId] = proof;
+    this.writeMap(this.serviceProofsPath, map);
   }
 
   private get leasesPath() {
@@ -459,6 +490,7 @@ export class MarketFileStore implements MarketStore {
       this.listDeliveries().length > 0 ||
       this.listSettlements().length > 0 ||
       this.listDisputes().length > 0 ||
+      this.listServiceProofs({ limit: 1 }).length > 0 ||
       this.listLeases().length > 0 ||
       this.listLedger({ limit: 1 }).length > 0 ||
       this.listRevocations().length > 0 ||

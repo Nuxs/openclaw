@@ -19,6 +19,8 @@ import type {
   RevocationJob,
   RewardGrant,
   RewardNonceRecord,
+  ServiceProof,
+  ServiceProofFilter,
   Settlement,
   TokenEconomyState,
 } from "../market/types.js";
@@ -47,6 +49,10 @@ export type MarketStore = {
   getDispute: (disputeId: string) => Dispute | undefined;
   getDisputeByOrder: (orderId: string) => Dispute | undefined;
   saveDispute: (dispute: Dispute) => void;
+  listServiceProofs: (filter?: ServiceProofFilter) => ServiceProof[];
+  getServiceProof: (proofId: string) => ServiceProof | undefined;
+  getServiceProofByOrder: (orderId: string) => ServiceProof | undefined;
+  saveServiceProof: (proof: ServiceProof) => void;
   listLeases: (filter?: MarketLeaseFilter) => MarketLease[];
   getLease: (leaseId: string) => MarketLease | undefined;
   saveLease: (lease: MarketLease) => void;
