@@ -73,7 +73,7 @@
 - **Week 6-6.5（KYA）**：策略拦截与 Daily Cap 状态持久化（完成状态与证据见 `WEB3_DEV_PLAN_PAYFI.md`）。
 - **Week 7（PayFi）**：增量结算与 Ledger 驱动释放（完成状态与证据见 `WEB3_DEV_PLAN_PAYFI.md`）。
 - **Week 8（x402）**：自动支付闭环已形成，当前进入发布前收尾（`maxRetries`/指标告警/故障注入）。
-- **Week 9+（Advanced）**：流支付工程化、动态策略、DID 与信用层推进。
+- **Week 9+（Discovery Sync）**：以主计划 Phase 4（P0/P1 发现网络对齐）为准，P2 见盟友文档（`references/web3-mdl-libp2p-discovery-plan.md`）。
 
 > **状态来源优先级**：`WEB3_DEV_PLAN_PAYFI.md`（主） > `WEB3_OVERALL_PROGRESS.md`（公告） > 本文件（历史里程碑）。
 

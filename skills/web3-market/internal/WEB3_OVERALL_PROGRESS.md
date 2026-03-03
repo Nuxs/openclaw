@@ -108,11 +108,12 @@
 
 ## 4. 下一步
 
-### 4.1 MDL（Market Discovery Layer）— ⏳ 执行中
+### 4.1 MDL（Market Discovery Layer）— ⏳ 执行中（与主计划对齐）
 
-- **目标**：基于 libp2p（DHT + Rendezvous）实现去中心化资源发现层，替代"局域网 + 配置"模式
-- **实施计划**：`skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`
-- **执行切片**：A(类型+NS) → B(签名v2) → C(ingest+静态后端) → D(libp2p后端) → E(插件集成) → F(文档)
+- **目标**：按 `WEB3_DEV_PLAN_PAYFI.md` v1.4 对齐，仅维护 Discovery **P0/P1**（我方接入与集成面），保障 PayFi 与 Discovery 并行推进。
+- **实施计划**：`skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`（盟友主导完整切片 A→F，我方按 P0/P1 接入）
+- **我方范围（P0/P1）**：节点身份映射、资源广播契约、`web3.index.*` / `market.resource.*` 索引对接、P2P 异常回退静态/HTTP 索引。
+- **边界说明（P2）**：NAT/Relay/端到端路由由盟友主文档维护与排期，本页不重复承诺实现细节。
 - **安全约束**：发现不暴露 endpoint/token、market.lease.issue 零改动、默认 disabled
 
 ### 4.2 既有路线图
