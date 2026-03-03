@@ -6,7 +6,12 @@ import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode } from "../errors/codes.js";
 import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.js";
 import type { Web3StateStore } from "../state/store.js";
-import type { PaymentRequiredInvoice, PaymentResumeToken, PaymentTraceRef } from "./types.js";
+import type {
+  BillingPaymentReceipt,
+  PaymentRequiredInvoice,
+  PaymentResumeToken,
+  PaymentTraceRef,
+} from "./types.js";
 
 export class PaymentRequiredError extends Error {
   readonly status = 402;
@@ -126,6 +131,30 @@ function buildPaymentTraceRef(params: {
   };
 }
 
+function resolveInvoiceChain(value: unknown, fallback: "evm" | "ton"): "evm" | "ton" {
+  if (value === "evm" || value === "ton") {
+    return value;
+  }
+  return fallback;
+}
+
+function buildBillingPaymentReceipt(params: {
+  resumeToken: PaymentResumeToken;
+  amount: string;
+  confirmedAt: string;
+  network?: string;
+}): BillingPaymentReceipt {
+  return {
+    receiptId: params.resumeToken.paymentReceiptId,
+    chain: params.resumeToken.chain,
+    network: params.network,
+    txHash: params.resumeToken.txHash,
+    amount: params.amount,
+    confirmedAt: params.confirmedAt,
+    mode: "live",
+  };
+}
+
 export function createBillingHandlePaymentRequiredHandler(
   store: Web3StateStore,
   config: Web3PluginConfig,
@@ -179,6 +208,12 @@ export function createBillingHandlePaymentRequiredHandler(
           invoiceId: invoice.invoiceId,
           resumeToken: existing.resumeToken,
           authorization: buildPaymentAuthorization(existing.resumeToken),
+          paymentReceipt: buildBillingPaymentReceipt({
+            resumeToken: existing.resumeToken,
+            amount: invoice.amount,
+            confirmedAt: existing.createdAt,
+            network: existing.network,
+          }),
           maxRetries: normalizeRetryBudget(existing.maxRetries),
           trace: buildPaymentTraceRef({
             requestId: existing.requestId ?? requestId,
@@ -204,8 +239,13 @@ export function createBillingHandlePaymentRequiredHandler(
       const paymentResponse = await callGateway({
         method: "agent-wallet.autopay",
         params: {
+          chain: invoice.chain,
           to: invoice.payTo,
+          // Compat layer: send both `value` (EVM convention) and `amount` (TON
+          // convention) so either handler resolves via `input.value ?? input.amount`.
+          // Target: unify to `amount` once all handlers are migrated.
           value: invoice.amount,
+          amount: invoice.amount,
           tool: toolName,
         },
         timeoutMs: config.brain.timeoutMs,
@@ -217,13 +257,15 @@ export function createBillingHandlePaymentRequiredHandler(
 
       const payload = (normalized.result ?? {}) as Record<string, unknown>;
       const txHash = typeof payload.txHash === "string" ? payload.txHash : undefined;
+      const network = typeof payload.network === "string" ? payload.network : undefined;
+      const resolvedChain = resolveInvoiceChain(payload.chain, invoice.chain);
       const maxRetries = normalizeRetryBudget(payload.policyAutoPayMaxRetries);
       const issuedAt = nowIso();
       const resumeToken: PaymentResumeToken = {
         invoiceId: invoice.invoiceId,
         paymentReceiptId: randomUUID(),
         txHash,
-        chain: invoice.chain,
+        chain: resolvedChain,
         issuedAt,
         expiresAt: invoice.expiresAt,
       };
@@ -236,6 +278,7 @@ export function createBillingHandlePaymentRequiredHandler(
         resumeToken,
         createdAt: issuedAt,
         maxRetries,
+        network,
       });
 
       respond(true, {
@@ -243,6 +286,12 @@ export function createBillingHandlePaymentRequiredHandler(
         invoiceId: invoice.invoiceId,
         resumeToken,
         authorization: buildPaymentAuthorization(resumeToken),
+        paymentReceipt: buildBillingPaymentReceipt({
+          resumeToken,
+          amount: invoice.amount,
+          confirmedAt: issuedAt,
+          network,
+        }),
         maxRetries,
         trace: buildPaymentTraceRef({
           requestId,

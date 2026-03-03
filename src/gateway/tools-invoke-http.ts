@@ -157,9 +157,21 @@ type PaymentTraceRef = {
   createdAt: string;
 };
 
+type PaymentReceipt = {
+  receiptId: string;
+  chain: "evm" | "ton";
+  network?: string;
+  txHash?: string;
+  amount?: string;
+  tokenAddress?: string;
+  confirmedAt: string;
+  mode: "live" | "simulated";
+};
+
 type PaymentRequiredResult = {
   authorization?: string;
   resumeToken?: PaymentResumeToken;
+  paymentReceipt?: PaymentReceipt;
   reused?: boolean;
   maxRetries?: number;
   trace?: PaymentTraceRef;
@@ -671,7 +683,12 @@ export async function handleToolsInvokeHttpRequest(
               const retryResult = await (tool as any).execute?.(`http-${Date.now()}`, retryArgs);
               autoPaySucceeded = true;
               await recordX402AutopayMetric({ event: "success" });
-              sendJson(res, 200, { ok: true, result: retryResult });
+              sendJson(res, 200, {
+                ok: true,
+                result: retryResult,
+                payment: autoPayResult?.paymentReceipt,
+                paymentTrace: autoPayResult?.trace,
+              });
               return true;
             } catch (retryErr) {
               autoPayError = getErrorMessage(retryErr) || autoPayError;
@@ -698,6 +715,7 @@ export async function handleToolsInvokeHttpRequest(
           requestId,
           authorization: autoPayResult?.authorization,
           resumeToken: autoPayResult?.resumeToken,
+          paymentReceipt: autoPayResult?.paymentReceipt,
           trace: autoPayResult?.trace,
           autoPayError,
         },

@@ -58,6 +58,17 @@ export type PaymentResumeToken = {
   expiresAt: string;
 };
 
+export type BillingPaymentReceipt = {
+  receiptId: string;
+  chain: "evm" | "ton";
+  network?: string;
+  txHash?: string;
+  amount?: string;
+  tokenAddress?: string;
+  confirmedAt: string;
+  mode: "live" | "simulated";
+};
+
 export type PaymentTraceRef = {
   requestId?: string;
   idempotencyKey: string;

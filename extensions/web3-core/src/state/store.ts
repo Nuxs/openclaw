@@ -55,6 +55,8 @@ export type PaymentRequiredRecord = {
   resumeToken: PaymentResumeToken;
   createdAt: string;
   maxRetries?: number;
+  /** Network identifier from the wallet response (e.g. "base", "ton-testnet"). */
+  network?: string;
 };
 
 export type X402AutopayStats = {

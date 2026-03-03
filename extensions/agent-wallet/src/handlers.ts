@@ -260,7 +260,8 @@ export function createAgentWalletAutopayHandler(config: AgentWalletConfig): Gate
       ensureEnabled(config);
       const input = (params ?? {}) as Record<string, unknown>;
       const to = getAddress(requireString(input.to, "to"));
-      const value = parseAmount(input.value, "value");
+      const valueRaw = input.value ?? input.amount;
+      const value = parseAmount(valueRaw, "value");
       const data = typeof input.data === "string" ? input.data : undefined;
       const enforcement = await enforcePolicy(config, {
         action: "autopay",
@@ -278,6 +279,8 @@ export function createAgentWalletAutopayHandler(config: AgentWalletConfig): Gate
         await enforcement.commitUsage();
         respond(true, {
           txHash,
+          chain: "evm",
+          network: config.chain.network,
           policyAutoPayMaxRetries: enforcement.autoPayMaxRetries,
         });
       } catch (txErr) {

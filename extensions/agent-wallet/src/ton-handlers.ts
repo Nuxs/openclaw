@@ -234,7 +234,8 @@ export function createTonWalletAutopayHandler(config: AgentWalletConfig): Gatewa
       ensureEnabled(config);
       const input = (params ?? {}) as Record<string, unknown>;
       const to = requireString(input.to, "to");
-      const amount = parseAmount(input.amount, "amount");
+      const amountRaw = input.amount ?? input.value;
+      const amount = parseAmount(amountRaw, "amount");
       const enforcement = await enforcePolicy(config, {
         action: "autopay",
         chain: "ton",
@@ -251,6 +252,7 @@ export function createTonWalletAutopayHandler(config: AgentWalletConfig): Gatewa
         respond(true, {
           txHash,
           chain: "ton",
+          network: config.chain.network,
           policyAutoPayMaxRetries: enforcement.autoPayMaxRetries,
         });
       } catch (txErr) {
