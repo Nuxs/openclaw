@@ -5,6 +5,12 @@
 
 ---
 
+## 🔒 非 PayFi 独立事项（2026-03-03）
+
+- ✅ `web3.wallet.*` 统一入口与 capabilities 注册完成。
+- ✅ 资源共享闭环补强：`usage.total_tokens` 记账、status summary 脱敏断言、事务回滚与并发串行化测试补齐。
+- ✅ 资源共享整改 Phase 1/2 关键项完成（`maxCost` 账本约束、repair/revocation/expireSweep 结构化运维输出、market metrics 告警补强）。
+
 ## 📅 阶段一：KYA 策略引擎 (Agent Identity MVP)
 
 **时间**：Week 6

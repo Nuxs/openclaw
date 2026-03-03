@@ -7,6 +7,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILLS_SRC="$REPO_ROOT/skills"
+CHECK_ONLY=false
+if [[ "${1:-}" == "--check" ]]; then
+  CHECK_ONLY=true
+fi
 
 # 目标目录列表（按优先级）
 # 1. 工作区根目录的 .codebuddy（IDE 通常从这里读取）
@@ -28,25 +32,39 @@ ALLOWED_SKILLS=(
   "canvas"            # UI 协议规范
 )
 
-echo "🔄 开始同步开发相关 Skills..."
+if [ "$CHECK_ONLY" = true ]; then
+  echo "🔍 校验 CodeBuddy Skills 链接状态..."
+else
+  echo "🔄 开始同步开发相关 Skills..."
+fi
 echo "📂 源目录: $SKILLS_SRC"
 
-# 对每个目标目录执行同步
+drift_total=0
+
+# 对每个目标目录执行同步/校验
 for CB_SKILLS in "${TARGET_DIRS[@]}"; do
   echo ""
   echo "🎯 目标: $CB_SKILLS"
-  
+
   mkdir -p "$CB_SKILLS"
 
-  # 1. 清理不在白名单内的 symlink
-  echo "   🧹 清理旧链接..."
+  if [ "$CHECK_ONLY" = true ]; then
+    echo "   🔎 校验链接..."
+  else
+    echo "   🧹 清理旧链接..."
+  fi
+
   removed=0
+  skipped=0
+  created=0
+  missing_src=0
+  drift=0
+
   if [ -d "$CB_SKILLS" ]; then
     for existing in "$CB_SKILLS"/*; do
       [ -e "$existing" ] || continue
       name="$(basename "$existing")"
-      
-      # 检查是否在白名单中
+
       is_allowed=false
       for allowed in "${ALLOWED_SKILLS[@]}"; do
         if [ "$name" == "$allowed" ]; then
@@ -55,34 +73,43 @@ for CB_SKILLS in "${TARGET_DIRS[@]}"; do
         fi
       done
 
-      if [ "$is_allowed" = false ]; then
-        if [ -L "$existing" ]; then
+      if [ "$is_allowed" = false ] && [ -L "$existing" ]; then
+        if [ "$CHECK_ONLY" = true ]; then
+          echo "      ❌ 非白名单链接: $name"
+          drift=$((drift + 1))
+        else
           echo "      🗑️  移除: $name"
           rm "$existing"
           removed=$((removed + 1))
-        else
-          echo "      ⚠️  跳过非链接: $name"
         fi
       fi
     done
   fi
 
-  # 2. 创建白名单内的 symlink
-  echo "   🔗 创建/更新链接..."
-  created=0
-  skipped=0
-  missing_src=0
+  if [ "$CHECK_ONLY" = true ]; then
+    echo "   🔗 验证白名单链接..."
+  else
+    echo "   🔗 创建/更新链接..."
+  fi
 
   for skill_name in "${ALLOWED_SKILLS[@]}"; do
     src_dir="$SKILLS_SRC/$skill_name"
     target="$CB_SKILLS/$skill_name"
-    
-    # 计算相对路径（从目标目录指向源目录）
     rel_path="$(realpath --relative-to="$CB_SKILLS" "$src_dir" 2>/dev/null || echo "$REPO_ROOT/skills/$skill_name")"
 
     if [ ! -d "$src_dir" ]; then
       echo "      ⚠️  源不存在: $skill_name"
       missing_src=$((missing_src + 1))
+      continue
+    fi
+
+    if [ "$CHECK_ONLY" = true ]; then
+      if [ -L "$target" ] && [ "$(readlink "$target")" == "$rel_path" ]; then
+        skipped=$((skipped + 1))
+      else
+        echo "      ❌ 链接不一致: $skill_name"
+        drift=$((drift + 1))
+      fi
       continue
     fi
 
@@ -104,11 +131,25 @@ for CB_SKILLS in "${TARGET_DIRS[@]}"; do
     fi
   done
 
-  echo "   📊 完成: 新建 $created, 保持 $skipped, 移除 $removed"
+  if [ "$CHECK_ONLY" = true ]; then
+    echo "   📊 校验: 正常 $skipped, 漂移 $drift"
+    drift_total=$((drift_total + drift))
+  else
+    echo "   📊 完成: 新建 $created, 保持 $skipped, 移除 $removed"
+  fi
+
   if [ $missing_src -gt 0 ]; then
     echo "   ⚠️  缺失源: $missing_src"
   fi
 done
 
 echo ""
-echo "🎉 全部同步完成！"
+if [ "$CHECK_ONLY" = true ]; then
+  if [ $drift_total -gt 0 ]; then
+    echo "❌ 校验失败：发现 $drift_total 处链接漂移"
+    exit 1
+  fi
+  echo "✅ 校验通过：CodeBuddy Skills 链接一致"
+else
+  echo "🎉 全部同步完成！"
+fi

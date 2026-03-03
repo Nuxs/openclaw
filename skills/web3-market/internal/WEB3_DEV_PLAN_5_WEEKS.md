@@ -64,12 +64,12 @@
 
 ---
 
-## Week 5：能力自描述与对外口径验收
+## Week 5：能力自描述与对外口径验收 ✅ 已完成（2026-03-03）
 
 - ✅ 校对 `web3.capabilities.*` 的 `paramsSchema/returns` 与实现一致。
 - ✅ ENS catalog 缺口已修复（67/67 gateway methods + 12/12 tools 全覆盖）。
-- ⏳ 文档自检：内部链接按 Mintlify 规则统一为根相对路径；示例全面脱敏（持续进行）。
-- ⏳ 运行 `scripts/sync-codebuddy.sh`，确保 skill 更新对 IDE 可见。
+- ✅ 文档自检：内部链接按 Mintlify 规则统一为根相对路径；示例完成脱敏复核。
+- ✅ `scripts/sync-codebuddy.sh` 已增强 `--check` 校验模式并完成链路验证。
 
 ### Week 5 追加交付（2026-02-23 TON 双栈落地）
 

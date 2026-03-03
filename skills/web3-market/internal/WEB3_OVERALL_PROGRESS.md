@@ -102,7 +102,7 @@
 - **"可分享对账摘要"完整闭环**：输出格式已有口径，但需要持续把所有对外输出点收敛为"可复制粘贴传播"的脱敏摘要。
 - **个人数据/私有知识纳入市场**：需要补齐 consent/脱敏/可撤销/合规回放的强约束规范（见本轮新增 skill references）。
 - **任务市场协议（Phase 3）**：`TaskOrder`/`TaskBid`/`TaskResult`/`TaskReceipt` 类型设计完成，代码实现推迟到开源冷启动之后。
-- **Agent Wallet 统一入口**：`web3.wallet.*` 聚合入口 + capabilities catalog 注册仍待 Phase 2。
+- **Agent Wallet 统一入口**：✅ 已完成 `web3.wallet.*` 聚合入口与 capabilities catalog 注册，并补齐 proxy 单测。
 
 ---
 
