@@ -141,14 +141,23 @@ if $VERIFY_ARCH; then
   echo "🧪 合流前架构预检..."
   if [[ -n "$PREDICT_JSON_FILE" && -f "private/scripts/verify-sync-architecture.sh" ]]; then
     ARCH_REPORT_FILE="$(mktemp)"
-    VERIFY_STRICT_ARGS=()
-    $VERIFY_STRICT && VERIFY_STRICT_ARGS=("--strict")
-    if ! bash private/scripts/verify-sync-architecture.sh \
+    if $VERIFY_STRICT; then
+      if ! bash private/scripts/verify-sync-architecture.sh \
+        --phase preflight \
+        --baseline "$BASELINE_PATH" \
+        --conflicts-json "$PREDICT_JSON_FILE" \
+        --report-json "$ARCH_REPORT_FILE" \
+        --strict; then
+        echo ""
+        echo "❌ 合流前架构预检未通过。"
+        echo "   可使用 --no-verify-architecture 跳过，或先按建议收敛冲突面后再合流。"
+        exit 1
+      fi
+    elif ! bash private/scripts/verify-sync-architecture.sh \
       --phase preflight \
       --baseline "$BASELINE_PATH" \
       --conflicts-json "$PREDICT_JSON_FILE" \
-      --report-json "$ARCH_REPORT_FILE" \
-      "${VERIFY_STRICT_ARGS[@]}"; then
+      --report-json "$ARCH_REPORT_FILE"; then
       echo ""
       echo "❌ 合流前架构预检未通过。"
       echo "   可使用 --no-verify-architecture 跳过，或先按建议收敛冲突面后再合流。"
