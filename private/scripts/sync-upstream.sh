@@ -22,6 +22,17 @@ CHECK_ONLY=false
 PREDICT_ONLY=false
 TARGET_REF="upstream/main"
 UPSTREAM_URL="https://github.com/openclaw/openclaw.git"
+VERIFY_ARCH=true
+VERIFY_STRICT=false
+BASELINE_PATH="private/sync-guardrails/baseline.json"
+PREDICT_JSON_FILE=""
+ARCH_REPORT_FILE=""
+
+cleanup_tmp_files() {
+  [[ -n "$PREDICT_JSON_FILE" && -f "$PREDICT_JSON_FILE" ]] && rm -f "$PREDICT_JSON_FILE"
+  [[ -n "$ARCH_REPORT_FILE" && -f "$ARCH_REPORT_FILE" ]] && rm -f "$ARCH_REPORT_FILE"
+}
+trap cleanup_tmp_files EXIT
 
 # --- 参数解析 ---------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
@@ -31,8 +42,11 @@ while [[ $# -gt 0 ]]; do
     --predict-conflicts|--conflicts) PREDICT_ONLY=true; shift ;;
     --tag)       TARGET_REF="$2"; shift 2 ;;
     --upstream)  UPSTREAM_URL="$2"; shift 2 ;;
+    --no-verify-architecture) VERIFY_ARCH=false; shift ;;
+    --verify-architecture-strict) VERIFY_STRICT=true; shift ;;
+    --baseline)  BASELINE_PATH="$2"; shift 2 ;;
     -h|--help)
-      echo "用法: $0 [--rebase] [--check] [--predict-conflicts] [--tag <ref>] [--upstream <url>]"
+      echo "用法: $0 [--rebase] [--check] [--predict-conflicts] [--tag <ref>] [--upstream <url>] [--no-verify-architecture] [--verify-architecture-strict] [--baseline <path>]"
       exit 0
       ;;
     *) echo "未知参数: $1"; exit 1 ;;
@@ -113,13 +127,35 @@ fi
 BEFORE_SHA="$(git rev-parse HEAD)"
 SYNC_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-PREDICT_JSON_FILE=""
 if [[ -x "private/scripts/predict-conflicts.sh" ]]; then
   tmp_predict="$(mktemp)"
   if bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --no-fetch --json >"$tmp_predict"; then
     PREDICT_JSON_FILE="$tmp_predict"
   else
     rm -f "$tmp_predict"
+  fi
+fi
+
+if $VERIFY_ARCH; then
+  echo ""
+  echo "🧪 合流前架构预检..."
+  if [[ -n "$PREDICT_JSON_FILE" && -f "private/scripts/verify-sync-architecture.sh" ]]; then
+    ARCH_REPORT_FILE="$(mktemp)"
+    VERIFY_STRICT_ARGS=()
+    $VERIFY_STRICT && VERIFY_STRICT_ARGS=("--strict")
+    if ! bash private/scripts/verify-sync-architecture.sh \
+      --phase preflight \
+      --baseline "$BASELINE_PATH" \
+      --conflicts-json "$PREDICT_JSON_FILE" \
+      --report-json "$ARCH_REPORT_FILE" \
+      "${VERIFY_STRICT_ARGS[@]}"; then
+      echo ""
+      echo "❌ 合流前架构预检未通过。"
+      echo "   可使用 --no-verify-architecture 跳过，或先按建议收敛冲突面后再合流。"
+      exit 1
+    fi
+  else
+    echo "ℹ️  缺少预测 JSON 或验证脚本，跳过架构预检。"
   fi
 fi
 
@@ -260,8 +296,29 @@ if [[ -f "private/scripts/write-upstream-pin.ts" ]]; then
       --after "$AFTER_SHA" \
       --at "$SYNC_AT"
   fi
+fi
 
-  [[ -n "$PREDICT_JSON_FILE" ]] && rm -f "$PREDICT_JSON_FILE"
+if $VERIFY_ARCH; then
+  echo ""
+  echo "🧪 合流后架构复检..."
+  if [[ -f "private/upstream-pin.json" && -f "private/scripts/verify-sync-architecture.sh" ]]; then
+    ARCH_REPORT_FILE="$(mktemp)"
+    VERIFY_STRICT_ARGS=()
+    $VERIFY_STRICT && VERIFY_STRICT_ARGS=("--strict")
+    if ! bash private/scripts/verify-sync-architecture.sh \
+      --phase postsync \
+      --baseline "$BASELINE_PATH" \
+      --pin-json "private/upstream-pin.json" \
+      --report-json "$ARCH_REPORT_FILE" \
+      "${VERIFY_STRICT_ARGS[@]}"; then
+      echo ""
+      echo "❌ 合流后架构复检未通过。"
+      echo "   合流已完成，但架构健康性失败；请按报告建议进行 overlay 收敛。"
+      exit 2
+    fi
+  else
+    echo "ℹ️  缺少 upstream pin 或验证脚本，跳过架构复检。"
+  fi
 fi
 
 # --- 后续步骤 ---------------------------------------------------------------

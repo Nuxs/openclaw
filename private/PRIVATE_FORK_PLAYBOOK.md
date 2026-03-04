@@ -120,6 +120,17 @@
 - 同步前：运行 `private/scripts/predict-conflicts.sh` 只读预测冲突
 - 同步后：必须跑 `pnpm test`（或至少跑变更相关的测试集）
 
+新增架构验证闭环（信达雅执行版）：
+
+1. **信（可审计）**：`predict-conflicts.sh --json` 生成机器可读预测。
+2. **达（可执行）**：`verify-sync-architecture.sh` 对照 `private/sync-guardrails/baseline.json` 做阈值判定。
+3. **雅（可演进）**：将失败项映射到 overlay-first 改造动作（薄入口、叶子模块、运行时品牌注入），并在 CI 持续守护。
+
+常用命令：
+
+- 预检：`bash private/scripts/verify-sync-architecture.sh --conflicts-json /tmp/predict.json --phase preflight`
+- 严格校验：`bash private/scripts/verify-sync-architecture.sh --pin-json private/upstream-pin.json --phase ci --strict`
+
 ### 3.3 建议的“同步节奏”
 
 - **固定节奏**：每周 2–3 次同步（或每日同步但只在固定窗口合入主线）

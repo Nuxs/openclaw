@@ -151,10 +151,86 @@ test_legacy_predict_fallback() {
   pass "legacy predict fallback (diff intersection)"
 }
 
+test_verify_sync_architecture() {
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+
+  local baseline pass_json fail_json report_json
+  baseline="$tmp_dir/baseline.json"
+  pass_json="$tmp_dir/pass.json"
+  fail_json="$tmp_dir/fail.json"
+  report_json="$tmp_dir/report.json"
+
+  cat > "$baseline" <<'EOF'
+{
+  "thresholds": {
+    "maxTotalPredictedConflicts": 3,
+    "maxOtherPredictedConflicts": 1,
+    "maxHotspotConflicts": 1,
+    "maxHotspotOtherConflicts": 0
+  },
+  "hotspots": {
+    "exact": ["ui/src/ui/tab-registry.ts"],
+    "prefixes": []
+  },
+  "allowlist": {
+    "otherConflictExact": [".github/labeler.yml"],
+    "otherConflictPrefixes": []
+  }
+}
+EOF
+
+  cat > "$pass_json" <<'EOF'
+{
+  "predicted": {
+    "total": 2,
+    "brand": 1,
+    "other": 1,
+    "files": ["apps/macos/Info.plist", ".github/labeler.yml"],
+    "brandFiles": ["apps/macos/Info.plist"],
+    "otherFiles": [".github/labeler.yml"]
+  }
+}
+EOF
+
+  if ! bash "$ROOT_DIR/private/scripts/verify-sync-architecture.sh" \
+    --baseline "$baseline" \
+    --conflicts-json "$pass_json" \
+    --json-only \
+    --report-json "$report_json" | grep -q '"status":"pass"'; then
+    fail "verify-sync-architecture 通过场景失败"
+  fi
+
+  cat > "$fail_json" <<'EOF'
+{
+  "predicted": {
+    "total": 2,
+    "brand": 0,
+    "other": 2,
+    "files": ["ui/src/ui/tab-registry.ts", "src/commands/status.command.ts"],
+    "brandFiles": [],
+    "otherFiles": ["ui/src/ui/tab-registry.ts", "src/commands/status.command.ts"]
+  }
+}
+EOF
+
+  if bash "$ROOT_DIR/private/scripts/verify-sync-architecture.sh" \
+    --baseline "$baseline" \
+    --conflicts-json "$fail_json" \
+    --strict \
+    --json-only >/dev/null 2>&1; then
+    fail "verify-sync-architecture 严格失败场景未返回非零"
+  fi
+
+  rm -rf "$tmp_dir"
+  pass "verify sync architecture (pass/fail)"
+}
+
 main() {
   echo "Running sync/predict smoke checks..."
   test_labeler_union_stage_merge
   test_legacy_predict_fallback
+  test_verify_sync_architecture
   pass "all smoke checks passed"
 }
 
