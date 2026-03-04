@@ -79,6 +79,10 @@ export type Libp2pBackendOptions = {
   logger?: (msg: string) => void;
 };
 
+async function importOptionalModule(moduleId: string): Promise<unknown> {
+  return import(moduleId);
+}
+
 export class Libp2pDiscoveryBackend implements DiscoveryBackend {
   private node: Libp2pNode | null = null;
   private readonly config: DiscoveryConfig;
@@ -114,12 +118,18 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
 
     const [{ createLibp2p }, { tcp }, { noise }, { yamux }, { kadDHT }, { circuitRelayTransport }] =
       await Promise.all([
-        import("libp2p"),
-        import("@libp2p/tcp"),
-        import("@chainsafe/libp2p-noise"),
-        import("@chainsafe/libp2p-yamux"),
-        import("@libp2p/kad-dht"),
-        import("@libp2p/circuit-relay-v2"),
+        importOptionalModule("libp2p") as Promise<{
+          createLibp2p: (opts: Record<string, unknown>) => Promise<unknown>;
+        }>,
+        importOptionalModule("@libp2p/tcp") as Promise<{ tcp: () => unknown }>,
+        importOptionalModule("@chainsafe/libp2p-noise") as Promise<{ noise: () => unknown }>,
+        importOptionalModule("@chainsafe/libp2p-yamux") as Promise<{ yamux: () => unknown }>,
+        importOptionalModule("@libp2p/kad-dht") as Promise<{
+          kadDHT: (opts: Record<string, unknown>) => unknown;
+        }>,
+        importOptionalModule("@libp2p/circuit-relay-v2") as Promise<{
+          circuitRelayTransport: () => unknown;
+        }>,
       ]);
 
     const node = await (createLibp2p as any)({
@@ -147,7 +157,9 @@ export class Libp2pDiscoveryBackend implements DiscoveryBackend {
     );
     for (const addr of this.config.bootstrapPeers) {
       try {
-        const { multiaddr } = await import("@multiformats/multiaddr");
+        const { multiaddr } = (await importOptionalModule("@multiformats/multiaddr")) as {
+          multiaddr: (addr: string) => unknown;
+        };
         await (node as any).dial(multiaddr(addr));
       } catch (err) {
         this.logger(

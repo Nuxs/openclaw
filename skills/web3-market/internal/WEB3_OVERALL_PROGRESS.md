@@ -1,7 +1,7 @@
 # OpenClaw Web3 Market：整体进度口径（可验证）
 
-> **状态**：Conditional Go（Public Beta）/ GA 门禁未闭合  
-> **更新日期**：2026-03-03  
+> **状态**：Draft（以严格评审为准：受控内测 Conditional Go，GA 待复评）  
+> **更新日期**：2026-03-04  
 > **适用范围**：Web3 Market（资源/能力市场 + AI 管家编排）
 
 本文档用于解决一个问题：当我们说"Web3 Market 已做到哪里"，**到底哪些是已实现、可演示、可验收的事实**，哪些仍是规划。
@@ -13,8 +13,20 @@
 - **对外单入口**：用户/看板/Agent 只依赖 `web3.*`；`market.*` 作为内部权威状态面。
 - **默认可分享输出**：任何可外发面（文档示例/日志/状态输出/工具返回）默认脱敏，不包含明文 token、Provider endpoint、真实路径。
 - **以代码为准**：本页只写"已能在代码里验证"的能力；规划内容必须标注为"计划"。
-- **上线口径**：当前仅支持 `Conditional Go (Public Beta)`，**安全修复前置条件已全部清零**（settlement TOCTOU per-orderId 互斥锁 + 乐观重校验、escrow-ton 结构化 TonError + 指数退避重试 + 超时 + 幂等 queryId、autopay maxRetries 硬上限——3 个原始阻断项全部已修复）；GA 需以 `WEB3_DEV_PLAN_PAYFI.md` 未闭合门禁清零为准。
+- **上线口径**：P0 阻断项已清零，当前以严格评审结论为准（受控内测 Conditional Go，GA 待复评）；后续转绿需满足 `WEB3_DEV_PLAN_PAYFI.md` 的门禁清零。
 - **核实依据**：`WEB3_LAUNCH_READINESS_EVALUATION_2026_03_03.md`（v2.2 安全修复完成版）与 `WEB3_LAUNCH_READINESS_EVIDENCE_MATRIX_2026_03_03.md`（v2.2）。
+
+---
+
+## 1.1 严格上线评审快照（2026-03-03）
+
+- 评审报告：`skills/web3-market/internal/WEB3_MARKET_GO_LIVE_REVIEW_2026-03.md`
+- 当前判定：**受控内测 Conditional Go**（GA 仍待复评）。
+- 本轮已闭环：
+  - `market.order.list` / `market.settlement.query` 已补齐并注册；
+  - `market-assistant` 已接入命令运行面并收口无效调用；
+  - `web3-market` 与 `/pay_status` 命令异常出口已统一稳定错误码。
+- 说明：本页维持“能力进度事实”口径；最终上线结论以严格评审报告为准。
 
 ---
 

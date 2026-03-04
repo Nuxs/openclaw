@@ -79,6 +79,16 @@ export function createMarketResourceListHandler(config: Web3PluginConfig): Gatew
   return createMarketProxyHandler(config, "market.resource.list", { requireResources: false });
 }
 
+export function createMarketOrderListHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.order.list", { requireResources: false });
+}
+
+export function createMarketSettlementQueryHandler(
+  config: Web3PluginConfig,
+): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.settlement.query", { requireResources: false });
+}
+
 export function createMarketLeaseIssueHandler(config: Web3PluginConfig): GatewayRequestHandler {
   return createMarketProxyHandler(config, "market.lease.issue", { requireConsumer: true });
 }

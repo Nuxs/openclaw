@@ -7,6 +7,7 @@ import { join } from "node:path";
 import type { PluginCommandHandler } from "openclaw/plugin-sdk";
 import { hashString } from "../audit/canonicalize.js";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import type { Web3StateStore } from "../state/store.js";
 import { requireNodeSqlite } from "../utils/require-node-sqlite.js";
 
@@ -222,11 +223,9 @@ export function createPayStatusCommand(
     try {
       snapshot = readMarketSettlementStatus(deps.stateDir, storeConfig, ids);
     } catch (err) {
+      const normalized = formatWeb3GatewayErrorResponse(err);
       return {
-        text:
-          "Unable to read market settlement status. " +
-          `(${storeConfig.mode} store) ` +
-          String(err),
+        text: `Unable to read market settlement status. (${storeConfig.mode} store) ${normalized.error} (${normalized.message})`,
       };
     }
 

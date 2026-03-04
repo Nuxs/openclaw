@@ -72,6 +72,8 @@ import {
   createMarketTokenEconomySummaryHandler,
   createMarketResourceGetHandler,
   createMarketResourceListHandler,
+  createMarketOrderListHandler,
+  createMarketSettlementQueryHandler,
   createMarketResourcePublishHandler,
   createMarketResourceUnpublishHandler,
   createMarketServiceProofSubmitHandler,
@@ -339,6 +341,11 @@ const plugin: OpenClawPluginDefinition = {
     );
     api.registerGatewayMethod("web3.market.resource.get", createMarketResourceGetHandler(config));
     api.registerGatewayMethod("web3.market.resource.list", createMarketResourceListHandler(config));
+    api.registerGatewayMethod("web3.market.order.list", createMarketOrderListHandler(config));
+    api.registerGatewayMethod(
+      "web3.market.settlement.query",
+      createMarketSettlementQueryHandler(config),
+    );
     api.registerGatewayMethod("web3.market.lease.issue", createMarketLeaseIssueHandler(config));
     api.registerGatewayMethod("web3.market.lease.revoke", createMarketLeaseRevokeHandler(config));
     api.registerGatewayMethod("web3.market.lease.get", createMarketLeaseGetHandler(config));

@@ -141,4 +141,27 @@ describe("/pay_status command", () => {
 
     expect(result.text).toContain("Usage: /pay_status");
   });
+
+  it("returns stable error code output when market state cannot be parsed", async () => {
+    const marketDir = path.join(tempDir, "market");
+    await fs.mkdir(marketDir, { recursive: true });
+    await fs.writeFile(path.join(marketDir, "settlements.json"), "{invalid json}");
+
+    const handler = createPayStatusCommand(new Web3StateStore(tempDir), {
+      stateDir: tempDir,
+      config: resolveConfig({}),
+      marketConfig: { store: { mode: "file" } },
+    });
+
+    const result = await handler({
+      channel: "test",
+      isAuthorizedSender: true,
+      commandBody: "/pay_status order-1",
+      args: "order-1",
+      config: { plugins: { entries: { "market-core": { config: { store: { mode: "file" } } } } } },
+    } as any);
+
+    expect(result.text).toContain("Unable to read market settlement status.");
+    expect(result.text).toMatch(/E_[A-Z_]+/);
+  });
 });

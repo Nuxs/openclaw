@@ -16,6 +16,24 @@ export function monitorCapabilities(): CapabilityDescriptor[] {
       risk: { level: "low" },
     },
     {
+      name: "web3.metrics.recordX402Autopay",
+      summary: "Record x402 autopay metric events for monitoring.",
+      kind: "gateway",
+      group: "monitor",
+      availability: availability(true),
+      paramsSchema: {
+        type: "object",
+        properties: {
+          providerId: { type: "string" },
+          model: { type: "string" },
+          status: { type: "string" },
+          amount: { type: "string" },
+        },
+      },
+      returns: "Metric record acknowledgement.",
+      risk: { level: "low" },
+    },
+    {
       name: "web3.monitor.snapshot",
       summary: "Aggregate web3 + market metrics for monitoring dashboards.",
       kind: "gateway",

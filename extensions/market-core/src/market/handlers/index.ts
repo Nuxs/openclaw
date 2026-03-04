@@ -18,12 +18,17 @@ export {
   createRewardListHandler,
   createRewardUpdateStatusHandler,
 } from "./reward.js";
-export { createOrderCreateHandler, createOrderCancelHandler } from "./order.js";
+export {
+  createOrderCreateHandler,
+  createOrderCancelHandler,
+  createOrderListHandler,
+} from "./order.js";
 export {
   createSettlementLockHandler,
   createSettlementReleaseHandler,
   createSettlementRefundHandler,
   createSettlementStatusHandler,
+  createSettlementQueryHandler,
 } from "./settlement.js";
 export { createConsentGrantHandler, createConsentRevokeHandler } from "./consent.js";
 export {

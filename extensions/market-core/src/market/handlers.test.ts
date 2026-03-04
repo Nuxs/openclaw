@@ -17,11 +17,13 @@ import {
   createLeaseRevokeHandler,
   createOfferCreateHandler,
   createOfferPublishHandler,
+  createOrderListHandler,
   createMarketStatusSummaryHandler,
   createResourceListHandler,
   createResourcePublishHandler,
   createResourceUnpublishHandler,
   createSettlementLockHandler,
+  createSettlementQueryHandler,
   createSettlementStatusHandler,
 } from "./handlers.js";
 import type { Offer, Order } from "./types.js";
@@ -355,6 +357,56 @@ describe("market-core handlers", () => {
     expect(result()?.payload.settlementId).toBe("settlement-1");
     expect(result()?.payload.status).toBe("settlement_locked");
     expect(result()?.payload.lockTxHash).toBe("0xlock");
+  });
+
+  it("lists active orders and queries settlement aggregates", async () => {
+    const config = resolveConfig({
+      store: { mode: "file" },
+      access: { mode: "open", requireActor: true, requireActorMatch: true },
+    });
+    const store = new MarketStateStore(tempDir, config);
+
+    const sellerId = "0x00000000000000000000000000000000000000a1";
+    const buyerId = "0x00000000000000000000000000000000000000b1";
+    const offer = createOffer({ offerId: "offer-list", sellerId, status: "offer_published" });
+    const order = createOrder({
+      orderId: "order-list",
+      offerId: offer.offerId,
+      buyerId,
+      status: "payment_locked",
+    });
+    store.saveOffer(offer);
+    store.saveOrder(order);
+    store.saveSettlement({
+      settlementId: "settlement-list",
+      orderId: order.orderId,
+      status: "settlement_locked",
+      amount: "120",
+      lockedAt: new Date().toISOString(),
+    });
+
+    const orderListHandler = createOrderListHandler(store, config);
+    const orderList = createResponder();
+    await orderListHandler({
+      params: { actorId: sellerId, status: "active" },
+      respond: orderList.respond,
+    } as any);
+
+    expect(orderList.result()?.ok).toBe(true);
+    const orders = (orderList.result()?.payload.orders as Array<Record<string, unknown>>) ?? [];
+    expect(orders).toHaveLength(1);
+    expect(orders[0]?.orderId).toBe(order.orderId);
+
+    const settlementQueryHandler = createSettlementQueryHandler(store, config);
+    const settlementQuery = createResponder();
+    await settlementQueryHandler({
+      params: { actorId: sellerId, timeRange: "today" },
+      respond: settlementQuery.respond,
+    } as any);
+
+    expect(settlementQuery.result()?.ok).toBe(true);
+    expect(settlementQuery.result()?.payload.pending).toBe(120);
+    expect(settlementQuery.result()?.payload.orderCount).toBe(1);
   });
 
   it("does not mutate order when settlement already exists", async () => {

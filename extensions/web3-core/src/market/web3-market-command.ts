@@ -9,6 +9,7 @@ import {
   writeConfigFile,
 } from "../../../../src/config/config.js";
 import type { Web3PluginConfig } from "../config.js";
+import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import {
   buildWeb3MarketStatusSummary,
   formatWeb3MarketStatusMessage,
@@ -399,9 +400,9 @@ export function createWeb3MarketCommand(config: Web3PluginConfig): PluginCommand
         ),
       };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const normalized = formatWeb3GatewayErrorResponse(err);
       return {
-        text: `⚠️ Web3 Market status failed: ${msg}`,
+        text: `⚠️ Web3 Market status failed: ${normalized.error} (${normalized.message})`,
       };
     }
   };

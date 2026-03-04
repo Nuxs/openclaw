@@ -89,12 +89,13 @@ export class MarketAssistant {
    */
   private async parseIntent(message: string): Promise<ParsedIntent> {
     const msg = message.toLowerCase();
+    const commonParams = this.extractCommonParams(message);
 
     // 发布资源
     if (msg.includes("卖") || msg.includes("发布") || msg.includes("上架")) {
       return {
         type: IntentType.SELL_RESOURCE,
-        params: this.extractSellParams(message),
+        params: { ...commonParams, ...this.extractSellParams(message) },
         confidence: 0.9,
       };
     }
@@ -103,7 +104,7 @@ export class MarketAssistant {
     if (msg.includes("改价") || msg.includes("调价") || msg.includes("改成")) {
       return {
         type: IntentType.UPDATE_PRICE,
-        params: this.extractPriceParams(message),
+        params: { ...commonParams, ...this.extractPriceParams(message) },
         confidence: 0.9,
       };
     }
@@ -112,7 +113,7 @@ export class MarketAssistant {
     if (msg.includes("库存") || msg.includes("剩余") || msg.includes("还有多少")) {
       return {
         type: IntentType.QUERY_INVENTORY,
-        params: {},
+        params: commonParams,
         confidence: 0.9,
       };
     }
@@ -121,7 +122,7 @@ export class MarketAssistant {
     if (msg.includes("收入") || msg.includes("赚了") || msg.includes("营收")) {
       return {
         type: IntentType.QUERY_EARNINGS,
-        params: this.extractTimeParams(message),
+        params: { ...commonParams, ...this.extractTimeParams(message) },
         confidence: 0.9,
       };
     }
@@ -130,7 +131,7 @@ export class MarketAssistant {
     if (msg.includes("订单") || msg.includes("有人买") || msg.includes("谁在用")) {
       return {
         type: IntentType.QUERY_ORDERS,
-        params: {},
+        params: commonParams,
         confidence: 0.9,
       };
     }
@@ -139,7 +140,7 @@ export class MarketAssistant {
     if (msg.includes("自动") || msg.includes("规则") || msg.includes("策略")) {
       return {
         type: IntentType.SET_AUTOMATION,
-        params: this.extractAutomationParams(message),
+        params: { ...commonParams, ...this.extractAutomationParams(message) },
         confidence: 0.8,
       };
     }
@@ -148,14 +149,14 @@ export class MarketAssistant {
     if (msg.includes("取消") || msg.includes("停止")) {
       return {
         type: IntentType.CANCEL_ORDERS,
-        params: this.extractCancelParams(message),
+        params: { ...commonParams, ...this.extractCancelParams(message) },
         confidence: 0.9,
       };
     }
 
     return {
       type: IntentType.UNKNOWN,
-      params: {},
+      params: commonParams,
       confidence: 0.0,
     };
   }
@@ -170,43 +171,40 @@ export class MarketAssistant {
       return '❌ 请提供资源名称和价格，例如：\n"帮我把 GPU 卖掉，价格 $10/小时"';
     }
 
-    // 1. 推断资源类型
-    const resourceType = this.inferResourceType(resourceName);
+    const actorId = this.resolveActorId(params);
+    if (!actorId) {
+      return '❌ 缺少 actorId，请在指令里附带，例如："actorId=0x... 帮我发布 GPU，价格 $10"';
+    }
 
-    // 2. 发布资源
-    const result = await this.openclaw.callGatewayMethod<unknown>("market.resource.publish", {
-      name: resourceName,
-      resourceType,
-      basePrice: price,
-      pricingModel: {
-        strategy: "dynamic",
-        constraints: {
-          min: price * 0.8,
-          max: price * 1.5,
+    const resourceKind = this.inferResourceKind(resourceName);
+    const unit = this.defaultUnitByKind(resourceKind);
+
+    const result = await this.openclaw.callGatewayMethod<{
+      resourceId?: string;
+      offerId?: string;
+      status?: string;
+    }>("market.resource.publish", {
+      actorId,
+      resource: {
+        kind: resourceKind,
+        label: resourceName,
+        price: { unit, amount: String(Math.max(1, Math.floor(price))), currency: "USDT" },
+        offer: {
+          assetId: `assistant:${resourceKind}:${Date.now()}`,
+          assetType: resourceKind === "storage" ? "service" : "api",
+          currency: "USDT",
+          usageScope: { purpose: "assistant_publish" },
+          deliveryType: resourceKind === "storage" ? "service" : "api",
         },
       },
     });
-    void result;
-
-    // 3. 查询市场行情
-    const marketStats = await this.openclaw.callGatewayMethod<{ avgPrice: number }>(
-      "market.query",
-      {
-        type: "marketStats",
-        resourceType,
-      },
-    );
-
-    // 4. 生成建议
-    const suggestion = this.generatePricingSuggestion(price, marketStats.avgPrice);
 
     return `✅ 已发布 ${resourceName} 服务
 
-💰 您的定价：$${price}/小时
-📊 市场均价：$${marketStats.avgPrice.toFixed(2)}/小时
-📈 智能定价：已开启（范围 $${(price * 0.8).toFixed(2)} - $${(price * 1.5).toFixed(2)}）
-
-${suggestion}`;
+🆔 Resource: ${result?.resourceId ?? "unknown"}
+📦 Offer: ${result?.offerId ?? "unknown"}
+💰 标价：${price} USDT/${unit}
+📌 状态：${result?.status ?? "resource_published"}`;
   }
 
   /**
@@ -219,99 +217,88 @@ ${suggestion}`;
       return '❌ 请提供新价格，例如："改成 $15"';
     }
 
-    // 获取用户的资源列表
-    const resources = await this.openclaw.callGatewayMethod<
-      Array<{ id: string; name: string; price: number; totalCapacity: number; unit: string }>
-    >("market.resource.list", {
-      status: "available",
+    const actorId = this.resolveActorId(params);
+    if (!actorId) {
+      return '❌ 缺少 actorId，请在指令里附带，例如："actorId=0x... 改成 $15"';
+    }
+
+    const resourcesRaw = await this.openclaw.callGatewayMethod<unknown>("market.resource.list", {
+      providerActorId: actorId,
+      status: "resource_published",
+      limit: 50,
     });
+    const resources = this.pickArray<Record<string, unknown>>(resourcesRaw, "resources");
 
     if (resources.length === 0) {
       return "❌ 您当前没有在售的服务";
     }
 
-    // 如果只有一个资源，直接调整
-    if (resources.length === 1) {
-      await this.openclaw.callGatewayMethod("market.pricing.setModel", {
-        offerId: resources[0].id,
-        basePrice: newPrice,
-      });
-
-      return `✅ 已将 ${resources[0].name} 价格调整为 $${newPrice}/小时`;
+    const targetOfferId =
+      typeof params.offerId === "string" && params.offerId.trim().length > 0
+        ? params.offerId.trim()
+        : typeof resources[0]?.offerId === "string"
+          ? resources[0].offerId
+          : undefined;
+    if (!targetOfferId) {
+      return "❌ 未找到可更新的 offerId，请在指令中提供 offerId";
     }
 
-    // 多个资源，需要用户明确
-    const resourceList = resources
-      .map((r: any, i: number) => `${i + 1}. ${r.name} (当前 $${r.price}/小时)`)
-      .join("\n");
+    await this.openclaw.callGatewayMethod("market.offer.update", {
+      actorId,
+      offerId: targetOfferId,
+      price: newPrice,
+    });
 
-    return `您有多个在售服务：\n${resourceList}\n\n请明确指定，例如：\"把 GPU 改成 $15\"`;
+    const targetLabel =
+      (resources.find((entry) => entry.offerId === targetOfferId)?.label as string | undefined) ??
+      targetOfferId;
+    return `✅ 已将 ${targetLabel} 价格调整为 $${newPrice}`;
   }
 
   /**
    * 处理查询库存
    */
   private async handleQueryInventory(params: any): Promise<string> {
-    void params;
-    // 1. 获取资源列表
-    const resources = await this.openclaw.callGatewayMethod<
-      Array<{ id: string; name: string; price: number; totalCapacity: number; unit: string }>
-    >("market.resource.list", {
-      status: "available",
+    const actorId = this.resolveActorId(params);
+    const resourcesRaw = await this.openclaw.callGatewayMethod<unknown>("market.resource.list", {
+      providerActorId: actorId,
+      status: "resource_published",
+      limit: 50,
     });
+    const resources = this.pickArray<Record<string, unknown>>(resourcesRaw, "resources");
 
     if (resources.length === 0) {
       return '📦 您当前没有在售的资源\n\n输入"帮我卖 GPU，价格 $10"来发布服务';
     }
 
-    // 2. 获取活跃订单
-    const orders = await this.openclaw.callGatewayMethod<
-      Array<{
-        resourceId: string;
-        resourceName: string;
-        buyerId: string;
-        quantity: number;
-        price: number;
-        unit: string;
-        duration?: number;
-        estimatedEnd?: string;
-      }>
-    >("market.order.list", { status: "active" });
-
-    // 3. 计算每个资源的剩余量
-    const inventory = resources.map((resource: any) => {
-      const resourceOrders = orders.filter((o: any) => o.resourceId === resource.id);
-      const used = resourceOrders.reduce((sum: number, o: any) => sum + o.quantity, 0);
-      const remaining = resource.totalCapacity - used;
-
-      return {
-        name: resource.name,
-        total: resource.totalCapacity,
-        used,
-        remaining,
-        unit: resource.unit,
-        utilization: ((used / resource.totalCapacity) * 100).toFixed(1),
-      };
+    const ordersRaw = await this.openclaw.callGatewayMethod<unknown>("market.order.list", {
+      status: "active",
+      sellerId: actorId,
+      limit: 100,
     });
+    const orders = this.pickArray<Record<string, unknown>>(ordersRaw, "orders");
 
-    // 4. 生成报告
-    const inventoryText = inventory
-      .map(
-        (item: any) =>
-          `• ${item.name}: 剩余 ${item.remaining} ${item.unit} (利用率 ${item.utilization}%)`,
-      )
+    const inventoryText = resources
+      .map((resource) => {
+        const resourceId =
+          typeof resource.resourceId === "string" ? resource.resourceId : "unknown";
+        const resourceName = typeof resource.label === "string" ? resource.label : resourceId;
+        const used = orders
+          .filter((order) => order.resourceId === resourceId)
+          .reduce((sum, order) => sum + this.toNumber(order.quantity), 0);
+        return `• ${resourceName}: 活跃订单占用 ${used}`;
+      })
       .join("\n");
 
-    const ordersText = (Array.isArray(orders) ? orders : [])
-      .map((o: unknown) => {
-        const rec = (o && typeof o === "object" ? (o as Record<string, unknown>) : {}) as Record<
-          string,
-          unknown
-        >;
-        const resourceName = typeof rec.resourceName === "string" ? rec.resourceName : "unknown";
-        const buyerId = typeof rec.buyerId === "string" ? rec.buyerId : "unknown";
-        const price = typeof rec.price === "number" ? rec.price : 0;
-        const unit = typeof rec.unit === "string" ? rec.unit : "unit";
+    const ordersText = orders
+      .map((order) => {
+        const resourceName =
+          typeof order.resourceName === "string"
+            ? order.resourceName
+            : String(order.resourceId ?? "unknown");
+        const buyerId = typeof order.buyerId === "string" ? order.buyerId : "unknown";
+        const price = this.toNumber(order.price);
+        const unit = typeof order.unit === "string" ? order.unit : "unit";
         return `• ${resourceName} → @${buyerId} ($${price}/${unit})`;
       })
       .join("\n");
@@ -324,16 +311,25 @@ ${suggestion}`;
    */
   private async handleQueryEarnings(params: any): Promise<string> {
     const { timeRange = "today" } = params;
+    const actorId = this.resolveActorId(params);
 
     const earnings = await this.openclaw.callGatewayMethod<{
-      total: number;
-      settled: number;
-      pending: number;
-      orderCount: number;
-      trend: number;
+      total?: number;
+      settled?: number;
+      pending?: number;
+      orderCount?: number;
+      trend?: number;
     }>("market.settlement.query", {
+      actorId,
       timeRange,
+      limit: 200,
     });
+
+    const total = this.toNumber(earnings?.total);
+    const settled = this.toNumber(earnings?.settled);
+    const pending = this.toNumber(earnings?.pending);
+    const orderCount = this.toNumber(earnings?.orderCount);
+    const trend = this.toNumber(earnings?.trend);
 
     const timeRangeMap: Record<string, string> = {
       today: "今天",
@@ -342,44 +338,43 @@ ${suggestion}`;
     };
     const timeText = timeRangeMap[timeRange as string] || "今天";
 
-    return `💰 ${timeText}收入：$${earnings.total.toFixed(2)}
+    return `💰 ${timeText}收入：$${total.toFixed(2)}
 
 📊 详细：
-• 已结算：$${earnings.settled.toFixed(2)}
-• 待结算：$${earnings.pending.toFixed(2)}
-• 订单数：${earnings.orderCount} 个
+• 已结算：$${settled.toFixed(2)}
+• 待结算：$${pending.toFixed(2)}
+• 订单数：${orderCount} 个
 
-📈 趋势：${earnings.trend > 0 ? "↑" : "↓"} ${Math.abs(earnings.trend).toFixed(1)}%`;
+📈 趋势：${trend > 0 ? "↑" : "↓"} ${Math.abs(trend).toFixed(1)}%`;
   }
 
   /**
    * 处理查询订单
    */
   private async handleQueryOrders(params: any): Promise<string> {
-    void params;
-    const orders = await this.openclaw.callGatewayMethod<
-      Array<{
-        resourceId: string;
-        resourceName: string;
-        buyerId: string;
-        quantity: number;
-        price: number;
-        unit: string;
-        duration?: number;
-        estimatedEnd?: string;
-      }>
-    >("market.order.list", { status: "active" });
+    const actorId = this.resolveActorId(params);
+    const response = await this.openclaw.callGatewayMethod<unknown>("market.order.list", {
+      status: "active",
+      sellerId: actorId,
+      limit: 100,
+    });
+    const orders = this.pickArray<Record<string, unknown>>(response, "orders");
 
     if (orders.length === 0) {
       return "📋 当前没有活跃订单";
     }
 
     const orderText = orders
-      .map(
-        (o: any, i: number) =>
-          `${i + 1}. ${o.resourceName} → @${o.buyerId}
-   💰 $${o.price}/${o.unit} | ⏱ 已运行 ${o.duration}h | 预计结束 ${o.estimatedEnd}`,
-      )
+      .map((order, i) => {
+        const resourceName =
+          typeof order.resourceName === "string"
+            ? order.resourceName
+            : String(order.resourceId ?? "unknown");
+        const buyerId = typeof order.buyerId === "string" ? order.buyerId : "unknown";
+        const price = this.toNumber(order.price);
+        const unit = typeof order.unit === "string" ? order.unit : "unit";
+        return `${i + 1}. ${resourceName} → @${buyerId}\n  💰 $${price}/${unit} | 状态 ${String(order.status ?? "unknown")}`;
+      })
       .join("\n\n");
 
     return `🔥 活跃订单：${orders.length} 个\n\n${orderText}`;
@@ -391,24 +386,18 @@ ${suggestion}`;
   private async handleSetAutomation(params: any): Promise<string> {
     const { action, minPrice, maxConcurrent } = params;
 
-    if (action === "auto_accept") {
-      await this.openclaw.callGatewayMethod("market.automation.setRule", {
-        trigger: "new_order",
-        action: "auto_accept",
-        conditions: {
-          minPrice,
-          maxConcurrent,
-        },
-      });
-
-      let msg = "✅ 已设置自动接单";
-      if (minPrice) msg += `\n• 最低价格：$${minPrice}`;
-      if (maxConcurrent) msg += `\n• 最大并发：${maxConcurrent} 个订单`;
-
-      return msg;
+    if (action !== "auto_accept") {
+      return "❌ 未知的自动化类型";
     }
 
-    return "❌ 未知的自动化类型";
+    return [
+      "⚠️ 当前 market-core 未注册自动化规则写入能力（market.automation.setRule）。",
+      "建议改用外部调度（cron/worker）调用 market.order.list + market.order.cancel/settlement.* 组合实现自动化。",
+      minPrice ? `期望最低价格：$${minPrice}` : undefined,
+      maxConcurrent ? `期望最大并发：${maxConcurrent}` : undefined,
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
   /**
@@ -417,29 +406,85 @@ ${suggestion}`;
   private async handleCancelOrders(params: any): Promise<string> {
     const { cancelAll } = params;
 
-    if (cancelAll) {
-      const result = await this.openclaw.callGatewayMethod<{ count: number }>(
-        "market.order.cancel",
-        {
-          cancelAll: true,
-        },
-      );
-
-      return `✅ 已取消 ${result.count} 个订单`;
+    if (!cancelAll) {
+      return '请明确指定要取消的订单，或输入"取消所有订单"';
     }
 
-    return '请明确指定要取消的订单，或输入"取消所有订单"';
+    const actorId = this.resolveActorId(params);
+    if (!actorId) {
+      return '❌ 缺少 actorId，请在指令里附带，例如："actorId=0x... 取消所有订单"';
+    }
+
+    const response = await this.openclaw.callGatewayMethod<unknown>("market.order.list", {
+      status: "active",
+      buyerId: actorId,
+      limit: 100,
+    });
+    const orders = this.pickArray<Record<string, unknown>>(response, "orders");
+
+    let cancelled = 0;
+    for (const order of orders) {
+      const orderId = typeof order.orderId === "string" ? order.orderId : undefined;
+      if (!orderId) continue;
+      await this.openclaw.callGatewayMethod("market.order.cancel", {
+        actorId,
+        orderId,
+      });
+      cancelled += 1;
+    }
+
+    return `✅ 已取消 ${cancelled} 个订单`;
   }
 
   // ========== 辅助方法 ==========
 
-  private inferResourceType(name: string): string {
+  private resolveActorId(params: Record<string, unknown>): string | undefined {
+    const raw = params.actorId;
+    if (typeof raw !== "string") return undefined;
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private pickArray<T>(payload: unknown, key: string): T[] {
+    if (Array.isArray(payload)) return payload as T[];
+    if (!payload || typeof payload !== "object") return [];
+    const value = (payload as Record<string, unknown>)[key];
+    return Array.isArray(value) ? (value as T[]) : [];
+  }
+
+  private toNumber(value: unknown): number {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return 0;
+  }
+
+  private inferResourceKind(name: string): "model" | "search" | "storage" | "service" {
     const n = name.toLowerCase();
-    if (n.includes("gpu")) return "compute_gpu";
-    if (n.includes("cpu")) return "compute_cpu";
     if (n.includes("存储") || n.includes("storage")) return "storage";
-    if (n.includes("带宽") || n.includes("bandwidth")) return "bandwidth";
-    return "compute_generic";
+    if (n.includes("搜索") || n.includes("search")) return "search";
+    if (n.includes("api") || n.includes("服务") || n.includes("service")) return "service";
+    return "model";
+  }
+
+  private defaultUnitByKind(kind: "model" | "search" | "storage" | "service"): string {
+    if (kind === "search") return "query";
+    if (kind === "storage") return "gb_day";
+    return "call";
+  }
+
+  private extractCommonParams(message: string): Record<string, unknown> {
+    const actorIdMatch = message.match(/actorId\s*[=:]\s*(0x[a-fA-F0-9]{40})/);
+    const offerIdMatch = message.match(/offerId\s*[=:]\s*([\w-]+)/);
+    const orderIdMatch = message.match(/orderId\s*[=:]\s*([\w-]+)/);
+
+    const out: Record<string, unknown> = {};
+    if (actorIdMatch) out.actorId = actorIdMatch[1];
+    if (offerIdMatch) out.offerId = offerIdMatch[1];
+    if (orderIdMatch) out.orderId = orderIdMatch[1];
+    return out;
   }
 
   private extractSellParams(message: string): any {

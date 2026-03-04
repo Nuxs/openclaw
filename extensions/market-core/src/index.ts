@@ -13,6 +13,7 @@
 import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
 import { resolveConfig, type MarketPluginConfig } from "./config.js";
 import { createMarketFacade } from "./facade.js";
+import { createMarketAssistantCommand } from "./market/assistant-command.js";
 import {
   createBridgeListHandler,
   createBridgeRequestHandler,
@@ -51,6 +52,7 @@ import {
   createOfferUpdateHandler,
   createOrderCancelHandler,
   createOrderCreateHandler,
+  createOrderListHandler,
   createResourceGetHandler,
   createResourceListHandler,
   createResourcePublishHandler,
@@ -70,6 +72,7 @@ import {
   createServiceProofGetHandler,
   createServiceProofListHandler,
   createSettlementLockHandler,
+  createSettlementQueryHandler,
   createSettlementRefundHandler,
   createSettlementReleaseHandler,
   createSettlementStatusHandler,
@@ -102,6 +105,13 @@ const plugin: OpenClawPluginDefinition = {
     }
     runtime.plugins._marketCoreFacade = facade;
 
+    api.registerCommand({
+      name: "market-assistant",
+      description: "Natural-language assistant for market operations",
+      acceptsArgs: true,
+      handler: createMarketAssistantCommand(),
+    });
+
     // Register internal gateway methods (market.*). These are expected by web3-core proxies.
     api.registerGatewayMethod("market.offer.create", createOfferCreateHandler(store, config));
     api.registerGatewayMethod("market.offer.publish", createOfferPublishHandler(store, config));
@@ -110,6 +120,7 @@ const plugin: OpenClawPluginDefinition = {
 
     api.registerGatewayMethod("market.order.create", createOrderCreateHandler(store, config));
     api.registerGatewayMethod("market.order.cancel", createOrderCancelHandler(store, config));
+    api.registerGatewayMethod("market.order.list", createOrderListHandler(store, config));
 
     api.registerGatewayMethod(
       "market.resource.publish",
@@ -189,6 +200,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod(
       "market.settlement.status",
       createSettlementStatusHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.settlement.query",
+      createSettlementQueryHandler(store, config),
     );
 
     api.registerGatewayMethod("market.consent.grant", createConsentGrantHandler(store, config));
