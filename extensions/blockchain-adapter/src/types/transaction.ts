@@ -111,8 +111,14 @@ export interface ConnectionConfig {
   privateKey?: `0x${string}`;
   /** 是否使用浏览器钱包 */
   useBrowserWallet?: boolean;
-  /** 远程签名函数 (AI 场景 - 调用外部签名服务) */
-  remoteSignFn?: (messageHash: string) => Promise<`0x${string}`>;
+  /**
+   * 远程签名配置 (AI 场景)
+   * address 必须是远程签名器对应的真实地址，避免地址/签名不一致。
+   */
+  remoteSigner?: {
+    address: `0x${string}`;
+    signMessage: (messageHash: string) => Promise<`0x${string}`>;
+  };
 
   /** RPC endpoint override (all chains that support it) */
   rpcUrl?: string;

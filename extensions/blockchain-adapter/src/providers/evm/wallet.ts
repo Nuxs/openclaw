@@ -22,7 +22,7 @@ import {
   type Account,
   type SignableMessage,
 } from "viem";
-import { privateKeyToAccount, generatePrivateKey, privateKeyToAddress } from "viem/accounts";
+import { privateKeyToAccount } from "viem/accounts";
 import type { ChainInfo, EvmChainId } from "../../types/chain.js";
 import { NotConnectedError, EvmError } from "../../types/error.js";
 import type { ConnectionConfig, Wallet } from "../../types/transaction.js";
@@ -33,16 +33,10 @@ import type { ConnectionConfig, Wallet } from "../../types/transaction.js";
 export type SignerMode =
   | { type: "private-key"; privateKey: `0x${string}` }
   | { type: "browser-wallet" }
-  | { type: "remote-signature"; signFn: (message: string) => Promise<`0x${string}`> }
+  | { type: "remote-signature"; signMessage: (messageHash: string) => Promise<`0x${string}`> }
   | { type: "none" };
 
-/**
- * 连接配置扩展 (支持 AI 场景)
- */
-export interface WalletConnectionConfig extends ConnectionConfig {
-  /** 远程签名函数 (AI 场景) */
-  remoteSignFn?: (message: string) => Promise<`0x${string}`>;
-}
+export type WalletConnectionConfig = ConnectionConfig;
 
 /**
  * WalletClient 封装类
@@ -72,10 +66,14 @@ export class EvmWallet {
     } else if (config.useBrowserWallet) {
       // TODO: 浏览器钱包模式暂时禁用，等待 viem 2.x 稳定
       throw new Error(
-        "Browser wallet support is temporarily disabled. Use privateKey or remoteSignFn.",
+        "Browser wallet support is temporarily disabled. Use privateKey or remoteSigner.",
       );
-    } else if (config.remoteSignFn) {
-      await this.connectWithRemoteSignature(config.remoteSignFn);
+    } else if (config.remoteSigner) {
+      const { address, signMessage } = config.remoteSigner;
+      if (!address || !signMessage) {
+        throw new Error("Invalid remoteSigner config: address and signMessage are required");
+      }
+      await this.connectWithRemoteSignature(address, signMessage);
     } else {
       throw new Error("No wallet configuration provided");
     }
@@ -149,18 +147,17 @@ export class EvmWallet {
    * 远程签名模式 (AI 场景 - 调用外部签名服务)
    */
   private async connectWithRemoteSignature(
-    signFn: (message: string) => Promise<`0x${string}`>,
+    address: EvmAddress,
+    signMessage: (messageHash: string) => Promise<`0x${string}`>,
   ): Promise<void> {
-    // 生成临时地址用于显示 (实际签名由远程服务完成)
-    const tempPrivateKey = generatePrivateKey();
-    this._account = privateKeyToAccount(tempPrivateKey);
-    this._address = privateKeyToAddress(tempPrivateKey);
+    // 远程签名必须使用签名器对应的真实地址，禁止随机临时地址
+    this._account = null;
+    this._address = address;
 
-    this.signerMode = { type: "remote-signature", signFn };
+    this.signerMode = { type: "remote-signature", signMessage };
 
-    // 创建只读 walletClient (不实际发送交易)
+    // 远程模式仅保留 client 能力，不在本地持有可签名私钥
     this.walletClient = createWalletClient({
-      account: this._account,
       chain: this.createChain(),
       transport: http(this.chainInfo.rpcUrl),
     });
@@ -236,7 +233,7 @@ export class EvmWallet {
       case "remote-signature": {
         // 远程签名服务 - 先计算哈希再签名
         const messageHash = hashMessage(message);
-        return this.signerMode.signFn(messageHash);
+        return this.signerMode.signMessage(messageHash);
       }
 
       default:
@@ -302,7 +299,7 @@ export class EvmWallet {
           primaryType: resolvedPrimaryType,
           message: value as any,
         });
-        return this.signerMode.signFn(messageHash);
+        return this.signerMode.signMessage(messageHash);
       }
 
       default:
@@ -347,14 +344,17 @@ export class EvmWallet {
     maxPriorityFeePerGas?: bigint;
     nonce?: number;
   }): Promise<Hash> {
-    if (!this.walletClient || !this._account) {
+    if (!this.walletClient || !this._address) {
       throw new NotConnectedError("evm");
+    }
+    if (this.signerMode.type === "remote-signature") {
+      throw new Error("Remote signer mode does not support sendTransaction yet");
     }
 
     try {
       const chain = this.createChain();
       const hash = await this.walletClient.sendTransaction({
-        account: this._account.address,
+        account: this._account ?? this._address,
         chain,
         to: tx.to,
         value: tx.value || 0n,
