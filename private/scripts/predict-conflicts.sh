@@ -13,9 +13,9 @@
 # - 对非品牌冲突文件提示是否需要进一步做 overlay 拆分。
 #
 # 实现:
-# - 优先使用 git merge-tree --write-tree（Git 2.38+）；不支持时 fallback 到
-#   git merge-tree <base> <ours> <theirs>（旧语法）。
-# - 全程不 touch index、不 checkout 文件。
+# - 优先使用临时 index + `git read-tree -m <base> <ours> <theirs>` 的 3-way merge 预测。
+# - 读取未合并条目（`git ls-files -u`）得到更接近真实 merge 的冲突集合。
+# - 若底层命令不可用，再退回“双方都修改文件交集”的近似预测。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -25,15 +25,17 @@ cd "$REPO_ROOT"
 TARGET_REF="upstream/main"
 DO_FETCH=true
 OUTPUT_MODE="text" # text | json
+MERGE_STRATEGY="merge" # merge | rebase
 
 usage() {
   cat <<'EOF'
-用法: predict-conflicts.sh [--tag <ref>] [--target <ref>] [--no-fetch] [--json]
+用法: predict-conflicts.sh [--tag <ref>] [--target <ref>] [--no-fetch] [--strategy <merge|rebase>] [--json]
 
 选项:
-  --tag <ref>      预测与指定 tag/ref 的 merge 冲突
-  --target <ref>   预测与指定 ref 的 merge 冲突（默认 upstream/main）
+  --tag <ref>      预测与指定 tag/ref 的冲突
+  --target <ref>   预测与指定 ref 的冲突（默认 upstream/main）
   --no-fetch       不执行 git fetch（使用本地已有 refs）
+  --strategy <s>   预测策略语义（merge|rebase，默认 merge）
   --json           输出 JSON（仅输出 JSON，不打印提示信息），供脚本/CI 消费
 EOF
 }
@@ -51,6 +53,10 @@ while [[ $# -gt 0 ]]; do
     --no-fetch)
       DO_FETCH=false
       shift
+      ;;
+    --strategy)
+      MERGE_STRATEGY="$2"
+      shift 2
       ;;
     --json)
       OUTPUT_MODE="json"
@@ -85,6 +91,11 @@ if ! git rev-parse "$TARGET_REF" >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ "$MERGE_STRATEGY" != "merge" && "$MERGE_STRATEGY" != "rebase" ]]; then
+  echo "❌ --strategy 仅支持 merge 或 rebase"
+  exit 1
+fi
+
 conflicts_tmp="$(mktemp)"
 brand_tmp="$(mktemp)"
 trap 'rm -f "$conflicts_tmp" "$brand_tmp"' EXIT
@@ -95,17 +106,23 @@ if [[ -z "$BASE" ]]; then
   exit 1
 fi
 
-# 尝试 Git 2.38+ 的 merge-tree --write-tree；仅在能力缺失时 fallback 到近似预测
-merge_tree_output=""
-if git merge-tree -h 2>&1 | grep -q -- '--write-tree'; then
-  # 注意：有冲突时命令可能返回非 0，但这不代表功能不可用
-  merge_tree_output="$(git merge-tree --write-tree --messages --name-only HEAD "$TARGET_REF" 2>/dev/null || true)"
-  printf '%s\n' "$merge_tree_output" \
-    | sed -n 's/^CONFLICT .*: Merge conflict in //p' \
+# 优先使用临时 index 的 3-way merge 进行精确预测：
+# - 不 touch 当前工作区/index
+# - 直接读取未合并条目（与真实 merge 冲突集合更一致）
+# 当底层命令不可用时，再退回“双方都修改”的近似预测。
+tmp_index="$(mktemp)"
+exact_mode_ok=false
+if GIT_INDEX_FILE="$tmp_index" git read-tree -m "$BASE" HEAD "$TARGET_REF" >/dev/null 2>&1; then
+  exact_mode_ok=true
+  GIT_INDEX_FILE="$tmp_index" git ls-files -u \
+    | awk '{print $4}' \
+    | sed '/^$/d' \
     | sort -u >"$conflicts_tmp"
-else
-  # Fallback: 旧版 Git 的 merge-tree 输出格式不稳定，直接使用近似预测：
-  # 取 base->HEAD 与 base->TARGET_REF 的变更文件交集。
+fi
+rm -f "$tmp_index"
+
+if ! $exact_mode_ok; then
+  # Fallback: 近似预测（双方都改过的文件交集）
   ours_changed="$(mktemp)"
   theirs_changed="$(mktemp)"
   git diff --name-only "$BASE" HEAD | sort -u >"$ours_changed"
@@ -114,7 +131,7 @@ else
   rm -f "$ours_changed" "$theirs_changed"
 
   if [[ -s "$conflicts_tmp" && "$OUTPUT_MODE" == "text" ]]; then
-    echo "⚠️  当前 Git 不支持 merge-tree --write-tree（$(git --version)），冲突预测为近似结果（双方都修改的文件）。"
+    echo "⚠️  冲突预测回退为近似模式（双方都修改的文件），结果可能偏多。"
   fi
 fi
 
@@ -182,7 +199,7 @@ NODE
 fi
 
 echo ""
-echo "⚠️  预计会发生冲突（HEAD vs ${TARGET_REF}）：${count_all} 个文件"
+echo "⚠️  预计会发生冲突（strategy=${MERGE_STRATEGY}, HEAD vs ${TARGET_REF}）：${count_all} 个文件"
 
 if [[ -n "${brand_conflicts// }" ]]; then
   echo ""
@@ -201,5 +218,5 @@ if [[ -n "${other_conflicts// }" ]]; then
 fi
 
 echo ""
-echo "提示：这是 merge 冲突预测（只读）。实际 rebase 冲突集合可能略有不同。"
+echo "提示：这是只读冲突预测（strategy=${MERGE_STRATEGY}）。实际冲突仍以真实合流结果为准。"
 echo "      pnpm-lock.yaml 冲突会在 sync-upstream.sh 中自动处理（accept theirs + pnpm install）。"

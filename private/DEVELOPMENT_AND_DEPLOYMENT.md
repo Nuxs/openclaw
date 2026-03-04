@@ -131,7 +131,40 @@
 
 ---
 
-## 6) 本地检查（建议）
+## 6) 私有化 Web Search 文档约定（SearxNG / 私有重排）
+
+- 私有搜索能力（如 `searxng` provider、自建 rerank 服务）文档只放在 `private/` 下，不进入 `docs/tools/web.md`。
+- 官方文档 `docs/tools/web.md` 仅保留 upstream 通用能力，合流冲突时优先保留 upstream 版本。
+- 私有配置示例建议写在本文件或 `private/PRIVATE_FORK_PLAYBOOK.md`，并在代码错误提示中使用私有文档链接（不要改官方 docs 链接）。
+
+建议私有配置示例（仅 fork 使用）：
+
+```json5
+{
+  tools: {
+    web: {
+      search: {
+        provider: "searxng",
+        searxng: {
+          baseUrl: "http://search.example.com:8080",
+          apiKey: "optional-token",
+          rerank: {
+            mode: "auto",
+            endpoint: "http://127.0.0.1:8899/rerank",
+            timeoutSeconds: 1,
+            maxCandidates: 20,
+            maxLength: 256,
+          },
+        },
+      },
+    },
+  },
+}
+```
+
+---
+
+## 7) 本地检查（建议）
 
 - `pnpm install`
 - `pnpm build`

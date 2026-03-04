@@ -96,7 +96,7 @@ if $PREDICT_ONLY; then
   echo ""
   echo "🔎 预测冲突文件（不修改工作区）..."
   if [[ -x "private/scripts/predict-conflicts.sh" ]]; then
-    bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --no-fetch
+    bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --strategy "$STRATEGY" --no-fetch
     exit 0
   fi
   echo "❌ 缺少脚本: private/scripts/predict-conflicts.sh"
@@ -129,7 +129,7 @@ SYNC_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 if [[ -x "private/scripts/predict-conflicts.sh" ]]; then
   tmp_predict="$(mktemp)"
-  if bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --no-fetch --json >"$tmp_predict"; then
+  if bash private/scripts/predict-conflicts.sh --target "$TARGET_REF" --strategy "$STRATEGY" --no-fetch --json >"$tmp_predict"; then
     PREDICT_JSON_FILE="$tmp_predict"
   else
     rm -f "$tmp_predict"
