@@ -16,6 +16,7 @@ export enum IntentType {
   QUERY_ORDERS = "query_orders", // 查询订单
   SET_AUTOMATION = "set_automation", // 设置自动化
   CANCEL_ORDERS = "cancel_orders", // 取消订单
+  DIAGNOSE = "diagnose", // 诊断
   UNKNOWN = "unknown", // 未知意图
 }
 
@@ -75,6 +76,8 @@ export class MarketAssistant {
           return await this.handleSetAutomation(intent.params);
         case IntentType.CANCEL_ORDERS:
           return await this.handleCancelOrders(intent.params);
+        case IntentType.DIAGNOSE:
+          return await this.handleDiagnose(intent.params);
         default:
           return this.generateHelpMessage();
       }
@@ -85,7 +88,14 @@ export class MarketAssistant {
   }
 
   /**
-   * 解析用户意图（简化版，实际应使用 LLM）
+   * 解析用户意图（L1 确定性反射层 — 关键词匹配）
+   *
+   * ⚠️ 架构过渡注释：此方法属于 Policy 层逻辑，按 "Extension = Mechanism, AI = Policy"
+   * 原则（见 skills/web3-market/SKILL.md），它不应长期存在于 Extension 中。
+   *
+   * 当前保留原因：在 LLM Function Calling 接管前，提供保底 CLI 交互。
+   * 升级路径（L2）：用 Capability Catalog（describeWeb3Capabilities）作为 LLM tools 定义，
+   * 将意图解析完全移交给 AI Agent 层。届时此方法应被移除或降级为 fallback。
    */
   private async parseIntent(message: string): Promise<ParsedIntent> {
     const msg = message.toLowerCase();
@@ -154,11 +164,82 @@ export class MarketAssistant {
       };
     }
 
+    // 诊断
+    if (
+      msg.includes("出问题") ||
+      msg.includes("帮我查") ||
+      msg.includes("怎么了") ||
+      msg.includes("有问题")
+    ) {
+      return {
+        type: IntentType.DIAGNOSE,
+        params: commonParams,
+        confidence: 0.9,
+      };
+    }
+
     return {
       type: IntentType.UNKNOWN,
       params: commonParams,
       confidence: 0.0,
     };
+  }
+
+  /**
+   * 处理诊断
+   */
+  private async handleDiagnose(params: any): Promise<string> {
+    const actorId = this.resolveActorId(params);
+
+    const [marketStatus, monitorHealth, reputation] = await Promise.all([
+      this.openclaw
+        .callGatewayMethod<any>("web3.market.status.summary", {})
+        .catch((e) => ({ error: e.message })),
+      this.openclaw
+        .callGatewayMethod<any>("web3.monitor.health", {})
+        .catch((e) => ({ error: e.message })),
+      actorId
+        ? this.openclaw
+            .callGatewayMethod<any>("market.reputation.summary", { providerActorId: actorId })
+            .catch((e) => ({ error: e.message }))
+        : Promise.resolve(null),
+    ]);
+
+    const parts = ["🏥 **系统诊断报告**"];
+
+    // 1. 系统健康
+    if (monitorHealth.error) {
+      parts.push(`⚠️ 监控服务不可用: ${monitorHealth.error}`);
+    } else {
+      const statusIcon = monitorHealth.status === "healthy" ? "✅" : "⚠️";
+      parts.push(
+        `${statusIcon} 系统状态: ${monitorHealth.status} (Alerts: ${monitorHealth.criticalAlerts ?? 0})`,
+      );
+    }
+
+    // 2. 市场状态
+    if (marketStatus.error) {
+      parts.push(`⚠️ 市场状态不可用: ${marketStatus.error}`);
+    } else {
+      parts.push(
+        `📊 市场概览: 活跃订单 ${marketStatus.activeOrders ?? "?"}, 总成交 $${marketStatus.totalVolume ?? "?"}`,
+      );
+    }
+
+    // 3. 个人信誉 (如果提供了 actorId)
+    if (reputation) {
+      if (reputation.error) {
+        parts.push(`⚠️ 信誉查询失败: ${reputation.error}`);
+      } else {
+        parts.push(
+          `⭐ 您的信誉: ${reputation.score ?? "N/A"} 分 (争议: ${reputation.disputes ?? 0})`,
+        );
+      }
+    } else {
+      parts.push("💡 提示: 提供 `actorId` 可查看个人信誉评分");
+    }
+
+    return parts.join("\n\n");
   }
 
   /**
@@ -199,12 +280,52 @@ export class MarketAssistant {
       },
     });
 
+    // P1: 定价建议
+    let suggestion = "";
+    try {
+      const marketResourcesRaw = await this.openclaw.callGatewayMethod<unknown>(
+        "market.resource.list",
+        {
+          limit: 20,
+          status: "resource_published",
+        },
+      );
+      const marketResources = this.pickArray<Record<string, unknown>>(
+        marketResourcesRaw,
+        "resources",
+      );
+      // 简单筛选同类 (Label match or Kind match if we had kind)
+      const peers = marketResources.filter((r) => {
+        const rLabel = String(r.label || "").toLowerCase();
+        return rLabel.includes(resourceKind) || rLabel.includes(resourceName.toLowerCase());
+      });
+
+      if (peers.length > 0) {
+        let total = 0;
+        let count = 0;
+        for (const p of peers) {
+          const pPrice = this.toNumber((p.price as any)?.amount);
+          if (pPrice > 0) {
+            total += pPrice;
+            count++;
+          }
+        }
+        if (count > 0) {
+          suggestion = this.generatePricingSuggestion(price, total / count);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     return `✅ 已发布 ${resourceName} 服务
 
 🆔 Resource: ${result?.resourceId ?? "unknown"}
 📦 Offer: ${result?.offerId ?? "unknown"}
 💰 标价：${price} USDT/${unit}
-📌 状态：${result?.status ?? "resource_published"}`;
+📌 状态：${result?.status ?? "resource_published"}
+
+${suggestion}`;
   }
 
   /**
@@ -338,6 +459,14 @@ export class MarketAssistant {
     };
     const timeText = timeRangeMap[timeRange as string] || "今天";
 
+    // P1: 增加对趋势的建议
+    let advice = "";
+    if (trend < -20) {
+      advice = "\n💡 收入下降显著，建议检查服务可用性或适当降价促销";
+    } else if (trend > 20) {
+      advice = "\n💡 收入增长强劲，可考虑增加资源供给";
+    }
+
     return `💰 ${timeText}收入：$${total.toFixed(2)}
 
 📊 详细：
@@ -345,7 +474,7 @@ export class MarketAssistant {
 • 待结算：$${pending.toFixed(2)}
 • 订单数：${orderCount} 个
 
-📈 趋势：${trend > 0 ? "↑" : "↓"} ${Math.abs(trend).toFixed(1)}%`;
+📈 趋势：${trend > 0 ? "↑" : "↓"} ${Math.abs(trend).toFixed(1)}%${advice}`;
   }
 
   /**
@@ -536,15 +665,25 @@ export class MarketAssistant {
     return {};
   }
 
+  /**
+   * 生成定价建议（L1 确定性反射层 — 简单阈值比较）
+   *
+   * ⚠️ 架构过渡注释：定价建议属于 Policy 层逻辑。按 "Extension = Mechanism, AI = Policy"
+   * 原则，Extension 只应返回市场均价等结构化数据，"该不该降价"的判断应由 AI Agent 做。
+   *
+   * 升级路径（L2）：Extension 提供 market.stats.price API 返回原始数据，
+   * LLM 基于 context（竞争力、独家资源、供需比）自行判断定价策略。
+   */
   private generatePricingSuggestion(myPrice: number, marketAvg: number): string {
+    if (marketAvg <= 0) return "";
     const diff = ((myPrice - marketAvg) / marketAvg) * 100;
 
     if (diff > 20) {
-      return "💡 建议：您的定价比市场均价高 20%+，可能影响成交率";
+      return `💡 建议：您的定价 ($${myPrice}) 比市场均价 ($${marketAvg.toFixed(2)}) 高 ${diff.toFixed(0)}%，可能影响成交率`;
     } else if (diff < -20) {
-      return "💡 建议：您的定价比市场均价低 20%+，考虑提高价格增加收入";
+      return `💡 建议：您的定价 ($${myPrice}) 比市场均价 ($${marketAvg.toFixed(2)}) 低 ${Math.abs(diff).toFixed(0)}%，考虑提高价格增加收入`;
     } else {
-      return "💡 定价合理，与市场均价接近";
+      return `💡 定价合理，与市场均价 ($${marketAvg.toFixed(2)}) 接近`;
     }
   }
 

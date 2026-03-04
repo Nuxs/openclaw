@@ -13,8 +13,12 @@ async function loadCallGateway(): Promise<CallGatewayFn> {
     if (typeof mod.callGateway === "function") {
       return mod.callGateway as CallGatewayFn;
     }
-  } catch {
+  } catch (err) {
     // ignore source import failure and fallback to dist
+    // we only warn if both fail, but debug log here could be useful
+    if (process.env.DEBUG_MARKET) {
+      console.warn("market-assistant: source import failed, trying dist...", err);
+    }
   }
 
   // @ts-expect-error dist fallback only exists after build
