@@ -1,5 +1,7 @@
 import type { PluginCommandHandler } from "openclaw/plugin-sdk";
+import { ErrorCode } from "../errors/codes.js";
 import { MarketAssistant, type MarketAssistantRuntime } from "../market-assistant.js";
+import { formatGatewayError } from "./handlers/_shared.js";
 
 type CallGatewayFn = (opts: {
   method: string;
@@ -89,8 +91,7 @@ export function createMarketAssistantCommand(): PluginCommandHandler {
       const text = await assistant.handleUserMessage(message);
       return { text };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      const code = message.startsWith("E_") ? message.split(":")[0] : "E_INTERNAL";
+      const code = formatGatewayError(err, ErrorCode.E_INTERNAL);
       return { text: `❌ 市场助手执行失败（${code}）` };
     }
   };
