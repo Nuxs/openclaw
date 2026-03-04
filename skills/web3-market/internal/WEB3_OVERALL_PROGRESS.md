@@ -1,6 +1,6 @@
 # OpenClaw Web3 Market：整体进度口径（可验证）
 
-> **状态**：Draft（随实现推进更新）  
+> **状态**：Conditional Go（Public Beta）/ GA 门禁未闭合  
 > **更新日期**：2026-03-03  
 > **适用范围**：Web3 Market（资源/能力市场 + AI 管家编排）
 
@@ -13,6 +13,8 @@
 - **对外单入口**：用户/看板/Agent 只依赖 `web3.*`；`market.*` 作为内部权威状态面。
 - **默认可分享输出**：任何可外发面（文档示例/日志/状态输出/工具返回）默认脱敏，不包含明文 token、Provider endpoint、真实路径。
 - **以代码为准**：本页只写"已能在代码里验证"的能力；规划内容必须标注为"计划"。
+- **上线口径**：当前仅支持 `Conditional Go (Public Beta)`，**安全修复前置条件已全部清零**（settlement TOCTOU per-orderId 互斥锁 + 乐观重校验、escrow-ton 结构化 TonError + 指数退避重试 + 超时 + 幂等 queryId、autopay maxRetries 硬上限——3 个原始阻断项全部已修复）；GA 需以 `WEB3_DEV_PLAN_PAYFI.md` 未闭合门禁清零为准。
+- **核实依据**：`WEB3_LAUNCH_READINESS_EVALUATION_2026_03_03.md`（v2.2 安全修复完成版）与 `WEB3_LAUNCH_READINESS_EVIDENCE_MATRIX_2026_03_03.md`（v2.2）。
 
 ---
 
@@ -68,6 +70,12 @@
 ### 2.9 UI 类型对齐（2026-03-02 完成）
 
 - **UI Overlay 同步**：`ui/src/ui/types-web3.ts` 已补齐 `PaymentIntent`/`PaymentReceipt`/`FXQuote`/`PayoutPreference`/`ReconciliationSummary`，消除前后端契约 GAP。
+
+### 2.10 Settlement 最优方案执行（2026-03-03 v2.3）
+
+- **P0 已执行**：TON 确认等待 + 真实超时、Settlement 强 CAS（`status+releasedAmount+revision`）、错误码归一。
+- **P1 基础设施已落地**：`settlement_operations`（SQLite/File）+ `market-settlement-poller`。
+- **P2 入口已接入**：lock/release/refund 的 `idempotencyKey`。
 
 ---
 
