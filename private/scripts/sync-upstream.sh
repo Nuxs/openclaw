@@ -303,14 +303,23 @@ if $VERIFY_ARCH; then
   echo "🧪 合流后架构复检..."
   if [[ -f "private/upstream-pin.json" && -f "private/scripts/verify-sync-architecture.sh" ]]; then
     ARCH_REPORT_FILE="$(mktemp)"
-    VERIFY_STRICT_ARGS=()
-    $VERIFY_STRICT && VERIFY_STRICT_ARGS=("--strict")
-    if ! bash private/scripts/verify-sync-architecture.sh \
+    if $VERIFY_STRICT; then
+      if ! bash private/scripts/verify-sync-architecture.sh \
+        --phase postsync \
+        --baseline "$BASELINE_PATH" \
+        --pin-json "private/upstream-pin.json" \
+        --report-json "$ARCH_REPORT_FILE" \
+        --strict; then
+        echo ""
+        echo "❌ 合流后架构复检未通过。"
+        echo "   合流已完成，但架构健康性失败；请按报告建议进行 overlay 收敛。"
+        exit 2
+      fi
+    elif ! bash private/scripts/verify-sync-architecture.sh \
       --phase postsync \
       --baseline "$BASELINE_PATH" \
       --pin-json "private/upstream-pin.json" \
-      --report-json "$ARCH_REPORT_FILE" \
-      "${VERIFY_STRICT_ARGS[@]}"; then
+      --report-json "$ARCH_REPORT_FILE"; then
       echo ""
       echo "❌ 合流后架构复检未通过。"
       echo "   合流已完成，但架构健康性失败；请按报告建议进行 overlay 收敛。"
