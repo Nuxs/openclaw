@@ -43,5 +43,8 @@ jobs:
       - name: Validate upstream pin files
         run: node --import tsx private/scripts/write-upstream-pin.ts --check
 
+      - name: Verify sync architecture (strict)
+        run: bash private/scripts/verify-sync-architecture.sh --pin-json private/upstream-pin.json --phase ci --strict --report-json private/sync-guardrails/latest-ci-report.json
+
       - name: Run base checks
         run: pnpm check

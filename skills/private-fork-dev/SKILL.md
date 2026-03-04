@@ -26,8 +26,21 @@ description: 维护 OpenClaw 私有化 fork（overlay-first），降低与 upstr
 
 - `bash private/scripts/predict-conflicts.sh`
 - 如只关心预测结果、避免 fetch 日志噪音：`bash private/scripts/predict-conflicts.sh --no-fetch`
+- 需要机器可读输入后续验证：`bash private/scripts/predict-conflicts.sh --json > /tmp/predict.json`
 
 输出会按“品牌相关/非品牌”分组。优先把“品牌相关”继续迁移到运行时（减少改源码）。
+
+### 1.5) 架构健康验证（新增）
+
+- 预检（本地）：
+  - `bash private/scripts/verify-sync-architecture.sh --conflicts-json /tmp/predict.json --phase preflight`
+- 严格校验（CI/门禁）：
+  - `bash private/scripts/verify-sync-architecture.sh --pin-json private/upstream-pin.json --phase ci --strict`
+
+判定语义：
+
+- PASS：冲突面仍在基线阈值内（可继续同步）。
+- FAIL：出现冲突扩散或热点非品牌冲突，优先做 overlay 收敛再继续。
 
 预测准确性说明：
 

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "name": "openclaw-private-fork-sync-guardrails",
+  "description": "Overlay-first 合流架构验证基线：冲突应主要留在品牌层与少量注册/import 位置，避免扩散到核心热点实现。",
+  "thresholds": {
+    "maxTotalPredictedConflicts": 25,
+    "maxOtherPredictedConflicts": 8,
+    "maxHotspotConflicts": 2,
+    "maxHotspotOtherConflicts": 0
+  },
+  "hotspots": {
+    "exact": [
+      "ui/src/ui/tab-registry.ts",
+      "ui/src/ui/app.ts",
+      "ui/src/ui/app-view-state.ts",
+      "extensions/web3-core/src/index.ts",
+      "extensions/market-core/src/market/handlers/index.ts"
+    ],
+    "prefixes": ["src/gateway/", "src/commands/", "ui/src/ui/"]
+  },
+  "allowlist": {
+    "otherConflictExact": [
+      "pnpm-lock.yaml",
+      ".github/labeler.yml",
+      ".github/workflows/labeler.yml"
+    ],
+    "otherConflictPrefixes": ["docs/", "docs/zh-CN/"]
+  },
+  "industryMappings": [
+    {
+      "pattern": "overlay-first",
+      "reference": "Brave/Chromium patch-overlay"
+    },
+    {
+      "pattern": "brand-runtime-separation",
+      "reference": "VSCodium 产品层分离"
+    },
+    {
+      "pattern": "extension-point-first",
+      "reference": "Grafana plugin extension points"
+    }
+  ]
+}
