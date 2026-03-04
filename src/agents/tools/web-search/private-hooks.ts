@@ -5,6 +5,12 @@ import { runSearxngSearch, serializeSearxngRerankConfig, serializeSiteWeights } 
 
 export type PrivateWebSearchProviderId = "searxng";
 
+export function isPrivateWebSearchProvider(
+  provider: unknown,
+): provider is PrivateWebSearchProviderId {
+  return provider === "searxng";
+}
+
 type SearxngConfig = {
   baseUrl?: string;
   apiKey?: string;
