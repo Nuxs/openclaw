@@ -1,0 +1,33 @@
+{
+  "status": "pass",
+  "meta": {
+    "phase": "ci",
+    "sourceType": "pin",
+    "sourcePath": "private/upstream-pin.json",
+    "baselinePath": "private/sync-guardrails/baseline.json",
+    "generatedAt": "2026-03-04T08:40:56.947Z",
+    "industryMappings": [
+      { "pattern": "overlay-first", "reference": "Brave/Chromium patch-overlay" },
+      { "pattern": "brand-runtime-separation", "reference": "VSCodium 产品层分离" },
+      { "pattern": "extension-point-first", "reference": "Grafana plugin extension points" }
+    ]
+  },
+  "summary": {
+    "total": 2,
+    "brand": 0,
+    "otherRaw": 2,
+    "otherEffective": 2,
+    "hotspotsTotal": 0,
+    "hotspotsOtherEffective": 0
+  },
+  "violations": [],
+  "recommendations": ["合流架构健康：冲突面保持在可控范围，可继续按既定节奏同步。"],
+  "files": {
+    "all": ["CHANGELOG.md", "src/plugin-sdk/index.ts"],
+    "brand": [],
+    "otherRaw": ["CHANGELOG.md", "src/plugin-sdk/index.ts"],
+    "otherEffective": ["CHANGELOG.md", "src/plugin-sdk/index.ts"],
+    "hotspots": [],
+    "hotspotOtherEffective": []
+  }
+}
