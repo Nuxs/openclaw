@@ -39,7 +39,17 @@ def _source_registry() -> dict[str, dict[str, Any]]:
         "sentiment": {"tier": 2, "sources": ["Alternative.me", "Binance Futures"]},
         "behavioral": {"tier": 2, "sources": ["Binance Spot API"]},
         "defi": {"tier": 2, "sources": ["DefiLlama", "GitHub"]},
-        "payments": {"tier": 2, "sources": ["DefiLlama Stablecoins", "CoinGecko Stablecoin Prices", "Circle Transparency"]},
+        "payments": {
+            "tier": 2,
+            "sources": [
+                "DefiLlama Stablecoins",
+                "CoinGecko Stablecoin Prices",
+                "Circle Transparency",
+                "Circle CCTP Docs",
+                "Circle Gateway Docs",
+                "Circle USDC Contract Addresses",
+            ],
+        },
     }
 
 
@@ -84,6 +94,7 @@ def _collect_counterarguments(dimensions: list[dict], composite: dict) -> list[s
                 "redeemability_state",
                 "reserve_state",
                 "issuance_state",
+                "adoption_state",
                 "chain_mix_state",
                 "price_vs_ma",
                 "weekly_structure",

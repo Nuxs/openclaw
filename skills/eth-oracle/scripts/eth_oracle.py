@@ -50,7 +50,16 @@ def main() -> None:
     )
     parser.add_argument("--score-only", action="store_true", help="Output only composite score (integer)")
     parser.add_argument("--json", action="store_true", help="Output full result as JSON")
+    parser.add_argument(
+        "--deliverable",
+        type=str,
+        choices=["research_report", "investment_memo", "board_brief", "principal_ready"],
+        help="Render a fixed-format deliverable from the full snapshot",
+    )
     args = parser.parse_args()
+
+    if args.dimension and args.deliverable:
+        parser.error("--deliverable requires full analysis, not --dimension")
 
     if not args.full and not args.dimension:
         args.full = True
@@ -81,6 +90,8 @@ def main() -> None:
 
     if args.score_only:
         print(snapshot["composite"]["composite_score"])
+    elif args.deliverable:
+        print(snapshot.get("deliverables", {}).get(args.deliverable, ""))
     elif args.json:
         print(json.dumps(snapshot, indent=2, default=str))
     else:

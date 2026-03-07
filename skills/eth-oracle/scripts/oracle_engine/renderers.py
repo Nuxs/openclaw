@@ -38,8 +38,11 @@ def _pick_key_factor(dimension: dict) -> str:
 
     if name == "payments":
         redeemability = details.get("redeemability_state", "orderly")
-        net_issued = details.get("net_issued_30d_usd_bn", "N/A")
+        adoption = details.get("adoption_state")
         top_chain = details.get("usdc_top_chain", "N/A")
+        if adoption and adoption != "Circle adoption unavailable":
+            return f"{redeemability}; {adoption}; top chain: {top_chain}"
+        net_issued = details.get("net_issued_30d_usd_bn", "N/A")
         return f"{redeemability}; net 30d: {net_issued}B; top chain: {top_chain}"
 
     return str(list(details.values())[:1])
@@ -191,9 +194,72 @@ def render_board_brief(snapshot: dict[str, Any]) -> str:
 
 
 
+def render_principal_ready(snapshot: dict[str, Any]) -> str:
+    dimensions = snapshot.get("dimensions", [])
+    composite = snapshot.get("composite", {})
+    governance = snapshot.get("portfolio_governance", {})
+    confidence = snapshot.get("confidence", {})
+    evidence = snapshot.get("evidence", {})
+    dimensions_by_name = {
+        dimension.get("dimension"): dimension for dimension in dimensions if dimension.get("dimension")
+    }
+    payments = dimensions_by_name.get("payments", {"score": 0, "details": {}})
+    payment_details = payments.get("details", {})
+    strongest_positive = sorted(dimensions, key=lambda item: item.get("score", 0), reverse=True)[:2]
+    strongest_negative = sorted(dimensions, key=lambda item: item.get("score", 0))[:2]
+    position_size_pct = governance.get("position_size_pct", composite.get("position_size_pct", 0))
+    execution_mode = "monitor-only" if float(position_size_pct or 0) <= 0 else "sized-risk"
+    tier_1_sources = ", ".join(evidence.get("tier_summary", {}).get("tier_1", {}).get("sources", [])) or "N/A"
+    tier_2_sources = ", ".join(evidence.get("tier_summary", {}).get("tier_2", {}).get("sources", [])) or "N/A"
+    adoption_key_chains = ", ".join(payment_details.get("adoption_key_chains", [])) or "N/A"
+    lines = [
+        "PRINCIPAL READY — DECISION PACKET",
+        f"Timestamp: {composite.get('timestamp', snapshot.get('timestamp', 'current snapshot'))}",
+        "",
+        "[Decision]",
+        f"Signal: {composite.get('signal', 'UNKNOWN')}",
+        f"Action: {composite.get('action', 'Hold')}",
+        f"Stance: {governance.get('stance', 'neutral')}",
+        f"Recommended size: {position_size_pct}% of portfolio",
+        f"Confidence: {confidence.get('level', 'low')} — {confidence.get('summary', '')}",
+        f"Review cadence: {governance.get('review_cadence', '72h')}",
+        "",
+        "[Transmission Map]",
+        *[f"Positive driver: {dimension['dimension']} {dimension['score']:+d} — {_pick_key_factor(dimension)}" for dimension in strongest_positive],
+        *[f"Drag: {dimension['dimension']} {dimension['score']:+d} — {_pick_key_factor(dimension)}" for dimension in strongest_negative],
+        "",
+        "[Circle / USDC / Payments]",
+        f"Payments score: {payments.get('score', 0):+d}",
+        f"Redeemability: {payment_details.get('redeemability_state', 'N/A')}",
+        f"Reserve: {payment_details.get('reserve_state', 'N/A')}",
+        f"Issuance: {payment_details.get('issuance_state', 'N/A')}",
+        f"Adoption: {payment_details.get('adoption_state', 'N/A')}",
+        f"Chain mix: {payment_details.get('chain_mix_state', 'N/A')}",
+        f"Native USDC mainnets: {payment_details.get('native_usdc_chain_count', 'N/A')}",
+        f"CCTP / Gateway / Programmable coverage: {payment_details.get('cctp_native_coverage_pct', 'N/A')}% / {payment_details.get('gateway_native_coverage_pct', 'N/A')}% / {payment_details.get('programmable_native_coverage_pct', 'N/A')}%",
+        f"Adoption key chains: {adoption_key_chains}",
+        "",
+        "[Risk Controls]",
+        *[f"Risk trigger: {item}" for item in governance.get('risk_triggers', [])[:3]],
+        *[f"Invalidation: {item}" for item in governance.get('invalidation_conditions', [])[:3]],
+        "",
+        "[Data Quality]",
+        f"Tier 1 sources: {tier_1_sources}",
+        f"Tier 2 sources: {tier_2_sources}",
+        *[f"Unknown: {item}" for item in confidence.get('unknowns', [])[:2]],
+        "",
+        "[AI Butler Handoff]",
+        f"Execution mode: {execution_mode}",
+        f"Escalate on: {(governance.get('risk_triggers') or confidence.get('unknowns') or ['next scheduled review'])[0]}",
+    ]
+    return "\n".join(lines)
+
+
+
 def build_deliverables(snapshot: dict[str, Any]) -> dict[str, str]:
     return {
         "research_report": render_research_report(snapshot),
         "investment_memo": render_investment_memo(snapshot),
         "board_brief": render_board_brief(snapshot),
+        "principal_ready": render_principal_ready(snapshot),
     }

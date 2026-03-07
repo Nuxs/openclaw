@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 
 from ..config import WEIGHTS
 from ..http import fetch_json
+from .payments_circle_adoption import CircleAdoptionSnapshot, fetch_circle_adoption_snapshot, score_circle_adoption
 
 ETH_ALIGNED_PAYMENT_CHAINS = (
     "Ethereum",
@@ -305,12 +306,15 @@ def _describe_payment_rail_state(
     reserve_state: str,
     issuance_state: str,
     chain_mix_state: str,
+    adoption_state: str,
 ) -> str:
     if redeemability_state in {"Redeemability stress", "Redeemability under pressure"}:
         return "Circle / USDC rails under stress"
     if reserve_state == "Reserve transparency stale":
         return "Circle / USDC rails need reserve verification"
-    if issuance_state in {"Net issuance accelerating", "Net issuance positive"} and "aligned" in chain_mix_state:
+    if issuance_state in {"Net issuance accelerating", "Net issuance positive"} and (
+        "aligned" in chain_mix_state or adoption_state in {"Circle adoption rails broad and programmable", "Circle adoption rails broadening"}
+    ):
         return "Circle / USDC rails strengthening"
     if issuance_state == "Net redemptions material" or "drifting" in chain_mix_state or "vulnerable" in chain_mix_state:
         return "Circle / USDC rails weakening"
@@ -503,6 +507,7 @@ def _score_payments_from_components(
     usdt_price_usd: float | None = None,
     dai_price_usd: float | None = None,
     transparency: CircleTransparencySnapshot | None = None,
+    adoption_snapshot: CircleAdoptionSnapshot | None = None,
     historical_proxy: bool = False,
 ) -> dict:
     details: dict[str, Any] = {"historical_proxy": historical_proxy}
@@ -601,6 +606,21 @@ def _score_payments_from_components(
     if chain_mix_score is not None:
         factor_scores["chain_mix"] = chain_mix_score
         signals.append(chain_mix_score)
+
+    details["adoption_state"] = "Circle adoption unavailable"
+    adoption_score, adoption_metrics = score_circle_adoption(
+        snapshot=adoption_snapshot,
+        eth_aligned_payment_chains=ETH_ALIGNED_PAYMENT_CHAINS,
+    )
+    if adoption_metrics:
+        details.update({key: value for key, value in adoption_metrics.items() if value is not None})
+    if adoption_score is not None:
+        factor_scores["adoption"] = adoption_score
+        signals.append(adoption_score)
+    elif historical_proxy:
+        _append_note(details, "Historical proxy cannot reconstruct Circle CCTP, Gateway, or native USDC coverage history")
+    else:
+        _append_note(details, "Circle developer docs unavailable; adoption factor omitted")
 
     net_issued_30d_pct_of_circulation = None
     issued_redeemed_ratio_30d = None
@@ -703,6 +723,7 @@ def _score_payments_from_components(
         reserve_state=reserve_state,
         issuance_state=issuance_state,
         chain_mix_state=details["chain_mix_state"],
+        adoption_state=str(details.get("adoption_state") or "Circle adoption unavailable"),
     )
     details["factor_scores"] = factor_scores
 
@@ -797,4 +818,5 @@ def score_payments() -> dict:
         usdt_price_usd=float(usdt_price) if usdt_price is not None else None,
         dai_price_usd=float(dai_price) if dai_price is not None else None,
         transparency=fetch_circle_transparency_snapshot(),
+        adoption_snapshot=fetch_circle_adoption_snapshot(),
     )
