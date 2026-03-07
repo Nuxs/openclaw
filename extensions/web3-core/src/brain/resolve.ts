@@ -1,4 +1,4 @@
-import type { PluginHookBeforeModelResolveResult } from "openclaw/plugin-sdk/compat";
+import type { PluginHookBeforeModelResolveResult } from "openclaw/plugin-sdk/plugin-hooks";
 import type { Web3PluginConfig } from "../config.js";
 import { getConsumerLeaseAccess } from "../resources/leases.js";
 

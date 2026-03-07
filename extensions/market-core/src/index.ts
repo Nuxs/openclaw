@@ -10,7 +10,7 @@
  * - Sensitive data must never leak (tokens, endpoints, real file paths)
  */
 
-import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk/compat";
+import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk/plugin-definition";
 import { resolveConfig, type MarketPluginConfig } from "./config.js";
 import { createMarketFacade } from "./facade.js";
 import { createMarketAssistantCommand } from "./market/assistant-command.js";

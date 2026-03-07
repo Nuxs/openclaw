@@ -2,7 +2,7 @@
  * Plugin commands: /bind_wallet, /unbind_wallet, /whoami_web3
  */
 
-import type { PluginCommandHandler } from "openclaw/plugin-sdk/compat";
+import type { PluginCommandHandler } from "openclaw/plugin-sdk/plugin-command";
 import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";
 

@@ -181,6 +181,34 @@ const pluginSdkScopedAliasEntries = [
     srcFile: "file-lock.ts",
     distFile: "file-lock.js",
   },
+  {
+    subpath: "gateway-types",
+    srcFile: "gateway-types.ts",
+    distFile: "gateway-types.js",
+  },
+  {
+    subpath: "plugin-definition",
+    srcFile: "plugin-definition.ts",
+    distFile: "plugin-definition.js",
+  },
+  {
+    subpath: "plugin-command",
+    srcFile: "plugin-command.ts",
+    distFile: "plugin-command.js",
+  },
+  {
+    subpath: "plugin-hooks",
+    srcFile: "plugin-hooks.ts",
+    distFile: "plugin-hooks.js",
+  },
+  { subpath: "ssrf", srcFile: "ssrf.ts", distFile: "ssrf.js" },
+  { subpath: "http-body", srcFile: "http-body.ts", distFile: "http-body.js" },
+  { subpath: "http-route", srcFile: "http-route.ts", distFile: "http-route.js" },
+  {
+    subpath: "config-types",
+    srcFile: "config-types.ts",
+    distFile: "config-types.js",
+  },
 ] as const;
 
 const resolvePluginSdkScopedAliasMap = (): Record<string, string> => {

@@ -8,7 +8,7 @@
 
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readJsonBodyWithLimit, requestBodyErrorToText } from "openclaw/plugin-sdk/compat";
+import { readJsonBodyWithLimit, requestBodyErrorToText } from "openclaw/plugin-sdk/http-body";
 import { recordExternalAuditEvent } from "../audit/hooks.js";
 import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";

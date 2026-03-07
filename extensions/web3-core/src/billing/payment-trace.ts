@@ -1,7 +1,7 @@
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/gateway-types";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import type { Web3StateStore } from "../state/store.js";
 

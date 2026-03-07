@@ -53,6 +53,14 @@ const pluginSdkSubpaths = [
   "zalouser",
   "keyed-async-queue",
   "file-lock",
+  "gateway-types",
+  "plugin-definition",
+  "plugin-command",
+  "plugin-hooks",
+  "ssrf",
+  "http-body",
+  "http-route",
+  "config-types",
 ] as const;
 
 const workspacePackageAliases = [

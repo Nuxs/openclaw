@@ -1,4 +1,4 @@
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/compat";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf";
 import type { DecentralizedStorageAdapter, GetResult, PutResult } from "./types.js";
 
 const DEFAULT_FILECOIN_ENDPOINT = "https://api.web3.storage/upload";

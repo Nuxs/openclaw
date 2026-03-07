@@ -13,7 +13,7 @@ import type {
   PluginHookAgentContext,
   PluginHookToolContext,
   PluginHookSessionContext,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/plugin-hooks";
 import { EvmChainAdapter } from "../chain/evm/adapter.js";
 import type { Web3PluginConfig } from "../config.js";
 import type { PendingArchive, PendingAnchor, Web3StateStore } from "../state/store.js";

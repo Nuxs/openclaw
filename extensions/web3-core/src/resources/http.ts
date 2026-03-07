@@ -6,11 +6,11 @@ import { resolve, relative, join, sep, dirname } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
-  fetchWithSsrFGuard,
   isRequestBodyLimitError,
   readRequestBodyWithLimit,
   requestBodyErrorToText,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/http-body";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf";
 import type { Web3PluginConfig } from "../config.js";
 import { validateLeaseAccess } from "./leases.js";
 

@@ -7,11 +7,11 @@
  * - Caching to avoid excessive RPC calls
  */
 
-import {
-  fetchWithSsrFGuard,
-  type GatewayRequestHandler,
-  type GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk/compat";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk/gateway-types";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf";
 import { getAddress, isAddress, keccak256 } from "viem";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";

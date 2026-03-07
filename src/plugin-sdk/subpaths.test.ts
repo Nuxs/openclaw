@@ -9,6 +9,14 @@ import * as slackSdk from "openclaw/plugin-sdk/slack";
 import * as whatsappSdk from "openclaw/plugin-sdk/whatsapp";
 import { describe, expect, it } from "vitest";
 
+const utilitySubpathLoaders = [
+  { id: "config-types", load: () => import("openclaw/plugin-sdk/config-types") },
+  { id: "gateway-types", load: () => import("openclaw/plugin-sdk/gateway-types") },
+  { id: "plugin-command", load: () => import("openclaw/plugin-sdk/plugin-command") },
+  { id: "plugin-definition", load: () => import("openclaw/plugin-sdk/plugin-definition") },
+  { id: "plugin-hooks", load: () => import("openclaw/plugin-sdk/plugin-hooks") },
+] as const;
+
 const bundledExtensionSubpathLoaders = [
   { id: "acpx", load: () => import("openclaw/plugin-sdk/acpx") },
   { id: "bluebubbles", load: () => import("openclaw/plugin-sdk/bluebubbles") },
@@ -93,6 +101,14 @@ describe("plugin-sdk subpath exports", () => {
   it("exports Microsoft Teams helpers", () => {
     expect(typeof msteamsSdk.resolveControlCommandGate).toBe("function");
     expect(typeof msteamsSdk.loadOutboundMediaFromUrl).toBe("function");
+  });
+
+  it("resolves utility subpaths", async () => {
+    for (const { id, load } of utilitySubpathLoaders) {
+      const mod = await load();
+      expect(typeof mod).toBe("object");
+      expect(mod, `subpath ${id} should resolve`).toBeTruthy();
+    }
   });
 
   it("resolves bundled extension subpaths", async () => {

@@ -50,6 +50,14 @@ const pluginSdkEntrypoints = [
   "account-id",
   "keyed-async-queue",
   "file-lock",
+  "gateway-types",
+  "plugin-definition",
+  "plugin-command",
+  "plugin-hooks",
+  "ssrf",
+  "http-body",
+  "http-route",
+  "config-types",
 ] as const;
 
 export default defineConfig([

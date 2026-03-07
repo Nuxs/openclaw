@@ -216,6 +216,38 @@
       "types": "./dist/plugin-sdk/file-lock.d.ts",
       "default": "./dist/plugin-sdk/file-lock.js"
     },
+    "./plugin-sdk/gateway-types": {
+      "types": "./dist/plugin-sdk/gateway-types.d.ts",
+      "default": "./dist/plugin-sdk/gateway-types.js"
+    },
+    "./plugin-sdk/plugin-definition": {
+      "types": "./dist/plugin-sdk/plugin-definition.d.ts",
+      "default": "./dist/plugin-sdk/plugin-definition.js"
+    },
+    "./plugin-sdk/plugin-command": {
+      "types": "./dist/plugin-sdk/plugin-command.d.ts",
+      "default": "./dist/plugin-sdk/plugin-command.js"
+    },
+    "./plugin-sdk/plugin-hooks": {
+      "types": "./dist/plugin-sdk/plugin-hooks.d.ts",
+      "default": "./dist/plugin-sdk/plugin-hooks.js"
+    },
+    "./plugin-sdk/ssrf": {
+      "types": "./dist/plugin-sdk/ssrf.d.ts",
+      "default": "./dist/plugin-sdk/ssrf.js"
+    },
+    "./plugin-sdk/http-body": {
+      "types": "./dist/plugin-sdk/http-body.d.ts",
+      "default": "./dist/plugin-sdk/http-body.js"
+    },
+    "./plugin-sdk/http-route": {
+      "types": "./dist/plugin-sdk/http-route.d.ts",
+      "default": "./dist/plugin-sdk/http-route.js"
+    },
+    "./plugin-sdk/config-types": {
+      "types": "./dist/plugin-sdk/config-types.d.ts",
+      "default": "./dist/plugin-sdk/config-types.js"
+    },
     "./cli-entry": "./openclaw.mjs"
   },
   "scripts": {

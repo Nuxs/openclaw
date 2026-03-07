@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import Arweave from "arweave";
 import type { JWKInterface } from "arweave/node/lib/wallet.js";
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/compat";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf";
 import type { DecentralizedStorageAdapter, GetResult, PutResult } from "./types.js";
 
 export class ArweaveStorageAdapter implements DecentralizedStorageAdapter {

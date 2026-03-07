@@ -8,7 +8,7 @@
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/gateway-types";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.js";

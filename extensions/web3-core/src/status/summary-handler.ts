@@ -5,7 +5,7 @@
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/gateway-types";
 import type { Web3PluginConfig } from "../config.js";
 import { AlertLevel, AlertStatus } from "../monitor/types.js";
 import { Web3StateStore } from "../state/store.js";

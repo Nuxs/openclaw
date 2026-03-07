@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/gateway-types";
 import { SiweMessage } from "siwe";
 import { getAddress } from "viem";
 import type { Web3PluginConfig } from "../config.js";

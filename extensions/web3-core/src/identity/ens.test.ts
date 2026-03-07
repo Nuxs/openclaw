@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchWithSsrFGuardMock = vi.fn();
 
-vi.mock("openclaw/plugin-sdk/compat", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/compat")>(
-    "openclaw/plugin-sdk/compat",
+vi.mock("openclaw/plugin-sdk/ssrf", async () => {
+  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/ssrf")>(
+    "openclaw/plugin-sdk/ssrf",
   );
   return {
     ...actual,

@@ -52,6 +52,14 @@ const entrypoints = [
   "account-id",
   "keyed-async-queue",
   "file-lock",
+  "gateway-types",
+  "plugin-definition",
+  "plugin-command",
+  "plugin-hooks",
+  "ssrf",
+  "http-body",
+  "http-route",
+  "config-types",
 ] as const;
 for (const entry of entrypoints) {
   const out = path.join(process.cwd(), `dist/plugin-sdk/${entry}.d.ts`);

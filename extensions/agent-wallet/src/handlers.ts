@@ -7,7 +7,7 @@ import {
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/gateway-types";
 import { getAddress } from "viem";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";

@@ -14,7 +14,7 @@
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/gateway-types";
 import type { MarketPluginConfig } from "./config.js";
 import { formatGatewayErrorResponse } from "./market/handlers/_shared.js";
 import type { MarketStateStore } from "./state/store.js";

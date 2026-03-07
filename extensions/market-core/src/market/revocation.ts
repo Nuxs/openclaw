@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/compat";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf";
 import type { MarketPluginConfig } from "../config.js";
 import { hashCanonical } from "./hash.js";
 import type { Consent, Delivery, Offer, Order } from "./types.js";

@@ -1,8 +1,8 @@
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-types";
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
-  OpenClawConfig,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/gateway-types";
 import type { SessionEntry } from "../../../../src/config/sessions/types.ts";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
