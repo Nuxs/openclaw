@@ -12,7 +12,10 @@ import {
   type IProvider,
   type IProviderTON,
 } from "@openclaw/blockchain-adapter";
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk/compat";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
 import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";

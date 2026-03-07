@@ -1,5 +1,6 @@
 import * as compatSdk from "openclaw/plugin-sdk/compat";
 import * as discordSdk from "openclaw/plugin-sdk/discord";
+import * as fileLockSdk from "openclaw/plugin-sdk/file-lock";
 import * as imessageSdk from "openclaw/plugin-sdk/imessage";
 import * as lineSdk from "openclaw/plugin-sdk/line";
 import * as msteamsSdk from "openclaw/plugin-sdk/msteams";
@@ -52,6 +53,11 @@ describe("plugin-sdk subpath exports", () => {
   it("exports compat helpers", () => {
     expect(typeof compatSdk.emptyPluginConfigSchema).toBe("function");
     expect(typeof compatSdk.resolveControlCommandGate).toBe("function");
+  });
+
+  it("exports file lock helpers", () => {
+    expect(typeof fileLockSdk.withFileLock).toBe("function");
+    expect(typeof fileLockSdk.acquireFileLock).toBe("function");
   });
 
   it("exports Discord helpers", () => {

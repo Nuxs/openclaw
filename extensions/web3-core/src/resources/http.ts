@@ -10,7 +10,7 @@ import {
   isRequestBodyLimitError,
   readRequestBodyWithLimit,
   requestBodyErrorToText,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import { validateLeaseAccess } from "./leases.js";
 

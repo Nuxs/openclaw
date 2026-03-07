@@ -176,6 +176,11 @@ const pluginSdkScopedAliasEntries = [
     srcFile: "keyed-async-queue.ts",
     distFile: "keyed-async-queue.js",
   },
+  {
+    subpath: "file-lock",
+    srcFile: "file-lock.ts",
+    distFile: "file-lock.js",
+  },
 ] as const;
 
 const resolvePluginSdkScopedAliasMap = (): Record<string, string> => {

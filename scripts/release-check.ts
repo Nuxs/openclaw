@@ -101,6 +101,8 @@ const requiredPathGroups = [
   "dist/plugin-sdk/account-id.d.ts",
   "dist/plugin-sdk/keyed-async-queue.js",
   "dist/plugin-sdk/keyed-async-queue.d.ts",
+  "dist/plugin-sdk/file-lock.js",
+  "dist/plugin-sdk/file-lock.d.ts",
   "dist/build-info.json",
 ];
 const forbiddenPrefixes = ["dist/OpenClaw.app/"];

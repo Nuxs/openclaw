@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { withFileLock } from "openclaw/plugin-sdk";
+import { withFileLock } from "openclaw/plugin-sdk/file-lock";
 import type { WalletPolicyConfig } from "./policy.js";
 
 const DEFAULT_LOCK_OPTIONS = {

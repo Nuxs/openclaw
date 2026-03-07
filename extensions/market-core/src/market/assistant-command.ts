@@ -1,4 +1,4 @@
-import type { PluginCommandHandler } from "openclaw/plugin-sdk";
+import type { PluginCommandHandler } from "openclaw/plugin-sdk/compat";
 import { ErrorCode } from "../errors/codes.js";
 import { MarketAssistant, type MarketAssistantRuntime } from "../market-assistant.js";
 import { formatGatewayError } from "./handlers/_shared.js";

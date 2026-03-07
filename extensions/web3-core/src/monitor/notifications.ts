@@ -4,7 +4,7 @@
  * Handles alert notifications via various channels (webhook, email, etc.)
  */
 
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import type { AlertEvent } from "./types.js";
 

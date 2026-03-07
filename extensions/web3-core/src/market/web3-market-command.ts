@@ -1,5 +1,5 @@
-import type { PluginCommandHandler, PluginCommandResult } from "openclaw/plugin-sdk";
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import type { PluginCommandHandler, PluginCommandResult } from "openclaw/plugin-sdk/compat";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/compat";
 import { resolveChannelConfigWrites } from "../../../../src/channels/plugins/config-writes.js";
 import { normalizeChannelId } from "../../../../src/channels/registry.js";
 import { getConfigValueAtPath, setConfigValueAtPath } from "../../../../src/config/config-paths.js";

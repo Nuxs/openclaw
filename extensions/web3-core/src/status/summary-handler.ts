@@ -2,7 +2,10 @@
  * Web3 Status Summary handler — extracted from index.ts to keep the
  * main entry file lean.
  */
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import { AlertLevel, AlertStatus } from "../monitor/types.js";
 import { Web3StateStore } from "../state/store.js";

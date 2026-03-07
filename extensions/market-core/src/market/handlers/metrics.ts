@@ -1,4 +1,7 @@
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk/compat";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { assertAccess, formatGatewayErrorResponse } from "./_shared.js";

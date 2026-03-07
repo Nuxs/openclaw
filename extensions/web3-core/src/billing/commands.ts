@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PluginCommandHandler } from "openclaw/plugin-sdk";
+import type { PluginCommandHandler } from "openclaw/plugin-sdk/compat";
 import { hashString } from "../audit/canonicalize.js";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";

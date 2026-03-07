@@ -1,5 +1,5 @@
 import { Type } from "@sinclair/typebox";
-import type { AnyAgentTool } from "openclaw/plugin-sdk";
+import type { AnyAgentTool } from "openclaw/plugin-sdk/core";
 import type { Web3PluginConfig } from "../config.js";
 import {
   buildWeb3MarketStatusSummary,

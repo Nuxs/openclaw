@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { withFileLock } from "openclaw/plugin-sdk";
+import { withFileLock } from "openclaw/plugin-sdk/file-lock";
 import type { CredentialsConfig } from "../config.js";
 import type { DeliveryPayload, DeliveryPayloadRef } from "./types.js";
 

@@ -3,7 +3,7 @@
  * Falls back to public gateway for reads.
  */
 
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk";
+import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/compat";
 import type { DecentralizedStorageAdapter, PutResult, GetResult } from "./types.js";
 
 export class IpfsStorageAdapter implements DecentralizedStorageAdapter {

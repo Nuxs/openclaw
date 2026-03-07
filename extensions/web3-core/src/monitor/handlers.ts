@@ -4,7 +4,10 @@
  * Provides RPC handlers for alert monitoring and management.
  */
 
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayError, formatWeb3GatewayErrorResponse } from "../errors.js";
 import type { Web3StateStore } from "../state/store.js";

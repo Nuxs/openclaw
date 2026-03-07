@@ -3,7 +3,7 @@
  * Aggregates identity, billing, audit, and market status into a paste-safe summary.
  */
 
-import type { PluginCommandHandler } from "openclaw/plugin-sdk";
+import type { PluginCommandHandler } from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import { AlertLevel } from "../monitor/types.js";
 import type { Web3StateStore } from "../state/store.js";

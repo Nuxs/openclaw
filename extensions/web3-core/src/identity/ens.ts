@@ -11,7 +11,7 @@ import {
   fetchWithSsrFGuard,
   type GatewayRequestHandler,
   type GatewayRequestHandlerOptions,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/compat";
 import { getAddress, isAddress, keccak256 } from "viem";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";

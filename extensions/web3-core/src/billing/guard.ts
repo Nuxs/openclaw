@@ -9,7 +9,7 @@ import type {
   PluginHookToolContext,
   PluginHookLlmOutputEvent,
   PluginHookAgentContext,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/compat";
 import { hashString } from "../audit/canonicalize.js";
 import type { Web3PluginConfig } from "../config.js";
 import type { Web3StateStore } from "../state/store.js";

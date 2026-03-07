@@ -5,7 +5,10 @@
  * duplicating loadCallGateway / normalizeGatewayResult.
  */
 
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.js";

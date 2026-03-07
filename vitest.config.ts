@@ -52,6 +52,7 @@ const pluginSdkSubpaths = [
   "zalo",
   "zalouser",
   "keyed-async-queue",
+  "file-lock",
 ] as const;
 
 const workspacePackageAliases = [

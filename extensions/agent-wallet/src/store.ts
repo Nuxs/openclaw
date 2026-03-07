@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { withFileLock } from "openclaw/plugin-sdk";
+import { withFileLock } from "openclaw/plugin-sdk/file-lock";
 import type { AgentWalletConfig } from "./config.js";
 
 const DEFAULT_LOCK_OPTIONS = {

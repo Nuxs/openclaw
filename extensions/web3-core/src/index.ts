@@ -13,8 +13,8 @@ import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
   OpenClawPluginDefinition,
-} from "openclaw/plugin-sdk";
-import { registerPluginHttpRoute } from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/compat";
+import { registerPluginHttpRoute } from "openclaw/plugin-sdk/compat";
 import { createAuditHooks, flushPendingAnchors, flushPendingArchives } from "./audit/hooks.js";
 import { createCreditsCommand, createPayStatusCommand } from "./billing/commands.js";
 import {

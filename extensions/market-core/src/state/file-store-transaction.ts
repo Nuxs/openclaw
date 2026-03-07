@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { withFileLock } from "openclaw/plugin-sdk";
+import { withFileLock } from "openclaw/plugin-sdk/file-lock";
 
 const DEFAULT_LOCK_OPTIONS = {
   retries: {

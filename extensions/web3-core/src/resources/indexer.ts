@@ -1,5 +1,8 @@
 import { createHash, createPrivateKey, sign } from "node:crypto";
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import type { IndexedResource, P2pPeerRecord, ResourceIndexEntry } from "../state/store.js";

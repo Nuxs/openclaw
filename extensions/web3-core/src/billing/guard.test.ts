@@ -6,7 +6,7 @@ import type {
   PluginHookBeforeToolCallEvent,
   PluginHookLlmOutputEvent,
   PluginHookToolContext,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/compat";
 import { describe, expect, it } from "vitest";
 import { hashString } from "../audit/canonicalize.js";
 import { resolveConfig } from "../config.js";

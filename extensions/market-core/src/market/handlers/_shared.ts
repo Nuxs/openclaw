@@ -3,7 +3,7 @@
  * Not re-exported — consumed only by sibling handler modules.
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk/core";
 import type { MarketPluginConfig } from "../../config.js";
 import { ErrorCode, ERROR_CODE_DESCRIPTIONS, type ErrorResponse } from "../../errors/codes.js";
 import type { MarketStateStore } from "../../state/store.js";

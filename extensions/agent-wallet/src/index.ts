@@ -1,4 +1,4 @@
-import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk";
+import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk/compat";
 import { createAutopayRouterHandler } from "./autopay-router.js";
 import type { AgentWalletConfig } from "./config.js";
 import { isTONNetwork, resolveConfig } from "./config.js";

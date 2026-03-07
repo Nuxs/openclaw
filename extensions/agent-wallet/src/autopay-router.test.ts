@@ -2,7 +2,7 @@
  * Tests for the autopay dispatcher routing logic in `autopay-router.ts`.
  */
 
-import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk/core";
 import { describe, expect, it, vi } from "vitest";
 import { createAutopayRouterDispatcher } from "./autopay-router.js";
 import { resolveConfig } from "./config.js";

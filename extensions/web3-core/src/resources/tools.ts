@@ -1,5 +1,5 @@
 import { Type } from "@sinclair/typebox";
-import { fetchWithSsrFGuard, type AnyAgentTool } from "openclaw/plugin-sdk";
+import { fetchWithSsrFGuard, type AnyAgentTool } from "openclaw/plugin-sdk/compat";
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode, ERROR_CODE_DESCRIPTIONS } from "../errors/codes.js";
