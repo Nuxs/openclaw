@@ -200,6 +200,7 @@ def render_principal_ready(snapshot: dict[str, Any]) -> str:
     governance = snapshot.get("portfolio_governance", {})
     confidence = snapshot.get("confidence", {})
     evidence = snapshot.get("evidence", {})
+    decision_contract = snapshot.get("decision_contract", {})
     dimensions_by_name = {
         dimension.get("dimension"): dimension for dimension in dimensions if dimension.get("dimension")
     }
@@ -208,7 +209,7 @@ def render_principal_ready(snapshot: dict[str, Any]) -> str:
     strongest_positive = sorted(dimensions, key=lambda item: item.get("score", 0), reverse=True)[:2]
     strongest_negative = sorted(dimensions, key=lambda item: item.get("score", 0))[:2]
     position_size_pct = governance.get("position_size_pct", composite.get("position_size_pct", 0))
-    execution_mode = "monitor-only" if float(position_size_pct or 0) <= 0 else "sized-risk"
+    execution_mode = str(decision_contract.get("execution_mode") or ("monitor_only" if float(position_size_pct or 0) <= 0 else "sized_risk")).replace("_", "-")
     tier_1_sources = ", ".join(evidence.get("tier_summary", {}).get("tier_1", {}).get("sources", [])) or "N/A"
     tier_2_sources = ", ".join(evidence.get("tier_summary", {}).get("tier_2", {}).get("sources", [])) or "N/A"
     adoption_key_chains = ", ".join(payment_details.get("adoption_key_chains", [])) or "N/A"
@@ -250,7 +251,7 @@ def render_principal_ready(snapshot: dict[str, Any]) -> str:
         "",
         "[AI Butler Handoff]",
         f"Execution mode: {execution_mode}",
-        f"Escalate on: {(governance.get('risk_triggers') or confidence.get('unknowns') or ['next scheduled review'])[0]}",
+        f"Escalate on: {decision_contract.get('escalation_reason') or (governance.get('risk_triggers') or confidence.get('unknowns') or ['next scheduled review'])[0]}",
     ]
     return "\n".join(lines)
 

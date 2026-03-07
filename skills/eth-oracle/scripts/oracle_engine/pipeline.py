@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .config import TRADE_THRESHOLD
+from .decision_contract import build_decision_contract
+from .evidence import build_claims_ledger, build_evidence_summary
 from .governance import build_portfolio_governance, compute_composite
 from .renderers import build_deliverables
 from .scoring import (
@@ -27,29 +29,6 @@ def get_scorers() -> dict[str, Any]:
         "behavioral": score_behavioral,
         "defi": score_defi,
         "payments": score_payments,
-    }
-
-
-
-def _source_registry() -> dict[str, dict[str, Any]]:
-    return {
-        "onchain": {"tier": 1, "sources": ["Etherscan", "CoinGecko"]},
-        "technical": {"tier": 2, "sources": ["Binance Spot API"]},
-        "macro": {"tier": 1, "sources": ["FRED", "CoinGecko Global"]},
-        "sentiment": {"tier": 2, "sources": ["Alternative.me", "Binance Futures"]},
-        "behavioral": {"tier": 2, "sources": ["Binance Spot API"]},
-        "defi": {"tier": 2, "sources": ["DefiLlama", "GitHub"]},
-        "payments": {
-            "tier": 2,
-            "sources": [
-                "DefiLlama Stablecoins",
-                "CoinGecko Stablecoin Prices",
-                "Circle Transparency",
-                "Circle CCTP Docs",
-                "Circle Gateway Docs",
-                "Circle USDC Contract Addresses",
-            ],
-        },
     }
 
 
@@ -126,42 +105,6 @@ def build_mandate() -> dict[str, Any]:
 
 
 
-def build_evidence_summary(dimensions: list[dict]) -> dict[str, Any]:
-    registry = _source_registry()
-    tier_summary = {
-        "tier_1": {"sources": [], "count": 0},
-        "tier_2": {"sources": [], "count": 0},
-        "tier_3": {"sources": [], "count": 0},
-    }
-    warnings: list[str] = []
-    scored = 0
-
-    for dimension in dimensions:
-        name = dimension.get("dimension")
-        entry = registry.get(name, {"tier": 2, "sources": []})
-        tier_key = f"tier_{entry['tier']}"
-        tier_summary[tier_key]["count"] += 1
-        for source in entry["sources"]:
-            if source not in tier_summary[tier_key]["sources"]:
-                tier_summary[tier_key]["sources"].append(source)
-        if not dimension.get("details", {}).get("error"):
-            scored += 1
-        else:
-            warnings.append(f"{name} degraded: {dimension['details']['error']}")
-
-    return {
-        "policy": "tiered-source-weighting",
-        "tier_summary": tier_summary,
-        "coverage": {
-            "dimensions_scored": scored,
-            "dimensions_total": len(dimensions),
-            "dimensions_missing": [d["dimension"] for d in dimensions if d.get("details", {}).get("error")],
-        },
-        "warnings": warnings,
-    }
-
-
-
 def build_confidence(dimensions: list[dict], composite: dict) -> dict[str, Any]:
     active_dimensions = [dimension for dimension in dimensions if not dimension.get("details", {}).get("error")]
     agreement_ratio = float(composite.get("agreement_ratio") or 0)
@@ -193,9 +136,16 @@ def build_analysis_snapshot(dimensions: list[dict]) -> dict[str, Any]:
     timestamp = datetime.now(timezone.utc).isoformat()
     composite = compute_composite(dimensions)
     composite["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    evidence = build_evidence_summary(dimensions)
     confidence = build_confidence(dimensions, composite)
     governance = build_portfolio_governance(dimensions, composite)
+    claims_ledger = build_claims_ledger(
+        dimensions,
+        composite,
+        governance,
+        confidence,
+        observed_at=timestamp,
+    )
+    evidence = build_evidence_summary(dimensions, claims_ledger)
 
     snapshot = {
         "timestamp": timestamp,
@@ -205,7 +155,9 @@ def build_analysis_snapshot(dimensions: list[dict]) -> dict[str, Any]:
         "evidence": evidence,
         "confidence": confidence,
         "portfolio_governance": governance,
+        "claims_ledger": claims_ledger,
     }
+    snapshot["decision_contract"] = build_decision_contract(snapshot)
     snapshot["deliverables"] = build_deliverables(snapshot)
     return snapshot
 

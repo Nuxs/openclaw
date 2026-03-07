@@ -289,6 +289,7 @@ def _recommend_orders(
     thesis = (state.get("strategy") or {}).get("thesis") or {}
     governance = (oracle.get("portfolio_governance") or {})
     confidence = (oracle.get("confidence") or {})
+    decision_contract = (oracle.get("decision_contract") or {})
 
     comp = int((oracle.get("composite") or {}).get("composite_score") or 0)
     sent = _find_dimension(oracle, "sentiment")["details"]
@@ -296,12 +297,29 @@ def _recommend_orders(
     fng = int(raw_fng) if raw_fng is not None else 50
     stance = str(governance.get("stance") or "neutral")
     veto_triggered = bool(governance.get("veto_triggered"))
+    execution_mode = str(
+        decision_contract.get("execution_mode")
+        or ("monitor_only" if float(governance.get("position_size_pct") or 0) <= 0 else "sized_risk")
+    )
+    can_open_risk = bool(decision_contract.get("can_open_risk")) if "can_open_risk" in decision_contract else not (veto_triggered or stance == "risk_off")
+    can_add_risk = bool(decision_contract.get("can_add_risk")) if "can_add_risk" in decision_contract else can_open_risk
+    blocking_conditions = list(decision_contract.get("blocking_conditions") or [])
+    must_wait_for = list(decision_contract.get("must_wait_for") or [])
 
     notes.append(
         f"Governance: stance={stance}, confidence={confidence.get('level', 'unknown')}, review={governance.get('review_cadence', '72h')}"
     )
+    notes.append(
+        f"Protocol: action={decision_contract.get('decision_action', 'legacy-governance')}, mode={execution_mode}, recheck={decision_contract.get('recheck_after', governance.get('review_cadence', '72h'))}"
+    )
     if veto_triggered:
         notes.append(f"Veto active: {governance.get('veto_reason') or 'Tier 1 risk trigger'}")
+    if blocking_conditions:
+        notes.append(f"Protocol block: {blocking_conditions[0]}")
+    if must_wait_for:
+        notes.append(f"Wait for: {must_wait_for[0]}")
+    if decision_contract.get("escalation_required"):
+        notes.append(f"Escalation: {decision_contract.get('escalation_reason') or 'manual review required'}")
 
     payments = None
     try:
@@ -311,10 +329,12 @@ def _recommend_orders(
 
     payments_score = int((payments or {}).get("score") or 0)
     payments_details = (payments or {}).get("details", {})
+    contract_payments = decision_contract.get("payments") or {}
     if payments_details and not payments_details.get("error"):
         notes.append(
             "Payments: "
-            f"{payments_details.get('payment_rail_state', 'mixed')} | "
+            f"{contract_payments.get('rail_health', payments_details.get('payment_rail_state', 'mixed'))} | "
+            f"adoption {contract_payments.get('adoption_status', payments_details.get('adoption_state', 'N/A'))} | "
             f"USDC 30d {payments_details.get('usdc_supply_change_30d_pct', 'N/A')}% | "
             f"ETH-aligned {payments_details.get('eth_aligned_share_pct', 'N/A')}% "
             f"({payments_details.get('eth_aligned_share_30d_pp', 'N/A')}pp)"
@@ -341,12 +361,13 @@ def _recommend_orders(
         if tron_share >= 35.0:
             notes.append("Thesis risk: TRON is taking a very large share of stablecoin circulation (>=35%).")
 
-    buying_locked = veto_triggered or stance == "risk_off"
+    buying_locked = not can_open_risk
+    adding_locked = not can_add_risk
 
     # Entry tranche 1
     if not _state_has_exec(state, "entry_tranche_1"):
         if buying_locked:
-            notes.append("Entry tranche 1 locked: governance is in defensive mode.")
+            notes.append("Entry tranche 1 locked: decision contract does not permit opening risk.")
         elif fng <= int(entry.get("first_tranche_fng_max", 15)):
             usd = float(entry.get("first_tranche_usd", 0.0))
             orders.append(
@@ -363,7 +384,7 @@ def _recommend_orders(
             )
 
     # Entry tranche 2 (depends on tranche1 timestamp)
-    if _state_has_exec(state, "entry_tranche_1") and not _state_has_exec(state, "entry_tranche_2") and not buying_locked:
+    if _state_has_exec(state, "entry_tranche_1") and not _state_has_exec(state, "entry_tranche_2") and not adding_locked:
         t1 = _state_get_exec(state, "entry_tranche_1")
         t1_ts = datetime.fromisoformat(t1["ts"])
         timeout_days = int(entry.get("second_tranche_timeout_days", 30))
@@ -402,6 +423,9 @@ def _recommend_orders(
                     "reason": "; ".join(reasons) or "triggered",
                 }
             )
+
+    if _state_has_exec(state, "entry_tranche_1") and not _state_has_exec(state, "entry_tranche_2") and adding_locked:
+        notes.append("Entry tranche 2 locked: decision contract does not permit adding risk.")
 
     # Exit recommendations (requires tracking position)
     pos_eth = _get_position_eth(state)
@@ -504,6 +528,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             "fng": fng,
         },
         "payments": payments_dimension,
+        "decision_contract": (oracle.get("decision_contract") or {}),
         "governance": governance,
         "confidence": confidence,
         "position": state.get("position"),
