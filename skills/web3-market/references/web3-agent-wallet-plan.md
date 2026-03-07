@@ -10,9 +10,9 @@
 
 ## 一、现状评估
 
-> **实现状态（对齐）**：主仓已存在 `extensions/agent-wallet`（独立插件原型），但尚未通过 `web3.wallet.*` 聚合入口对外稳定暴露，也未纳入 `web3.capabilities.*` catalog；本文同时覆盖“已落地事实”与后续 Phase 0/1 规划（以实际 PR 为准）。
+> **实现状态（对齐）**：主仓已存在 `extensions/agent-wallet`（独立插件），且 `web3-core` 已通过 `web3.wallet.*` 聚合入口对外暴露，并纳入 `web3.capabilities.*` catalog；本文保留架构演进脉络，但涉及“尚未接入 `web3.wallet.*` / 尚未入 catalog”的表述应视为历史状态。
 >
-> 补充：TON headless（助记词派生/地址生成/发送）与结算合约部署 + BOC/payload 验收指南见 `docs/web3/TON_E2E_SETTLEMENT.md`。
+> **当前边界**：TON headless（助记词派生/地址生成/发送）与结算合约部署 + BOC/payload 验收指南见 `docs/web3/TON_E2E_SETTLEMENT.md`；但 TON `sign` 仍未支持，TEE/更强密钥隔离仍属后续阶段。
 
 ### 1.1 现有架构盘点
 
@@ -209,10 +209,10 @@ export interface AgentWalletAPI {
 | 签名     | 调用 blockchain-adapter 的 EVM Provider                                                                         |
 | 充值     | 用户向 AI 钱包地址充值（先支持）                                                                                |
 
-**入口与能力对齐（建议）**：
+**入口与能力对齐（当前要求）**：
 
-- UI/面板优先走 `web3.wallet.*` 代理入口，避免直接依赖 `agent-wallet.*`
-- `web3.capabilities.*` 中把 `web3.wallet.*` 标为 Experimental，并注明前置条件（启用 agent-wallet 插件）
+- UI/面板优先走 `web3.wallet.*` 统一入口，避免直接依赖 `agent-wallet.*`
+- `web3.capabilities.*` 已公开 `web3.wallet.*`；能力是否可用、稳定性与风险提示以 catalog 当前输出为准，并明确前置条件（需启用 `agent-wallet` 插件；TON `sign` 仍不可用）
 
 **安全与运维约束**：
 

@@ -1,3 +1,15 @@
+---
+summary: "Historical free-market design document mixing vision, UX drafts, and technical gates for OpenClaw Web3"
+read_when:
+  - You are reviewing historical free-market design ideas or earlier gate definitions
+  - You need context on superseded Web3 market plans and drafts
+  - You want non-normative background for current Web3 market reference docs
+title: "OpenClaw Web3 自由市场技术文档"
+doc_family: "web3"
+doc_layer: "historical"
+normative: false
+---
+
 # OpenClaw Web3 自由市场技术文档
 
 > 重要提示：本文是“自由市场”方向的**设计/愿景 + 可执行 Gate**混合文档，其中部分 UX/CLI 示例为概念草案，不代表当前实现已完整具备。
@@ -12,20 +24,20 @@
 
 ---
 
-## 📋 目录
+## 目录
 
-1. [概述](#1-概述)
-2. [核心理念](#2-核心理念)
-3. [系统架构](#3-系统架构)
-4. [核心功能](#4-核心功能)
-5. [信誉评分系统](#5-信誉评分系统)
-6. [市场仪表盘 UI](#6-市场仪表盘-ui)
-7. [API 接口文档](#7-api-接口文档)
-8. [智能合约设计](#8-智能合约设计)
-9. [安全与防作弊机制](#9-安全与防作弊机制)
-10. [部署指南](#10-部署指南)
-11. [开发路线图](#11-开发路线图)
-12. [常见问题](#12-常见问题)
+1. 概述
+2. 核心理念
+3. 系统架构
+4. 核心功能
+5. 信誉评分系统
+6. 市场仪表盘 UI
+7. API 接口文档
+8. 智能合约设计
+9. 安全与防作弊机制
+10. 部署指南
+11. 开发路线图
+12. 常见问题
 
 ---
 
@@ -1302,6 +1314,7 @@ contract OrderEscrow {
    ```
 
 4. **账户年龄权重**
+
    ```typescript
    // 新账户的评价权重降低
    const weight = Math.min(accountAge / 30, 1.0); // 30 天达到满权重
@@ -1594,6 +1607,6 @@ openclaw-provider add-resource
 - v2.0 (2026-02-20): 增加自由市场设计
 - v1.0 (2026-02-15): 初始版本
 
-**维护者**: OpenClaw Team (team@openclaw.io)
+**维护者**: OpenClaw Team ([team@openclaw.io](mailto:team@openclaw.io))
 
 **许可证**: MIT

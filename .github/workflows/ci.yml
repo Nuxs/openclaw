@@ -181,6 +181,9 @@ jobs:
       - name: Check types and lint and oxfmt
         run: pnpm check
 
+      - name: Check Web3 contract governance
+        run: pnpm web3:contracts:check
+
       - name: Strict TS build smoke
         run: pnpm build:strict-smoke
 
@@ -246,6 +249,9 @@ jobs:
 
       - name: Check docs
         run: pnpm check:docs
+
+      - name: Check Web3 contract governance
+        run: pnpm web3:contracts:check
 
   skills-python:
     needs: [docs-scope, changed-scope]

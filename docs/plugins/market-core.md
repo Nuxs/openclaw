@@ -1,3 +1,15 @@
+---
+summary: "Market Core plugin guide: internal market authority for offers, orders, settlements, leases, ledger, disputes, and rewards"
+read_when:
+  - You are configuring or operating the market-core plugin
+  - You need the internal `market.*` runtime inventory behind `web3.market.*`
+  - You are aligning settlement, dispute, reward, or resource-market behavior with the gateway
+title: "Market Core Plugin"
+doc_family: "web3"
+doc_layer: "guide"
+normative: false
+---
+
 ## Market Core 插件
 
 ### 概览
@@ -44,30 +56,38 @@
 - **BridgeRoute**: 跨链桥路由配置（fromChain, toChain, assetSymbol, feeBps, estimatedSeconds）。
 - **BridgeTransfer**: 跨链转移记录（bridgeId, orderId, settlementId, status, amount）。
 
-### 网关方法（内部 `market.*`）
+### 契约治理与权威来源
 
-> `market.*` 仅供 `web3-core` 与受信运维使用，对外入口请使用 `web3.*`。
+- `market-core` 的运行时 inventory 以 `extensions/market-core/src/index.ts` 为准。
+- 对外稳定入口以 `web3-core` 暴露的 `web3.*` / `web3.market.*` 与 `web3.capabilities.*` 为准。
+- 本页保留按领域分组的当前实现摘要，不代替字段级 schema / stability 契约。
+
+### 网关方法（内部 `market.*` 运行时 inventory）
+
+> `market.*` 仅供 `web3-core` 与受信运维使用；对外入口请使用 `web3.*`。
+
+交易与结算市场：
 
 - **Offer**: `market.offer.create` `market.offer.publish` `market.offer.update` `market.offer.close`
-- **Order**: `market.order.create` `market.order.cancel`
-- **Settlement**: `market.settlement.lock` `market.settlement.release` `market.settlement.refund` `market.settlement.status`
+- **Order**: `market.order.create` `market.order.cancel` `market.order.list`
+- **Settlement**: `market.settlement.lock` `market.settlement.release` `market.settlement.refund` `market.settlement.status` `market.settlement.query`
 - **Consent**: `market.consent.grant` `market.consent.revoke`
 - **Delivery**: `market.delivery.issue` `market.delivery.complete` `market.delivery.revoke`
+- **ServiceProof**: `market.service.proof.submit` `market.service.proof.get` `market.service.proof.list`
+- **Dispute**: `market.dispute.open` `market.dispute.submitEvidence` `market.dispute.resolve` `market.dispute.reject` `market.dispute.get` `market.dispute.list`
 - **Transparency**: `market.status.summary` `market.audit.query` `market.transparency.summary` `market.transparency.trace`
-- **Revocation**: `market.revocation.retry`
 
-资源共享（B-2，resources/leases/ledger）：
+资源共享与运营：
 
 - **Resource**: `market.resource.publish` `market.resource.unpublish` `market.resource.get` `market.resource.list`
 - **Lease**: `market.lease.issue` `market.lease.revoke` `market.lease.get` `market.lease.list` `market.lease.expireSweep`
 - **Ledger**: `market.ledger.append` `market.ledger.list` `market.ledger.summary`
-- **Repair**: `market.repair.retry`
-
-扩展能力（2026.2 实现）：
-
-- **Reputation**: `market.reputation.summary` — 基于租约、争议与账本的可解释信誉评分
-- **TokenEconomy**: `market.tokenEconomy.summary` `market.tokenEconomy.mint` `market.tokenEconomy.burn` `market.tokenEconomy.governance.update` — 代币经济与治理策略
-- **Bridge**: `market.bridge.routes` `market.bridge.request` `market.bridge.update` `market.bridge.status` `market.bridge.list` — 跨链桥接入口，支持 TON ↔ EVM 路由
+- **Reputation**: `market.reputation.summary`
+- **Reward**: `market.reward.create` `market.reward.get` `market.reward.list` `market.reward.issueClaim` `market.reward.updateStatus`
+- **TokenEconomy**: `market.tokenEconomy.summary` `market.tokenEconomy.configure` `market.tokenEconomy.mint` `market.tokenEconomy.burn` `market.tokenEconomy.governance.update`
+- **Bridge**: `market.bridge.routes` `market.bridge.request` `market.bridge.update` `market.bridge.status` `market.bridge.list`
+- **Metrics**: `market.metrics.snapshot`
+- **Repair / Revocation**: `market.repair.retry` `market.revocation.retry`
 
 ### 数据链路概览
 

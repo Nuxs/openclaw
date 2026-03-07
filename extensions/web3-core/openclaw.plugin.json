@@ -85,6 +85,68 @@
       "placeholder": "1000",
       "help": "Maximum credits per session before requiring top-up"
     },
+    "x402.autopay.enabled": {
+      "label": "Enable x402 Autopay",
+      "help": "Allow x402 autopay flow when the wallet policy permits it"
+    },
+    "brain.enabled": {
+      "label": "Enable Decentralized Brain",
+      "help": "Enable the custom decentralized brain routing hook"
+    },
+    "brain.providerId": {
+      "label": "Brain Provider ID",
+      "help": "Provider ID used by the decentralized brain override"
+    },
+    "brain.defaultModel": {
+      "label": "Brain Default Model",
+      "help": "Model ID used when routing to the decentralized brain"
+    },
+    "brain.endpoint": {
+      "label": "Brain Endpoint",
+      "help": "Optional endpoint for openai-compat or websocket brain transport",
+      "sensitive": true
+    },
+    "resources.enabled": {
+      "label": "Enable Resource Sharing",
+      "help": "Turn on the Web3 resource-sharing market features"
+    },
+    "resources.advertiseToMarket": {
+      "label": "Advertise Resources To Market",
+      "help": "Allow local provider offers to be published into the market"
+    },
+    "resources.provider.listen.enabled": {
+      "label": "Enable Provider Routes",
+      "help": "Expose the local resource provider HTTP routes"
+    },
+    "resources.provider.listen.bind": {
+      "label": "Provider Bind Scope",
+      "help": "Bind provider routes to loopback or LAN"
+    },
+    "resources.provider.listen.port": {
+      "label": "Provider Listen Port",
+      "help": "TCP port for the resource provider listener"
+    },
+    "resources.provider.listen.publicBaseUrl": {
+      "label": "Provider Public Base URL",
+      "help": "Optional externally routable base URL for provider access",
+      "sensitive": true
+    },
+    "resources.provider.auth.mode": {
+      "label": "Provider Auth Mode",
+      "help": "Lease authentication mode for provider routes"
+    },
+    "resources.provider.auth.tokenTtlMs": {
+      "label": "Provider Token TTL (ms)",
+      "help": "How long issued lease tokens stay valid"
+    },
+    "resources.consumer.enabled": {
+      "label": "Enable Resource Consumer",
+      "help": "Allow this node to lease and call remote market resources"
+    },
+    "resources.consumer.preferLocalFirst": {
+      "label": "Prefer Local First",
+      "help": "Prefer local resources before remote market leases"
+    },
     "browserIngest.enabled": {
       "label": "Enable Browser Ingest",
       "help": "Allow browser extension events to be posted into the Gateway"
@@ -108,6 +170,14 @@
       "placeholder": "65536",
       "help": "Maximum payload size accepted from the browser extension"
     },
+    "monitor.enabled": {
+      "label": "Enable Monitoring",
+      "help": "Enable Web3 health snapshots and alert surfaces"
+    },
+    "monitor.notifications.enabled": {
+      "label": "Enable Monitor Notifications",
+      "help": "Allow Web3 monitor notifications to external channels"
+    },
     "discovery.enabled": {
       "label": "Enable MDL Discovery",
       "help": "Enable decentralized discovery publish/discover pipeline"
@@ -129,6 +199,10 @@
       "label": "Discovery DHT Key Prefix",
       "placeholder": "/openclaw/resource",
       "help": "DHT key prefix used for resource-granular publish"
+    },
+    "rewards.enabled": {
+      "label": "Enable Reward Surface",
+      "help": "Expose reward lifecycle orchestration in the public Web3 surface"
     }
   },
   "configSchema": {
@@ -212,6 +286,237 @@
           "paymentReceiverAddress": { "type": "string" }
         }
       },
+      "x402": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "autopay": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": { "type": "boolean", "default": true }
+            }
+          }
+        }
+      },
+      "brain": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "providerId": { "type": "string", "default": "web3-decentralized" },
+          "defaultModel": { "type": "string", "default": "" },
+          "allowlist": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          },
+          "endpoint": { "type": "string" },
+          "protocol": {
+            "type": "string",
+            "enum": ["openai-compat", "custom-ws", "p2p"],
+            "default": "openai-compat"
+          },
+          "fallback": {
+            "type": "string",
+            "enum": ["centralized"],
+            "default": "centralized"
+          },
+          "timeoutMs": { "type": "number", "default": 30000 }
+        }
+      },
+      "resources": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "advertiseToMarket": { "type": "boolean", "default": false },
+          "provider": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "listen": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": { "type": "boolean", "default": false },
+                  "bind": {
+                    "type": "string",
+                    "enum": ["loopback", "lan"],
+                    "default": "loopback"
+                  },
+                  "port": { "type": "number", "default": 0 },
+                  "publicBaseUrl": { "type": "string" }
+                }
+              },
+              "auth": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": ["siwe", "token"],
+                    "default": "siwe"
+                  },
+                  "tokenTtlMs": { "type": "number", "default": 600000 },
+                  "allowedConsumers": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": []
+                  }
+                }
+              },
+              "offers": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "models": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["id", "label", "backend", "backendConfig", "price", "policy"],
+                      "properties": {
+                        "id": { "type": "string" },
+                        "label": { "type": "string" },
+                        "backend": {
+                          "type": "string",
+                          "enum": ["ollama", "lmstudio", "openai-compat", "custom"]
+                        },
+                        "backendConfig": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "price": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["unit", "amount", "currency"],
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": ["token", "call", "query", "gb_day", "put", "get"]
+                            },
+                            "amount": { "type": "number" },
+                            "currency": { "type": "string" }
+                          }
+                        },
+                        "policy": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["maxConcurrent", "allowTools"],
+                          "properties": {
+                            "maxConcurrent": { "type": "number" },
+                            "maxTokens": { "type": "number" },
+                            "allowTools": { "type": "boolean" }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "search": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["id", "label", "backend", "backendConfig", "price"],
+                      "properties": {
+                        "id": { "type": "string" },
+                        "label": { "type": "string" },
+                        "backend": {
+                          "type": "string",
+                          "enum": ["searxng", "custom"]
+                        },
+                        "backendConfig": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "price": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["unit", "amount", "currency"],
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": ["token", "call", "query", "gb_day", "put", "get"]
+                            },
+                            "amount": { "type": "number" },
+                            "currency": { "type": "string" }
+                          }
+                        },
+                        "policy": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "maxConcurrent": { "type": "number" },
+                            "maxQueryChars": { "type": "number" }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "storage": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["id", "label", "backend", "backendConfig", "price", "policy"],
+                      "properties": {
+                        "id": { "type": "string" },
+                        "label": { "type": "string" },
+                        "backend": {
+                          "type": "string",
+                          "enum": ["filesystem", "s3", "ipfs", "custom"]
+                        },
+                        "backendConfig": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "price": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["unit", "amount", "currency"],
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": ["token", "call", "query", "gb_day", "put", "get"]
+                            },
+                            "amount": { "type": "number" },
+                            "currency": { "type": "string" }
+                          }
+                        },
+                        "policy": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["maxBytes"],
+                          "properties": {
+                            "maxBytes": { "type": "number" },
+                            "allowMime": {
+                              "type": "array",
+                              "items": { "type": "string" }
+                            },
+                            "maxConcurrent": { "type": "number" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "consumer": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": { "type": "boolean", "default": true },
+              "preferLocalFirst": { "type": "boolean", "default": true }
+            }
+          }
+        }
+      },
       "browserIngest": {
         "type": "object",
         "additionalProperties": false,
@@ -221,6 +526,54 @@
           "token": { "type": "string" },
           "allowLoopback": { "type": "boolean", "default": true },
           "maxBodyBytes": { "type": "number", "default": 65536 }
+        }
+      },
+      "monitor": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "notifications": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": { "type": "boolean", "default": false },
+              "channels": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "webhook": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "url": { "type": "string" },
+                      "method": {
+                        "type": "string",
+                        "enum": ["POST", "PUT"]
+                      },
+                      "headers": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" }
+                      },
+                      "timeout": { "type": "number" }
+                    }
+                  },
+                  "wecom": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "webhookUrl": { "type": "string" },
+                      "mentionUsers": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "mentionAll": { "type": "boolean" }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "discovery": {
@@ -240,6 +593,13 @@
           },
           "rendezvousIntervalMs": { "type": "number", "default": 30000 },
           "dhtKeyPrefix": { "type": "string", "default": "/openclaw/resource" }
+        }
+      },
+      "rewards": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": true }
         }
       }
     }

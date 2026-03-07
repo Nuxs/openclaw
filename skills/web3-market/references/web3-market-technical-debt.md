@@ -116,4 +116,4 @@
 
 ## 6. P1 路线图提醒（非本次清理范围）
 
-- **Agent Wallet**：主仓已存在 `extensions/agent-wallet` 原型；本轮目标是把口径与安全硬约束对齐并做最小硬化（错误脱敏/契约），后续再补 `web3.wallet.*` 聚合入口与 capabilities/catalog（见 `web3-agent-wallet-plan.md`）。
+- **Agent Wallet**：主仓已存在 `extensions/agent-wallet`，且 `web3-core` 已提供 `web3.wallet.*` 聚合入口并进入 capabilities catalog；当前技术债转为**条件可用性表达**（尤其 TON `sign` 边界）、策略/错误契约一致性，以及 TEE/更强密钥隔离（见 `web3-agent-wallet-plan.md`）。

@@ -354,9 +354,9 @@ openclaw/docs/reference/
 ## 📞 联系方式
 
 **项目维护者**: OpenClaw Team  
-**邮箱**: team@openclaw.io  
-**GitHub**: https://github.com/openclaw/openclaw  
-**Discord**: https://discord.gg/openclaw
+**邮箱**: [team@openclaw.io](mailto:team@openclaw.io)  
+**GitHub**: [openclaw/openclaw](https://github.com/openclaw/openclaw)  
+**Discord**: [discord.gg/openclaw](https://discord.gg/openclaw)
 
 ---
 

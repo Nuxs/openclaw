@@ -5,6 +5,9 @@ read_when:
   - You are implementing or auditing redaction and token-handling rules
   - You are integrating web3-core / market-core status into UI or operations
 title: "Web3 Market Tools & Commands Review"
+doc_family: "web3"
+doc_layer: "historical"
+normative: false
 ---
 
 ## 背景与评审范围

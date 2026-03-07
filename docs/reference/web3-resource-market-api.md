@@ -5,6 +5,9 @@ read_when:
   - You need a stable API and error contract for Gateway RPC and Provider routes
   - You are reviewing security constraints like one time tokens and endpoint non-disclosure
 title: "Web3 Resource Market API"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
 ---
 
 ## 目标与适用范围

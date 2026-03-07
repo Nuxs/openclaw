@@ -1,3 +1,15 @@
+---
+summary: "AI steward guide for Web3 Market: safe triage order, approval gates, and paste-safe outputs"
+read_when:
+  - You are operating Web3 Market as an AI steward or butler
+  - You need the recommended diagnosis-first sequence for `/web3` and `/web3-market`
+  - You want the safest operator-facing next action for a Web3 issue
+title: "AI Steward Golden Path for Web3 Market"
+doc_family: "web3"
+doc_layer: "guide"
+normative: false
+---
+
 # AI Steward Golden Path for Web3 Market
 
 > **Status**: Stable
@@ -18,6 +30,7 @@ This guide describes the minimal, safe, repeatable path for an AI steward to ope
 
 - `/web3`: one page dashboard for identity, billing, audit, and market health.
 - `/web3-market status`: market health snapshot and enablement hints.
+- `/web3-market enable ok`: guided one-shot enablement helper; treat as a write operation and require explicit approval.
 - `web3.capabilities.list`: authoritative capability catalog with `stability`.
 - `web3.status.summary`: canonical status snapshot for UI and agents.
 
@@ -33,7 +46,9 @@ This guide describes the minimal, safe, repeatable path for an AI steward to ope
 
 3. **Market status**
    - Call `web3.market.status.summary` for offers, orders, and disputes.
-   - If market is disabled, recommend `/web3-market start`.
+   - If market is disabled, first recommend `/web3-market status` for a no-write diagnosis.
+   - If the operator explicitly approves config changes, recommend `/web3-market enable ok`.
+   - If the operator wants a no-write preview of the exact steps, recommend `/web3-market start`.
 
 4. **Give one next action**
    - Examples: `/bind_wallet`, `/credits`, `/audit_status`, `/web3-market status`.

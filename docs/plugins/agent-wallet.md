@@ -1,27 +1,33 @@
 ---
-summary: "Agent Wallet plugin: agent-owned wallet for signing and sending EVM transactions"
+summary: "Agent Wallet plugin: agent-owned wallet primitives for EVM/TON, including policy-guarded autopay"
 read_when:
-  - You want an agent-owned EVM wallet for signing or sending transactions
+  - You want an agent-owned wallet for signing or sending transactions
   - You are configuring the agent-wallet plugin
-  - You need the gateway methods for agent-wallet.*
+  - You need the low-level `agent-wallet.*` methods behind `web3.wallet.*`
 title: "Agent Wallet Plugin"
+doc_family: "web3"
+doc_layer: "guide"
+normative: false
 ---
 
 ## What it is
 
-`agent-wallet` is a plugin that creates (or loads) an **agent-owned EVM wallet**, stores the private key **encrypted at rest**, and exposes gateway methods for:
+`agent-wallet` is the low-level wallet plugin for OpenClaw. It creates (or loads) an **agent-owned wallet**, stores the secret **encrypted at rest**, and exposes signing/payment primitives.
 
-- Creating/loading the wallet
-- Getting balance
-- Signing messages
-- Sending transactions
+Current chain behavior:
+
+- **EVM mode**: `create`, `balance`, `sign`, `send`, `autopay`
+- **TON mode**: `create`, `balance`, `send`, `autopay`
+- **Current boundary**: TON signing is not supported yet; `agent-wallet.sign` / `web3.wallet.sign` require EVM mode underneath
 
 It runs inside the Gateway process.
 
 ## Important scope notes
 
-- This plugin currently exposes **only** `agent-wallet.*` gateway methods.
-- It does **not** (yet) provide `web3.wallet.*` aliases, and it is not (yet) listed in `web3.capabilities.*`.
+- `agent-wallet.*` is the low-level plugin namespace owned by this plugin.
+- When `web3-core` is installed, it also exposes `web3.wallet.*` proxy methods and capability catalog entries as the public Web3 wallet entrypoint.
+- UI, agents, and external docs should prefer `web3.wallet.*`; direct `agent-wallet.*` calls are mainly for plugin-level/debug use.
+- Policy-guarded `autopay` is supported and routes by configured chain (`evm` or `ton`).
 
 ## Install
 
@@ -55,7 +61,7 @@ Set config under `plugins.entries.agent-wallet.config`.
           storePath: "${AGENT_WALLET_STORE_PATH}",
 
           chain: {
-            network: "base", // ethereum | base | optimism | arbitrum | sepolia
+            network: "base", // ethereum | base | optimism | arbitrum | sepolia | ton-mainnet | ton-testnet
           },
         },
       },
@@ -73,8 +79,17 @@ Notes:
 
 - `agent-wallet.create` → `{ address, publicKey }`
 - `agent-wallet.balance` → `{ address, balance, symbol }`
-- `agent-wallet.sign` → `{ signature }`
+- `agent-wallet.sign` → `{ signature }` (**EVM mode only**)
 - `agent-wallet.send` → `{ txHash }`
+- `agent-wallet.autopay` → policy-guarded payment execution (`evm` / `ton` routed by config)
+
+When `web3-core` is present, the public entrypoint is mirrored as:
+
+- `web3.wallet.create`
+- `web3.wallet.balance`
+- `web3.wallet.sign`
+- `web3.wallet.send`
+- `web3.wallet.autopay`
 
 `agent-wallet.send` params (hint):
 

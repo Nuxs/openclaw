@@ -1,5 +1,13 @@
 ---
-title: TON 端到端结算（Headless）落地指南
+summary: "TON headless settlement implementation guide: contract deployment, payload rules, provider behavior, and market-core integration"
+read_when:
+  - You are implementing or validating TON headless settlement end to end
+  - You need the payload, deployment, or provider details for TON settlement
+  - You are debugging TON market-core or agent-wallet settlement behavior
+title: "TON 端到端结算（Headless）落地指南"
+doc_family: "web3"
+doc_layer: "guide"
+normative: false
 ---
 
 ## 目标

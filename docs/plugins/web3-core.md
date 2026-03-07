@@ -5,6 +5,9 @@ read_when:
   - You are configuring or debugging the web3-core plugin
   - You want usage billing and quota enforcement tied to sessions
 title: "Web3 Core Plugin"
+doc_family: "web3"
+doc_layer: "guide"
+normative: false
 ---
 
 # Web3 Core (plugin)
@@ -117,6 +120,7 @@ Notes:
 - **`/web3-market`**: Web3 Market status and enable guidance.
   - `status [deep]`: probes market endpoints (default `fast`; use `deep` for lists)
   - `start`: prints the `/config set ...` steps to enable Web3 Market (does not write config)
+  - `enable ok`: applies the guided enablement baseline; treat as a write operation and require explicit operator confirmation
 
 ## Hooks
 
@@ -134,19 +138,25 @@ Billing hooks:
 
 ## Gateway RPC
 
-- `web3.capabilities.list` (params: `includeUnavailable?`, `includeDetails?`, `group?`)
-- `web3.capabilities.describe` (params: `name`, `includeUnavailable?`)
-- `web3.siwe.challenge` (params: `address`)
-- `web3.siwe.verify` (params: `message`, `signature`)
-- `web3.audit.query` (params: `limit?`)
-- `web3.billing.status` (params: `sessionIdHash`)
-- `web3.billing.summary` (params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`)
-- `web3.status.summary` (no params)
+> Public-contract governance:
+>
+> - Runtime inventory: `extensions/web3-core/src/index.ts`
+> - Exact public contract, availability, and `stability`: `web3.capabilities.*`
+> - This section is a grouped summary; field-level params/returns should follow the capability catalog, not this page
+
+- **Capability / identity**: `web3.capabilities.*`, `web3.siwe.*`, `web3.identity.resolveEns`, `web3.identity.reverseEns`
+- **Wallet**: `web3.wallet.create`, `web3.wallet.balance`, `web3.wallet.sign`, `web3.wallet.send`, `web3.wallet.autopay`
+- **Audit / billing / status**: `web3.audit.query`, `web3.billing.status`, `web3.billing.summary`, `web3.billing.paymentTrace.query`, `web3.billing.handlePaymentRequired`, `web3.billing.consumePaymentRequired`, `web3.status.summary`
+- **Reward**: `web3.reward.get`, `web3.reward.list`, `web3.reward.claim`, `web3.reward.updateStatus`
+- **Market public surface** (when enabled): `web3.market.resource.*`, `web3.market.order.list`, `web3.market.settlement.query`, `web3.market.lease.*`, `web3.market.service.proof.*`, `web3.market.ledger.*`, `web3.market.reputation.summary`, `web3.market.tokenEconomy.*`, `web3.market.bridge.*`, `web3.market.metrics.snapshot`, `web3.market.reconciliation.summary`, `web3.market.status.summary`, `web3.market.dispute.*`
+- **Compatibility resource aliases**: `web3.resources.*`
+- **Discovery / monitoring**: `web3.index.*`, `web3.metrics.*`, `web3.monitor.*`
 
 Notes:
 
 - `web3.capabilities.*` descriptors include `stability: stable | experimental | internal` for UI/agent gating.
 - `web3.status.summary` includes an optional `identity` summary (bindings + SIWE flag) for dashboard rendering.
+- `web3.wallet.sign` is currently only available when the underlying `agent-wallet` runs in EVM mode; TON signing remains unsupported.
 
 ## Agent tools (LLM)
 
@@ -171,15 +181,14 @@ Status tool (redacted, safe to paste/share):
 - `web3.market.ledger.summary`
 - `web3.market.ledger.list`
 
-扩展市场工具（2026.2 实现）：
+补充说明：以下能力当前属于 **Gateway RPC** 读写面，而不是 agent tool：
 
-- `web3.market.reputation.summary` — 信誉评分与反作弊信号
-- `web3.market.tokenEconomy.summary` — 代币经济状态查询（minted/burned/totalSupply/circulating）
-- `web3.market.bridge.routes` — 跨链桥路由列表
-- `web3.market.bridge.request` — 创建跨链转移请求
-- `web3.market.bridge.update` — 更新跨链转移状态（运营/受信调用）
-- `web3.market.bridge.status` — 查询跨链转移状态
-- `web3.market.bridge.list` — 列出跨链转移记录
+- `web3.market.reputation.summary`
+- `web3.market.tokenEconomy.*`
+- `web3.market.bridge.*`
+- `web3.market.metrics.snapshot`
+- `web3.market.reconciliation.summary`
+- `web3.market.dispute.*`
 
 ## Example debug flow
 

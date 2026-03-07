@@ -5,6 +5,9 @@ read_when:
   - You are integrating web3-core and market-core in UI/Gateway
   - You need exact order/settlement state machines and gateway method contracts
 title: "Web3 Market Dev (web3-core + market-core)"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
 ---
 
 ## 范围与目标
@@ -58,42 +61,58 @@ graph TD
 
 > 备注：`w3up-client`/Storacha 属于更现代的栈，但当前代码里还未直接接入；可以作为后续 adapter 增强项。
 
-## 接口：已有 Gateway 方法（可直接集成）
+## 契约治理（工业级规则）
+
+- **运行时真相**：`extensions/web3-core/src/index.ts` 与 `extensions/market-core/src/index.ts`
+- **对外稳定契约**：`web3.capabilities.*`（包含 `paramsSchema`、`stability`、风险提示、最小示例）
+- **配置契约**：各插件 `openclaw.plugin.json`
+- **本文定位**：开发导读与分组摘要；字段级 `params` / `returns` / `stability` 以 capability/schema 为准，不以手工表格为准
+
+## 接口：已有 Gateway 方法（按当前代码分组）
 
 > 对外入口统一为 `web3.*`；`market.*` 仅供 `web3-core` 与受信运维使用。
 
-### `web3-core`（已存在）
+### `web3-core`（对外入口；是否可用与稳定性以 `web3.capabilities.*` 为准）
 
-- `web3.capabilities.list`（params: `includeUnavailable?`, `includeDetails?`, `group?`）
-- `web3.capabilities.describe`（params: `name`, `includeUnavailable?`）
-- `web3.siwe.challenge`（params: `address`）
-- `web3.siwe.verify`（params: `message`, `signature`）
-- `web3.audit.query`（params: `limit?`）
-- `web3.billing.status`（params: `sessionIdHash`）
-- `web3.billing.summary`（params: `sessionKey?`, `sessionId?`, `senderId?`, `sessionIdHash?`）
-- `web3.status.summary`（no params）
+- **Capabilities**：`web3.capabilities.list` `web3.capabilities.describe`
+- **Identity**：`web3.siwe.challenge` `web3.siwe.verify` `web3.identity.resolveEns` `web3.identity.reverseEns`
+- **Wallet**：`web3.wallet.create` `web3.wallet.balance` `web3.wallet.sign` `web3.wallet.send` `web3.wallet.autopay`
+- **Audit / Billing / Status**：`web3.audit.query` `web3.billing.status` `web3.billing.summary` `web3.billing.paymentTrace.query` `web3.billing.handlePaymentRequired` `web3.billing.consumePaymentRequired` `web3.status.summary`
+- **Reward**：`web3.reward.get` `web3.reward.list` `web3.reward.claim` `web3.reward.updateStatus`
+- **Market public surface**：`web3.market.resource.*` `web3.market.order.list` `web3.market.settlement.query` `web3.market.lease.*` `web3.market.service.proof.*` `web3.market.ledger.*` `web3.market.reputation.summary` `web3.market.tokenEconomy.*` `web3.market.bridge.*` `web3.market.metrics.snapshot` `web3.market.reconciliation.summary` `web3.market.status.summary` `web3.market.dispute.*`
+- **Compatibility aliases**：`web3.resources.publish` `web3.resources.unpublish` `web3.resources.list` `web3.resources.lease` `web3.resources.revokeLease` `web3.resources.status`
+- **Discovery / Monitoring**：`web3.index.*` `web3.metrics.*` `web3.monitor.*`
 
-> `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口：能力描述应包含字段级 `paramsSchema`、`stability`（stable/experimental/internal）、常见稳定错误码集合（以 `docs/reference/web3-resource-market-api.md` 的口径为准）与最小示例，且不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
+> `web3.capabilities.*` 是 UI/Agent 构造调用的权威入口；能力描述不得泄露 `accessToken`、Provider `endpoint` 或真实路径。
+>
+> 当前边界：`web3.wallet.sign` 依赖底层 `agent-wallet.sign`，因此仅在 EVM 模式可用；TON 签名仍未支持，应明确降级说明。
 
-### `market-core`（已存在，内部权威层）
+### `market-core`（内部权威层；当前运行时 inventory）
 
 > `market.*` 属于内部权威方法，仅供 `web3-core` 与受信运维使用；对外入口统一为 `web3.*`。
 
 交易与结算（Offer/Order/Settlement/Consent/Delivery/Transparency）：
 
 - Offer：`market.offer.create|publish|update|close`
-- Order：`market.order.create|cancel`
-- Settlement：`market.settlement.lock|release|refund|status`
+- Order：`market.order.create|cancel|list`
+- Settlement：`market.settlement.lock|release|refund|status|query`
 - Consent：`market.consent.grant|revoke`
 - Delivery：`market.delivery.issue|complete|revoke`
+- ServiceProof：`market.service.proof.submit|get|list`
+- Dispute：`market.dispute.open|submitEvidence|resolve|reject|get|list`
 - Transparency：`market.status.summary` `market.audit.query` `market.transparency.summary` `market.transparency.trace`
 
-资源共享（resources/leases/ledger）：
+资源共享与运营：
 
 - Resource：`market.resource.publish|unpublish|get|list`
 - Lease：`market.lease.issue|revoke|get|list|expireSweep`
 - Ledger：`market.ledger.append|list|summary`
-- Repair：`market.repair.retry`
+- Reputation：`market.reputation.summary`
+- Reward：`market.reward.create|get|list|issueClaim|updateStatus`
+- TokenEconomy：`market.tokenEconomy.summary|configure|mint|burn|governance.update`
+- Bridge：`market.bridge.routes|request|update|status|list`
+- Metrics：`market.metrics.snapshot`
+- Repair / Revocation：`market.repair.retry` `market.revocation.retry`
 
 资源共享的详细 API 契约与 Provider routes 见：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)。
 

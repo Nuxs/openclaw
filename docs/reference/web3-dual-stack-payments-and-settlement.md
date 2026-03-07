@@ -1,6 +1,14 @@
 ---
 title: "Web3 Dual-Stack Payments & Settlement (Reference)"
+summary: "Web3 双栈支付与结算参考：TON/EVM 两端支付、统一订单口径、汇率与对账输出、链上最小披露与安全约束"
 description: "Web3 双栈支付与结算参考：TON/EVM 两端支付、统一订单口径、汇率与对账输出、链上最小披露与安全约束"
+read_when:
+  - You need the stable dual-stack payment, receipt, FX, and reconciliation contract
+  - You are aligning TON and EVM settlement outputs into one public summary
+  - You need canonical terms for PaymentIntent, PaymentReceipt, FXQuote, and ReconciliationSummary
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
 ---
 
 ## 1. 目标

@@ -98,13 +98,13 @@
 | Phase 3：经济闭环 | 自动结算 + 计费绑定      | ❌ 未实现                                                                                                              |
 | Phase 4：TEE 隔离 | 硬件 enclave             | ❌ 未实现                                                                                                              |
 
-### `web3.wallet.*` 统一入口
+### `web3.wallet.*` 统一入口（历史缺口，现已关闭）
 
-- `web3-core/index.ts` 中**未注册任何** `web3.wallet.*` gateway method
-- `capabilities/catalog/` 中**无 wallet 分组**
-- agent-wallet 使用独立的 `agent-wallet.*` 命名空间
+- `web3-core/src/index.ts` 已注册 `web3.wallet.create|balance|sign|send|autopay`
+- `extensions/web3-core/src/capabilities/catalog/core.ts` 已存在 wallet 分组描述
+- `agent-wallet.*` 仍保留为低层插件命名空间，`web3.wallet.*` 作为统一对外入口
 
-**行动项**：本轮仅更新进度文档标注状态，wallet 接入推迟到 Phase 2。
+**当前行动项**：把旧报告中的“未接入/未注册”表述视为历史状态；后续重点转向条件可用性说明（TON `sign` 未支持）与 TEE 隔离硬化。
 
 ---
 

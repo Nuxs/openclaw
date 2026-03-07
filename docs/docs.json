@@ -1305,6 +1305,44 @@
                 "pages": ["reference/rpc", "reference/device-models"]
               },
               {
+                "group": "Web3",
+                "pages": [
+                  {
+                    "group": "Guides",
+                    "pages": [
+                      "concepts/web3-market",
+                      "plugins/agent-wallet",
+                      "plugins/web3-core",
+                      "plugins/market-core",
+                      "web3/ai-steward-golden-path",
+                      "web3/TON_E2E_SETTLEMENT"
+                    ]
+                  },
+                  {
+                    "group": "Status",
+                    "pages": ["web3/WEB3_DUAL_STACK_STRATEGY"]
+                  },
+                  {
+                    "group": "Reference",
+                    "pages": [
+                      "plugins/web3-core-dev",
+                      "reference/web3-market-dev",
+                      "reference/web3-resource-market-api",
+                      "reference/web3-dual-stack-payments-and-settlement",
+                      "reference/web3-market-output-redaction"
+                    ]
+                  },
+                  {
+                    "group": "Plan and historical",
+                    "pages": [
+                      "reference/web3-market-tools-review",
+                      "reference/web3-free-market-technical-doc",
+                      "assessments/web3-fitness-report"
+                    ]
+                  }
+                ]
+              },
+              {
                 "group": "Templates",
                 "pages": [
                   "reference/AGENTS.default",
@@ -1774,6 +1812,7 @@
                       "zh-CN/gateway/gateway-lock",
                       "zh-CN/gateway/background-process",
                       "zh-CN/gateway/multiple-gateways",
+                      "zh-CN/gateway/home-hub-deployment",
                       "zh-CN/gateway/troubleshooting"
                     ]
                   },

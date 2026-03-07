@@ -115,7 +115,8 @@ export function coreCapabilities(config: Web3PluginConfig): CapabilityDescriptor
           summary: "Verify SIWE signature",
           params: {
             message: "example.com wants you to sign in with your Ethereum account...",
-            signature: "0x1234567890abcdef...",
+            signature:
+              "0x1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
           },
         },
       ],

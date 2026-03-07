@@ -5,6 +5,9 @@ read_when:
   - You need a reference for audit anchoring, SIWE, and billing flows
   - You want concrete interface docs for gateway methods and commands
 title: "Web3 Core Dev Guide"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
 ---
 
 # Web3 Core Dev Guide

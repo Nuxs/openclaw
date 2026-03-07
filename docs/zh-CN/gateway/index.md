@@ -62,7 +62,7 @@ pnpm gateway:watch
 - 然后客户端通过隧道连接到 `ws://127.0.0.1:18789`。
 - 如果配置了令牌，即使通过隧道，客户端也必须在 `connect.params.auth.token` 中包含它。
 
-如需在“外网中转 + 家庭多机”场景部署（手机同时通过 Web UI 与 IM 控制），请参见：[家庭中枢部署](/gateway/home-hub-deployment)。
+如需在“外网中转 + 家庭多机”场景部署（手机同时通过 Web UI 与 IM 控制），请参见：[家庭中枢部署](/zh-CN/gateway/home-hub-deployment)。
 
 ## 多个 Gateway 网关（同一主机）
 

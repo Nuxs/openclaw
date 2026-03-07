@@ -5,6 +5,9 @@ read_when:
   - You want the default Web3 payment policy (escrow) and user-facing flows
   - You are onboarding users to Web3 market mode
 title: "Web3 Market (概览)"
+doc_family: "web3"
+doc_layer: "guide"
+normative: false
 ---
 
 ## 什么是 Web3 Market 模式

@@ -1,3 +1,15 @@
+---
+summary: "Current dual-stack status for Web3 Market: TON + EVM scope, boundaries, acceptance criteria, and operator language"
+read_when:
+  - You need the current implementation boundary between TON and EVM flows
+  - You are aligning product, docs, or ops language for dual-stack Web3 Market
+  - You need the status-oriented acceptance checklist for dual-stack rollout
+title: "OpenClaw Web3 Market: TON + EVM 双栈策略"
+doc_family: "web3"
+doc_layer: "status"
+normative: false
+---
+
 # OpenClaw Web3 Market：TON + EVM 双栈策略
 
 > **状态**：Stable（随实现推进更新）  

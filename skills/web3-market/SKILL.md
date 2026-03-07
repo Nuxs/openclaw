@@ -40,12 +40,19 @@ Use this skill when working on:
 
 ## References (source of truth)
 
-Read these files as needed:
+Read these files as needed. When they disagree, use this precedence:
+
+1. Runtime registration in `extensions/web3-core/src/index.ts` and `extensions/market-core/src/index.ts`
+2. Capability/config schemas in `extensions/web3-core/src/capabilities/**` and each plugin `openclaw.plugin.json`
+3. External docs under `docs/`
+4. Internal plans/reviews under `skills/web3-market/references/` and `skills/web3-market/internal/`
+
+Reference set:
 
 - `skills/web3-market/references/web3-brain-architecture.md`
-- `skills/web3-market/references/web3-agent-wallet-plan.md` ← **AI Agent Wallet（已合入 `extensions/agent-wallet` 原型，但尚未接入 `web3.*` 统一入口/`web3.capabilities.*`，仍需持续硬化）**
+- `skills/web3-market/references/web3-agent-wallet-plan.md` ← **Agent Wallet 已通过 `web3.wallet.*` 聚合入口进入 `web3.capabilities.*`；当前剩余边界是 TON `sign` 未支持、TEE/更强隔离仍在后续阶段**
 - `skills/web3-market/references/web3-market-privacy-knowledge.md` ← **个人数据/私有知识：consent/脱敏/合规/撤销规范**
-- `skills/web3-market/references/web3-market-technical-debt.md` ← **技术债清单与一次性清理计划**
+- `skills/web3-market/references/web3-market-technical-debt.md` ← **技术债清单；当前重点已从“补 `web3.wallet.*` 入口”转为“契约治理、条件可用性表达、TEE/隔离硬化”**
 - `skills/web3-market/references/web3-market-plan-overview.md`
 - `skills/web3-market/references/web3-market-plan-phase1-execution.md`
 - `skills/web3-market/references/web3-market-plan-roadmap-open-source-coldstart.md`

@@ -3,7 +3,7 @@
   "uiHints": {
     "chain.network": {
       "label": "Blockchain Network",
-      "help": "EVM chain to anchor market hashes and settle payments",
+      "help": "Settlement network for escrow, rewards, and anchoring",
       "placeholder": "base"
     },
     "chain.rpcUrl": {
@@ -15,15 +15,24 @@
     "chain.privateKey": {
       "label": "Operator Private Key",
       "sensitive": true,
-      "help": "Private key used for anchoring and escrow calls (hex, 0x prefix)"
+      "help": "Private key used for anchoring and EVM escrow calls (hex, 0x prefix)"
+    },
+    "chain.tonMnemonic": {
+      "label": "TON Mnemonic",
+      "sensitive": true,
+      "help": "Space-separated mnemonic for TON headless settlement signing"
+    },
+    "chain.tonWorkchain": {
+      "label": "TON Workchain",
+      "help": "TON workchain used when deriving the settlement wallet"
     },
     "chain.escrowContractAddress": {
       "label": "Escrow Contract Address",
-      "help": "On-chain escrow contract address"
+      "help": "On-chain escrow or settlement contract address"
     },
     "chain.rewardDistributorAddress": {
       "label": "Reward Distributor Address",
-      "help": "EVM RewardDistributor contract address (claim-based rewards)"
+      "help": "Reward distributor contract address for claim-based rewards"
     },
     "settlement.mode": {
       "label": "Settlement Mode",
@@ -32,6 +41,30 @@
     "settlement.tokenAddress": {
       "label": "Payment Token Address",
       "help": "ERC-20 token used for settlement"
+    },
+    "settlement.confirmations": {
+      "label": "Settlement Confirmations",
+      "help": "Required confirmation count before settlement is treated as final"
+    },
+    "settlement.confirmationTimeoutMs": {
+      "label": "Confirmation Timeout (ms)",
+      "help": "How long to wait for chain confirmations"
+    },
+    "settlement.transferTimeoutMs": {
+      "label": "Transfer Timeout (ms)",
+      "help": "Timeout for on-chain transfer submission"
+    },
+    "settlement.maxRetries": {
+      "label": "Settlement Max Retries",
+      "help": "Maximum settlement retry attempts"
+    },
+    "settlement.retryBaseDelayMs": {
+      "label": "Retry Base Delay (ms)",
+      "help": "Initial retry delay for settlement operations"
+    },
+    "settlement.retryMaxDelayMs": {
+      "label": "Retry Max Delay (ms)",
+      "help": "Maximum retry delay for settlement operations"
     },
     "revocation.mode": {
       "label": "Revocation Mode",
@@ -144,11 +177,21 @@
         "properties": {
           "network": {
             "type": "string",
-            "enum": ["base", "optimism", "arbitrum", "ethereum", "sepolia"],
+            "enum": [
+              "base",
+              "optimism",
+              "arbitrum",
+              "ethereum",
+              "sepolia",
+              "ton-mainnet",
+              "ton-testnet"
+            ],
             "default": "base"
           },
           "rpcUrl": { "type": "string" },
           "privateKey": { "type": "string" },
+          "tonMnemonic": { "type": "string" },
+          "tonWorkchain": { "type": "number" },
           "escrowContractAddress": { "type": "string" },
           "rewardDistributorAddress": { "type": "string" }
         }
@@ -162,7 +205,13 @@
             "enum": ["contract", "anchor_only"],
             "default": "contract"
           },
-          "tokenAddress": { "type": "string" }
+          "tokenAddress": { "type": "string" },
+          "confirmations": { "type": "number", "default": 1 },
+          "confirmationTimeoutMs": { "type": "number", "default": 60000 },
+          "transferTimeoutMs": { "type": "number", "default": 30000 },
+          "maxRetries": { "type": "number", "default": 2 },
+          "retryBaseDelayMs": { "type": "number", "default": 1000 },
+          "retryMaxDelayMs": { "type": "number", "default": 8000 }
         }
       },
       "revocation": {
@@ -192,7 +241,7 @@
             "default": "sqlite"
           },
           "dbPath": { "type": "string" },
-          "migrateFromFile": { "type": "boolean" }
+          "migrateFromFile": { "type": "boolean", "default": true }
         }
       },
       "access": {
@@ -229,7 +278,7 @@
           },
           "storePath": { "type": "string" },
           "encryptionKey": { "type": "string" },
-          "lockTimeoutMs": { "type": "number" }
+          "lockTimeoutMs": { "type": "number", "default": 5000 }
         }
       },
       "rewards": {

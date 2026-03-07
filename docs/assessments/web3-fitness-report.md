@@ -1,3 +1,15 @@
+---
+summary: "Historical assessment of Web3 extension fit against the OpenClaw overlay architecture"
+read_when:
+  - You are reviewing historical architectural fit or merge-risk analysis for Web3 extensions
+  - You need past assessment context, not the current public contract
+  - You want an audit trail of earlier overlay-first conclusions
+title: "Web3 扩展与 OpenClaw 架构契合度评估报告"
+doc_family: "web3"
+doc_layer: "historical"
+normative: false
+---
+
 # Web3 扩展与 OpenClaw 架构契合度评估报告
 
 **评估日期**: 2026-02-26

@@ -1,6 +1,13 @@
 ---
 summary: "Web3 Market 对外输出脱敏验收清单：禁止字段、审查面与抽样步骤"
+read_when:
+  - You are reviewing Web3 output safety, redaction, or paste-safe sharing
+  - You are validating that tool, RPC, route, and status outputs do not leak secrets
+  - You need the normative Web3 redaction acceptance checklist
 title: "Web3 Market Output Redaction Checklist"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
 ---
 
 ## 目标与范围
