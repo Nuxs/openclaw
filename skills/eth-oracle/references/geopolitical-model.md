@@ -79,6 +79,17 @@ To avoid "Narrative Traps" (AI Hallucinations/Hype), the following logic applies
 - **Oracle Logic**:
   - Only official FOMC/Treasury announcements trigger "CBDC Risk" scores. Social media rumors = Tier 3 (Ignore).
 
+## Portfolio Translation
+
+Do not stop at macro interpretation. Translate the macro read into:
+
+- stance (`risk_on` / `neutral` / `risk_off`)
+- position constraint
+- event-driven de-risking rule
+- next review time
+
+For the exact governance contract, follow `references/portfolio-governance.md`.
+
 ## Scoring Algorithm
 
 ### Step 1: Event Identification

@@ -4,6 +4,8 @@
 
 To ensure "Faithfulness" (信), data inputs are weighted by source reliability.
 
+For evidence handling, contradiction resolution, and confidence wording, also follow `references/confidence-policy.md`.
+
 | Tier       | Category                  | Examples                                                                                                         | Weight  | Handling Rule                                    |
 | :--------- | :------------------------ | :--------------------------------------------------------------------------------------------------------------- | :------ | :----------------------------------------------- |
 | **Tier 1** | **Ground Truth**          | On-chain data (Etherscan), Regulatory Filings (SEC), Central Bank Reports (FED/BIS), Official Docs (Circle.com). | **1.0** | Primary decision driver.                         |

@@ -287,10 +287,21 @@ def _recommend_orders(
 
     entry = (state.get("strategy") or {}).get("entry") or {}
     thesis = (state.get("strategy") or {}).get("thesis") or {}
+    governance = (oracle.get("portfolio_governance") or {})
+    confidence = (oracle.get("confidence") or {})
 
     comp = int((oracle.get("composite") or {}).get("composite_score") or 0)
     sent = _find_dimension(oracle, "sentiment")["details"]
-    fng = int(sent.get("fear_greed_index") or 0)
+    raw_fng = sent.get("fear_greed_index")
+    fng = int(raw_fng) if raw_fng is not None else 50
+    stance = str(governance.get("stance") or "neutral")
+    veto_triggered = bool(governance.get("veto_triggered"))
+
+    notes.append(
+        f"Governance: stance={stance}, confidence={confidence.get('level', 'unknown')}, review={governance.get('review_cadence', '72h')}"
+    )
+    if veto_triggered:
+        notes.append(f"Veto active: {governance.get('veto_reason') or 'Tier 1 risk trigger'}")
 
     # Thesis metrics (stablecoin chain distribution)
     eth_aligned = set(thesis.get("eth_aligned_chains") or [])
@@ -315,9 +326,13 @@ def _recommend_orders(
             "Thesis risk: TRON is taking a very large share of stablecoin circulation (>=35%)."
         )
 
+    buying_locked = veto_triggered or stance == "risk_off"
+
     # Entry tranche 1
     if not _state_has_exec(state, "entry_tranche_1"):
-        if fng <= int(entry.get("first_tranche_fng_max", 15)):
+        if buying_locked:
+            notes.append("Entry tranche 1 locked: governance is in defensive mode.")
+        elif fng <= int(entry.get("first_tranche_fng_max", 15)):
             usd = float(entry.get("first_tranche_usd", 0.0))
             orders.append(
                 {
@@ -333,7 +348,7 @@ def _recommend_orders(
             )
 
     # Entry tranche 2 (depends on tranche1 timestamp)
-    if _state_has_exec(state, "entry_tranche_1") and not _state_has_exec(state, "entry_tranche_2"):
+    if _state_has_exec(state, "entry_tranche_1") and not _state_has_exec(state, "entry_tranche_2") and not buying_locked:
         t1 = _state_get_exec(state, "entry_tranche_1")
         t1_ts = datetime.fromisoformat(t1["ts"])
         timeout_days = int(entry.get("second_tranche_timeout_days", 30))
@@ -437,7 +452,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     comp = int((oracle.get("composite") or {}).get("composite_score") or 0)
     sent = _find_dimension(oracle, "sentiment")["details"]
-    fng = int(sent.get("fear_greed_index") or 0)
+    raw_fng = sent.get("fear_greed_index")
+    fng = int(raw_fng) if raw_fng is not None else 50
+    governance = (oracle.get("portfolio_governance") or {})
+    confidence = (oracle.get("confidence") or {})
 
     snap = {
         "ts": _utc_now().isoformat(),
@@ -445,6 +463,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         "price_24h_change_pct": cg_24h,
         "composite_score": comp,
         "fng": fng,
+        "stance": governance.get("stance", "neutral"),
+        "confidence": confidence.get("level", "low"),
     }
     _append_snapshot(state, snap)
 
@@ -464,9 +484,12 @@ def cmd_run(args: argparse.Namespace) -> int:
             "composite_score": comp,
             "fng": fng,
         },
+        "governance": governance,
+        "confidence": confidence,
         "position": state.get("position"),
         "notes": notes,
         "recommended_orders": orders,
+        "board_brief": ((oracle.get("deliverables") or {}).get("board_brief") or ""),
     }
 
     if args.format == "json":
@@ -476,7 +499,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"ETH Long-term Exec — {_utc_now().strftime('%Y-%m-%d %H:%M UTC')}")
         print("═══════════════════════════════════════════════════════")
         print(f"Price: ${price:,.2f} (24h {cg_24h:+.2f}%)")
-        print(f"Oracle composite: {comp:+d}  |  F&G: {fng}")
+        print(
+            f"Oracle composite: {comp:+d}  |  F&G: {fng}  |  stance={governance.get('stance', 'neutral')}  |  confidence={confidence.get('level', 'low')}"
+        )
         pos = state.get("position") or {}
         print(f"Position: cash=${pos.get('cash_usd', 0):.2f}, eth={pos.get('eth', 0):.6f}")
         print()
@@ -492,6 +517,11 @@ def cmd_run(args: argparse.Namespace) -> int:
                     print(f"- BUY  ${o['usd']:.2f}  (id={o['id']})  reason: {o['reason']}")
                 else:
                     print(f"- SELL {o['eth']:.6f} ETH (id={o['id']})  reason: {o['reason']}")
+
+        board_brief = ((oracle.get("deliverables") or {}).get("board_brief") or "").strip()
+        if board_brief:
+            print("\nBoard brief:")
+            print(board_brief)
 
         if args.apply and orders:
             for o in orders:

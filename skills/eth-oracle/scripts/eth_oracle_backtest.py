@@ -35,17 +35,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-# Import the model's *pure* scorers and composite engine.
-# (They are underscored by design but stable within this skill.)
-from eth_oracle import (  # type: ignore
+# Import the model's pure scorers and composite engine from the shared package.
+from oracle_engine import (
     TRADE_THRESHOLD,
     WEIGHTS,
-    compute_composite,
-    fetch_json,
     _score_behavioral_from_klines,
     _score_onchain_price_signals,
     _score_sentiment_from_components,
     _score_technical_from_klines,
+    compute_composite,
+    fetch_json,
 )
 
 

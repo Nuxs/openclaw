@@ -1,145 +1,125 @@
-# ETH February 2026 Case Study — Multi-Factor Post-Mortem
+# ETH 2026 年 2 月案例：面向 AI 私人管家的金标准样例
 
-Deep analysis of ETH's crash from $2,534 to $1,747 (-31%) starting Feb 1, 2026.
+本案例不是为了证明模型“神准”，而是为了展示 `eth-oracle` 在真实高波动环境中应如何做到：
 
-## Market Snapshot (2026-02-01)
+- 先证据，后判断
+- 先边界，后仓位
+- 先反证，后表达
 
-```
-Open:    $2,534.20
-High:    $2,551.26
-Low:     $2,250.00
-Close:   $2,382.82
-Change:  -5.97%
-Range:   11.88%
+## 1. Mandate
 
-MA(7):   $2,626.20  ← price below
-MA(25):  $2,349.38  ← price near
-MA(99):  $3,019.59  ← price far below (bearish structure)
+- **分析对象**：ETH
+- **时间窗口**：2026-02-01 起始的一轮急跌
+- **问题**：当时是否应减仓、何时不该盲目抄底、何时开始从防守转为观察
+- **模式**：`research + decision + brief`
+- **默认严格性**：平衡型严格性（允许推断，但必须标注置信度）
 
-Vol(ETH):  562.612K
-Vol(USDT): 1.354B
+## 2. Bottom Line
 
-Subsequent low: $1,747.80 (Feb 6–8 area)
-```
+**底线判断**：以 2026-02-01 的可得证据看，ETH 处于典型的“宏观压制 + 技术破位 + 杠杆脆弱”区间，主判断应为 **`SELL / selective_risk_off`**，而不是把“跌得够多”误判成“马上值得满仓抄底”。
 
-## Dimension-by-Dimension Scoring (Retrospective)
+- **当时合理动作**：先减仓，再等待二次确认；不宜仅凭情绪化恐慌反向重仓。
+- **当时主要风险**：宏观主导仍在，情绪极端虽接近反转区，但尚不足以覆盖趋势性下行风险。
+- **综合置信度**：`medium`
 
-### 1. On-Chain: Score = -40
+## 3. Evidence Ledger
 
-Pre-crash signals:
+| 证据项                       | 性质        | Tier | 方向                 | 说明                                    |
+| ---------------------------- | ----------- | ---- | -------------------- | --------------------------------------- |
+| 价格跌破 MA(7)/MA(25)/MA(99) | 直接观测    | 2    | Bearish              | 趋势结构已坏，不是普通回撤              |
+| DXY 走强、10Y 利率上行       | 直接观测    | 1    | Bearish              | 宏观风险偏好压制加密资产估值            |
+| 关税升级与全球 risk-off      | 解释 + 新闻 | 2    | Bearish              | 与美元走强、风险资产承压形成共振        |
+| F&G 跌入极度恐惧             | 直接观测    | 2    | Bullish (contrarian) | 是反向信号，但通常早于真正底部          |
+| OI 大幅收缩、资金费率转负    | 直接观测    | 2    | Bullish (contrarian) | 表明杠杆清洗接近充分                    |
+| 开发者活跃未同步崩塌         | 直接观测    | 2    | Medium-term Bullish  | 对 3–6 月维度有支撑，不足以否定短线下跌 |
 
-- Exchange inflows had been rising for 2 weeks (bearish)
-- Active addresses declining from January peak (bearish)
-- Gas fees low at 8–12 gwei (reduced on-chain demand)
-- Staking deposits stable (neutral)
-- MVRV Z-Score was already below 1 (approaching undervalued, but momentum was negative)
+## 4. Facts / Interpretations / Scenarios
 
-**Lesson:** On-chain signaled weakness but not the magnitude. Exchange inflow was the strongest pre-crash warning.
+### Facts
 
-### 2. Technical: Score = -70
+- ETH 跌破主要均线结构。
+- 美元与利率环境同时偏紧。
+- 恐惧指标与杠杆指标显示清算压力快速上升。
 
-As of Feb 1:
+### Interpretations
 
-- Price below ALL three MAs (7/25/99) — strong bearish trend
-- MA(7) < MA(25) < MA(99) — death cross formation in progress
-- RSI(14) at ~35 — approaching oversold but not extreme
-- MACD deeply negative with widening histogram
-- Bollinger Bands expanding (increasing volatility)
-- No support until $2,000 psychological level, then $1,800
+- **短线**：趋势主导仍偏空，技术面未给出确认性止跌信号。
+- **中线**：若清算完成、量能衰减、链上资金回流，则可以从 `SELL` 逐步过渡到 `HOLD / watch entry`。
+- **长线**：开发者活动未显著衰退，说明生态基本面未出现 FTX 式结构性断裂。
 
-**What happened:** Technical breakdown confirmed with massive volume. $2,250 support broke intraday, cascading to $1,747 over following days.
+### Scenarios
 
-**Lesson:** Below-all-MAs + increasing volume + no nearby support = expect waterfall.
+1. **基准情景**：延续下探至心理位与次级支撑区，再进入筑底。
+2. **空头强化情景**：宏观继续恶化，则技术性超卖也不足以快速托底。
+3. **反转情景**：若出现量能退潮、资金费率持续负值、价格不再创新低，则情绪面将转为有效反向信号。
 
-### 3. Macro-Geopolitical: Score = -65
+## 5. 六维回溯评分（示意）
 
-Key events in late Jan / early Feb 2026:
+| 维度             | 分数 | 判断                  | 核心理由                         |
+| ---------------- | ---- | --------------------- | -------------------------------- |
+| On-Chain         | -40  | Bearish               | 活跃度回落、交易所流向承压       |
+| Technical        | -70  | Strong Bearish        | 跌破多均线且放量破位             |
+| Macro            | -65  | Strong Bearish        | 美元、利率、风险偏好三杀         |
+| Sentiment        | -50  | Bearish to Contrarian | 恐惧极端，但过早抄底风险仍高     |
+| Behavioral       | -30  | Bearish               | 恐慌、锚定、踩踏仍在扩散         |
+| DeFi / Ecosystem | -35  | Bearish               | TVL 与活动受压，但未见生态性断裂 |
 
-- **Trump tariff expansion:** New round targeting multiple sectors, markets pricing in trade war 2.0
-- **DXY strengthening:** Dollar index rose as safe haven demand increased
-- **Fed rhetoric:** Hawkish hold — rates staying higher for longer than expected
-- **Treasury yields:** 10Y climbing above 4.5%
-- **Global risk-off:** European equities and EM currencies also declining
-- **GPR Index:** Elevated above 150 (multiple geopolitical tensions)
+**综合含义**：这不是“价值发现式下跌”，而更像“趋势主导下的杠杆踩踏”。
 
-**Transmission path:** Tariff fears → strong USD → risk-off → crypto selloff amplified by leverage.
+## 6. Portfolio Governance Translation
 
-**Lesson:** When DXY, yields, and GPR all move against crypto simultaneously, expect -20% minimum. The combination is historically the most bearish macro setup for ETH.
+### 当时合理治理语言
 
-### 4. Sentiment: Score = -50 (contrarian: approaching buy zone)
+- **Stance**：`selective_risk_off`
+- **Recommended size**：主动风险仓位明显下调
+- **Max position**：仍遵守单仓 `≤ 25%`
+- **Action**：减仓、等待，不追空但也不抢反弹
+- **Review cadence**：`24h`
 
-- Fear & Greed Index: dropped to 10 ("Extreme Fear") by late Feb
-- Funding rates: turned negative (shorts paying longs)
-- Open Interest: collapsed ~25% during liquidation cascade
-- Social media: "ETH is dead" narratives proliferating
-- ETH/BTC ratio: declining — capital flight from ETH to BTC
+### 失效条件
 
-**Contrarian reading:** These are capitulation markers. Historically, F&G < 15 + negative funding + OI flush = reversal zone within 2–3 weeks.
+以下条件若成立，原始偏空结论开始失效：
 
-### 5. Behavioral: Score = -30 (mixed — capitulation underway)
+- 价格不再创新低，但情绪继续极端
+- 量能下降，恐慌宣泄完成
+- 链上出现明显回流信号
+- 宏观风险不再继续强化
 
-- **Capitulation candle detected** (Feb 3–6): Massive volume, long lower wicks
-- **Anchoring:** Heavy selling around $2,000 (round number + prior support)
-- **Disposition effect:** Addresses that bought at $2,200–2,500 were panic selling at $1,800–1,900
-- **Reflexivity:** ETH price decline → DeFi liquidations → TVL dropped ~18% in 1 week → more sell pressure
-- **Recency bias:** Media extrapolating "ETH going to $1,000" based on 4-week trend
+## 7. Counterargument
 
-**Lesson:** The behavioral cascade (panic → liquidation → more panic) typically exhausts within 5–10 days of the initial shock.
+最强反方观点不是“ETH 永远不会死”，而是：
 
-### 6. DeFi/Ecosystem: Score = -35
+> “清算已接近尾声，极端恐惧和负 funding 已接近历史反转区，因此继续减仓可能卖在局部底部附近。”
 
-- TVL dropped from $62B to $51B (-17.7%) in the month
-- DEX volumes spiked during crash (panic swaps) then collapsed
-- L2 transaction counts declined ~10%
-- ETH burn rate dropped below issuance (briefly inflationary)
-- Developer commits: stable (builders didn't leave — positive divergence)
+### 为什么它当时还不是主判断
 
-**Key insight:** Developer activity as a contrarian indicator — when price crashes but devs stay, the ecosystem is intact. This is a buy signal on 3–6 month horizon.
+- 它更多依赖 **情绪与仓位清洗**，而不是 **趋势确认**。
+- 宏观变量仍未停止施压。
+- 技术面还没有出现结构性止跌证据。
 
-## Composite Score (Feb 1, 2026)
+### 什么条件下反方转正
 
-```
-On-Chain:    -40 × 0.20 = -8.0
-Technical:   -70 × 0.25 = -17.5
-Macro:       -65 × 0.20 = -13.0
-Sentiment:   -50 × 0.15 = -7.5  (raw; contrarian adjustment would flip this)
-Behavioral:  -30 × 0.10 = -3.0
-DeFi/Eco:    -35 × 0.10 = -3.5
-─────────────────────────────
-Composite:   -52.5  →  SELL signal
-```
+- RSI 极端超卖后形成背离
+- 成交量缩减而非继续放大
+- 资金费率维持负值但价格止跌
+- 交易所净流向转为净流出
 
-**What the oracle would have recommended on Feb 1:**
+## 8. Unknowns
 
-- **Signal:** SELL — reduce exposure by 50–70%
-- **Stop:** $2,600 (if somehow recovering, close shorts)
-- **Target:** $1,900–$2,000 (first support), $1,750 (second support)
-- **Timeframe:** 1–2 weeks for the move to play out
+- 清算链条是否已真正完成，而非第一轮出清
+- 宏观变量是否继续升级为更大级别 risk-off
+- 链上大额资金是否仅短期避险，而非中期增配
 
-**Accuracy:** The oracle would have correctly signaled exit before the bulk of the -31% decline.
+## 9. Board Brief Sample
 
-## Post-Crash Reversal Analysis (Feb 10–Mar 7)
+**Judgment**：ETH 短线仍偏防守，不能把极度恐惧直接等同于可重仓抄底。  
+**Three points**：一，宏观与技术同时偏空；二，情绪极端只说明接近反转区，不说明反转已确认；三，生态基本面未坏，故中长期不宜线性看空。  
+**Action**：减风险、等确认、24 小时复核。  
+**Watchpoint**：是否出现“价格不再创新低 + 情绪仍极端”的底部组合。
 
-By mid-February:
+## 10. Lessons for the Framework
 
-- Composite score shifted to approximately **-25** (LEAN SELL → approaching NEUTRAL)
-- Sentiment flipped contrarian bullish (F&G = 10, funding negative)
-- Technical: RSI reached 25 (extreme oversold), bullish divergence forming
-- On-chain: Exchange outflows resumed (smart money accumulating)
-- Macro: Unchanged (still headwind)
-
-**The oracle would shift to:** NEUTRAL with "watch for entry" by Feb 15–20.
-
-By early March:
-
-- Partial recovery visible in chart (price bouncing from $1,747 low)
-- Volume declining (typical of basing pattern)
-- Score estimate: **-10 to 0** (NEUTRAL/HOLD)
-
-## Key Takeaways for the Model
-
-1. **Macro dominance:** In regime shifts (tariff wars, Fed pivots), macro dimension should get temporary weight boost from 20% → 30%
-2. **Cascade detection:** When >4 dimensions agree directionally, increase signal confidence and position size
-3. **Contrarian timing:** Sentiment extremes + behavioral capitulation = reliable entry signals, but timing requires patience (wait for volume decline + RSI divergence)
-4. **Reflexivity monitoring:** ETH's DeFi reflexivity loop amplifies both directions — monitor TVL/price divergence as leading indicator
-5. **Developer divergence:** Stable dev activity during price crashes = strong long-term buy signal (3–6 month horizon)
+1. **宏观主导期要承认宏观主导**：在 regime shift 中，宏观比情绪更有解释力。
+2. **反向指标不能脱离时机**：极端恐惧是“准备观察”，不是“立即满仓”。
+3. **治理语言比方向语言更重要**：真正可执行的是 `stance / size / veto / review cadence`。
+4. **好样例必须包含反方与未知项**：否则只是事后诸葛亮，而不是可复用方法。
