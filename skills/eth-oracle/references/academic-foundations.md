@@ -15,7 +15,7 @@ Applied to crypto: traditional factors (size, value, momentum) are adapted:
 - **Momentum factor** → 30/90-day return momentum
 - **Network factor** (crypto-specific) → Active addresses, tx count, TVL growth
 
-**Key insight:** Single-factor models (just price or just on-chain) systematically underperform multi-factor. Our 6-dimension approach is an implementation of multi-factor pricing for crypto.
+**Key insight:** Single-factor models (just price or just on-chain) systematically underperform multi-factor. Our 7-dimension approach is an implementation of multi-factor pricing for crypto, with payment rails promoted to a first-class factor alongside price, macro, and ecosystem structure.
 
 ### 1.2 MVRV Z-Score Model
 

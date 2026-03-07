@@ -36,6 +36,12 @@ def _pick_key_factor(dimension: dict) -> str:
         tvl_change = details.get("tvl_change_30d_pct", "N/A")
         return f"TVL 30d: {tvl_change}%"
 
+    if name == "payments":
+        redeemability = details.get("redeemability_state", "orderly")
+        net_issued = details.get("net_issued_30d_usd_bn", "N/A")
+        top_chain = details.get("usdc_top_chain", "N/A")
+        return f"{redeemability}; net 30d: {net_issued}B; top chain: {top_chain}"
+
     return str(list(details.values())[:1])
 
 
@@ -152,7 +158,8 @@ def render_investment_memo(snapshot: dict[str, Any]) -> str:
         f"Confidence: {confidence.get('level', 'low')} — {confidence.get('summary', '')}",
         "Key drivers:",
     ]
-    for dimension in snapshot.get("dimensions", [])[:3]:
+    top_drivers = sorted(snapshot.get("dimensions", []), key=lambda item: abs(item.get("score", 0)), reverse=True)[:3]
+    for dimension in top_drivers:
         lines.append(f"- {dimension['dimension']}: {_pick_key_factor(dimension)}")
     lines.extend([
         "Risk triggers:",

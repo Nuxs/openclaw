@@ -11,6 +11,7 @@ from .scoring import (
     score_defi,
     score_macro,
     score_onchain,
+    score_payments,
     score_sentiment,
     score_technical,
 )
@@ -25,6 +26,7 @@ def get_scorers() -> dict[str, Any]:
         "sentiment": score_sentiment,
         "behavioral": score_behavioral,
         "defi": score_defi,
+        "payments": score_payments,
     }
 
 
@@ -37,6 +39,7 @@ def _source_registry() -> dict[str, dict[str, Any]]:
         "sentiment": {"tier": 2, "sources": ["Alternative.me", "Binance Futures"]},
         "behavioral": {"tier": 2, "sources": ["Binance Spot API"]},
         "defi": {"tier": 2, "sources": ["DefiLlama", "GitHub"]},
+        "payments": {"tier": 2, "sources": ["DefiLlama Stablecoins", "CoinGecko Stablecoin Prices", "Circle Transparency"]},
     }
 
 
@@ -74,7 +77,27 @@ def _collect_counterarguments(dimensions: list[dict], composite: dict) -> list[s
         if direction == "SHORT" and score <= 0:
             continue
         details = dimension.get("details", {})
-        key = next(iter(details.values()), "counter-signal present") if details else "counter-signal present"
+        key = "counter-signal present"
+        if details:
+            for preferred_key in (
+                "payment_rail_state",
+                "redeemability_state",
+                "reserve_state",
+                "issuance_state",
+                "chain_mix_state",
+                "price_vs_ma",
+                "weekly_structure",
+                "note",
+                "error",
+            ):
+                if preferred_key in details:
+                    key = details[preferred_key]
+                    break
+            else:
+                for value in details.values():
+                    if isinstance(value, (str, int, float)) and value not in {True, False}:
+                        key = value
+                        break
         counterarguments.append(f"{dimension['dimension']} pushes against the base case: {key}")
 
     if not counterarguments:
@@ -85,7 +108,7 @@ def _collect_counterarguments(dimensions: list[dict], composite: dict) -> list[s
 
 def build_mandate() -> dict[str, Any]:
     return {
-        "asset_scope": ["ETH", "stablecoins", "macro"],
+        "asset_scope": ["ETH", "stablecoins", "payments", "macro"],
         "time_horizon": "position",
         "mode": ["research", "decision", "brief", "automation"],
     }

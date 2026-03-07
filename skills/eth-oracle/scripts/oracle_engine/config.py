@@ -6,7 +6,8 @@ WEIGHTS = {
     "macro": 0.20,
     "sentiment": 0.15,
     "behavioral": 0.10,
-    "defi": 0.10,
+    "defi": 0.05,
+    "payments": 0.05,
 }
 
 TIER_WEIGHTS = {

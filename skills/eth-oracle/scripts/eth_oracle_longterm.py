@@ -303,28 +303,43 @@ def _recommend_orders(
     if veto_triggered:
         notes.append(f"Veto active: {governance.get('veto_reason') or 'Tier 1 risk trigger'}")
 
-    # Thesis metrics (stablecoin chain distribution)
-    eth_aligned = set(thesis.get("eth_aligned_chains") or [])
-    eth_cur = sum(stable.chain_usd.get(c, 0.0) for c in eth_aligned)
-    eth_pm = sum(stable.chain_prev_month_usd.get(c, 0.0) for c in eth_aligned)
-    eth_share = _pct(eth_cur, stable.total_usd)
-    eth_share_30d_pp = eth_share - _pct(eth_pm, stable.total_usd)
+    payments = None
+    try:
+        payments = _find_dimension(oracle, "payments")
+    except KeyError:
+        payments = None
 
-    tron_share = _pct(stable.chain_usd.get("Tron", 0.0), stable.total_usd)
-    sol_share = _pct(stable.chain_usd.get("Solana", 0.0), stable.total_usd)
-
-    notes.append(
-        f"Thesis: stablecoin share — ETH-aligned {eth_share:.1f}% (30d {eth_share_30d_pp:+.1f}pp), Tron {tron_share:.1f}%, Solana {sol_share:.1f}%"
-    )
-    # Heuristic thesis warnings (not price signals)
-    if eth_share_30d_pp <= -1.0:
+    payments_score = int((payments or {}).get("score") or 0)
+    payments_details = (payments or {}).get("details", {})
+    if payments_details and not payments_details.get("error"):
         notes.append(
-            "Thesis risk: ETH-aligned stablecoin share is shrinking meaningfully (30d <= -1.0pp)."
+            "Payments: "
+            f"{payments_details.get('payment_rail_state', 'mixed')} | "
+            f"USDC 30d {payments_details.get('usdc_supply_change_30d_pct', 'N/A')}% | "
+            f"ETH-aligned {payments_details.get('eth_aligned_share_pct', 'N/A')}% "
+            f"({payments_details.get('eth_aligned_share_30d_pp', 'N/A')}pp)"
         )
-    if tron_share >= 35.0:
+        if payments_score <= -20:
+            notes.append("Payments risk: Circle / USDC rail structure is deteriorating; keep entries defensive.")
+        tron_share = payments_details.get("tron_share_pct")
+        if tron_share is not None and float(tron_share) >= 35.0:
+            notes.append("Payments risk: TRON controls an outsized share of stablecoin circulation (>=35%).")
+    else:
+        # Fallback keeps older state files usable even if the new payments dimension is unavailable.
+        eth_aligned = set(thesis.get("eth_aligned_chains") or [])
+        eth_cur = sum(stable.chain_usd.get(c, 0.0) for c in eth_aligned)
+        eth_pm = sum(stable.chain_prev_month_usd.get(c, 0.0) for c in eth_aligned)
+        eth_share = _pct(eth_cur, stable.total_usd)
+        eth_share_30d_pp = eth_share - _pct(eth_pm, stable.total_usd)
+        tron_share = _pct(stable.chain_usd.get("Tron", 0.0), stable.total_usd)
+        sol_share = _pct(stable.chain_usd.get("Solana", 0.0), stable.total_usd)
         notes.append(
-            "Thesis risk: TRON is taking a very large share of stablecoin circulation (>=35%)."
+            f"Thesis: stablecoin share — ETH-aligned {eth_share:.1f}% (30d {eth_share_30d_pp:+.1f}pp), Tron {tron_share:.1f}%, Solana {sol_share:.1f}%"
         )
+        if eth_share_30d_pp <= -1.0:
+            notes.append("Thesis risk: ETH-aligned stablecoin share is shrinking meaningfully (30d <= -1.0pp).")
+        if tron_share >= 35.0:
+            notes.append("Thesis risk: TRON is taking a very large share of stablecoin circulation (>=35%).")
 
     buying_locked = veto_triggered or stance == "risk_off"
 
@@ -476,6 +491,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         stable=stable,
     )
 
+    payments_dimension = next(
+        (dimension for dimension in oracle.get("dimensions", []) if dimension.get("dimension") == "payments"),
+        {},
+    )
     out = {
         "ts": snap["ts"],
         "market": {
@@ -484,6 +503,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             "composite_score": comp,
             "fng": fng,
         },
+        "payments": payments_dimension,
         "governance": governance,
         "confidence": confidence,
         "position": state.get("position"),

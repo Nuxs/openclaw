@@ -13,6 +13,7 @@ Notes / limitations:
   - behavioral (spot OHLCV)
   - sentiment (futures funding + global long/short ratio)
   - onchain proxy (price vs ATH + 30d momentum)
+  - payments proxy (USDC / USDT market-cap structure + stablecoin price integrity)
 - Macro/DeFi are excluded in the backtest because their *historical* free data is not reliably available.
   The composite score is computed with dynamic weights (only included dims contribute).
 
@@ -41,6 +42,7 @@ from oracle_engine import (
     WEIGHTS,
     _score_behavioral_from_klines,
     _score_onchain_price_signals,
+    _score_payments_from_market_caps,
     _score_sentiment_from_components,
     _score_technical_from_klines,
     compute_composite,
@@ -50,6 +52,7 @@ from oracle_engine import (
 
 BINANCE_SPOT = "https://api.binance.com"
 BINANCE_FAPI = "https://fapi.binance.com"
+COINGECKO = "https://api.coingecko.com/api/v3"
 
 
 @dataclass(frozen=True)
@@ -227,6 +230,45 @@ def _ls_ratio_by_day(ls: list[dict]) -> dict[str, float]:
         day = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
         out[day] = float(row.get("longShortRatio", 1))
     return out
+
+
+
+def _coingecko_series_by_day(points: list[list]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for point in points:
+        if not isinstance(point, list) or len(point) < 2:
+            continue
+        ts_ms = int(point[0])
+        day = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        out[day] = float(point[1])
+    return out
+
+
+
+def _fetch_coingecko_market_chart_range(
+    *,
+    coin_id: str,
+    start_ms: int,
+    end_ms: int,
+    cache_hours: float,
+) -> dict[str, Any]:
+    start_s = max(0, start_ms // 1000)
+    end_s = max(start_s + 1, end_ms // 1000)
+    cache_name = f"coingecko-{coin_id}-{start_s}-{end_s}.json"
+    cache_path = _cache_dir() / cache_name
+    cached = _load_cache(cache_path, max_age_hours=cache_hours)
+    if isinstance(cached, dict):
+        return cached
+
+    payload = fetch_json(
+        f"{COINGECKO}/coins/{coin_id}/market_chart/range?vs_currency=usd&from={start_s}&to={end_s}",
+        timeout=20,
+    )
+    if isinstance(payload, dict):
+        _save_cache(cache_path, payload)
+        return payload
+    return {}
+
 
 
 def _as_day_bars(klines: list[list]) -> list[DayBar]:
@@ -453,6 +495,24 @@ def main() -> None:
     daily_avg_funding = _daily_avg_funding(funding if isinstance(funding, list) else [])
     ls_ratio_daily = _ls_ratio_by_day(ls_ratio if isinstance(ls_ratio, list) else [])
 
+    proxy_start_ms = max(0, start_ms - int(40 * 86400 * 1000))
+    usdc_chart = _fetch_coingecko_market_chart_range(
+        coin_id="usd-coin",
+        start_ms=proxy_start_ms,
+        end_ms=end_ms,
+        cache_hours=args.cache_hours,
+    )
+    usdt_chart = _fetch_coingecko_market_chart_range(
+        coin_id="tether",
+        start_ms=proxy_start_ms,
+        end_ms=end_ms,
+        cache_hours=args.cache_hours,
+    )
+    usdc_price_daily = _coingecko_series_by_day(list(usdc_chart.get("prices") or []))
+    usdc_mcap_daily = _coingecko_series_by_day(list(usdc_chart.get("market_caps") or []))
+    usdt_price_daily = _coingecko_series_by_day(list(usdt_chart.get("prices") or []))
+    usdt_mcap_daily = _coingecko_series_by_day(list(usdt_chart.get("market_caps") or []))
+
     # Build eligible indices (need lookback for indicators)
     min_lookback = 110  # 100 for technical + cushion
     eligible = list(range(min_lookback, len(bars) - max(args.horizon, 1)))
@@ -473,12 +533,21 @@ def main() -> None:
         tech_slice = _market_slice_to_klines(bars[idx - 99 : idx + 1])
         beh_slice = _market_slice_to_klines(bars[idx - 29 : idx + 1])
         closes = [b.close for b in bars[: idx + 1]]
+        day_minus_30 = bars[idx - 30].date_utc
 
         dims = [
             _compute_onchain_proxy_from_closes(closes[-4000:]),  # cap for perf
             _score_technical_from_klines(tech_slice),
             _sentiment_from_history(day=day, daily_avg_funding=daily_avg_funding, ls_ratio_daily=ls_ratio_daily),
             _score_behavioral_from_klines(beh_slice),
+            _score_payments_from_market_caps(
+                usdc_price_usd=usdc_price_daily.get(day),
+                usdt_price_usd=usdt_price_daily.get(day),
+                usdc_market_cap_usd=usdc_mcap_daily.get(day),
+                usdc_market_cap_30d_ago_usd=usdc_mcap_daily.get(day_minus_30),
+                usdt_market_cap_usd=usdt_mcap_daily.get(day),
+                usdt_market_cap_30d_ago_usd=usdt_mcap_daily.get(day_minus_30),
+            ),
         ]
         dims = _dynamic_weights(dims)
         comp = compute_composite(dims)
@@ -555,7 +624,7 @@ def main() -> None:
     print("\n═══════════════════════════════════════════════════════")
     print(f"ETH Oracle Backtest — {len(rows)} samples, horizon={args.horizon}d")
     print(f"Range: {bars[0].date_utc} → {bars[-1].date_utc}  (seed={args.seed})")
-    print("Dimensions: onchain(proxy)+technical+sentiment+behavioral")
+    print("Dimensions: onchain(proxy)+technical+sentiment+behavioral+payments(proxy)")
     print("═══════════════════════════════════════════════════════\n")
 
     print(f"Overall mean forward return: {mean(overall_fwd)*100:+.2f}%")

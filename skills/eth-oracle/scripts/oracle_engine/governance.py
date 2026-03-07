@@ -17,6 +17,7 @@ def check_tier1_veto(dimensions: list[dict]) -> tuple[bool, str]:
             if ath_change_pct < -90:
                 return True, "Extreme Tier 1 on-chain deviation (>90% below ATH proxy)"
 
+        if dimension.get("dimension") == "payments":
             stablecoin_depeg = details.get("stablecoin_depeg")
             if stablecoin_depeg is not None and float(stablecoin_depeg) <= 0.95:
                 return True, "Tier 1 stablecoin de-peg trigger"
@@ -166,6 +167,24 @@ def build_portfolio_governance(dimensions: list[dict], composite: dict) -> dict:
         risk_triggers.append("Realized volatility spike (>2x average volume)")
         if review_cadence == "7d":
             review_cadence = "72h"
+
+    payments = next((dimension for dimension in dimensions if dimension.get("dimension") == "payments"), None)
+    payments_score = int((payments or {}).get("score") or 0)
+    payments_details = (payments or {}).get("details", {})
+    eth_aligned_share_30d_pp = payments_details.get("eth_aligned_share_30d_pp")
+    net_issued_30d_pct_of_circulation = payments_details.get("net_issued_30d_pct_of_circulation")
+    reserve_report_freshness_days = payments_details.get("reserve_report_freshness_days")
+    redeemability_state = str(payments_details.get("redeemability_state") or "")
+    if payments_score <= -20 or redeemability_state in {"Redeemability stress", "Redeemability under pressure"}:
+        risk_triggers.append("USDC / payment rail structure is deteriorating materially")
+        if review_cadence == "7d":
+            review_cadence = "72h"
+    if net_issued_30d_pct_of_circulation is not None and float(net_issued_30d_pct_of_circulation) <= -5.0:
+        risk_triggers.append("USDC is seeing meaningful net redemptions versus current circulation")
+    if reserve_report_freshness_days is not None and int(float(reserve_report_freshness_days)) > 21:
+        risk_triggers.append("Circle reserve transparency snapshot is getting stale")
+    if eth_aligned_share_30d_pp is not None and float(eth_aligned_share_30d_pp) <= -1.0:
+        invalidation_conditions.append("ETH-aligned settlement rails keep losing stablecoin share")
 
     return {
         "stance": stance,

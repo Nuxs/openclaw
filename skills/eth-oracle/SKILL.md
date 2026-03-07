@@ -122,7 +122,7 @@ Do not let narratives silently masquerade as facts.
 
 ### 4. Score the system
 
-Use the six-dimension engine for quantitative backbone:
+Use the seven-dimension engine for quantitative backbone:
 
 - on-chain
 - technical
@@ -130,6 +130,7 @@ Use the six-dimension engine for quantitative backbone:
 - sentiment
 - behavioral
 - DeFi / ecosystem
+- payments / stablecoin rails (Circle / USDC / settlement structure)
 
 Use `scripts/eth_oracle.py` as the executable backbone and `references/geopolitical-model.md` for macro transmission logic.
 
@@ -213,6 +214,7 @@ Use the current command entry points below.
 python3 scripts/eth_oracle.py --full
 python3 scripts/eth_oracle.py --json
 python3 scripts/eth_oracle.py --dimension macro
+python3 scripts/eth_oracle.py --dimension payments
 python3 scripts/eth_oracle_longterm.py run
 python3 scripts/eth_oracle_backtest.py --years 9 --all --horizon 30 --show 0
 ```
@@ -237,7 +239,7 @@ When invoked in normal analysis mode, structure the work in this order:
 
 1. Mandate
 2. Evidence status
-3. Six-dimension analytical read
+3. Seven-dimension analytical read
 4. Governing conclusion
 5. Counter-view
 6. Risks / unknowns

@@ -20,6 +20,7 @@ from oracle_engine import (
     WEIGHTS,
     _score_behavioral_from_klines,
     _score_onchain_price_signals,
+    _score_payments_from_market_caps,
     _score_sentiment_from_components,
     _score_technical_from_klines,
     compute_composite,
@@ -31,6 +32,7 @@ from oracle_engine import (
     score_defi,
     score_macro,
     score_onchain,
+    score_payments,
     score_sentiment,
     score_technical,
 )
@@ -43,7 +45,7 @@ def main() -> None:
     parser.add_argument(
         "--dimension",
         type=str,
-        choices=["onchain", "technical", "macro", "sentiment", "defi", "behavioral"],
+        choices=["onchain", "technical", "macro", "sentiment", "defi", "behavioral", "payments"],
         help="Run single dimension",
     )
     parser.add_argument("--score-only", action="store_true", help="Output only composite score (integer)")
@@ -60,6 +62,7 @@ def main() -> None:
         "sentiment": score_sentiment,
         "behavioral": score_behavioral,
         "defi": score_defi,
+        "payments": score_payments,
     }
 
     if args.dimension:

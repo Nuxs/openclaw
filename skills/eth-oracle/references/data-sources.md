@@ -86,6 +86,25 @@ curl "https://api.llama.fi/overview/dexs/ethereum"
 curl "https://stablecoins.llama.fi/stablecoinchains"
 ```
 
+## Payments & Stablecoin Rails
+
+### Live Payment-Rail Dimension Inputs
+
+```bash
+# Stablecoin asset + chain distribution (current / prev month)
+curl "https://stablecoins.llama.fi/stablecoins"
+
+# Stablecoin prices for de-peg checks
+curl "https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether,dai&vs_currencies=usd"
+```
+
+Used to score:
+
+- USDC supply growth / contraction
+- USDC share of global stablecoin structure
+- ETH-aligned rail share vs. competing rails
+- Tier 1 stablecoin de-peg conditions
+
 ## Technical Data
 
 ### Binance Public API (Free, no key for market data)
