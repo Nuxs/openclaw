@@ -1,7 +1,7 @@
 ---
 name: web3-market-rectification-plan
-version: v1.0
-updated: 2026-03-03
+version: v1.1
+updated: 2026-03-04
 status: active
 owner: OpenClaw Web3 扩展团队
 ---
@@ -24,6 +24,7 @@ owner: OpenClaw Web3 扩展团队
 - **权威账本**：`market.ledger.append` 只能由 Provider 写入，Consumer 不能伪造。
 - **双存储一致性**：File/SQLite 行为必须一致，并通过双模式测试验证。
 - **不破坏现有行为**：不得改变 `/pay_status` 既有语义。
+- **文档口径与实现一致**：协议字段、状态机与完成度声明必须能在代码中复核；TODO/空函数不得写成“已完成”。
 
 ### 进度快照（2026-03-03）
 

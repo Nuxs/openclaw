@@ -18,6 +18,26 @@ Use this skill when working on:
 - Token handling, auditing, and settlement/ledger alignment
 - **Discovery Network (Phase 4)**: `extensions/web3-core/src/discovery/` — P2P resource discovery, libp2p integration (P0/P1 scope; P2 by ally agent per `references/web3-mdl-libp2p-discovery-plan.md`)
 
+## Implementation Status (as of 2026-03-04)
+
+**Completed**:
+
+- ✅ B-1: Decentralized brain switch (resolve_stream_fn hook)
+- ✅ B-2: Resource sharing market (resources/leases/ledger)
+- ✅ Phase 1: Reward lifecycle（create → issueClaim → status update / poll confirm）
+  - 说明：`market-core` 已实现创建、签发、状态机校验与确认回写；“链上提交”依赖外部执行/上游调用，不应默认表述为插件内部自动完成。
+- ✅ Dispute data source unification (web3-core dispute interfaces delegated to market-core)
+- ✅ TON transaction receipt query (getTransactionReceipt)
+- ✅ Capabilities Catalog: covers core, resources, market, monitor, tools, **reward**
+
+**In Progress / Pending**:
+
+- Task market protocol
+- Full arbitration system
+- Independent index service
+- Monitoring & alerting
+- Web management console
+
 ## References (source of truth)
 
 Read these files as needed:

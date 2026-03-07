@@ -19,31 +19,42 @@ description: "Web3 双栈支付与结算参考：TON/EVM 两端支付、统一�
 
 ### 2.1 支付入口（PaymentIntent）
 
-PaymentIntent 是“用户选择链与资产”的最小表达：
+PaymentIntent 是“用户选择链与资产”的统一对象（以 `extensions/market-core/src/market/types.ts` 为准）：
 
+- `intentId`: 支付意图 ID
 - `chain`: `"ton" | "evm"`
-- `asset`: 例如 `"TON" | "JETTON:<address>" | "ERC20:<address>" | "NATIVE"`
+- `asset`: 资产标识（例如 `"TON"` / `"ERC20:<address>"`）
 - `amount`: 字符串（避免精度丢失）
-- `expiresAt`: ISO 时间
+- `currency`: 计价币种（例如 `"USD"`）
+- `orderId?`: 可选关联订单
+- `createdAt`: ISO 时间
 
 示例（仅示意，地址为占位符）：
 
 ```json
 {
+  "intentId": "pi_001",
   "chain": "ton",
   "asset": "TON",
   "amount": "1.25",
-  "expiresAt": "2026-02-22T12:00:00.000Z"
+  "currency": "USD",
+  "orderId": "order_001",
+  "createdAt": "2026-02-22T12:00:00.000Z"
 }
 ```
 
 ### 2.2 支付回执（PaymentReceipt）
 
-PaymentReceipt 是链上最小披露：
+PaymentReceipt 是链上最小披露统一对象（链特有细节可放扩展元数据，不进入统一主字段）：
 
-- TON：`txHash`/`seqno`/`network`/`amount`/`confirmedAt`
-- EVM：`txHash`/`chainId`/`tokenAddress?`/`amount`/`block`
-- 通用：`mode`（`"live"` 或 `"simulated"`，区分真实回执与演示/测试回执）
+- `receiptId?`
+- `chain`
+- `network?`
+- `txHash?`
+- `amount?`
+- `tokenAddress?`
+- `confirmedAt?`
+- `mode`（`"live"` 或 `"simulated"`，区分真实回执与演示/测试回执）
 
 > **关系约束**：一笔 Order 对应一笔 PaymentReceipt（1:1）。部分支付/补差价场景暂不支持，后续如需 1:N 关系在此扩展。
 
@@ -72,14 +83,15 @@ PaymentReceipt 是链上最小披露：
 - **对外标价优先稳定币口径**（例如 USD 计价）
 - 用户可用 TON/EVM 支付时，后台根据 FXQuote 换算
 
-FXQuote 的最小结构：
+FXQuote 的最小结构（以 `market/types.ts` 为准）：
 
-- `base`: 计价资产（例如 USD）
-- `quote`: 支付资产（例如 TON / USDC / Jetton）
-- `rate`: base/quote
+- `quoteId`: 报价 ID
+- `fromAsset`: 源资产（例如 `"USD"`）
+- `toAsset`: 目标资产（例如 `"TON"` / `"USDC"`）
+- `rate`: 汇率字符串
 - `source`: 报价来源标识（例如 `"binance-spot"` / `"pyth-oracle"` / `"manual"`）
 - `expiresAt`: 过期时间
-- `roundingRule`: 取整规则（例如 `"round-half-up"` / `"ceil"` / `"floor"`，默认 `"round-half-up"`）
+- `roundingRule?`: 取整规则（`"floor"` / `"ceil"` / `"nearest"`）
 
 > 候选报价来源与选型 tradeoff 见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` §3.3。MVP 阶段建议 CEX API + 手动 fallback。
 
@@ -132,9 +144,10 @@ FXQuote 的最小结构：
 ## 6. 与现有模块的对齐（当前事实 vs 规划）
 
 - **已存在（EVM 主线）**：SIWE 身份、EVM audit anchoring、market-core escrow settlement、资源租约与 Provider 权威账本、dispute 机制、索引签名验证与 endpoint 脱敏。
-- **规划中（TON 融合）**：将 TON 支付/回执/结算能力纳入统一口径；链交互将由 `extensions/blockchain-adapter` 的 TON provider 抽象承接（补充：EVM escrow 侧已通过 blockchain-adapter 的 EVM provider 发送合约交易）。
+- **已实现（TON 融合）**：TON 支付/回执/结算主路径已纳入统一口径；链交互由 `extensions/blockchain-adapter` 的 TON provider 抽象承接（详见 `docs/web3/TON_E2E_SETTLEMENT.md`）。
+- **边界说明**：TON provider 事件轮询链路存在待实现项（`checkNewTransactions()` 仍为 TODO），当前文档按已实现主路径描述，不将该轮询能力表述为已完成。
 
-> 本文档只定义口径与输出格式；具体实现以 `web3-core`/`market-core` 的后续开发为准。
+> 本文档只定义口径与输出格式；具体实现以 `web3-core`/`market-core` 当前代码为准。
 
 ---
 

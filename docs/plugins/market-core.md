@@ -14,18 +14,20 @@
 
 ### 研究与场景对齐
 
-- **控制感与收益感**: 设计将“用途约束 + 签名同意 + 审计回放”作为强制路径，满足控制感与收益可追溯诉求（参考 [BMC 研究](https://link.springer.com/article/10.1186/s12911-019-0886-9) 与 [2024 研究](https://link.springer.com/10.1186/s13690-024-01416-z)）。
-- **数据层面的透明度**: 透明度摘要与链路追踪直接展示“使用了哪些数据、产生了什么影响”，符合用户偏好的数据级解释（参考 [隐私偏好研究](https://link.springer.com/article/10.1007/s12525-020-00447-y)）。
+- **控制感与收益感**: 设计将"用途约束 + 签名同意 + 审计回放"作为强制路径，满足控制感与收益可追溯诉求（参考 [BMC 研究](https://link.springer.com/article/10.1186/s12911-019-0886-9) 与 [2024 研究](https://link.springer.com/10.1186/s13690-024-01416-z)）。
+- **数据层面的透明度**: 透明度摘要与链路追踪直接展示"使用了哪些数据、产生了什么影响"，符合用户偏好的数据级解释（参考 [隐私偏好研究](https://link.springer.com/article/10.1007/s12525-020-00447-y)）。
 - **合规可追溯**: 以哈希锚定实现最小披露与争议举证能力，契合欧盟 EHDS 对个人控制与二次使用治理的趋势（参考 [EHDS](https://health.ec.europa.eu/ehealth-digital-health-and-care/european-health-data-space-regulation-ehds_en)）。
 
 ### 核心对象
 
 `market-core` 同时覆盖两条能力链路：
 
-- **交易与结算市场**：Offer/Order/Consent/Delivery/Settlement（面向“买卖与托管”）。
-- **资源共享市场**：Resource/Lease/Ledger（面向“出租能力并由 Provider 权威记账”）。
+- **交易与结算市场**：Offer/Order/Consent/Delivery/Settlement（面向"买卖与托管"）。
+- **资源共享市场**：Resource/Lease/Ledger（面向"出租能力并由 Provider 权威记账"）。
 
-并且在产品口径上遵循“**支付双入口，结算单出口**”：统一口径已定义（见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`），但当前可落地路径仍以 **EVM** 为主；TON 支付入口与统一回执/编排仍处于规划阶段。
+并且在产品口径上遵循"**支付双入口，结算单出口**"：统一口径已定义（见 `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` 与 `docs/reference/web3-dual-stack-payments-and-settlement.md`），当前 **EVM** 路径已成熟，**TON** 主路径（支付/回执/结算）已实现（见 `docs/web3/TON_E2E_SETTLEMENT.md`）。
+
+边界说明：TON provider 事件轮询链路中的 `checkNewTransactions()` 当前仍为 TODO，不计入“已完成”能力。
 
 - **Offer**: 资产发布与定价信息，包含 `assetId`、`assetType`、`usageScope` 与 `offerHash`。
 - **Order**: 订单状态机与支付托管状态。

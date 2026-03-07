@@ -1,7 +1,7 @@
 # AI Steward Golden Path for Web3 Market
 
-> **Status**: Draft
-> **Updated**: 2026-02-23
+> **Status**: Stable
+> **Updated**: 2026-03-04
 > **Scope**: Web3 Market steward operations (identity, billing, audit, market health)
 
 This guide describes the minimal, safe, repeatable path for an AI steward to operate Web3 Market in OpenClaw. It focuses on observable state, redaction rules, and minimal next actions.
@@ -11,6 +11,7 @@ This guide describes the minimal, safe, repeatable path for an AI steward to ope
 - **Read first**: Always inspect capabilities and summaries before proposing actions.
 - **No secrets in outputs**: Never emit `accessToken`, provider endpoints, or real file paths.
 - **Prefer stable APIs**: Use `web3.capabilities.*` and only call `stable` methods unless explicitly authorized.
+- **Do not over-claim implementation**: If a capability has TODO/placeholder boundaries in code, report it as limited rather than completed.
 - **One action at a time**: Provide a single minimal next action after diagnosis.
 
 ## Primary entrypoints
