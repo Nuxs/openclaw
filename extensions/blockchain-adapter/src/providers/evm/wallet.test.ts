@@ -77,7 +77,7 @@ describe("EvmWallet", () => {
       version: "1",
       chainId: 11155111,
       verifyingContract: "0x0000000000000000000000000000000000000001",
-    };
+    } as const;
     const types = {
       Proof: [{ name: "taskId", type: "string" }],
     };

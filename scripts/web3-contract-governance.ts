@@ -4,16 +4,17 @@ import {
   buildWeb3ContractSnapshot,
   collectGovernanceIssues,
   compareSnapshots,
-  formatIssues,
   readCommittedWeb3ContractSnapshot,
   writeWeb3ContractSnapshot,
   WEB3_CONTRACT_SNAPSHOT_PATH,
 } from "../src/web3-contracts/governance.js";
+import { formatGovernanceReport } from "../src/web3-contracts/report.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const args = new Set(process.argv.slice(2));
 const checkOnly = args.has("--check");
+const reportOnly = args.has("--report");
 
 if (checkOnly && args.has("--write")) {
   console.error("Use either --check or --write, not both.");
@@ -23,24 +24,33 @@ if (checkOnly && args.has("--write")) {
 async function main() {
   const snapshot = await buildWeb3ContractSnapshot(repoRoot);
   const governanceIssues = collectGovernanceIssues(snapshot);
+  const committed = await readCommittedWeb3ContractSnapshot(repoRoot);
+  const snapshotIssues = compareSnapshots(committed, snapshot);
+  const report = formatGovernanceReport({
+    currentSnapshot: committed,
+    nextSnapshot: snapshot,
+    governanceIssues,
+    snapshotIssues,
+  });
 
   if (checkOnly) {
-    const committed = await readCommittedWeb3ContractSnapshot(repoRoot);
-    const snapshotIssues = compareSnapshots(committed, snapshot);
     const issues = [...governanceIssues, ...snapshotIssues];
     if (issues.length === 0) {
       console.log(`OK ${WEB3_CONTRACT_SNAPSHOT_PATH}`);
       return;
     }
-    console.error(formatIssues(issues));
+    console.error(report);
     process.exit(1);
   }
 
-  await writeWeb3ContractSnapshot(repoRoot, snapshot);
-  if (governanceIssues.length > 0) {
-    console.warn(formatIssues(governanceIssues));
+  if (reportOnly) {
+    console.log(report);
+    return;
   }
+
+  await writeWeb3ContractSnapshot(repoRoot, snapshot);
   console.log(`Wrote ${WEB3_CONTRACT_SNAPSHOT_PATH}`);
+  console.log(report);
 }
 
 main().catch((error) => {
