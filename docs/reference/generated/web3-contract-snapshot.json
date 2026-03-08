@@ -1115,6 +1115,11 @@
           "required": ["actorId", "resourceId", "consumerActorId", "ttlMs"],
           "type": "object"
         },
+        "prerequisites": [
+          "Docs: /reference/web3-resource-market-api",
+          "Docs: /reference/web3-eaas-protocol-spec",
+          "Note: Access tokens are stored internally and must not be returned in tool outputs."
+        ],
         "pricing": {
           "requiresPreLock": true
         },
@@ -1449,6 +1454,10 @@
           },
           "type": "object"
         },
+        "prerequisites": [
+          "Docs: /reference/web3-eaas-protocol-spec",
+          "Docs: /reference/web3-dual-stack-payments-and-settlement"
+        ],
         "returns": "Reconciliation summary payload with payment receipt, ledger/dispute overview, and service proof summary.",
         "risk": {
           "level": "low"
@@ -1989,6 +1998,10 @@
           "required": ["actorId", "orderId", "proof"],
           "type": "object"
         },
+        "prerequisites": [
+          "Docs: /reference/web3-eaas-protocol-spec",
+          "Docs: /reference/web3-eaas-developer-guide"
+        ],
         "returns": "Service proof submission result with proofId/proofHash and order/settlement status snapshot.",
         "risk": {
           "level": "medium"
@@ -4356,6 +4369,11 @@
           "required": ["actorId", "resourceId", "consumerActorId", "ttlMs"],
           "type": "object"
         },
+        "prerequisites": [
+          "Docs: /reference/web3-resource-market-api",
+          "Docs: /reference/web3-eaas-protocol-spec",
+          "Note: Access tokens are stored internally and must not be returned in tool outputs."
+        ],
         "pricing": {
           "requiresPreLock": true
         },
@@ -4682,6 +4700,10 @@
           },
           "type": "object"
         },
+        "prerequisites": [
+          "Docs: /reference/web3-eaas-protocol-spec",
+          "Docs: /reference/web3-dual-stack-payments-and-settlement"
+        ],
         "returns": "Reconciliation summary payload with payment receipt, ledger/dispute overview, and service proof summary.",
         "risk": {
           "level": "low"
@@ -5213,6 +5235,10 @@
           "required": ["actorId", "orderId", "proof"],
           "type": "object"
         },
+        "prerequisites": [
+          "Docs: /reference/web3-eaas-protocol-spec",
+          "Docs: /reference/web3-eaas-developer-guide"
+        ],
         "returns": "Service proof submission result with proofId/proofHash and order/settlement status snapshot.",
         "risk": {
           "level": "medium"
@@ -6498,7 +6524,15 @@
       "title": "Web3 扩展与 OpenClaw 架构契合度评估报告"
     },
     {
-      "declaredContracts": [],
+      "declaredContracts": [
+        "web3.market.dispute.*",
+        "web3.market.lease.*",
+        "web3.market.ledger.*",
+        "web3.market.resource.*",
+        "web3.market.service.proof.*",
+        "web3.market.settlement.query",
+        "web3.market.status.summary"
+      ],
       "docLayer": "guide",
       "normative": false,
       "path": "docs/concepts/web3-market.md",
@@ -6695,7 +6729,80 @@
       "title": "Web3 Dual-Stack Payments & Settlement (Reference)"
     },
     {
-      "declaredContracts": ["market.dispute.*", "web3.search.query", "web3.storage.*"],
+      "declaredContracts": [
+        "market.*",
+        "market.dispute.open",
+        "market.order.create",
+        "market.settlement.lock",
+        "web3.market.*",
+        "web3.market.dispute.*",
+        "web3.market.dispute.open",
+        "web3.market.lease.*",
+        "web3.market.lease.issue",
+        "web3.market.ledger.*",
+        "web3.market.order.list",
+        "web3.market.reconciliation.summary",
+        "web3.market.resource.*",
+        "web3.market.resource.list",
+        "web3.market.service.proof.*",
+        "web3.market.service.proof.submit",
+        "web3.market.settlement.query",
+        "web3.market.status.summary"
+      ],
+      "docLayer": "guide",
+      "normative": false,
+      "path": "docs/reference/web3-eaas-developer-guide.md",
+      "title": "EaaS Developer Guide: Discovery, MCP Integration, and Industrial Checklists"
+    },
+    {
+      "declaredContracts": [
+        "market.*",
+        "market.audit.query",
+        "market.lease.issue",
+        "market.service.proof.submit",
+        "market.status.summary",
+        "web3.*",
+        "web3.market.*",
+        "web3.market.bridge.*",
+        "web3.market.lease",
+        "web3.market.metrics.snapshot",
+        "web3.market.order.list",
+        "web3.market.reconciliation.summary",
+        "web3.market.reputation.summary",
+        "web3.market.settlement.query",
+        "web3.market.status.summary",
+        "web3.market.tokenEconomy.*"
+      ],
+      "docLayer": "reference",
+      "normative": false,
+      "path": "docs/reference/web3-eaas-protocol-spec.md",
+      "title": "EaaS Protocol Spec (Industrial): Interfaces, Schemas, State Machines"
+    },
+    {
+      "declaredContracts": [
+        "market.*",
+        "market.order.create",
+        "market.settlement.lock",
+        "web3.*",
+        "web3.market.*",
+        "web3.market.lease.issue",
+        "web3.market.resource.list",
+        "web3.market.service.proof.submit"
+      ],
+      "docLayer": "guide",
+      "normative": false,
+      "path": "docs/reference/web3-eaas-protocol-upgrade-report-2026.md",
+      "title": "OpenClaw Agent Economy: Everything as a Service (EaaS) Protocol Upgrade Report (2026)"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "guide",
+      "normative": false,
+      "path": "docs/reference/web3-everything-as-a-service-vision.md",
+      "title": "OpenClaw Agent Economy: Everything as a Service Protocol"
+    },
+    {
+      "declaredContracts": [],
       "docLayer": "historical",
       "normative": false,
       "path": "docs/reference/web3-free-market-technical-doc.md",

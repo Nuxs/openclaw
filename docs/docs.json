@@ -1329,12 +1329,17 @@
                       "reference/web3-market-dev",
                       "reference/web3-resource-market-api",
                       "reference/web3-dual-stack-payments-and-settlement",
-                      "reference/web3-market-output-redaction"
+                      "reference/web3-market-output-redaction",
+                      "reference/web3-eaas-protocol-spec",
+                      "reference/web3-eaas-developer-guide"
                     ]
                   },
                   {
                     "group": "Plan and historical",
                     "pages": [
+                      "reference/web3-everything-as-a-service-vision",
+                      "reference/web3-eaas-protocol-upgrade-report-2026",
+                      "reference/ai-steward-service-market-plan",
                       "reference/web3-market-tools-review",
                       "reference/web3-free-market-technical-doc",
                       "assessments/web3-fitness-report"
