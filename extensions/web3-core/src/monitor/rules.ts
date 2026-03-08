@@ -188,12 +188,98 @@ const P2_RULES: AlertRule[] = [
 ];
 
 /**
+ * Task Market Rules
+ */
+const TASK_RULES: AlertRule[] = [
+  {
+    name: "task_failures_spike",
+    level: AlertLevel.P1,
+    category: AlertCategory.TASK,
+    description: "Multiple task delivery failures detected",
+    condition: (ctx) => (ctx.taskFailureCount ?? 0) > 10,
+    messageTemplate: "📋 Task Failures: {taskFailureCount} task failures need attention",
+    enabled: true,
+    cooldownMs: 15 * 60 * 1000,
+  },
+  {
+    name: "expired_tasks_backlog",
+    level: AlertLevel.P2,
+    category: AlertCategory.TASK,
+    description: "Multiple tasks expired without completion",
+    condition: (ctx) => (ctx.expiredTaskCount ?? 0) > 5,
+    messageTemplate: "⏰ Expired Tasks: {expiredTaskCount} tasks expired without delivery",
+    enabled: true,
+    cooldownMs: 60 * 60 * 1000,
+  },
+];
+
+/**
+ * Privacy / Consent Rules
+ */
+const PRIVACY_RULES: AlertRule[] = [
+  {
+    name: "consent_erase_pending",
+    level: AlertLevel.P1,
+    category: AlertCategory.PRIVACY,
+    description: "Revoked consents have pending data erasure",
+    condition: (ctx) => (ctx.revokedConsentsPendingErase ?? 0) > 0,
+    messageTemplate:
+      "🔐 Privacy: {revokedConsentsPendingErase} revoked consents pending data erasure",
+    enabled: true,
+    cooldownMs: 30 * 60 * 1000,
+  },
+  {
+    name: "privacy_replay_failures",
+    level: AlertLevel.P2,
+    category: AlertCategory.PRIVACY,
+    description: "Privacy replay generation failures detected",
+    condition: (ctx) => (ctx.privacyReplayFailures ?? 0) > 3,
+    messageTemplate: "🔐 Privacy Replay: {privacyReplayFailures} replay generation failures",
+    enabled: true,
+    cooldownMs: 60 * 60 * 1000,
+  },
+];
+
+/**
+ * Discovery Rules
+ */
+const DISCOVERY_RULES: AlertRule[] = [
+  {
+    name: "discovery_unhealthy",
+    level: AlertLevel.P0,
+    category: AlertCategory.DISCOVERY,
+    description: "Service discovery is unavailable or degraded",
+    condition: (ctx) => ctx.discoveryHealthy === false,
+    messageTemplate: "🔍 Discovery Down: service discovery unavailable, falling back to static",
+    enabled: true,
+    cooldownMs: 5 * 60 * 1000,
+  },
+  {
+    name: "discovery_stale_records",
+    level: AlertLevel.P2,
+    category: AlertCategory.DISCOVERY,
+    description: "High number of stale discovery records",
+    condition: (ctx) => (ctx.discoveryStaleRecords ?? 0) > 20,
+    messageTemplate: "🔍 Stale Records: {discoveryStaleRecords} stale discovery entries",
+    enabled: true,
+    cooldownMs: 60 * 60 * 1000,
+  },
+];
+
+/**
  * All alert rules registry
  */
 export const ALERT_RULES: Record<string, AlertRule> = {};
 
 // Register all rules
-[...P0_RULES, ...P1_RULES, ...P2_RULES].forEach((rule) => {
+[
+  ...P0_RULES,
+  ...P1_RULES,
+  ...P2_RULES,
+  ...TASK_RULES,
+  ...PRIVACY_RULES,
+  ...DISCOVERY_RULES,
+].forEach((rule) => {
   ALERT_RULES[rule.name] = rule;
 });
 
@@ -249,6 +335,24 @@ export function formatAlertMessage(template: string, ctx: AlertContext): string 
   }
   if (ctx.settlementPending) {
     message = message.replace("{settlementPending}", ctx.settlementPending.toString());
+  }
+  if (ctx.taskFailureCount) {
+    message = message.replace("{taskFailureCount}", ctx.taskFailureCount.toString());
+  }
+  if (ctx.expiredTaskCount) {
+    message = message.replace("{expiredTaskCount}", ctx.expiredTaskCount.toString());
+  }
+  if (ctx.revokedConsentsPendingErase) {
+    message = message.replace(
+      "{revokedConsentsPendingErase}",
+      ctx.revokedConsentsPendingErase.toString(),
+    );
+  }
+  if (ctx.privacyReplayFailures) {
+    message = message.replace("{privacyReplayFailures}", ctx.privacyReplayFailures.toString());
+  }
+  if (ctx.discoveryStaleRecords) {
+    message = message.replace("{discoveryStaleRecords}", ctx.discoveryStaleRecords.toString());
   }
 
   return message;

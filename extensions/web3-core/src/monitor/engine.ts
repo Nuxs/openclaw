@@ -262,6 +262,9 @@ export class AlertEngine {
       [AlertCategory.STORAGE]: 0,
       [AlertCategory.CHAIN]: 0,
       [AlertCategory.DISPUTE]: 0,
+      [AlertCategory.TASK]: 0,
+      [AlertCategory.PRIVACY]: 0,
+      [AlertCategory.DISCOVERY]: 0,
     };
     for (const alert of alerts) {
       alertsByCategory[alert.category]++;

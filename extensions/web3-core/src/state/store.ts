@@ -126,6 +126,15 @@ export type P2pPeerRecord = {
   source?: string;
 };
 
+export type DiscoveryIdentityRecord = {
+  providerId: string;
+  peerId: string;
+  actorId: string;
+  did?: string;
+  publicKey?: string;
+  updatedAt: string;
+};
+
 export type AnchorReceipt = {
   anchorId: string;
   tx: string;
@@ -389,6 +398,10 @@ export class Web3StateStore {
     return join(this.dir, "p2p-peers.json");
   }
 
+  private get discoveryIdentityPath() {
+    return join(this.dir, "identity-map.json");
+  }
+
   getP2pPeers(): P2pPeerRecord[] {
     if (!existsSync(this.p2pPeersPath)) return [];
     return JSON.parse(readFileSync(this.p2pPeersPath, "utf-8")) as P2pPeerRecord[];
@@ -418,6 +431,28 @@ export class Web3StateStore {
       this.saveP2pPeers(filtered);
     }
     return list.length - filtered.length;
+  }
+
+  getDiscoveryIdentityMap(): DiscoveryIdentityRecord[] {
+    if (!existsSync(this.discoveryIdentityPath)) return [];
+    return JSON.parse(
+      readFileSync(this.discoveryIdentityPath, "utf-8"),
+    ) as DiscoveryIdentityRecord[];
+  }
+
+  saveDiscoveryIdentityMap(entries: DiscoveryIdentityRecord[]): void {
+    writeFileSync(this.discoveryIdentityPath, JSON.stringify(entries, null, 2));
+  }
+
+  upsertDiscoveryIdentity(entry: DiscoveryIdentityRecord): void {
+    const list = this.getDiscoveryIdentityMap();
+    const index = list.findIndex((item) => item.providerId === entry.providerId);
+    if (index >= 0) {
+      list[index] = entry;
+    } else {
+      list.push(entry);
+    }
+    this.saveDiscoveryIdentityMap(list);
   }
 
   // ---- Pending settlements (retry queue) ----

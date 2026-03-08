@@ -43,6 +43,11 @@ export type DiscoveryResourceSummary = {
 
 /** A verifiable summary of a provider's offerings, propagated via
  *  DHT / Rendezvous. Contains NO endpoint, multiaddr, or token. */
+export type DiscoveryRecordIdentity = {
+  actorId?: string;
+  did?: string;
+};
+
 export type DiscoveryRecord = {
   providerId: string;
   peerId: string;
@@ -51,6 +56,7 @@ export type DiscoveryRecord = {
   updatedAt: string;
   expiresAt?: string;
   signature?: IndexSignature & { payloadVersion: 2 };
+  identity?: DiscoveryRecordIdentity;
 };
 
 // ---------------------------------------------------------------------------

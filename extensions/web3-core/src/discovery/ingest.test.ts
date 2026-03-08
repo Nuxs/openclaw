@@ -56,6 +56,7 @@ function makeSignedRecord(
 function createMockStore() {
   const indexEntries: ResourceIndexEntry[] = [];
   const peerRecords: P2pPeerRecord[] = [];
+  const identityRecords: Array<{ providerId: string; peerId: string; actorId: string }> = [];
 
   return {
     upsertResourceIndex: vi.fn((entry: ResourceIndexEntry) => {
@@ -68,8 +69,16 @@ function createMockStore() {
       if (idx >= 0) peerRecords[idx] = entry;
       else peerRecords.push(entry);
     }),
+    upsertDiscoveryIdentity: vi.fn(
+      (entry: { providerId: string; peerId: string; actorId: string }) => {
+        const idx = identityRecords.findIndex((e) => e.providerId === entry.providerId);
+        if (idx >= 0) identityRecords[idx] = entry;
+        else identityRecords.push(entry);
+      },
+    ),
     getIndexEntries: () => indexEntries,
     getPeerRecords: () => peerRecords,
+    getIdentityRecords: () => identityRecords,
   };
 }
 
@@ -90,6 +99,7 @@ describe("ingestDiscoveryRecords", () => {
     expect(result.rejected).toBe(0);
     expect(store.upsertResourceIndex).toHaveBeenCalledOnce();
     expect(store.upsertP2pPeer).toHaveBeenCalledOnce();
+    expect(store.upsertDiscoveryIdentity).toHaveBeenCalledOnce();
 
     // Verify the index entry shape
     const entry = store.getIndexEntries()[0]!;
@@ -103,6 +113,10 @@ describe("ingestDiscoveryRecords", () => {
     const peer = store.getPeerRecords()[0]!;
     expect(peer.peerId).toBe("12D3KooWTest");
     expect(peer.transport).toBe("dht");
+
+    const identity = store.getIdentityRecords()[0]!;
+    expect(identity.providerId).toBe("provider-test");
+    expect(identity.peerId).toBe("12D3KooWTest");
   });
 
   it("rejects expired records", () => {

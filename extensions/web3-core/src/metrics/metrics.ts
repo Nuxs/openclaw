@@ -236,6 +236,14 @@ function buildWeb3MetricsSnapshot(store: Web3StateStore, config: Web3PluginConfi
       total: resourceTotal,
       byKind: resourceByKind,
     },
+    discovery: {
+      peers: store.getP2pPeers().length,
+      identities: store.getDiscoveryIdentityMap().length,
+      staleRecords: store.getP2pPeers().filter((p) => {
+        const ts = Date.parse(p.lastSeenAt);
+        return !Number.isNaN(ts) && now - ts > 24 * 60 * 60 * 1000;
+      }).length,
+    },
     alerts,
   };
 }

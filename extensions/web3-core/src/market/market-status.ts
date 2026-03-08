@@ -66,6 +66,21 @@ type LedgerSummary = {
   recentCount?: number;
 };
 
+type TaskMarketSummary = {
+  total: number;
+  byStatus: Record<string, number>;
+  openTasks: number;
+  awardedTasks: number;
+  closedTasks: number;
+};
+
+type PrivacyConsentSummary = {
+  total: number;
+  activeConsents: number;
+  revokedConsents: number;
+  pendingErasure: number;
+};
+
 export type Web3MarketStatusProfile = "fast" | "deep";
 
 export type Web3MarketStatusSummary = {
@@ -81,6 +96,8 @@ export type Web3MarketStatusSummary = {
     resources?: ResourceSummary;
     leases?: LeaseSummary;
     ledger?: LedgerSummary;
+    tasks?: TaskMarketSummary;
+    privacy?: PrivacyConsentSummary;
     errors?: string[];
   };
 };
@@ -291,6 +308,12 @@ export async function buildWeb3MarketStatusSummary(params: {
   const marketStatusPromise = callGatewayMethod(params.config, "web3.market.status.summary", {});
   const ledgerSummaryPromise = callGatewayMethod(params.config, "web3.market.ledger.summary", {});
 
+  // Task and privacy probes — always fetched for complete AI管家 operational view
+  const taskListPromise = callGatewayMethod(params.config, "market.task.list", { limit: 200 });
+  const consentListPromise = callGatewayMethod(params.config, "market.consent.list", {
+    limit: 200,
+  });
+
   const resourcesPromise =
     profile === "deep"
       ? callGatewayMethod(params.config, "web3.market.resource.list", { limit: resourceLimit })
@@ -304,15 +327,25 @@ export async function buildWeb3MarketStatusSummary(params: {
       ? callGatewayMethod(params.config, "web3.market.ledger.list", { limit: ledgerLimit })
       : null;
 
-  const [web3StatusRes, marketStatusRes, ledgerSummaryRes, resourcesRes, leasesRes, ledgerListRes] =
-    await Promise.all([
-      web3StatusPromise,
-      marketStatusPromise,
-      ledgerSummaryPromise,
-      resourcesPromise,
-      leasesPromise,
-      ledgerListPromise,
-    ]);
+  const [
+    web3StatusRes,
+    marketStatusRes,
+    ledgerSummaryRes,
+    taskListRes,
+    consentListRes,
+    resourcesRes,
+    leasesRes,
+    ledgerListRes,
+  ] = await Promise.all([
+    web3StatusPromise,
+    marketStatusPromise,
+    ledgerSummaryPromise,
+    taskListPromise,
+    consentListPromise,
+    resourcesPromise,
+    leasesPromise,
+    ledgerListPromise,
+  ]);
 
   if (web3StatusRes.ok) {
     runtime.web3Status = redactUnknown(web3StatusRes.result);
@@ -374,6 +407,44 @@ export async function buildWeb3MarketStatusSummary(params: {
   }
   if (Object.keys(ledger).length > 0) {
     runtime.ledger = ledger;
+  }
+
+  // ── Task market aggregation ──
+  if (taskListRes.ok) {
+    const payload = taskListRes.result as { tasks?: Array<unknown> } | undefined;
+    const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
+    const byStatus = countByStatus(tasks);
+    runtime.tasks = {
+      total: tasks.length,
+      byStatus,
+      openTasks: byStatus["task_open"] ?? 0,
+      awardedTasks: byStatus["task_awarded"] ?? 0,
+      closedTasks: byStatus["task_closed"] ?? 0,
+    };
+  } else {
+    errors.push(`market.task.list: ${taskListRes.error}`);
+  }
+
+  // ── Privacy / consent aggregation ──
+  if (consentListRes.ok) {
+    const payload = consentListRes.result as { consents?: Array<unknown> } | undefined;
+    const consents = Array.isArray(payload?.consents) ? payload.consents : [];
+    const byStatus = countByStatus(consents);
+    const pendingErasure = consents.filter((c) => {
+      if (!c || typeof c !== "object") {
+        return false;
+      }
+      const record = c as { status?: string; erasedAt?: string };
+      return record.status === "consent_revoked" && !record.erasedAt;
+    }).length;
+    runtime.privacy = {
+      total: consents.length,
+      activeConsents: byStatus["consent_granted"] ?? 0,
+      revokedConsents: byStatus["consent_revoked"] ?? 0,
+      pendingErasure,
+    };
+  } else {
+    errors.push(`market.consent.list: ${consentListRes.error}`);
   }
 
   const cached = lastOkRuntimeByProfile[profile];
@@ -440,6 +511,20 @@ export function formatWeb3MarketStatusMessage(summary: Web3MarketStatusSummary):
         ? `recent=${summary.runtime.ledger.recentCount}`
         : "";
     lines.push(`📒 Ledger: ${recent || "ok"}`.trim());
+  }
+
+  if (summary.runtime.tasks) {
+    const t = summary.runtime.tasks;
+    lines.push(
+      `📋 Tasks: total=${t.total} · open=${t.openTasks} · awarded=${t.awardedTasks} · closed=${t.closedTasks}`,
+    );
+  }
+
+  if (summary.runtime.privacy) {
+    const p = summary.runtime.privacy;
+    lines.push(
+      `🔒 Privacy: consents=${p.total} · active=${p.activeConsents} · revoked=${p.revokedConsents} · pendingErase=${p.pendingErasure}`,
+    );
   }
 
   if (summary.runtime.errors && summary.runtime.errors.length > 0) {

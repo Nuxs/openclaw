@@ -27,6 +27,9 @@ export enum AlertCategory {
   STORAGE = "storage",
   CHAIN = "chain",
   DISPUTE = "dispute",
+  TASK = "task",
+  PRIVACY = "privacy",
+  DISCOVERY = "discovery",
 }
 
 /**
@@ -100,6 +103,17 @@ export type AlertContext = {
   pendingTxCount?: number;
   // Dispute
   openDisputesCount?: number;
+  // Task
+  openTaskCount?: number;
+  taskFailureCount?: number;
+  expiredTaskCount?: number;
+  // Privacy
+  revokedConsentsPendingErase?: number;
+  privacyReplayFailures?: number;
+  // Discovery
+  discoveryHealthy?: boolean;
+  discoveryPeerCount?: number;
+  discoveryStaleRecords?: number;
   // General error
   error?: Error;
   errorCode?: string;

@@ -13,6 +13,7 @@
 import { verifyIndexSignature } from "../resources/signature-verification.js";
 import type { P2pPeerRecord, ResourceIndexEntry } from "../state/store.js";
 import type { Web3StateStore } from "../state/store.js";
+import { buildDiscoveryIdentityMapEntry } from "./identity-map.js";
 import type { DiscoveryRecord } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -179,6 +180,10 @@ export function ingestDiscoveryRecords(
 
     store.upsertResourceIndex(indexEntry);
     store.upsertP2pPeer(peerRecord);
+    const identityEntry = buildDiscoveryIdentityMapEntry(record);
+    if (identityEntry) {
+      store.upsertDiscoveryIdentity(identityEntry);
+    }
 
     result.accepted++;
   }

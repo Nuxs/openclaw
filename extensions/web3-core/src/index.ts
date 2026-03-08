@@ -87,6 +87,26 @@ import {
   createMarketDisputeResolveHandler,
   createMarketDisputeRejectHandler,
 } from "./market/handlers.js";
+import {
+  createMarketTaskPublishHandler,
+  createMarketTaskGetHandler,
+  createMarketTaskListHandler,
+  createMarketTaskCancelHandler,
+  createMarketTaskExpireSweepHandler,
+  createMarketTaskBidPlaceHandler,
+  createMarketTaskBidListHandler,
+  createMarketTaskBidAwardHandler,
+  createMarketTaskResultSubmitHandler,
+  createMarketTaskResultReviewHandler,
+  createMarketTaskReceiptGetHandler,
+  createMarketTaskReceiptListHandler,
+  createMarketConsentListHandler,
+  createMarketConsentGetHandler,
+  createMarketPrivacyAssetsHandler,
+  createMarketPrivacyReplayGenerateHandler,
+  createMarketPrivacyReplayListHandler,
+  createMarketPrivacyEraseHandler,
+} from "./market/task-handlers.js";
 import { createWeb3MarketCommand } from "./market/web3-market-command.js";
 import { createWeb3MarketStatusTool } from "./market/web3-market-status-tool.js";
 import {
@@ -430,6 +450,58 @@ const plugin: OpenClawPluginDefinition = {
       "web3.market.dispute.reject",
       createMarketDisputeRejectHandler(config),
     );
+
+    // ── Task Market ──
+    api.registerGatewayMethod("web3.market.task.publish", createMarketTaskPublishHandler(config));
+    api.registerGatewayMethod("web3.market.task.get", createMarketTaskGetHandler(config));
+    api.registerGatewayMethod("web3.market.task.list", createMarketTaskListHandler(config));
+    api.registerGatewayMethod("web3.market.task.cancel", createMarketTaskCancelHandler(config));
+    api.registerGatewayMethod(
+      "web3.market.task.expireSweep",
+      createMarketTaskExpireSweepHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.task.bid.place",
+      createMarketTaskBidPlaceHandler(config),
+    );
+    api.registerGatewayMethod("web3.market.task.bid.list", createMarketTaskBidListHandler(config));
+    api.registerGatewayMethod(
+      "web3.market.task.bid.award",
+      createMarketTaskBidAwardHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.task.result.submit",
+      createMarketTaskResultSubmitHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.task.result.review",
+      createMarketTaskResultReviewHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.task.receipt.get",
+      createMarketTaskReceiptGetHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.task.receipt.list",
+      createMarketTaskReceiptListHandler(config),
+    );
+
+    // ── Privacy / Consent Replay ──
+    api.registerGatewayMethod("web3.market.consent.list", createMarketConsentListHandler(config));
+    api.registerGatewayMethod("web3.market.consent.get", createMarketConsentGetHandler(config));
+    api.registerGatewayMethod(
+      "web3.market.privacy.assets",
+      createMarketPrivacyAssetsHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.privacy.replay.generate",
+      createMarketPrivacyReplayGenerateHandler(config),
+    );
+    api.registerGatewayMethod(
+      "web3.market.privacy.replay.list",
+      createMarketPrivacyReplayListHandler(config),
+    );
+    api.registerGatewayMethod("web3.market.privacy.erase", createMarketPrivacyEraseHandler(config));
     api.registerGatewayMethod(
       "web3.index.report",
       createResourceIndexReportHandler(store, config, {
