@@ -119,9 +119,16 @@
 
 ### 3.2 其他规划
 
-- **"可分享对账摘要"完整闭环**：输出格式已有口径，但需要持续把所有对外输出点收敛为"可复制粘贴传播"的脱敏摘要。
-- **个人数据/私有知识纳入市场**：需要补齐 consent/脱敏/可撤销/合规回放的强约束规范（见本轮新增 skill references）。
-- **任务市场协议（Phase 3）**：`TaskOrder`/`TaskBid`/`TaskResult`/`TaskReceipt` 类型设计完成，代码实现推迟到开源冷启动之后。
+- **个人数据/私有知识纳入市场**：✅ 工业级已实现——consent/脱敏/可撤销/合规回放/删除保留策略强约束规范已落地。
+  - `privacy-replay.ts`：`hashReplaySummary()` 使用 SHA-256（via `hashCanonical`）、`deriveRetentionAction()` 自动推导保留策略、`buildPrivacyReplaySummary()` 生成脱敏摘要。
+  - `handlers/privacy.ts`：consent 查询（scope-aware）、知识资产聚合、回放生成（事务安全 + hash 验证）、删除执行（事务包裹 consent 保存 + replay 擦除）。
+  - AI 助手：`handleQueryConsents`（含 erased/active/revoked 分类、scope 用途展示）、`handleGenerateReplay`（含 replayHash）、`handleEraseData`（含 replayCount 和 erasedAt）。
+- **任务市场协议（Phase 3）**：✅ 工业级已实现——`TaskOrder`/`TaskBid`/`TaskResult`/`TaskReceipt` 全生命周期闭环。
+  - 权威层（`market-core`）：状态机守卫（`task-state-machine.ts`）、事务保护（`store.runInTransaction()`）、审计锚定（`recordAuditWithAnchor()`）。
+  - handler 层：`task-order.ts`（发布/查询/取消/过期清扫，事务包裹写操作）、`task-bid.ts`（竞标/撤回/授标，联动 Order + Settlement lock）、`task-result.ts`（交付/验收，接受触发结算释放+回执生成，拒绝触发争议创建，事务包裹写操作）、`privacy.ts`（SHA-256 哈希替代 hex、事务包裹擦除）。
+  - 编排层（`web3-core`）：`market-status.ts` 新增 `tasks`（TaskMarketSummary）+ `privacy`（PrivacyConsentSummary）聚合字段，始终探测（非仅 deep 模式），格式化输出含任务/隐私摘要行。
+  - 助手层（`MarketAssistant`）：5 个任务 handler（publish/query/bid/submit/review）+ 3 个隐私 handler（queryConsents/generateReplay/eraseData）+ 2 个运营 handler（opsStatus/alerts），全部使用 `paste-safe.ts` 脱敏输出。
+  - UI 层：`types-web3.ts` 已有完整视图模型，`controllers/market-status.ts` 已实现 `loadMarketTasks`/`loadMarketPrivacy`/`loadMarketOps` 懒加载器，`views/` 下已有任务/隐私/运营三个独立区块。
 - **Agent Wallet 统一入口**：✅ 已完成 `web3.wallet.*` 聚合入口与 capabilities catalog 注册，并补齐 proxy 单测。
 
 ---

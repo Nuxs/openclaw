@@ -8,7 +8,7 @@ normative: false
 
 # EaaS Protocol Spec (Industrial): Interfaces, Schemas, State Machines
 
-> 本文是对内工业级规范：用于实现与评审，默认以“代码为真”。
+> 本文是对内工业级规范：用于实现与评审，默认以"代码为真"。
 >
 > 约束：所有示例与字段表遵循最小披露，不得包含 provider endpoint、token、真实本地路径。
 >
@@ -53,9 +53,29 @@ normative: false
 - **Status/Transparency**：`web3.market.status.summary`、`web3.market.reconciliation.summary`
 - **Economy extras**：`web3.market.reputation.summary`、`web3.market.tokenEconomy.*`、`web3.market.bridge.*`、`web3.market.metrics.snapshot`
 
-> 注意：`web3.market.*` 中存在少量“非纯透传”实现（例如 reputation 会补充 ENS 信息、reconciliation 是聚合器）。实现细节与证据路径见开发指南：[/reference/web3-eaas-developer-guide](/reference/web3-eaas-developer-guide)
+> 注意：`web3.market.*` 中存在少量"非纯透传"实现（例如 reputation 会补充 ENS 信息、reconciliation 是聚合器）。实现细节与证据路径见开发指南：[/reference/web3-eaas-developer-guide](/reference/web3-eaas-developer-guide)
 
-### 2.2 内部权威层：`market.*`（稳定合同，以实现为准）
+### 2.2 Task 市场（Implemented）
+
+> 基于 Offer/Order/Settlement 增量建模，不另起平行经济系统。
+
+- **Task Order**：`web3.market.task.publish|get|list|cancel|expireSweep`
+- **Task Bid**：`web3.market.task.bid.place|list|award`
+- **Task Result**：`web3.market.task.result.submit|review`
+- **Task Receipt**：`web3.market.task.receipt.get|list`
+
+内部权威层对应：`market.task.*`（由 `market-core` 执行，`web3-core` 代理）
+
+### 2.3 隐私与 Consent（Implemented）
+
+- **Consent 管理**：`web3.market.consent.list|get`
+- **知识资产**：`web3.market.privacy.assets`
+- **合规回放**：`web3.market.privacy.replay.generate|list`
+- **删除/保留**：`web3.market.privacy.erase`
+
+内部权威层对应：`market.privacy.*`（由 `market-core` 执行）
+
+### 2.4 内部权威层：`market.*`（稳定合同，以实现为准）
 
 已实现的 `market.*` 分组：
 
@@ -70,6 +90,8 @@ normative: false
 - **Lease**：`market.lease.issue|revoke|get|list|expireSweep`
 - **Ledger**：`market.ledger.append|list|summary`
 - **Transparency**：`market.transparency.summary|trace`、`market.audit.query`、`market.status.summary`
+- **Task**：`market.task.*|bid.*|result.*|receipt.*`
+- **Privacy**：`market.consent.*|market.privacy.assets|market.privacy.replay.*|market.privacy.erase`
 
 ---
 
@@ -79,7 +101,7 @@ normative: false
 
 ### 3.1 Resource（资源/服务的可租用表达）
 
-Resource 是“可租用能力”的权威对象：compute/search/storage/service 都可以用 Resource 表达。
+Resource 是"可租用能力"的权威对象：compute/search/storage/service 都可以用 Resource 表达。
 
 核心字段（摘要）：
 
@@ -98,7 +120,7 @@ Resource 是“可租用能力”的权威对象：compute/search/storage/servic
 
 > 现状事实：实现中使用 `serviceSchema`，而不是 `serviceWrapper` 字段。
 
-ServiceSchema 的目标：用标准字段描述“输入/输出/验收约束”，为后续 Proof 与结算提供锚点。
+ServiceSchema 的目标：用标准字段描述"输入/输出/验收约束"，为后续 Proof 与结算提供锚点。
 
 建议字段（与现有实现对齐，细节以代码为准）：
 
@@ -108,7 +130,7 @@ ServiceSchema 的目标：用标准字段描述“输入/输出/验收约束”�
 
 ### 3.3 Lease（租约）
 
-Lease 是“访问权 + 预算门禁”的合同对象，通常由 Consumer 发起、Provider/Market 签发。
+Lease 是"访问权 + 预算门禁"的合同对象，通常由 Consumer 发起、Provider/Market 签发。
 
 - `leaseId`: string
 - `resourceId`: string
@@ -120,7 +142,7 @@ Lease 是“访问权 + 预算门禁”的合同对象，通常由 Consumer 发�
 安全约束：
 
 - `market.lease.issue` 会生成一次性 `accessToken`（内部敏感数据）。
-- 对外工具（如 `web3.market.lease` tool）必须“存 token 不回显”。
+- 对外工具（如 `web3.market.lease` tool）必须"存 token 不回显"。
 
 ### 3.4 LedgerEntry（权威记账条目）
 
@@ -155,7 +177,7 @@ Dispute 是乐观结算的兜底：
 
 > 现状事实：已实现 `service` 专用 proof 提交接口，当前 proof 类型以 `tlsnotary` 为主。
 
-ServiceProof 的目标：提供“交付发生且可验证”的证据锚点，用于自动结算与争议裁决。
+ServiceProof 的目标：提供"交付发生且可验证"的证据锚点，用于自动结算与争议裁决。
 
 - `proofId`: string
 - `orderId`: string
@@ -171,6 +193,78 @@ ExecutionProof（现状最小集）：
 - `verifier`: string
 - `redactedFields?`: string[]
 
+### 3.8 TaskOrder（任务订单）
+
+TaskOrder 是任务市场的核心可交易对象。
+
+核心字段：
+
+- `taskId`: string（UUID）
+- `creatorActorId`: string（发布者）
+- `title`: string
+- `summary?`: string
+- `requirements`: string[]（验收标准）
+- `budget`: { `amount`: string, `currency`: string }
+- `expiryAt`: ISO string
+- `status`: `task_open | task_awarded | task_closed | task_expired | task_cancelled`
+- `awardedBidId?`: string
+- `orderId?` / `settlementId?` / `resultId?`: string
+- `closedAt?` / `cancellationReason?`: string
+- `createdAt` / `updatedAt`: ISO string
+
+### 3.9 TaskBid（任务竞标）
+
+- `bidId`: string（UUID）
+- `taskId`: string
+- `bidderActorId`: string
+- `price`: string
+- `currency`: string
+- `etaHours?`: number
+- `summary?`: string
+- `status`: `bid_submitted | bid_accepted | bid_rejected | bid_withdrawn`
+- `createdAt` / `updatedAt`: ISO string
+
+### 3.10 TaskResult（任务交付物）
+
+- `resultId`: string（UUID）
+- `taskId`: string
+- `bidId`: string
+- `delivererActorId`: string
+- `summary?`: string
+- `artifacts`: string[]
+- `proofIds?`: string[]
+- `status`: `result_submitted | result_accepted | result_rejected`
+- `submittedAt`: ISO string
+- `reviewedAt?` / `reviewNote?`: ISO string | string
+- `updatedAt`: ISO string
+
+### 3.11 TaskReceipt（任务回执）
+
+- `receiptId`: string（UUID）
+- `taskId`: string
+- `bidId`: string
+- `resultId`: string
+- `payerActorId` / `payeeActorId`: string
+- `amount`: string
+- `currency`: string
+- `settlementId`: string
+- `status`: `receipt_pending | receipt_settled | receipt_refunded | receipt_disputed`
+- `createdAt` / `updatedAt`: ISO string
+- `settledAt?` / `disputeId?`: ISO string | string
+
+### 3.12 PrivacyReplay（合规回放）
+
+- `replayId`: string（UUID）
+- `consentId`: string
+- `orderId`: string
+- `taskId?`: string
+- `actorId`: string
+- `status`: `replay_generated | replay_viewed | replay_erased`
+- `summary`: { title, purpose, retentionAction, redactedFields, evidenceRefs, timeline }（脱敏后）
+- `replayHash`: string（`sha256:...`）
+- `generatedAt` / `updatedAt`: ISO string
+- `erasedAt?` / `eraseReason?`: ISO string | string
+
 ---
 
 ## 4. 状态机与前置条件（Industrial）
@@ -181,15 +275,63 @@ ExecutionProof（现状最小集）：
 
 - `order_created` → `payment_locked` → `consent_granted` → `delivery_ready` → `delivery_completed` → `settlement_completed`
 
-### 4.2 证明提交前置条件（现状已实现）
+### 4.2 Task 状态机（Implemented）
+
+#### TaskOrder 状态机
+
+- `task_open` → `task_awarded`（授标后）→ `task_closed`（验收通过后）
+- 取消分支：`task_open` → `task_cancelled`
+- 过期分支：`task_open` → `task_expired`（过期清扫）
+
+> 注意：`task_awarded` → `task_closed` 在结果被接受（`result_accepted`）并结算完成后触发。
+
+#### TaskBid 状态机
+
+- `bid_submitted` → `bid_accepted`（授标）
+- `bid_submitted` → `bid_rejected`（未选中或撤回）
+- `bid_submitted` → `bid_withdrawn`（竞标者撤回）
+
+#### TaskResult 状态机
+
+- `result_submitted` → `result_accepted`（买家验收通过，触发结算释放）
+- `result_submitted` → `result_rejected`（买家拒绝，触发争议创建）
+
+#### Task 与 Order/Settlement 联动
+
+当 `awardBid` 授标时：
+
+1. 创建 Order（初始状态 `delivery_completed`，跳过标准 consent/delivery 流程）
+2. 锁定 Settlement escrow
+
+当 `reviewResult` 接受时：
+
+1. 调用 `releaseSettlementIncremental` 释放资金
+2. Order 从 `delivery_completed` → `settlement_completed`
+3. Task 从 `task_awarded` → `task_closed`
+4. 生成 TaskReceipt
+
+当 `reviewResult` 拒绝时：
+
+1. 创建 Dispute（初始状态 `dispute_opened`）
+2. Result 标记为 `result_rejected`
+
+### 4.3 证明提交前置条件（现状已实现）
 
 - `market.service.proof.submit` 仅允许在 order.status 为 `delivery_completed` 或 `settlement_completed` 时调用。
 - 若 settlement 已退款，proof 提交应被拒绝。
 - 每个 order 只能提交一次 proof（重复提交视为冲突）。
 
-### 4.3 Planned：PendingVerification（规划中，未实现）
+### 4.4 Privacy / Consent 前置条件（Implemented）
 
-规划提出在状态机中引入 `PendingVerification`，用于“交付完成但待验证”与“验证通过自动释放”之间的门禁。
+- `market.consent.list|get`：查看所有授权状态（`granted` / `revoked`）。
+- `market.privacy.assets`：聚合 consent + offer 推导出知识资产分类与作用域。
+- `market.privacy.replay.generate`：生成回放记录（输出脱敏摘要与保留策略）。
+- `market.privacy.erase`：执行删除/保留策略；当 consent 仍为 granted 时，系统会自动先执行撤销再删除。
+- 保留策略自动推导：基于 consent 条款（`retentionDays`、`purpose`、`allowedUsage`）计算 `erase | retain_anonymized | retain_with_consent`。
+
+### 4.5 Planned：PendingVerification（规划中，未实现）
+
+规划提出在状态机中引入 `PendingVerification`，用于"交付完成但待验证"与"验证通过自动释放"之间的门禁。
 
 - 当前实现中不存在该状态（文档必须明确标注为 Planned）。
 

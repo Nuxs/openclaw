@@ -769,6 +769,28 @@
           "enabled": false,
           "reason": "resources disabled"
         },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.consent.get",
+        "stability": "experimental",
+        "summary": "Retrieve a single consent by consentId."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.consent.list",
+        "stability": "experimental",
+        "summary": "List all consent records with status, scope and retention info."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
         "group": "dispute",
         "kind": "gateway",
         "name": "web3.market.dispute.get",
@@ -1412,6 +1434,58 @@
           "level": "low"
         },
         "summary": "List market orders with status/actor filters."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.assets",
+        "stability": "experimental",
+        "summary": "List knowledge assets under consent governance with scope, purpose and retention."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.erase",
+        "risk": {
+          "level": "high",
+          "notes": ["Irreversible data deletion. Requires consent to be revoked."]
+        },
+        "stability": "experimental",
+        "summary": "Erase data associated with a revoked consent per retention policy."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.replay.generate",
+        "risk": {
+          "level": "low",
+          "notes": ["Read-only audit replay; all sensitive fields are redacted."]
+        },
+        "stability": "experimental",
+        "summary": "Generate a privacy-compliant replay summary for a consent, fully redacted."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.replay.list",
+        "stability": "experimental",
+        "summary": "List previously generated privacy replay records."
       },
       {
         "availability": {
@@ -2066,6 +2140,191 @@
           "level": "low"
         },
         "summary": "Summarize market-core status totals and counts."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.bid.award",
+        "risk": {
+          "level": "high",
+          "notes": ["Locks funds in escrow and transitions task to awarded."]
+        },
+        "stability": "experimental",
+        "summary": "Award a bid — synthesises offer, order and settlement lock."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.bid.list",
+        "stability": "experimental",
+        "summary": "List bids for a task with optional filters."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.bid.place",
+        "risk": {
+          "level": "medium",
+          "notes": ["Commits the bidder to deliver if awarded."]
+        },
+        "stability": "experimental",
+        "summary": "Place a bid on an open task with price, currency and optional ETA."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.cancel",
+        "risk": {
+          "level": "medium",
+          "notes": ["Cancels the task and prevents further bids."]
+        },
+        "stability": "experimental",
+        "summary": "Cancel an open task. Only the creator may cancel."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.expireSweep",
+        "stability": "experimental",
+        "summary": "Sweep and expire tasks past their expiry date."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.get",
+        "stability": "experimental",
+        "summary": "Retrieve a single task by taskId."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.list",
+        "stability": "experimental",
+        "summary": "List tasks with optional filters (status, creator, limit)."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.publish",
+        "paramsSchema": {
+          "properties": {
+            "budget": {
+              "properties": {
+                "amount": {
+                  "description": "Budget amount (integer string)",
+                  "type": "string"
+                },
+                "currency": {
+                  "description": "Currency code",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "expiryAt": {
+              "description": "ISO 8601 expiry timestamp",
+              "type": "string"
+            },
+            "requirements": {
+              "description": "Requirement list",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": {
+              "description": "Task title",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "risk": {
+          "level": "medium",
+          "notes": ["Creates a task with locked budget; requires actor identity."]
+        },
+        "stability": "experimental",
+        "summary": "Publish a new task to the market with title, requirements, budget and expiry."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.receipt.get",
+        "stability": "experimental",
+        "summary": "Retrieve a task receipt by receiptId."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.receipt.list",
+        "stability": "experimental",
+        "summary": "List task receipts with optional filters."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.result.review",
+        "risk": {
+          "level": "high",
+          "notes": ["Accepting releases escrowed funds; rejecting may open dispute."]
+        },
+        "stability": "experimental",
+        "summary": "Accept or reject a submitted result. Accept triggers settlement release."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.result.submit",
+        "stability": "experimental",
+        "summary": "Submit work result with artifacts and optional proof IDs."
       },
       {
         "availability": {
@@ -4033,6 +4292,26 @@
         "availability": {
           "enabled": true
         },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.consent.get",
+        "stability": "experimental",
+        "summary": "Retrieve a single consent by consentId."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.consent.list",
+        "stability": "experimental",
+        "summary": "List all consent records with status, scope and retention info."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
         "group": "dispute",
         "kind": "gateway",
         "name": "web3.market.dispute.get",
@@ -4658,6 +4937,54 @@
           "level": "low"
         },
         "summary": "List market orders with status/actor filters."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.assets",
+        "stability": "experimental",
+        "summary": "List knowledge assets under consent governance with scope, purpose and retention."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.erase",
+        "risk": {
+          "level": "high",
+          "notes": ["Irreversible data deletion. Requires consent to be revoked."]
+        },
+        "stability": "experimental",
+        "summary": "Erase data associated with a revoked consent per retention policy."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.replay.generate",
+        "risk": {
+          "level": "low",
+          "notes": ["Read-only audit replay; all sensitive fields are redacted."]
+        },
+        "stability": "experimental",
+        "summary": "Generate a privacy-compliant replay summary for a consent, fully redacted."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.privacy.replay.list",
+        "stability": "experimental",
+        "summary": "List previously generated privacy replay records."
       },
       {
         "availability": {
@@ -5302,6 +5629,179 @@
           "level": "low"
         },
         "summary": "Summarize market-core status totals and counts."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.bid.award",
+        "risk": {
+          "level": "high",
+          "notes": ["Locks funds in escrow and transitions task to awarded."]
+        },
+        "stability": "experimental",
+        "summary": "Award a bid — synthesises offer, order and settlement lock."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.bid.list",
+        "stability": "experimental",
+        "summary": "List bids for a task with optional filters."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.bid.place",
+        "risk": {
+          "level": "medium",
+          "notes": ["Commits the bidder to deliver if awarded."]
+        },
+        "stability": "experimental",
+        "summary": "Place a bid on an open task with price, currency and optional ETA."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.cancel",
+        "risk": {
+          "level": "medium",
+          "notes": ["Cancels the task and prevents further bids."]
+        },
+        "stability": "experimental",
+        "summary": "Cancel an open task. Only the creator may cancel."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.expireSweep",
+        "stability": "experimental",
+        "summary": "Sweep and expire tasks past their expiry date."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.get",
+        "stability": "experimental",
+        "summary": "Retrieve a single task by taskId."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.list",
+        "stability": "experimental",
+        "summary": "List tasks with optional filters (status, creator, limit)."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.publish",
+        "paramsSchema": {
+          "properties": {
+            "budget": {
+              "properties": {
+                "amount": {
+                  "description": "Budget amount (integer string)",
+                  "type": "string"
+                },
+                "currency": {
+                  "description": "Currency code",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "expiryAt": {
+              "description": "ISO 8601 expiry timestamp",
+              "type": "string"
+            },
+            "requirements": {
+              "description": "Requirement list",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": {
+              "description": "Task title",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "risk": {
+          "level": "medium",
+          "notes": ["Creates a task with locked budget; requires actor identity."]
+        },
+        "stability": "experimental",
+        "summary": "Publish a new task to the market with title, requirements, budget and expiry."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.receipt.get",
+        "stability": "experimental",
+        "summary": "Retrieve a task receipt by receiptId."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.receipt.list",
+        "stability": "experimental",
+        "summary": "List task receipts with optional filters."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.result.review",
+        "risk": {
+          "level": "high",
+          "notes": ["Accepting releases escrowed funds; rejecting may open dispute."]
+        },
+        "stability": "experimental",
+        "summary": "Accept or reject a submitted result. Accept triggers settlement release."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.result.submit",
+        "stability": "experimental",
+        "summary": "Submit work result with artifacts and optional proof IDs."
       },
       {
         "availability": {
@@ -6525,13 +7025,18 @@
     },
     {
       "declaredContracts": [
+        "web3.market.consent.*",
         "web3.market.dispute.*",
         "web3.market.lease.*",
         "web3.market.ledger.*",
+        "web3.market.privacy.assets",
+        "web3.market.privacy.erase",
+        "web3.market.privacy.replay.*",
         "web3.market.resource.*",
         "web3.market.service.proof.*",
         "web3.market.settlement.query",
-        "web3.market.status.summary"
+        "web3.market.status.summary",
+        "web3.market.task.*"
       ],
       "docLayer": "guide",
       "normative": false,
@@ -6593,6 +7098,8 @@
         "market.order.cancel",
         "market.order.create",
         "market.order.list",
+        "market.privacy.assets",
+        "market.privacy.erase",
         "market.repair.retry",
         "market.reputation.summary",
         "market.resource.get",
@@ -6647,6 +7154,7 @@
         "web3.index.list",
         "web3.index.report",
         "web3.market.resource.publish",
+        "web3.market.status.summary",
         "web3.siwe.challenge",
         "web3.siwe.verify",
         "web3.status.summary"
@@ -6731,23 +7239,38 @@
     {
       "declaredContracts": [
         "market.*",
+        "market.consent.revoke",
         "market.dispute.open",
         "market.order.create",
         "market.settlement.lock",
         "web3.market.*",
+        "web3.market.consent.*",
+        "web3.market.consent.list",
         "web3.market.dispute.*",
         "web3.market.dispute.open",
         "web3.market.lease.*",
         "web3.market.lease.issue",
         "web3.market.ledger.*",
         "web3.market.order.list",
+        "web3.market.privacy.assets",
+        "web3.market.privacy.erase",
+        "web3.market.privacy.replay.*",
+        "web3.market.privacy.replay.generate",
         "web3.market.reconciliation.summary",
         "web3.market.resource.*",
         "web3.market.resource.list",
         "web3.market.service.proof.*",
         "web3.market.service.proof.submit",
         "web3.market.settlement.query",
-        "web3.market.status.summary"
+        "web3.market.status.summary",
+        "web3.market.task.bid.*",
+        "web3.market.task.bid.award",
+        "web3.market.task.bid.place",
+        "web3.market.task.publish",
+        "web3.market.task.receipt.*",
+        "web3.market.task.result.*",
+        "web3.market.task.result.review",
+        "web3.market.task.result.submit"
       ],
       "docLayer": "guide",
       "normative": false,
@@ -6759,14 +7282,21 @@
         "market.*",
         "market.audit.query",
         "market.lease.issue",
+        "market.privacy.*",
+        "market.privacy.assets",
+        "market.privacy.erase",
+        "market.privacy.replay.generate",
         "market.service.proof.submit",
         "market.status.summary",
+        "market.task.*",
         "web3.*",
         "web3.market.*",
         "web3.market.bridge.*",
         "web3.market.lease",
         "web3.market.metrics.snapshot",
         "web3.market.order.list",
+        "web3.market.privacy.assets",
+        "web3.market.privacy.erase",
         "web3.market.reconciliation.summary",
         "web3.market.reputation.summary",
         "web3.market.settlement.query",
@@ -6810,6 +7340,24 @@
     },
     {
       "declaredContracts": [
+        "market.settlement.lock",
+        "market.settlement.release",
+        "market.task.*",
+        "web3.billing.handlePaymentRequired",
+        "web3.index.list",
+        "web3.market.consent.list",
+        "web3.market.privacy.erase",
+        "web3.market.privacy.replay.generate",
+        "web3.market.status.summary",
+        "web3.wallet.balance"
+      ],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/reference/web3-ga-runbook.md",
+      "title": "Web3 GA Runbook"
+    },
+    {
+      "declaredContracts": [
         "/web3",
         "agent-wallet.sign",
         "market.*",
@@ -6817,6 +7365,8 @@
         "market.dispute.*",
         "market.metrics.snapshot",
         "market.order.create",
+        "market.privacy.assets",
+        "market.privacy.erase",
         "market.repair.retry",
         "market.reputation.summary",
         "market.revocation.retry",
@@ -6845,6 +7395,8 @@
         "web3.market.ledger.*",
         "web3.market.metrics.snapshot",
         "web3.market.order.list",
+        "web3.market.privacy.assets",
+        "web3.market.privacy.erase",
         "web3.market.reconciliation.summary",
         "web3.market.reputation.summary",
         "web3.market.resource.*",
@@ -6962,6 +7514,7 @@
         "/credits",
         "/web3",
         "/web3-market",
+        "market.task.list",
         "web3.capabilities.*",
         "web3.capabilities.list",
         "web3.market.status.summary",
@@ -7550,7 +8103,9 @@
           "market.bridge.routes",
           "market.bridge.status",
           "market.bridge.update",
+          "market.consent.get",
           "market.consent.grant",
+          "market.consent.list",
           "market.consent.revoke",
           "market.delivery.complete",
           "market.delivery.issue",
@@ -7577,6 +8132,10 @@
           "market.order.cancel",
           "market.order.create",
           "market.order.list",
+          "market.privacy.assets",
+          "market.privacy.erase",
+          "market.privacy.replay.generate",
+          "market.privacy.replay.list",
           "market.repair.retry",
           "market.reputation.summary",
           "market.resource.get",
@@ -7598,6 +8157,18 @@
           "market.settlement.release",
           "market.settlement.status",
           "market.status.summary",
+          "market.task.bid.award",
+          "market.task.bid.list",
+          "market.task.bid.place",
+          "market.task.cancel",
+          "market.task.expireSweep",
+          "market.task.get",
+          "market.task.list",
+          "market.task.publish",
+          "market.task.receipt.get",
+          "market.task.receipt.list",
+          "market.task.result.review",
+          "market.task.result.submit",
           "market.tokenEconomy.burn",
           "market.tokenEconomy.configure",
           "market.tokenEconomy.governance.update",
@@ -8455,6 +9026,8 @@
           "web3.market.bridge.routes",
           "web3.market.bridge.status",
           "web3.market.bridge.update",
+          "web3.market.consent.get",
+          "web3.market.consent.list",
           "web3.market.dispute.get",
           "web3.market.dispute.list",
           "web3.market.dispute.open",
@@ -8470,6 +9043,10 @@
           "web3.market.ledger.summary",
           "web3.market.metrics.snapshot",
           "web3.market.order.list",
+          "web3.market.privacy.assets",
+          "web3.market.privacy.erase",
+          "web3.market.privacy.replay.generate",
+          "web3.market.privacy.replay.list",
           "web3.market.reconciliation.summary",
           "web3.market.reputation.summary",
           "web3.market.resource.get",
@@ -8481,6 +9058,18 @@
           "web3.market.service.proof.submit",
           "web3.market.settlement.query",
           "web3.market.status.summary",
+          "web3.market.task.bid.award",
+          "web3.market.task.bid.list",
+          "web3.market.task.bid.place",
+          "web3.market.task.cancel",
+          "web3.market.task.expireSweep",
+          "web3.market.task.get",
+          "web3.market.task.list",
+          "web3.market.task.publish",
+          "web3.market.task.receipt.get",
+          "web3.market.task.receipt.list",
+          "web3.market.task.result.review",
+          "web3.market.task.result.submit",
           "web3.market.tokenEconomy.burn",
           "web3.market.tokenEconomy.configure",
           "web3.market.tokenEconomy.governance.update",

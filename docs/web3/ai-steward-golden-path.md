@@ -45,13 +45,28 @@ This guide describes the minimal, safe, repeatable path for an AI steward to ope
    - Focus on identity bindings, credits, audit pending queues, and market enablement.
 
 3. **Market status**
-   - Call `web3.market.status.summary` for offers, orders, and disputes.
+   - Call `web3.market.status.summary` for offers, orders, disputes, **tasks, and privacy**.
+   - The summary now includes task market aggregation (`open/awarded/closed`) and privacy consent stats (`active/revoked/pendingErasure`).
    - If market is disabled, first recommend `/web3-market status` for a no-write diagnosis.
    - If the operator explicitly approves config changes, recommend `/web3-market enable ok`.
    - If the operator wants a no-write preview of the exact steps, recommend `/web3-market start`.
 
-4. **Give one next action**
-   - Examples: `/bind_wallet`, `/credits`, `/audit_status`, `/web3-market status`.
+4. **Task market triage** (when tasks are active)
+   - Query tasks: natural language intent → `market.task.list` → status breakdown and budget info.
+   - Publish/bid/submit/review: each action returns hash for audit verification.
+   - Rejection triggers dispute creation automatically; receipt generation on acceptance.
+
+5. **Privacy compliance triage** (when consents exist)
+   - Query consents: scope-aware purpose display, order linkage, erased count.
+   - Generate replay: for revoked consents, produces redacted summary with `replayHash`.
+   - Erase data: atomic operation (transaction-wrapped), returns replay count and timestamp.
+
+6. **Operations overview**
+   - The AI steward fetches task/consent/status data in parallel for a full-spectrum operations snapshot.
+   - Shows resource count, dispute status, settlement pending, task market distribution, privacy stats, and active alerts.
+
+7. **Give one next action**
+   - Examples: `/bind_wallet`, `/credits`, `/audit_status`, `/web3-market status`, "查看任务", "授权状态", "告警".
 
 ## Approval gates
 
@@ -62,6 +77,10 @@ The steward must request explicit confirmation before:
 - Issuing or revoking leases.
 - Resolving disputes.
 - Any token economy writes or bridge requests.
+- Publishing tasks or awarding bids (involves settlement lock).
+- Reviewing task results (accept triggers fund release; reject creates dispute).
+- Erasing privacy data (irreversible).
+- Generating compliance replays for external sharing.
 
 ## Safe output template
 
@@ -75,6 +94,9 @@ Use a consistent paste safe format:
 ## Related docs
 
 - Web3 Core plugin: [/plugins/web3-core](/plugins/web3-core)
+- Market Core plugin: [/plugins/market-core](/plugins/market-core)
 - Web3 Market dev: [/reference/web3-market-dev](/reference/web3-market-dev)
 - Resource market API: [/reference/web3-resource-market-api](/reference/web3-resource-market-api)
 - Dual stack strategy: [/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)
+- EaaS protocol spec: [/reference/web3-eaas-protocol-spec](/reference/web3-eaas-protocol-spec)
+- GA Runbook: [/reference/web3-ga-runbook](/reference/web3-ga-runbook)

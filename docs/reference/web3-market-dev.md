@@ -80,6 +80,8 @@ graph TD
 - **Audit / Billing / Status**：`web3.audit.query` `web3.billing.status` `web3.billing.summary` `web3.billing.paymentTrace.query` `web3.billing.handlePaymentRequired` `web3.billing.consumePaymentRequired` `web3.status.summary`
 - **Reward**：`web3.reward.get` `web3.reward.list` `web3.reward.claim` `web3.reward.updateStatus`
 - **Market public surface**：`web3.market.resource.*` `web3.market.order.list` `web3.market.settlement.query` `web3.market.lease.*` `web3.market.service.proof.*` `web3.market.ledger.*` `web3.market.reputation.summary` `web3.market.tokenEconomy.*` `web3.market.bridge.*` `web3.market.metrics.snapshot` `web3.market.reconciliation.summary` `web3.market.status.summary` `web3.market.dispute.*`
+- **Task Market**：`web3.market.task.publish|get|list|cancel|expireSweep` `web3.market.task.bid.place|list|award` `web3.market.task.result.submit|review` `web3.market.task.receipt.get|list`
+- **Privacy / Consent**：`web3.market.consent.list|get` `web3.market.privacy.assets` `web3.market.privacy.replay.generate|list` `web3.market.privacy.erase`
 - **Compatibility aliases**：`web3.resources.publish` `web3.resources.unpublish` `web3.resources.list` `web3.resources.lease` `web3.resources.revokeLease` `web3.resources.status`
 - **Discovery / Monitoring**：`web3.index.*` `web3.metrics.*` `web3.monitor.*`
 
@@ -101,6 +103,20 @@ graph TD
 - ServiceProof：`market.service.proof.submit|get|list`
 - Dispute：`market.dispute.open|submitEvidence|resolve|reject|get|list`
 - Transparency：`market.status.summary` `market.audit.query` `market.transparency.summary` `market.transparency.trace`
+
+任务市场（Task Market）：
+
+- TaskOrder：`market.task.publish|get|list|cancel|expireSweep`
+- TaskBid：`market.task.bid.place|list|award`
+- TaskResult：`market.task.result.submit|review`
+- TaskReceipt：`market.task.receipt.get|list`
+
+隐私与 Consent 管理：
+
+- Consent 查询：`market.consent.list|get`
+- 知识资产：`market.privacy.assets`
+- 合规回放：`market.privacy.replay.generate|list`
+- 删除/保留：`market.privacy.erase`
 
 资源共享与运营：
 
@@ -130,6 +146,32 @@ graph TD
 
 - `settlement_locked` → `settlement_released`
 - `settlement_locked` → `settlement_refunded`
+
+### TaskOrder 状态机
+
+- `task_open` → `task_awarded` → `task_closed`
+- 取消：`task_open` → `task_cancelled`
+- 过期：`task_open` → `task_expired`
+
+### TaskBid 状态机
+
+- `bid_submitted` → `bid_accepted` | `bid_rejected` | `bid_withdrawn`
+
+### TaskResult 状态机
+
+- `result_submitted` → `result_accepted`（触发结算释放）
+- `result_submitted` → `result_rejected`（触发争议创建）
+
+### Task 与 Order/Settlement 联动
+
+- 授标时（`awardBid`）：创建 Order（`delivery_completed`）+ Settlement lock
+- 验收通过（`reviewResult accept`）：释放结算 → Order → `settlement_completed` → Task → `task_closed` → 生成 Receipt
+- 验收拒绝（`reviewResult reject`）：创建 Dispute → Result → `result_rejected`
+
+### Dispute 状态机
+
+- `dispute_opened` → `dispute_resolved` | `dispute_rejected`
+- 注意：Dispute 状态机不允许自迁移（`dispute_opened → dispute_opened` 会抛出 `E_CONFLICT`）
 
 ## 默认结算策略规范（你已确认）
 
@@ -184,3 +226,6 @@ graph TD
 - AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 双栈总规划（TON+EVM）：`docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
 - 双栈支付与结算参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
+- EaaS 协议规范：[/reference/web3-eaas-protocol-spec](/reference/web3-eaas-protocol-spec)
+- EaaS 开发指南：[/reference/web3-eaas-developer-guide](/reference/web3-eaas-developer-guide)
+- GA 运维 Runbook：[/reference/web3-ga-runbook](/reference/web3-ga-runbook)

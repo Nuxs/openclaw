@@ -196,6 +196,58 @@ Notes:
 - `settlement.mode="contract"` will broadcast on-chain escrow transactions (`lock`/`release`/`refund`) using `chain.privateKey`. It also requires `chain.escrowContractAddress` and `settlement.tokenAddress`.
 - `settlement.mode="anchor_only"` will not broadcast escrow contract transactions (anchor/hash-only behavior).
 
+### 任务市场（Task Market）
+
+`market-core` 内置完整的任务市场协议，基于已有 Offer/Order/Settlement 能力增量建模：
+
+- **TaskOrder**：任务发布与生命周期管理（`market.task.publish|get|list|cancel|expireSweep`）
+- **TaskBid**：竞标、撤回、授标（`market.task.bid.place|list|award`）
+- **TaskResult**：交付物提交与验收（`market.task.result.submit|review`）
+- **TaskReceipt**：全流程可审计的交付回执（`market.task.receipt.get|list`）
+
+状态机与联动：
+
+- TaskOrder：`task_open → task_awarded → task_closed`（取消：`→ task_cancelled`；过期：`→ task_expired`）
+- TaskBid：`bid_submitted → bid_accepted | bid_rejected | bid_withdrawn`
+- TaskResult：`result_submitted → result_accepted`（触发结算释放）/ `→ result_rejected`（触发争议创建）
+- 授标时自动创建 Order + Settlement lock；验收通过后自动释放结算、生成 Receipt；拒绝时自动创建 Dispute
+
+工业级保障：
+
+- 所有写操作（publish/award/submit/review）使用 `store.runInTransaction()` 保证原子性
+- 状态迁移由 `task-state-machine.ts` 集中守卫，拒绝非法迁移
+- 审计事件通过 `recordAuditWithAnchor()` 锚定，支持链上可验证
+
+### 隐私与 Consent 管理
+
+- **Consent 查询**：`market.consent.list|get`（查看活跃/撤销/过期的授权）
+- **知识资产**：`market.privacy.assets`（聚合 consent + offer 推导资产分类与作用域）
+- **合规回放**：`market.privacy.replay.generate|list`（撤销后生成脱敏摘要、保留策略、审计事件链）
+- **删除/保留**：`market.privacy.erase`（执行 erase/retain_anonymized/retain_with_consent 策略）
+
+保留策略推导规则（`deriveRetentionAction`）：
+
+- consent 包含 `retentionDays` 且未过期 → `retain_with_consent`
+- consent 有 `allowedUsage` 包含 "anonymized" → `retain_anonymized`
+- 其余情况 → `erase`
+
+工业级保障：
+
+- 回放哈希使用 `hashReplaySummary()`（SHA-256 via `hashCanonical`），替代此前的 hex 编码
+- 删除操作使用 `store.runInTransaction()` 包裹 consent 保存 + replay 擦除，保证原子性
+- 所有输出默认脱敏，不返回 token、endpoint、真实路径
+
+### AI 管家助手（MarketAssistant）
+
+`market-core` 内置 `MarketAssistant` 编排层，覆盖四条主线：
+
+- **基础市场**：资源发布、定价查询、销售诊断、结算状态
+- **任务市场**：发布任务、查询任务（含状态分解与预算信息）、投标、提交成果、验收（通过/拒绝联动争议）
+- **隐私合规**：授权查询（含 scope-aware 用途展示）、合规回放生成（含 hash）、数据擦除（含回放计数）
+- **运营诊断**：并行抓取 task/consent/status 数据，输出全景摘要（资源、争议、结算、任务市场分布、隐私统计、告警）
+
+所有输出使用 `paste-safe.ts` 做脱敏处理。
+
 ### 运维与合规要点
 
 - 默认使用 sqlite 存储（`store.mode=sqlite`），审计事件落入 `audit` 表；可选 `store.migrateFromFile` 自动迁移旧 JSON 状态。

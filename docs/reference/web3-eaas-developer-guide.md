@@ -8,7 +8,7 @@ normative: false
 
 # EaaS Developer Guide: Discovery, MCP Integration, and Industrial Checklists
 
-> 本文面向工程团队：如何把 EaaS（Everything as a Service）从“资源共享市场”升级到“服务市场”，并保持工业级约束（幂等、最小披露、审计与可运维）。
+> 本文面向工程团队：如何把 EaaS（Everything as a Service）从"资源共享市场"升级到"服务市场"，并保持工业级约束（幂等、最小披露、审计与可运维）。
 >
 > 关联：协议规范见 [/reference/web3-eaas-protocol-spec](/reference/web3-eaas-protocol-spec)。
 
@@ -24,6 +24,8 @@ normative: false
 - 争议：`web3.market.dispute.*`
 - 服务证明：`web3.market.service.proof.*`
 - 状态与对账摘要：`web3.market.status.summary`、`web3.market.reconciliation.summary`
+- 任务市场：`web3.market.task.publish|get|list|cancel|expireSweep`、`web3.market.task.bid.*`、`web3.market.task.result.*`、`web3.market.task.receipt.*`
+- 隐私/Consent：`web3.market.consent.*`、`web3.market.privacy.assets`、`web3.market.privacy.replay.*`、`web3.market.privacy.erase`
 
 更多总体接口与状态机口径见：[/reference/web3-market-dev](/reference/web3-market-dev)
 
@@ -37,7 +39,7 @@ normative: false
 
 ## 2. Discovery（自动发现）怎么做：p2p、市场、工具三层各司其职
 
-### 2.1 误区：Discovery 不是“找节点”，是“找可交易 Offer”
+### 2.1 误区：Discovery 不是"找节点"，是"找可交易 Offer"
 
 Agent 需要发现的是：
 
@@ -48,7 +50,7 @@ Agent 需要发现的是：
 
 1. **p2p 承载层**
 
-- 只传播与查询“摘要元数据”（例如：kind/label/tags/price/信誉摘要/proof 类型），不传播 endpoint/token。
+- 只传播与查询"摘要元数据"（例如：kind/label/tags/price/信誉摘要/proof 类型），不传播 endpoint/token。
 - 与最小披露一致：任何连接信息都应被视为敏感资产。
 
 2. **Market 经济层（OpenClaw market-core）**
@@ -60,7 +62,7 @@ Agent 需要发现的是：
 
 3. **Tooling 接入层（OpenClaw tools / MCP）**
 
-- 负责“标准化调用”与“会话级编排/观测”。
+- 负责"标准化调用"与"会话级编排/观测"。
 
 ---
 
@@ -70,7 +72,7 @@ Agent 需要发现的是：
 
 ### 3.1 方案 A：Market as MCP Server（推荐优先落地）
 
-把市场动作封装为 **MCP façade tools**，但要明确区分“对外稳定入口”和“服务端内部 authority”：
+把市场动作封装为 **MCP façade tools**，但要明确区分"对外稳定入口"和"服务端内部 authority"：
 
 - Discovery / catalog：直接走 `web3.market.resource.list`（当前已实现 public surface）
 - Lease issuance：直接走 `web3.market.lease.issue`（当前已实现 public surface）
@@ -86,7 +88,7 @@ Agent 需要发现的是：
 注意：
 
 - MCP façade 的返回值仍需遵循 [/reference/web3-market-output-redaction](/reference/web3-market-output-redaction)。
-- 文档与 UI 里必须把 `market.*` 标成“内部 authority”，避免外部调用方误把它们当公共 RPC。
+- 文档与 UI 里必须把 `market.*` 标成"内部 authority"，避免外部调用方误把它们当公共 RPC。
 
 ### 3.2 方案 B：Provider as MCP Server（lease-gated，适合高级场景）
 
@@ -114,7 +116,7 @@ Provider 暴露 MCP server，但必须由 Market 发放 lease 后才允许调用
 
 ### 4.3 审计与对账
 
-- 必须能输出“可分享对账摘要”（最小披露）。
+- 必须能输出"可分享对账摘要"（最小披露）。
 - 重要事件建议形成结构化审计事件：order_created / payment_locked / delivery_completed / service_proof_submitted / settlement_released / dispute_opened 等。
 
 参考：[/plugins/web3-core](/plugins/web3-core)（hooks 与审计能力）、[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
@@ -123,13 +125,63 @@ Provider 暴露 MCP server，但必须由 Market 发放 lease 后才允许调用
 
 ## 5. 端到端示例流程（脱敏示意）
 
-> 下面是“API 类服务 + 证明 + 自动结算”的最小闭环示意，字段为示意，真实字段以协议规范与实现为准。
+> 下面是"API 类服务 + 证明 + 自动结算"的最小闭环示意，字段为示意，真实字段以协议规范与实现为准。
 
 1. Seller 发布 service resource（包含 `serviceSchema`）
 2. Buyer 通过受信 façade 创建 order 并 lock escrow（服务端落到 `market.order.create` + `market.settlement.lock`）
 3. Buyer 获得 lease 并调用服务（token 存储在本地，不回显）
 4. Buyer 或 Provider 通过 façade 调用 `web3.market.service.proof.submit`
 5. 系统触发 release 或进入争议窗口
+
+---
+
+## 5.1 任务市场端到端流程（脱敏示意）
+
+> 适用于人类服务、Agent 协作、代码审计等场景。
+
+1. **发布任务**：买家调用 `web3.market.task.publish`，设置标题、描述、需求、预算与截止日期
+2. **竞标**：卖家调用 `web3.market.task.bid.place` 提交方案与报价
+3. **授标**：买家调用 `web3.market.task.bid.award`——系统自动创建 Order（跳过 consent/delivery 流程，直接 `delivery_completed`）并锁定 Settlement escrow
+4. **交付**：中标者调用 `web3.market.task.result.submit` 提交交付物（含可选 proofHash）
+5. **验收（通过）**：买家调用 `web3.market.task.result.review` + `accept`——系统释放结算资金、关闭任务、生成回执
+6. **验收（拒绝）**：买家调用 `web3.market.task.result.review` + `reject`——系统创建争议（`dispute_opened`），待仲裁
+
+> 关键约束：
+>
+> - 任务市场订单跳过标准 consent/delivery 流程（TaskResult 承担交付验证）
+> - 结算锁定后只能通过验收或争议解决来释放
+> - 所有操作均可审计、可回放、默认脱敏
+
+---
+
+## 5.2 隐私与 Consent 管理流程
+
+> 适用于数据授权、知识资产管理、合规审计场景。
+
+1. **查看授权**：调用 `web3.market.consent.list` 查看所有活跃/撤销的授权
+2. **查看知识资产**：调用 `web3.market.privacy.assets` 查看资产分类、作用域与地域限制
+3. **撤销授权**：通过 `market.consent.revoke` 撤销
+4. **生成合规回放**：撤销后调用 `web3.market.privacy.replay.generate`——输出包含脱敏摘要、保留策略、审计事件链
+5. **执行删除**：调用 `web3.market.privacy.erase`——根据保留策略执行 erase/retain_anonymized/retain_with_consent
+
+> 保留策略推导规则（`deriveRetentionAction`）：
+>
+> - consent 包含 `retentionDays` 且未过期 → `retain_with_consent`
+> - consent 有 `allowedUsage` 包含 "anonymized" → `retain_anonymized`
+> - 其余情况 → `erase`
+
+---
+
+## 5.3 A2A 任务协作
+
+当多个 Agent 协作执行任务时，通过 `sessions-send-tool.a2a.ts` 透传以下标识：
+
+- `taskId`：任务标识
+- `orderId`：关联订单
+- `proofId`：服务证明标识
+- `settlementId`：结算标识
+
+这保证了跨 Agent 的审计链路可追踪，且 `market.*` 始终是资金真相源。
 
 ---
 

@@ -388,6 +388,19 @@ Suggested client behavior:
 - Allow manual refresh
 - Avoid polling faster than 30 seconds
 
+## Market status aggregation
+
+The `web3.market.status.summary` (and `buildWeb3MarketStatusSummary()` in `market-status.ts`) provides a comprehensive operational snapshot. The `runtime` section of the summary includes:
+
+- **`resources`**: total count, by-status, by-kind breakdown, sample IDs
+- **`leases`**: total count, by-status breakdown, sample IDs
+- **`ledger`**: summary and recent entry count
+- **`tasks`**: task market aggregation — total, by-status, open/awarded/closed counts
+- **`privacy`**: consent aggregation — total, active/revoked counts, pending erasure count
+- **`errors`**: any probe failures
+
+The task and privacy probes are always fetched (not just in `deep` profile) to provide the AI steward with a complete operational view. The formatted output includes task and privacy summary lines for paste-safe sharing.
+
 ## Debug and operational notes
 
 - **No signer key**: anchoring is queued into `pending-tx.json`.
