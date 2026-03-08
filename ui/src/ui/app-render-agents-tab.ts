@@ -3,7 +3,7 @@ import type { AppViewState } from "./app-view-state.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
-import { loadAgents } from "./controllers/agents.ts";
+import { loadAgents, loadToolsCatalog } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import {
   loadConfig,
@@ -64,6 +64,12 @@ export function renderAgentsTab(state: AppViewState) {
     skillsFilter: state.skillsFilter,
     onRefresh: async () => {
       await loadAgents(state);
+      const nextSelected =
+        state.agentsSelectedId ??
+        state.agentsList?.defaultId ??
+        state.agentsList?.agents?.[0]?.id ??
+        null;
+      await loadToolsCatalog(state, nextSelected);
       const agentIds = state.agentsList?.agents?.map((entry) => entry.id) ?? [];
       if (agentIds.length > 0) {
         void loadAgentIdentities(state, agentIds);
@@ -84,6 +90,9 @@ export function renderAgentsTab(state: AppViewState) {
       state.agentSkillsError = null;
       state.agentSkillsAgentId = null;
       void loadAgentIdentity(state, agentId);
+      if (state.agentsPanel === "tools") {
+        void loadToolsCatalog(state, agentId);
+      }
       if (state.agentsPanel === "files") {
         void loadAgentFiles(state, agentId);
       }
@@ -102,6 +111,9 @@ export function renderAgentsTab(state: AppViewState) {
           state.agentFileDrafts = {};
           void loadAgentFiles(state, resolvedAgentId);
         }
+      }
+      if (panel === "tools") {
+        void loadToolsCatalog(state, resolvedAgentId);
       }
       if (panel === "skills") {
         if (resolvedAgentId) {

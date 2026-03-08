@@ -54,8 +54,14 @@ import { renderAgentsTab } from "./app-render-agents-tab.ts";
 import { renderChannelsTab } from "./app-render-channels-tab.ts";
 import { renderChatTab } from "./app-render-chat-tab.ts";
 import { renderConfigTab } from "./app-render-config-tab.ts";
+import { renderCronTab } from "./app-render-cron-tab.ts";
+import { renderDebugTab } from "./app-render-debug-tab.ts";
+import { renderInstancesTab } from "./app-render-instances-tab.ts";
+import { renderLogsTab } from "./app-render-logs-tab.ts";
 import { renderNodesTab } from "./app-render-nodes-tab.ts";
 import { renderOverviewTab } from "./app-render-overview-tab.ts";
+import { renderSessionsTab } from "./app-render-sessions-tab.ts";
+import { renderSkillsTab } from "./app-render-skills-tab.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
 import { renderChatControls } from "./app-render.helpers.ts";
 import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
@@ -64,91 +70,23 @@ import { loadOverview, loadChannelsTabData, loadCronData } from "./app-tab-loade
 import type { OpenClawApp } from "./app.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
-import { loadAgents } from "./controllers/agents.ts";
+import { loadAgents, loadToolsCatalog } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import { loadConfigSchema, loadConfig } from "./controllers/config.ts";
-import {
-  loadCronRuns,
-  loadMoreCronJobs,
-  loadMoreCronRuns,
-  reloadCronJobs,
-  toggleCronJob,
-  runCronJob,
-  removeCronJob,
-  addCronJob,
-  startCronEdit,
-  startCronClone,
-  cancelCronEdit,
-  validateCronForm,
-  hasCronFormErrors,
-  updateCronJobsFilter,
-  updateCronRunsFilter,
-  normalizeCronFormState,
-} from "./controllers/cron.ts";
-import { loadDebug, callDebugMethod } from "./controllers/debug.ts";
+import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
-import { loadSessions, deleteSessionAndRefresh, patchSession } from "./controllers/sessions.ts";
-import {
-  loadSkills,
-  installSkill,
-  saveSkillApiKey,
-  updateSkillEdit,
-  updateSkillEnabled,
-} from "./controllers/skills.ts";
+import { loadSessions } from "./controllers/sessions.ts";
+import { loadSkills } from "./controllers/skills.ts";
 // Web3/Market tab entries (overlay)
 import { WEB3_TAB_ENTRIES } from "./tab-registry-web3.ts";
-import { renderCron } from "./views/cron.ts";
-import { renderDebug } from "./views/debug.ts";
-import { renderInstances } from "./views/instances.ts";
-import { renderLogs } from "./views/logs.ts";
-import { renderSessions } from "./views/sessions.ts";
-import { renderSkills } from "./views/skills.ts";
 
 // ---------------------------------------------------------------------------
 // Registry: ordered array — group order + intra-group order preserved
 // ---------------------------------------------------------------------------
-
-const CRON_THINKING_SUGGESTIONS = ["off", "minimal", "low", "medium", "high"];
-const CRON_TIMEZONE_SUGGESTIONS = [
-  "UTC",
-  "America/Los_Angeles",
-  "America/Denver",
-  "America/Chicago",
-  "America/New_York",
-  "Europe/London",
-  "Europe/Berlin",
-  "Asia/Tokyo",
-];
-
-function isHttpUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value.trim());
-}
-
-function normalizeSuggestionValue(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function uniquePreserveOrder(values: string[]): string[] {
-  const seen = new Set<string>();
-  const output: string[] = [];
-  for (const value of values) {
-    const normalized = value.trim();
-    if (!normalized) {
-      continue;
-    }
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    output.push(normalized);
-  }
-  return output;
-}
 
 export const TAB_REGISTRY: TabDefinition[] = [
   // ── chat ──────────────────────────────────────────────────────────────
@@ -157,7 +95,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
     path: "/chat",
     icon: "messageSquare",
     group: "chat",
-    hideTitle: false,
+    hideTitle: true,
     headerExtra: (state) => renderChatControls(state),
     render: renderChatTab,
     load: async (host) => {
@@ -201,19 +139,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
     path: "/instances",
     icon: "radio",
     group: "control",
-    render: (state) => {
-      if (state.tab !== "instances") {
-        return nothing;
-      }
-      return renderInstances({
-        loading: state.presenceLoading,
-        entries: state.presenceEntries,
-        lastError: state.presenceError,
-        statusMessage: state.presenceStatus,
-        streamMode: state.streamMode,
-        onRefresh: () => loadPresence(state as unknown as OpenClawApp),
-      });
-    },
+    render: renderInstancesTab,
     load: async (host) => {
       await loadPresence(host as OpenClawApp);
     },
@@ -223,30 +149,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
     path: "/sessions",
     icon: "fileText",
     group: "control",
-    render: (state) => {
-      if (state.tab !== "sessions") {
-        return nothing;
-      }
-      return renderSessions({
-        loading: state.sessionsLoading,
-        result: state.sessionsResult,
-        error: state.sessionsError,
-        activeMinutes: state.sessionsFilterActive,
-        limit: state.sessionsFilterLimit,
-        includeGlobal: state.sessionsIncludeGlobal,
-        includeUnknown: state.sessionsIncludeUnknown,
-        basePath: state.basePath,
-        onFiltersChange: (next) => {
-          state.sessionsFilterActive = next.activeMinutes;
-          state.sessionsFilterLimit = next.limit;
-          state.sessionsIncludeGlobal = next.includeGlobal;
-          state.sessionsIncludeUnknown = next.includeUnknown;
-        },
-        onRefresh: () => loadSessions(state as unknown as OpenClawApp),
-        onPatch: (key, patch) => patchSession(state as unknown as OpenClawApp, key, patch),
-        onDelete: (key) => deleteSessionAndRefresh(state as unknown as OpenClawApp, key),
-      });
-    },
+    render: renderSessionsTab,
     load: async (host) => {
       await loadSessions(host as OpenClawApp);
     },
@@ -264,159 +167,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
     path: "/cron",
     icon: "loader",
     group: "control",
-    render: (state) => {
-      if (state.tab !== "cron") {
-        return nothing;
-      }
-      const cronAgentSuggestions = Array.from(
-        new Set(
-          [
-            ...(state.agentsList?.agents?.map((entry) => entry.id.trim()) ?? []),
-            ...state.cronJobs
-              .map((job) => (typeof job.agentId === "string" ? job.agentId.trim() : ""))
-              .filter(Boolean),
-          ].filter(Boolean),
-        ),
-      ).toSorted((a, b) => a.localeCompare(b));
-
-      const cronModelSuggestions = Array.from(
-        new Set(
-          [
-            ...state.cronModelSuggestions,
-            ...state.cronJobs
-              .map((job) => {
-                if (job.payload.kind !== "agentTurn" || typeof job.payload.model !== "string") {
-                  return "";
-                }
-                return job.payload.model.trim();
-              })
-              .filter(Boolean),
-          ].filter(Boolean),
-        ),
-      ).toSorted((a, b) => a.localeCompare(b));
-
-      const selectedDeliveryChannel =
-        state.cronForm.deliveryChannel && state.cronForm.deliveryChannel.trim()
-          ? state.cronForm.deliveryChannel.trim()
-          : "last";
-
-      const jobToSuggestions = state.cronJobs
-        .map((job) => normalizeSuggestionValue(job.delivery?.to))
-        .filter(Boolean);
-
-      const accountToSuggestions = (
-        selectedDeliveryChannel === "last"
-          ? Object.values(state.channelsSnapshot?.channelAccounts ?? {}).flat()
-          : (state.channelsSnapshot?.channelAccounts?.[selectedDeliveryChannel] ?? [])
-      )
-        .flatMap((account) => [
-          normalizeSuggestionValue(account.accountId),
-          normalizeSuggestionValue(account.name),
-        ])
-        .filter(Boolean);
-
-      const rawDeliveryToSuggestions = uniquePreserveOrder([
-        ...jobToSuggestions,
-        ...accountToSuggestions,
-      ]);
-
-      const deliveryToSuggestions =
-        state.cronForm.deliveryMode === "webhook"
-          ? rawDeliveryToSuggestions.filter((value) => isHttpUrl(value))
-          : rawDeliveryToSuggestions;
-
-      return renderCron({
-        basePath: state.basePath,
-        loading: state.cronLoading,
-        jobsLoadingMore: state.cronJobsLoadingMore,
-        status: state.cronStatus,
-        jobs: state.cronJobs,
-        jobsTotal: state.cronJobsTotal,
-        jobsHasMore: state.cronJobsHasMore,
-        jobsQuery: state.cronJobsQuery,
-        jobsEnabledFilter: state.cronJobsEnabledFilter,
-        jobsScheduleKindFilter: state.cronJobsScheduleKindFilter,
-        jobsLastStatusFilter: state.cronJobsLastStatusFilter,
-        jobsSortBy: state.cronJobsSortBy,
-        jobsSortDir: state.cronJobsSortDir,
-        error: state.cronError,
-        busy: state.cronBusy,
-        form: state.cronForm,
-        fieldErrors: state.cronFieldErrors,
-        canSubmit: !hasCronFormErrors(state.cronFieldErrors),
-        editingJobId: state.cronEditingJobId,
-        channels: state.channelsSnapshot?.channelMeta?.length
-          ? state.channelsSnapshot.channelMeta.map((entry) => entry.id)
-          : (state.channelsSnapshot?.channelOrder ?? []),
-        channelLabels: state.channelsSnapshot?.channelLabels ?? {},
-        channelMeta: state.channelsSnapshot?.channelMeta ?? [],
-        runsJobId: state.cronRunsJobId,
-        runs: state.cronRuns,
-        runsTotal: state.cronRunsTotal,
-        runsHasMore: state.cronRunsHasMore,
-        runsLoadingMore: state.cronRunsLoadingMore,
-        runsScope: state.cronRunsScope,
-        runsStatuses: state.cronRunsStatuses,
-        runsDeliveryStatuses: state.cronRunsDeliveryStatuses,
-        runsStatusFilter: state.cronRunsStatusFilter,
-        runsQuery: state.cronRunsQuery,
-        runsSortDir: state.cronRunsSortDir,
-        agentSuggestions: cronAgentSuggestions,
-        modelSuggestions: cronModelSuggestions,
-        thinkingSuggestions: CRON_THINKING_SUGGESTIONS,
-        timezoneSuggestions: CRON_TIMEZONE_SUGGESTIONS,
-        deliveryToSuggestions,
-        accountSuggestions: accountToSuggestions,
-        onFormChange: (patch) => {
-          state.cronForm = normalizeCronFormState({ ...state.cronForm, ...patch });
-          state.cronFieldErrors = validateCronForm(state.cronForm);
-        },
-        onRefresh: () => state.loadCron(),
-        onAdd: () => addCronJob(state as unknown as OpenClawApp),
-        onEdit: (job) => startCronEdit(state as unknown as OpenClawApp, job),
-        onClone: (job) => startCronClone(state as unknown as OpenClawApp, job),
-        onCancelEdit: () => cancelCronEdit(state as unknown as OpenClawApp),
-        onToggle: (job, enabled) => toggleCronJob(state as unknown as OpenClawApp, job, enabled),
-        onRun: (job) => runCronJob(state as unknown as OpenClawApp, job),
-        onRemove: (job) => removeCronJob(state as unknown as OpenClawApp, job),
-        onLoadRuns: async (jobId) => {
-          updateCronRunsFilter(state as unknown as OpenClawApp, { cronRunsScope: "job" });
-          await loadCronRuns(state as unknown as OpenClawApp, jobId);
-        },
-        onLoadMoreJobs: () => loadMoreCronJobs(state as unknown as OpenClawApp),
-        onJobsFiltersChange: async (patch) => {
-          updateCronJobsFilter(state as unknown as OpenClawApp, patch);
-          const shouldReload =
-            typeof patch.cronJobsQuery === "string" ||
-            Boolean(patch.cronJobsEnabledFilter) ||
-            Boolean(patch.cronJobsSortBy) ||
-            Boolean(patch.cronJobsSortDir);
-          if (shouldReload) {
-            await reloadCronJobs(state as unknown as OpenClawApp);
-          }
-        },
-        onJobsFiltersReset: async () => {
-          updateCronJobsFilter(state as unknown as OpenClawApp, {
-            cronJobsQuery: "",
-            cronJobsEnabledFilter: "all",
-            cronJobsScheduleKindFilter: "all",
-            cronJobsLastStatusFilter: "all",
-            cronJobsSortBy: "nextRunAtMs",
-            cronJobsSortDir: "asc",
-          });
-          await reloadCronJobs(state as unknown as OpenClawApp);
-        },
-        onLoadMoreRuns: () => loadMoreCronRuns(state as unknown as OpenClawApp),
-        onRunsFiltersChange: async (patch) => {
-          updateCronRunsFilter(state as unknown as OpenClawApp, patch);
-          if (state.cronRunsScope === "all") {
-            await loadCronRuns(state as unknown as OpenClawApp, null);
-            return;
-          }
-          await loadCronRuns(state as unknown as OpenClawApp, state.cronRunsJobId);
-        },
-      });
-    },
+    render: renderCronTab,
     load: async (host) => {
       await loadCronData(host as Parameters<typeof loadCronData>[0]);
     },
@@ -441,6 +192,9 @@ export const TAB_REGISTRY: TabDefinition[] = [
         h.agentsSelectedId ?? h.agentsList?.defaultId ?? h.agentsList?.agents?.[0]?.id;
       if (agentId) {
         void loadAgentIdentity(h, agentId);
+        if (h.agentsPanel === "tools") {
+          void loadToolsCatalog(h, agentId);
+        }
         if (h.agentsPanel === "skills") {
           void loadAgentSkills(h, agentId);
         }
@@ -458,28 +212,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
     path: "/skills",
     icon: "zap",
     group: "agent",
-    render: (state) => {
-      if (state.tab !== "skills") {
-        return nothing;
-      }
-      return renderSkills({
-        loading: state.skillsLoading,
-        report: state.skillsReport,
-        error: state.skillsError,
-        filter: state.skillsFilter,
-        edits: state.skillEdits,
-        messages: state.skillMessages,
-        busyKey: state.skillsBusyKey,
-        onFilterChange: (next) => (state.skillsFilter = next),
-        onRefresh: () => loadSkills(state as unknown as OpenClawApp, { clearMessages: true }),
-        onToggle: (key, enabled) =>
-          updateSkillEnabled(state as unknown as OpenClawApp, key, enabled),
-        onEdit: (key, value) => updateSkillEdit(state as unknown as OpenClawApp, key, value),
-        onSaveKey: (key) => saveSkillApiKey(state as unknown as OpenClawApp, key),
-        onInstall: (skillKey, name, installId) =>
-          installSkill(state as unknown as OpenClawApp, skillKey, name, installId),
-      });
-    },
+    render: renderSkillsTab,
     load: async (host) => {
       await loadSkills(host as OpenClawApp);
     },
@@ -517,29 +250,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
     path: "/debug",
     icon: "bug",
     group: "settings",
-    render: (state) => {
-      if (state.tab !== "debug") {
-        return nothing;
-      }
-      return renderDebug({
-        loading: state.debugLoading,
-        status: state.debugStatus,
-        health: state.debugHealth,
-        models: state.debugModels,
-        heartbeat: state.debugHeartbeat,
-        web3Audit: state.debugWeb3Audit,
-        web3AuditError: state.debugWeb3AuditError,
-        eventLog: state.eventLog,
-        callMethod: state.debugCallMethod,
-        callParams: state.debugCallParams,
-        callResult: state.debugCallResult,
-        callError: state.debugCallError,
-        onCallMethodChange: (next) => (state.debugCallMethod = next),
-        onCallParamsChange: (next) => (state.debugCallParams = next),
-        onRefresh: () => loadDebug(state as unknown as OpenClawApp),
-        onCall: () => callDebugMethod(state as unknown as OpenClawApp),
-      });
-    },
+    render: renderDebugTab,
     load: async (host) => {
       const h = host as OpenClawApp;
       await loadDebug(h);
@@ -559,29 +270,7 @@ export const TAB_REGISTRY: TabDefinition[] = [
     path: "/logs",
     icon: "scrollText",
     group: "settings",
-    render: (state) => {
-      if (state.tab !== "logs") {
-        return nothing;
-      }
-      return renderLogs({
-        loading: state.logsLoading,
-        error: state.logsError,
-        file: state.logsFile,
-        entries: state.logsEntries,
-        filterText: state.logsFilterText,
-        levelFilters: state.logsLevelFilters,
-        autoFollow: state.logsAutoFollow,
-        truncated: state.logsTruncated,
-        onFilterTextChange: (next) => (state.logsFilterText = next),
-        onLevelToggle: (level, enabled) => {
-          state.logsLevelFilters = { ...state.logsLevelFilters, [level]: enabled };
-        },
-        onToggleAutoFollow: (next) => (state.logsAutoFollow = next),
-        onRefresh: () => loadLogs(state as unknown as OpenClawApp, { reset: true }),
-        onExport: (lines, label) => state.exportLogs(lines, label),
-        onScroll: (event) => state.handleLogsScroll(event),
-      });
-    },
+    render: renderLogsTab,
     load: async (host) => {
       const h = host as OpenClawApp;
       (h as { logsAtBottom: boolean }).logsAtBottom = true;
