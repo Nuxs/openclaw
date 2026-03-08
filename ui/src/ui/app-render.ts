@@ -3,6 +3,7 @@ import { t } from "../i18n/index.ts";
 import { renderActiveTabShell } from "./app-render-active-tab.ts";
 import { renderTab, renderThemeToggle } from "./app-render.helpers.ts";
 import type { AppViewState } from "./app-view-state.ts";
+import { readControlUiBrand } from "./control-ui-brand.ts";
 import { runUpdate } from "./controllers/config.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
 import { icons } from "./icons.ts";
@@ -24,6 +25,7 @@ export function renderApp(state: AppViewState) {
   const isChat = state.tab === "chat";
   const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
   const basePath = normalizeBasePath(state.basePath ?? "");
+  const brand = readControlUiBrand();
 
   return html`
     <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
@@ -43,10 +45,10 @@ export function renderApp(state: AppViewState) {
           </button>
           <div class="brand">
             <div class="brand-logo">
-              <img src=${basePath ? `${basePath}/favicon.svg` : "/favicon.svg"} alt="OpenClaw" />
+              <img src=${basePath ? `${basePath}/favicon.svg` : "/favicon.svg"} alt=${brand.productName} />
             </div>
             <div class="brand-text">
-              <div class="brand-title">OPENCLAW</div>
+              <div class="brand-title">${brand.productName}</div>
               <div class="brand-sub">Gateway Dashboard</div>
             </div>
           </div>

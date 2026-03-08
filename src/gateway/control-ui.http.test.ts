@@ -203,6 +203,45 @@ describe("handleControlUiHttpRequest", () => {
     });
   });
 
+  it("uses shared product brand env overrides in bootstrap payload", async () => {
+    const previousName = process.env.OPENCLAW_PRODUCT_NAME;
+    const previousTitle = process.env.OPENCLAW_PRODUCT_TITLE;
+    process.env.OPENCLAW_PRODUCT_NAME = "MyClaw";
+    process.env.OPENCLAW_PRODUCT_TITLE = "MyClaw Console";
+    try {
+      await withControlUiRoot({
+        fn: async (tmp) => {
+          const { res, end } = makeMockHttpResponse();
+          const handled = handleControlUiHttpRequest(
+            { url: CONTROL_UI_BOOTSTRAP_CONFIG_PATH, method: "GET" } as IncomingMessage,
+            res,
+            {
+              root: { kind: "resolved", path: tmp },
+              config: {
+                agents: { defaults: { workspace: tmp } },
+              },
+            },
+          );
+          expect(handled).toBe(true);
+          const parsed = parseBootstrapPayload(end);
+          expect(parsed.productName).toBe("MyClaw");
+          expect(parsed.productTitle).toBe("MyClaw Console");
+        },
+      });
+    } finally {
+      if (previousName === undefined) {
+        delete process.env.OPENCLAW_PRODUCT_NAME;
+      } else {
+        process.env.OPENCLAW_PRODUCT_NAME = previousName;
+      }
+      if (previousTitle === undefined) {
+        delete process.env.OPENCLAW_PRODUCT_TITLE;
+      } else {
+        process.env.OPENCLAW_PRODUCT_TITLE = previousTitle;
+      }
+    }
+  });
+
   it("serves local avatar bytes through hardened avatar handler", async () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-avatar-http-"));
     try {

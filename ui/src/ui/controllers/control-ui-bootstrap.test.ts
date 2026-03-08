@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { CONTROL_UI_BOOTSTRAP_CONFIG_PATH } from "../../../../src/gateway/control-ui-contract.js";
+import { readControlUiBrand } from "../control-ui-brand.ts";
 import { loadControlUiBootstrapConfig } from "./control-ui-bootstrap.ts";
 
 describe("loadControlUiBootstrapConfig", () => {
@@ -19,13 +20,6 @@ describe("loadControlUiBootstrapConfig", () => {
       }),
     });
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
-
-    document.body.innerHTML = `
-      <div class="sidebar-brand">
-        <img class="sidebar-brand__logo" alt="OpenClaw" />
-        <span class="sidebar-brand__title">OpenClaw</span>
-      </div>
-    `;
 
     const state = {
       basePath: "/openclaw",
@@ -48,9 +42,10 @@ describe("loadControlUiBootstrapConfig", () => {
     expect(document.documentElement.dataset.openclawProductName).toBe("MyClaw");
     expect(document.documentElement.dataset.openclawProductTitle).toBe("MyClaw");
     expect(document.title).toBe("MyClaw Control");
-
-    expect(document.querySelector(".sidebar-brand__title")?.textContent).toBe("MyClaw");
-    expect(document.querySelector<HTMLImageElement>(".sidebar-brand__logo")?.alt).toBe("MyClaw");
+    expect(readControlUiBrand()).toEqual({
+      productName: "MyClaw",
+      productTitle: "MyClaw",
+    });
 
     vi.unstubAllGlobals();
   });
