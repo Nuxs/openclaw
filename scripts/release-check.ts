@@ -335,10 +335,63 @@ function checkPluginSdkExports() {
   }
 }
 
+type SourceGateCheck = {
+  filePath: string;
+  markers: string[];
+};
+
+const sourceGateChecks: SourceGateCheck[] = [
+  {
+    filePath: resolve("extensions", "web3-core", "src", "index.ts"),
+    markers: [
+      "web3.wallet.balance",
+      "web3.billing.handlePaymentRequired",
+      "web3.index.list",
+      "web3.market.status.summary",
+      "web3.market.task.publish",
+      "web3.market.task.result.review",
+      "web3.market.privacy.erase",
+    ],
+  },
+  {
+    filePath: resolve("extensions", "market-core", "src", "index.ts"),
+    markers: [
+      "market.task.publish",
+      "market.task.result.review",
+      "market.privacy.replay.generate",
+      "market.privacy.erase",
+    ],
+  },
+];
+
+function checkWeb3GaSourceGates() {
+  for (const check of sourceGateChecks) {
+    let content: string;
+    try {
+      content = readFileSync(check.filePath, "utf8");
+    } catch {
+      console.error(`release-check: source gate file missing: ${check.filePath}`);
+      process.exit(1);
+      return;
+    }
+
+    const missingMarkers = check.markers.filter((marker) => !content.includes(marker));
+    if (missingMarkers.length > 0) {
+      console.error(`release-check: web3 ga source gates missing in ${check.filePath}:`);
+      for (const marker of missingMarkers) {
+        console.error(`  - ${marker}`);
+      }
+      process.exit(1);
+      return;
+    }
+  }
+}
+
 function main() {
   checkPluginVersions();
   checkAppcastSparkleVersions();
   checkPluginSdkExports();
+  checkWeb3GaSourceGates();
 
   const results = runPackDry();
   const files = results.flatMap((entry) => entry.files ?? []);
