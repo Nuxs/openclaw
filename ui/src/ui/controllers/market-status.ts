@@ -3,14 +3,25 @@ import type {
   BridgeRoutesSnapshot,
   BridgeTransfer,
   ConfigSnapshot,
+  ConsentView,
   MarketDispute,
   MarketLedgerEntry,
   MarketLedgerSummary,
   MarketLease,
   MarketMetricsSnapshot,
+  MarketOpsSummary,
+  MarketPrivacySummary,
   MarketReputationSummary,
   MarketResource,
   MarketStatusSummary,
+  MarketTaskSummary,
+  OpsAlertView,
+  PrivacyAssetView,
+  PrivacyReplayView,
+  TaskBidView,
+  TaskOrderView,
+  TaskReceiptView,
+  TaskResultView,
   TokenEconomyState,
   Web3IndexEntry,
   Web3IndexStats,
@@ -240,6 +251,146 @@ function normalizePayload<T>(input: unknown): T | null {
     return null;
   }
   return payload as T;
+}
+
+// ── Task / Privacy / Ops lazy loaders ──
+
+export type MarketTaskState = {
+  client: GatewayBrowserClient | null;
+  connected: boolean;
+  taskLoading: boolean;
+  taskSummary: MarketTaskSummary | null;
+  taskOrders: TaskOrderView[];
+  taskBids: TaskBidView[];
+  taskResults: TaskResultView[];
+  taskReceipts: TaskReceiptView[];
+};
+
+export async function loadMarketTasks(state: MarketTaskState) {
+  if (!state.client || !state.connected || state.taskLoading) {
+    return;
+  }
+  state.taskLoading = true;
+  try {
+    const [summaryRes, tasksRes, bidsRes, resultsRes, receiptsRes] = await Promise.allSettled([
+      state.client.request("web3.market.task.list", { limit: 1, summary: true }),
+      state.client.request("web3.market.task.list", { limit: 20 }),
+      state.client.request("web3.market.task.bid.list", { limit: 20 }),
+      state.client.request("web3.market.task.result.submit", { list: true, limit: 20 }),
+      state.client.request("web3.market.task.receipt.list", { limit: 20 }),
+    ]);
+    if (summaryRes.status === "fulfilled") {
+      state.taskSummary = normalizePayload<MarketTaskSummary>(summaryRes.value);
+    }
+    if (tasksRes.status === "fulfilled") {
+      const payload = normalizePayload<{ tasks?: TaskOrderView[] }>(tasksRes.value);
+      state.taskOrders = payload?.tasks ?? [];
+    }
+    if (bidsRes.status === "fulfilled") {
+      const payload = normalizePayload<{ bids?: TaskBidView[] }>(bidsRes.value);
+      state.taskBids = payload?.bids ?? [];
+    }
+    if (resultsRes.status === "fulfilled") {
+      const payload = normalizePayload<{ results?: TaskResultView[] }>(resultsRes.value);
+      state.taskResults = payload?.results ?? [];
+    }
+    if (receiptsRes.status === "fulfilled") {
+      const payload = normalizePayload<{ receipts?: TaskReceiptView[] }>(receiptsRes.value);
+      state.taskReceipts = payload?.receipts ?? [];
+    }
+  } finally {
+    state.taskLoading = false;
+  }
+}
+
+export type MarketPrivacyState = {
+  client: GatewayBrowserClient | null;
+  connected: boolean;
+  privacyLoading: boolean;
+  privacySummary: MarketPrivacySummary | null;
+  privacyConsents: ConsentView[];
+  privacyAssets: PrivacyAssetView[];
+  privacyReplays: PrivacyReplayView[];
+};
+
+export async function loadMarketPrivacy(state: MarketPrivacyState) {
+  if (!state.client || !state.connected || state.privacyLoading) {
+    return;
+  }
+  state.privacyLoading = true;
+  try {
+    const [consentsRes, assetsRes, replaysRes] = await Promise.allSettled([
+      state.client.request("web3.market.consent.list", { limit: 20 }),
+      state.client.request("web3.market.privacy.assets", { limit: 20 }),
+      state.client.request("web3.market.privacy.replay.list", { limit: 20 }),
+    ]);
+    let activeConsents = 0;
+    let revokedConsents = 0;
+    if (consentsRes.status === "fulfilled") {
+      const payload = normalizePayload<{ consents?: ConsentView[] }>(consentsRes.value);
+      state.privacyConsents = payload?.consents ?? [];
+      activeConsents = state.privacyConsents.filter((c) => c.status === "consent_granted").length;
+      revokedConsents = state.privacyConsents.filter((c) => c.status === "consent_revoked").length;
+    }
+    if (assetsRes.status === "fulfilled") {
+      const payload = normalizePayload<{ assets?: PrivacyAssetView[] }>(assetsRes.value);
+      state.privacyAssets = payload?.assets ?? [];
+    }
+    if (replaysRes.status === "fulfilled") {
+      const payload = normalizePayload<{ replays?: PrivacyReplayView[] }>(replaysRes.value);
+      state.privacyReplays = payload?.replays ?? [];
+    }
+    state.privacySummary = {
+      activeConsents,
+      revokedConsents,
+      pendingErasure: state.privacyReplays.filter((r) => r.status === "replay_generated").length,
+      totalReplays: state.privacyReplays.length,
+      assetCount: state.privacyAssets.length,
+    };
+  } finally {
+    state.privacyLoading = false;
+  }
+}
+
+export type MarketOpsState = {
+  client: GatewayBrowserClient | null;
+  connected: boolean;
+  opsLoading: boolean;
+  opsSummary: MarketOpsSummary | null;
+  opsAlerts: OpsAlertView[];
+};
+
+export async function loadMarketOps(state: MarketOpsState) {
+  if (!state.client || !state.connected || state.opsLoading) {
+    return;
+  }
+  state.opsLoading = true;
+  try {
+    const [monitorRes] = await Promise.allSettled([
+      state.client.request("web3.monitor.snapshot", {}),
+    ]);
+    if (monitorRes.status === "fulfilled") {
+      const payload = normalizePayload<Web3MonitorSnapshot>(monitorRes.value);
+      const activeAlerts = (payload as unknown as { alerts?: OpsAlertView[] })?.alerts ?? [];
+      state.opsAlerts = activeAlerts;
+      state.opsSummary = {
+        activeAlerts: activeAlerts.filter((a) => a.status === "active").length,
+        alertsByLevel: activeAlerts.reduce(
+          (acc, a) => {
+            acc[a.level] = (acc[a.level] ?? 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
+        healthProbes: [],
+        discoveryHealthy: true,
+        paymentHealthy: true,
+        settlementHealthy: true,
+      };
+    }
+  } finally {
+    state.opsLoading = false;
+  }
 }
 
 function getPathValue(root: Record<string, unknown>, path: Array<string | number>): unknown {

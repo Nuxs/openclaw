@@ -25,7 +25,10 @@ import {
   renderReputationCard,
   renderTokenEconomyCard,
 } from "./market-cards.ts";
+import { renderOpsSection, type OpsSectionProps } from "./market-ops-section.ts";
+import { renderPrivacySection, type PrivacySectionProps } from "./market-privacy-section.ts";
 import { renderIndexOverview, renderMonitorOverview } from "./market-sections.ts";
+import { renderTaskSection, type TaskSectionProps } from "./market-task-section.ts";
 
 type MarketProps = {
   loading: boolean;
@@ -51,6 +54,9 @@ type MarketProps = {
   enableError: string | null;
   enableNotice: string | null;
   configPath: string;
+  taskSection?: TaskSectionProps;
+  privacySection?: PrivacySectionProps;
+  opsSection?: OpsSectionProps;
   onResourceKindChange: (next: MarketResourceKind | "all") => void;
   onFiltersChange: (next: MarketFilters) => void;
   onRefresh: () => void;
@@ -327,6 +333,21 @@ export function renderMarket(props: MarketProps) {
       ${renderBridgeRoutesCard(props.bridgeRoutes, props.loading)}
       ${renderBridgeTransfersCard(props.bridgeTransfers, props.loading)}
     </section>
+
+    <section class="grid grid-cols-2" style="margin-top: 18px;">
+      ${props.taskSection ? renderTaskSection(props.taskSection) : nothing}
+      ${props.privacySection ? renderPrivacySection(props.privacySection) : nothing}
+    </section>
+
+    ${
+      props.opsSection
+        ? html`
+      <section style="margin-top: 18px;">
+        ${renderOpsSection(props.opsSection)}
+      </section>
+    `
+        : nothing
+    }
 
     <section class="grid grid-cols-2" style="margin-top: 18px;">
       ${renderIndexOverview({

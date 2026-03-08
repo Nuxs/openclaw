@@ -503,3 +503,144 @@ export type MarketFilters = {
   ledgerUnit: MarketLedgerUnitFilter;
   ledgerSort: MarketLedgerSort;
 };
+
+// ── Task Market View Models ──
+
+export type TaskOrderView = {
+  taskId: string;
+  title: string;
+  status: string;
+  creatorActorId: string;
+  budget: { amount: string; currency: string };
+  requirements: string[];
+  expiryAt: string;
+  createdAt: string;
+  awardedBidId?: string;
+  bidCount?: number;
+};
+
+export type TaskBidView = {
+  bidId: string;
+  taskId: string;
+  bidderActorId: string;
+  price: string;
+  currency: string;
+  status: string;
+  etaHours?: number;
+  summary?: string;
+  createdAt: string;
+};
+
+export type TaskResultView = {
+  resultId: string;
+  taskId: string;
+  bidId: string;
+  delivererActorId: string;
+  status: string;
+  artifacts: string[];
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+};
+
+export type TaskReceiptView = {
+  receiptId: string;
+  taskId: string;
+  amount: string;
+  currency: string;
+  status: string;
+  settledAt?: string;
+  disputeId?: string;
+};
+
+export type MarketTaskSummary = {
+  openTasks: number;
+  awardedTasks: number;
+  closedTasks: number;
+  totalBids: number;
+  pendingResults: number;
+  settledReceipts: number;
+  disputedReceipts: number;
+};
+
+// ── Privacy View Models ──
+
+export type ConsentView = {
+  consentId: string;
+  orderId: string;
+  status: string;
+  purpose: string;
+  durationDays?: number;
+  grantedAt: string;
+  revokedAt?: string;
+  retentionUntil?: string;
+};
+
+export type PrivacyAssetView = {
+  consentId: string;
+  assetId: string;
+  title: string;
+  purpose: string;
+  status: string;
+  taskId?: string;
+};
+
+export type PrivacyReplayView = {
+  replayId: string;
+  consentId: string;
+  status: string;
+  retentionAction: string;
+  generatedAt: string;
+  erasedAt?: string;
+};
+
+export type MarketPrivacySummary = {
+  activeConsents: number;
+  revokedConsents: number;
+  pendingErasure: number;
+  totalReplays: number;
+  assetCount: number;
+};
+
+// ── Ops View Models ──
+
+export type OpsAlertView = {
+  id: string;
+  level: string;
+  category: string;
+  status: string;
+  message: string;
+  timestamp: string;
+};
+
+export type OpsHealthProbe = {
+  name: string;
+  status: "healthy" | "degraded" | "down";
+  lastCheck: string;
+  details?: string;
+};
+
+export type MarketOpsSummary = {
+  activeAlerts: number;
+  alertsByLevel: Record<string, number>;
+  healthProbes: OpsHealthProbe[];
+  discoveryHealthy: boolean;
+  paymentHealthy: boolean;
+  settlementHealthy: boolean;
+};
+
+// ── GA Readiness ──
+
+export type GaReadinessCheck = {
+  name: string;
+  status: "pass" | "warn" | "fail";
+  detail?: string;
+};
+
+export type GaReadiness = {
+  ready: boolean;
+  checks: GaReadinessCheck[];
+  passCount: number;
+  warnCount: number;
+  failCount: number;
+};
