@@ -27,6 +27,10 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
       kind: "gateway",
       group: "market",
       availability: availability(true),
+      prerequisites: [
+        "Docs: /reference/web3-eaas-protocol-spec",
+        "Docs: /reference/web3-dual-stack-payments-and-settlement",
+      ],
       paramsSchema: {
         type: "object",
         properties: {
@@ -615,6 +619,11 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
       kind: "gateway",
       group: "market",
       availability: availability(consumerEnabled, "resources consumer disabled"),
+      prerequisites: [
+        "Docs: /reference/web3-resource-market-api",
+        "Docs: /reference/web3-eaas-protocol-spec",
+        "Note: Access tokens are stored internally and must not be returned in tool outputs.",
+      ],
       paramsSchema: {
         type: "object",
         required: ["actorId", "resourceId", "consumerActorId", "ttlMs"],
@@ -727,6 +736,10 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
       kind: "gateway",
       group: "market",
       availability: availability(resourcesEnabled, "resources disabled"),
+      prerequisites: [
+        "Docs: /reference/web3-eaas-protocol-spec",
+        "Docs: /reference/web3-eaas-developer-guide",
+      ],
       paramsSchema: {
         type: "object",
         required: ["actorId", "orderId", "proof"],

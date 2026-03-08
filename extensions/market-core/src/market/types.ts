@@ -111,11 +111,21 @@ export type Delivery = {
   payloadRef?: DeliveryPayloadRef;
 };
 
+/**
+ * A sha256 artifact hash string.
+ *
+ * Format: `sha256:<hex>`.
+ * Validation is enforced at runtime via `requireExecutionProof()`.
+ */
+export type Sha256ArtifactHash = `sha256:${string}`;
+
 export type ExecutionProof = {
   type: "tlsnotary";
-  artifactHash: string;
+  artifactHash: Sha256ArtifactHash;
+  /** ISO timestamp. */
   issuedAt: string;
   redactedFields?: string[];
+  /** The verifier identifier (e.g. "tlsnotary"). */
   verifier: string;
 };
 
@@ -490,7 +500,7 @@ export type ReconciliationSummary = {
     total: number;
     byStatus: Record<string, number>;
     latestSubmittedAt?: string;
-    artifactHashes: string[];
+    artifactHashes: Sha256ArtifactHash[];
   };
   archiveReceipt?: { cid?: string; uri?: string; updatedAt?: string };
   anchorReceipt?: { tx?: string; network?: string; block?: number; updatedAt?: string };

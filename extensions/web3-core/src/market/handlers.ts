@@ -287,6 +287,8 @@ function countByStatus(items: Array<{ status?: string }>): Record<string, number
   }, {});
 }
 
+type Sha256ArtifactHash = `sha256:${string}`;
+
 type ServiceProofSummaryInput = {
   status?: string;
   submittedAt?: string;
@@ -309,7 +311,10 @@ function summarizeServiceProofs(
         .map((entry) =>
           typeof entry.proof?.artifactHash === "string" ? entry.proof.artifactHash : undefined,
         )
-        .filter((hash): hash is string => Boolean(hash)),
+        .filter(
+          (hash): hash is Sha256ArtifactHash =>
+            typeof hash === "string" && /^sha256:[a-f0-9]{64}$/i.test(hash),
+        ),
     ),
   ].slice(0, 5);
   return {

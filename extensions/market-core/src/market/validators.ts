@@ -11,6 +11,7 @@ import type {
   DeliveryPayload,
   DeliveryType,
   ExecutionProof,
+  Sha256ArtifactHash,
   UsageScope,
 } from "./types.js";
 
@@ -120,6 +121,7 @@ export function requireExecutionProof(input: unknown): ExecutionProof {
   if (!/^sha256:[a-f0-9]{64}$/i.test(artifactHash)) {
     throw new Error("proof.artifactHash must be sha256:<hex>");
   }
+  const artifactHashTyped = artifactHash as Sha256ArtifactHash;
   const issuedAt = requireIsoTimestamp(proof, "issuedAt");
   const redactedFields = requireOptionalStringArray(proof, "proof.redactedFields", {
     maxItems: 64,
@@ -129,7 +131,7 @@ export function requireExecutionProof(input: unknown): ExecutionProof {
   const verifier = requireString(proof.verifier, "proof.verifier");
   return {
     type: "tlsnotary",
-    artifactHash,
+    artifactHash: artifactHashTyped,
     issuedAt,
     redactedFields,
     verifier,
