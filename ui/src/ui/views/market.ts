@@ -253,22 +253,22 @@ export function renderMarket(props: MarketProps) {
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
             <div class="stat-label">Offers</div>
-            <div class="stat-value">${status?.totals.offers ?? 0}</div>
+            <div class="stat-value">${status?.totals?.offers ?? 0}</div>
             ${renderStatusPills(status?.offers ?? {})}
           </div>
           <div class="stat">
             <div class="stat-label">Orders</div>
-            <div class="stat-value">${status?.totals.orders ?? 0}</div>
+            <div class="stat-value">${status?.totals?.orders ?? 0}</div>
             ${renderStatusPills(status?.orders ?? {})}
           </div>
           <div class="stat">
             <div class="stat-label">Deliveries</div>
-            <div class="stat-value">${status?.totals.deliveries ?? 0}</div>
+            <div class="stat-value">${status?.totals?.deliveries ?? 0}</div>
             ${renderStatusPills(status?.deliveries ?? {})}
           </div>
           <div class="stat">
             <div class="stat-label">Settlements</div>
-            <div class="stat-value">${status?.totals.settlements ?? 0}</div>
+            <div class="stat-value">${status?.totals?.settlements ?? 0}</div>
             ${renderStatusPills(status?.settlements ?? {})}
           </div>
           <div class="stat">
