@@ -1,6 +1,6 @@
 ---
 name: eth-oracle
-description: "This skill should be used when an AI agent must perform strict crypto research, portfolio decision support, or executive-grade briefing across ETH, stablecoins, payment narratives, macro, regulation, and geopolitical transmission into digital assets. It is designed for an AI private butler that must produce evidence-led research reports, investment memos, board briefs, and auditable JSON with explicit confidence, counterarguments, risk triggers, and review cadence."
+description: "Use when the task is about ETH or crypto market research, stablecoins, Circle/USDC, payment rails, crypto positioning, risk review, or writing an investment memo / board brief for digital assets. Also fits asks like: 以太坊、稳定币、USDC、支付叙事、仓位、减仓、对冲、风险复盘、投资备忘录。 Best for questions about whether to increase, reduce, hedge, monitor, or explain crypto exposure."
 ---
 
 # ETH Oracle — AI Private Butler Research & Decision Framework
