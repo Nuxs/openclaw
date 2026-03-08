@@ -89,10 +89,113 @@ export async function parseIntent(message: string): Promise<ParsedIntent> {
     };
   }
 
+  // ── 任务市场 ──
+
+  if (msg.includes("发任务") || msg.includes("发布任务") || msg.includes("publish task")) {
+    return {
+      type: IntentType.PUBLISH_TASK,
+      params: { ...commonParams, ...extractTaskParams(message) },
+      confidence: 0.9,
+    };
+  }
+
+  if (msg.includes("任务列表") || msg.includes("查看任务") || msg.includes("我的任务")) {
+    return {
+      type: IntentType.QUERY_TASKS,
+      params: commonParams,
+      confidence: 0.9,
+    };
+  }
+
+  if (msg.includes("投标") || msg.includes("竞标") || msg.includes("bid")) {
+    return {
+      type: IntentType.PLACE_BID,
+      params: { ...commonParams, ...extractBidParams(message) },
+      confidence: 0.85,
+    };
+  }
+
+  if (msg.includes("提交成果") || msg.includes("交付") || msg.includes("submit result")) {
+    return {
+      type: IntentType.SUBMIT_RESULT,
+      params: commonParams,
+      confidence: 0.85,
+    };
+  }
+
+  if (msg.includes("验收") || msg.includes("审查") || msg.includes("review result")) {
+    return {
+      type: IntentType.REVIEW_RESULT,
+      params: commonParams,
+      confidence: 0.85,
+    };
+  }
+
+  // ── 隐私合规 ──
+
+  if (msg.includes("授权") || msg.includes("consent") || msg.includes("隐私授权")) {
+    return {
+      type: IntentType.QUERY_CONSENTS,
+      params: commonParams,
+      confidence: 0.85,
+    };
+  }
+
+  if (msg.includes("回放") || msg.includes("replay") || msg.includes("合规回放")) {
+    return {
+      type: IntentType.GENERATE_REPLAY,
+      params: commonParams,
+      confidence: 0.85,
+    };
+  }
+
+  if (msg.includes("删除数据") || msg.includes("擦除") || msg.includes("erase")) {
+    return {
+      type: IntentType.ERASE_DATA,
+      params: commonParams,
+      confidence: 0.85,
+    };
+  }
+
+  // ── 运营 ──
+
+  if (msg.includes("运营") || msg.includes("ops") || msg.includes("运行状态")) {
+    return {
+      type: IntentType.QUERY_OPS_STATUS,
+      params: commonParams,
+      confidence: 0.85,
+    };
+  }
+
+  if (msg.includes("告警") || msg.includes("alert") || msg.includes("报警")) {
+    return {
+      type: IntentType.QUERY_ALERTS,
+      params: commonParams,
+      confidence: 0.85,
+    };
+  }
+
   return {
     type: IntentType.UNKNOWN,
     params: commonParams,
     confidence: 0.0,
+  };
+}
+
+function extractTaskParams(message: string): Record<string, unknown> {
+  const budgetMatch = message.match(/\$?(\d+(?:\.\d+)?)/);
+  const budget = budgetMatch ? Number(budgetMatch[1]) : undefined;
+  const titleMatch = message.match(/[""「](.+?)[""」]/);
+  const title = titleMatch ? titleMatch[1] : undefined;
+  return { budget, title };
+}
+
+function extractBidParams(message: string): Record<string, unknown> {
+  const taskIdMatch = message.match(/taskId\s*[=:]\s*([\w-]+)/);
+  const priceMatch = message.match(/\$?(\d+(?:\.\d+)?)/);
+  return {
+    taskId: taskIdMatch ? taskIdMatch[1] : undefined,
+    bidAmount: priceMatch ? Number(priceMatch[1]) : undefined,
   };
 }
 

@@ -23,5 +23,21 @@ export function generateHelpMessage(): string {
 ❌ 取消订单：
 • "取消所有订单"
 
+📋 任务市场：
+• "发布任务「翻译报告」$50"
+• "查看任务"
+• "投标 taskId=xxx $30"
+• "提交成果 taskId=xxx"
+• "验收 resultId=xxx"
+
+🔒 隐私合规：
+• "查看授权"
+• "回放 consentId=xxx"
+• "删除数据 consentId=xxx"
+
+📊 运营状态：
+• "运营状态"
+• "告警"
+
 提示：可以在指令里附带 actorId，例如：actorId=0x...`;
 }

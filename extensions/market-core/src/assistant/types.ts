@@ -6,17 +6,37 @@ export type MarketAssistantRuntime = {
 
 /**
  * 用户意图类型
+ *
+ * 覆盖基础市场、任务市场、隐私合规、运营诊断四条主线。
  */
 export enum IntentType {
-  SELL_RESOURCE = "sell_resource", // 发布资源
-  UPDATE_PRICE = "update_price", // 调整价格
-  QUERY_INVENTORY = "query_inventory", // 查询库存
-  QUERY_EARNINGS = "query_earnings", // 查询收入
-  QUERY_ORDERS = "query_orders", // 查询订单
-  SET_AUTOMATION = "set_automation", // 设置自动化
-  CANCEL_ORDERS = "cancel_orders", // 取消订单
-  DIAGNOSE = "diagnose", // 诊断
-  UNKNOWN = "unknown", // 未知意图
+  // ── 基础市场 ──
+  SELL_RESOURCE = "sell_resource",
+  UPDATE_PRICE = "update_price",
+  QUERY_INVENTORY = "query_inventory",
+  QUERY_EARNINGS = "query_earnings",
+  QUERY_ORDERS = "query_orders",
+  SET_AUTOMATION = "set_automation",
+  CANCEL_ORDERS = "cancel_orders",
+  DIAGNOSE = "diagnose",
+
+  // ── 任务市场 ──
+  PUBLISH_TASK = "publish_task",
+  QUERY_TASKS = "query_tasks",
+  PLACE_BID = "place_bid",
+  SUBMIT_RESULT = "submit_result",
+  REVIEW_RESULT = "review_result",
+
+  // ── 隐私合规 ──
+  QUERY_CONSENTS = "query_consents",
+  GENERATE_REPLAY = "generate_replay",
+  ERASE_DATA = "erase_data",
+
+  // ── 运营 ──
+  QUERY_OPS_STATUS = "query_ops_status",
+  QUERY_ALERTS = "query_alerts",
+
+  UNKNOWN = "unknown",
 }
 
 /**
