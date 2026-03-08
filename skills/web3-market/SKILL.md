@@ -1,144 +1,181 @@
 ---
 name: web3-market
-description: Implement OpenClaw Web3 decentralized brain switch (B-1) and resource-sharing market-core (B-2: resources/leases/ledger).
+description: Design and implement OpenClaw Private Steward architecture, Web3 Market runtime, EaaS evolution, and A2A/MCP integration with accountable settlement.
 metadata: { "openclaw": { "emoji": "🕸️" } }
 ---
 
 # web3-market
 
-Implement the Web3 "decentralized brain" switch and the B-2 resource-sharing platform (model/search/storage) using the design docs in this repo.
+Design and extend OpenClaw as a `Private Steward OS` with a `Market-backed A2A` stack. Treat Web3 as the trust and settlement substrate, not the product façade. Evolve the current resource-sharing runtime into a broader EaaS stack without breaking the existing `web3.*` public contract.
 
 ## Trigger
 
 Use this skill when working on:
 
-- Core hook: `resolve_stream_fn` (custom `StreamFn` override)
-- `market-core` extensions: `resources` / `leases` / `ledger`
-- `web3-core` orchestration: publish/list/lease/revoke, Provider HTTP routes, consumer tools
-- Token handling, auditing, and settlement/ledger alignment
-- **Discovery Network (Phase 4)**: `extensions/web3-core/src/discovery/` — P2P resource discovery, libp2p integration (P0/P1 scope; P2 by ally agent per `references/web3-mdl-libp2p-discovery-plan.md`)
+- `market-core` / `web3-core` market runtime, catalog, lease, ledger, settlement, dispute, reconciliation
+- `serviceSchema`, planned `Service Wrapper`, proof, acceptance, arbitration, and execution-state design
+- `MCP` façade design or `A2A` / `ACP` coordination that touches market, trust, or settlement boundaries
+- Private Steward architecture, product positioning, 2026-2028 roadmap, or executive/RFC planning
+- Discovery / offer / capability modeling for agent commerce
+- Budget, trust, governance, audit, and redaction rules for agent-to-agent service execution
 
-## Implementation Status (as of 2026-03-04)
+## Runtime anchor (state the truth first)
 
-**Completed**:
+Anchor every proposal to the current repo truth:
 
-- ✅ B-1: Decentralized brain switch (resolve_stream_fn hook)
-- ✅ B-2: Resource sharing market (resources/leases/ledger)
-- ✅ Phase 1: Reward lifecycle（create → issueClaim → status update / poll confirm）
-  - 说明：`market-core` 已实现创建、签发、状态机校验与确认回写；“链上提交”依赖外部执行/上游调用，不应默认表述为插件内部自动完成。
-- ✅ Dispute data source unification (web3-core dispute interfaces delegated to market-core)
-- ✅ TON transaction receipt query (getTransactionReceipt)
-- ✅ Capabilities Catalog: covers core, resources, market, monitor, tools, **reward**
+- Current runtime still centers on `resource` / `lease` / `ledger` / `service proof`
+- Public contract is `web3.*`; internal authority is `market.*`
+- Sensitive assets (`accessToken`, provider endpoint, real file path) never leak in normal outputs
+- `serviceSchema` is the current concrete service descriptor; `Service Wrapper` is target-state abstraction
+- A2A/subagent coordination already exists in `src/agents/tools/*`; market settlement remains a separate authority plane
 
-**In Progress / Pending**:
+Do not describe planned EaaS layers as already implemented. Distinguish clearly between:
 
-- Task market protocol
-- Full arbitration system
-- Independent index service
-- Monitoring & alerting
-- Web management console
+1. current runtime fact
+2. additive next step
+3. long-range target state
 
-## References (source of truth)
+## Source of truth and precedence
 
-Read these files as needed. When they disagree, use this precedence:
+When references disagree, use this order:
 
 1. Runtime registration in `extensions/web3-core/src/index.ts` and `extensions/market-core/src/index.ts`
 2. Capability/config schemas in `extensions/web3-core/src/capabilities/**` and each plugin `openclaw.plugin.json`
 3. External docs under `docs/`
-4. Internal plans/reviews under `skills/web3-market/references/` and `skills/web3-market/internal/`
+4. Skill references under `skills/web3-market/references/`
+5. Internal memos/RFCs under `skills/web3-market/internal/`
 
-Reference set:
+## Core model
 
+Treat the stack as:
+
+- **Product definition**: `Private Steward OS`
+- **Network definition**: `Market-backed A2A Network`
+- **Protocol split**:
+  - `MCP` = tool/data entry and façade surface
+  - `A2A` / `ACP` = delegation, coordination, and cross-agent communication
+  - `OpenClaw Market` = offer, lease, ledger, settlement, proof, dispute, reconciliation
+  - chain/wallet/identity = trust anchor, signature, payment, and audit substrate
+
+## Architectural invariants
+
+Do not violate these rules:
+
+- Keep `web3.*` as the user/agent/UI public contract
+- Keep `market.*` as the internal authority / authoritative execution layer
+- Keep **Extension = Mechanism, AI = Policy**
+- Evolve `serviceSchema` additively toward `Service Wrapper`; do not rewrite the runtime around a fantasy schema
+- Use `MCP` for controlled entry, not as the settlement source of truth
+- Use `A2A` for collaboration, not as the financial authority layer
+- Keep proof, settlement, and dispute tied together; avoid standalone “proof-only” abstractions that cannot reconcile against orders/leases
+- Preserve redaction guarantees: no token/endpoint/path leaks in docs, logs, tool results, dashboards, or capability descriptors
+
+## Reference map
+
+### Main architecture and execution references
+
+Read these first for architecture or protocol work:
+
+- `skills/web3-market/references/openclaw-private-steward-architecture-2026-2028.md`
+- `skills/web3-market/references/openclaw-eaas-a2a-mcp-productization.md`
 - `skills/web3-market/references/web3-brain-architecture.md`
-- `skills/web3-market/references/web3-agent-wallet-plan.md` ← **Agent Wallet 已通过 `web3.wallet.*` 聚合入口进入 `web3.capabilities.*`；当前剩余边界是 TON `sign` 未支持、TEE/更强隔离仍在后续阶段**
-- `skills/web3-market/references/web3-market-privacy-knowledge.md` ← **个人数据/私有知识：consent/脱敏/合规/撤销规范**
-- `skills/web3-market/references/web3-market-technical-debt.md` ← **技术债清单；当前重点已从“补 `web3.wallet.*` 入口”转为“契约治理、条件可用性表达、TEE/隔离硬化”**
 - `skills/web3-market/references/web3-market-plan-overview.md`
 - `skills/web3-market/references/web3-market-plan-phase1-execution.md`
-- `skills/web3-market/references/web3-market-plan-roadmap-open-source-coldstart.md`
-- `skills/web3-market/references/web3-market-plan-parallel-execution-ray-celery.md`
+- `skills/web3-market/references/web3-market-resource-implementation-checklist.md`
+
+### Market/runtime reference set
+
+Load as needed:
+
+- `skills/web3-market/references/web3-agent-wallet-plan.md`
+- `skills/web3-market/references/web3-market-privacy-knowledge.md`
+- `skills/web3-market/references/web3-market-technical-debt.md`
 - `skills/web3-market/references/web3-market-resource-api.md`
 - `skills/web3-market/references/web3-market-resource-security.md`
 - `skills/web3-market/references/web3-market-resource-ops.md`
 - `skills/web3-market/references/web3-market-resource-testing.md`
 - `skills/web3-market/references/web3-market-resource-config-examples.md`
-- `skills/web3-market/references/web3-market-resource-implementation-checklist.md`
 - `skills/web3-market/references/web3-market-tools-commands-evolution.md`
-- `skills/web3-market/references/web3-market-assessment-2026-02-19.md`
-- `skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md` ← **MDL（Market Discovery Layer）：基于 libp2p 的去中心化发现层实施计划（可量化追溯）**
+- `skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`
 
-## Docs
+### Executive and implementation deliverables
 
-### External docs (`docs/web3/`)
+Read when drafting plans, leadership updates, or implementation breakdowns:
 
-- `docs/web3/ai-steward-golden-path.md`
-- `docs/web3/TON_E2E_SETTLEMENT.md` ← TON 端到端结算（Headless）验收指南
-- `docs/web3/WEB3_DUAL_STACK_STRATEGY.md` ← 双栈策略与统一口径（对外）
-
-### Internal planning & research (`skills/web3-market/internal/`)
-
+- `skills/web3-market/internal/BOARD_STRATEGY_MEMO_2026_PRIVATE_STEWARD.md`
+- `skills/web3-market/internal/RFC_2026_PRIVATE_STEWARD_MARKET_STACK.md`
 - `skills/web3-market/internal/WEB3_OVERALL_PROGRESS.md`
-- `skills/web3-market/internal/WEB3_WEEK3_5_ROADMAP.md`
-- `skills/web3-market/internal/WEB3_DEV_PLAN_5_WEEKS.md`
+- `skills/web3-market/internal/WEB3_MARKET_GO_LIVE_REVIEW_2026-03.md`
 - `skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
-- `skills/web3-market/internal/openclaw-web3-evaluation-report.md`
-- `skills/web3-market/internal/2026年十大优秀公链技术调研报告.md`
 
-## Architecture Principle: Extension = Mechanism, AI = Policy
+### External docs to align with
 
-> **单一权威声明**：此原则是 OpenClaw Web3 全栈的架构基石，所有 skill/agent/contributor 必须遵循。
+When changing public contracts or public narratives, align with:
 
-**OpenClaw 愿景**：AI（大脑）通过 Tool-use（手脚）在去中心化市场（物理世界）中自由活动。
+- `docs/concepts/web3-market.md`
+- `docs/reference/web3-market-dev.md`
+- `docs/reference/web3-eaas-protocol-spec.md`
+- `docs/reference/web3-eaas-developer-guide.md`
+- `docs/reference/web3-eaas-protocol-upgrade-report-2026.md`
+- `docs/reference/web3-everything-as-a-service-vision.md`
+- `docs/reference/ai-steward-service-market-plan.md`
 
-### Extension 层（`market-core` / `web3-core`）= 物理世界 + 手脚
+## File map
 
-提供**确定性的原子能力**，不包含决策智慧：
+Use these repo areas deliberately:
 
-| 职责         | 示例                                                | 说明                                     |
-| :----------- | :-------------------------------------------------- | :--------------------------------------- |
-| **原子动作** | `market.order.list`, `market.settlement.release`    | 可组合的最小操作单元                     |
-| **感知能力** | `web3.market.status.summary`, `web3.monitor.health` | 五官——返回结构化数据，不附带"建议"       |
-| **聚合感知** | `handleDiagnose`（聚合多个 API 的高级传感器）       | 合理——是"更灵敏的眼睛"，不是"替你做决定" |
-| **安全边界** | 签名校验、状态机约束、CAS 冲突检测                  | 物理定律——防止大脑发疯                   |
+- `extensions/market-core/src/market/handlers/*.ts` = authority state machines and write paths
+- `extensions/market-core/src/market/types.ts` / `validators.ts` / `resources.ts` = canonical market object model and validation
+- `extensions/web3-core/src/market/handlers.ts` = façade/proxy layer for `web3.market.*`
+- `extensions/web3-core/src/capabilities/catalog/market.ts` = agent-readable capability descriptors
+- `extensions/web3-core/src/resources/*` = lease-token storage, safe consumer routing, credential redaction
+- `src/agents/tools/sessions-send-tool.a2a.ts` and `src/agents/tools/sessions-spawn-tool.ts` = existing coordination runtime
 
-**Extension 层禁止**：
+When adding new market capabilities to already-large files, prefer creating leaf modules and keeping entry files thin.
 
-- 固化意图解析逻辑（自然语言 → 意图映射是 AI Agent 的工作）
-- 固化决策策略（"建议降价"是 LLM 基于 context 做的判断，不能写死在代码里）
-- 固化业务规则（"收入下降 20% → 建议降价促销"是 Policy，不是 Mechanism）
+## Task playbooks
 
-### AI Agent 层（LLM / Skills / Butler）= 大脑
+### For runtime / protocol implementation
 
-负责**理解意图、做出决策、编排行动**：
+1. Read `openclaw-private-steward-architecture-2026-2028.md` to confirm the target layer and protocol boundary.
+2. Read `RFC_2026_PRIVATE_STEWARD_MARKET_STACK.md` for proposed modules, interfaces, and phase order.
+3. Confirm current repo truth in runtime files before editing.
+4. Implement additive changes first:
+   - type/model additions
+   - validator additions
+   - authority handler additions
+   - façade additions
+   - capability descriptor additions
+5. Reuse existing `offer` / `order` / `lease` / `service-proof` / `dispute` flows when possible instead of inventing parallel state machines.
+6. Add tests in the touched leaf modules and keep file + SQLite store behavior aligned.
 
-| 职责         | 示例                                 | 说明                                   |
-| :----------- | :----------------------------------- | :------------------------------------- |
-| **意图理解** | "老板觉得赚得少" → `QUERY_EARNINGS`  | LLM 的工作                             |
-| **复杂决策** | "市场均价 $10，我有独家算力，卖 $15" | 不能写死在代码里                       |
-| **行动编排** | 先查健康 → 再查订单 → 最后建议       | Skill/Prompt 定义，不是 Extension 代码 |
+### For product / strategy work
 
-### 过渡期约定（L1 → L2）
+1. Read `openclaw-eaas-a2a-mcp-productization.md`.
+2. Anchor every claim to a current runtime fact or clearly label it as roadmap.
+3. Present `Private Steward` as the product and `Web3 Market` as the accountable economic substrate.
+4. Explain `MCP`, `A2A`, and `Market` as complementary layers, not mutually exclusive bets.
 
-`market-assistant.ts` 中的 `parseIntent`（关键词匹配）和 `generatePricingSuggestion`（定价建议）属于 **L1 确定性反射层**——在 LLM 未接管时提供保底 CLI 交互。这不是终态：
+### For A2A / MCP integration design
 
-- L1（当前）：关键词匹配 + 硬编码建议 → CLI 可用
-- L2（目标）：`parseIntent` 替换为 LLM Function Calling，`generatePricingSuggestion` 移入 Skill/Prompt → 管家智能化
-- **Capability Catalog**（`describeWeb3Capabilities`）是 L1 → L2 的桥梁：它已经生成了 LLM 可读的 JSON Schema 工具清单
+1. Keep public entry at `web3.*` or another redacted façade.
+2. Keep order/lock/release/refund authority inside `market.*`.
+3. Use lease-gated access and stored credentials; do not expose raw tokens to top-level agent UX unless the existing contract explicitly requires a one-time response.
+4. Tie coordination outputs back to proof/settlement/audit IDs.
 
 ## Non-negotiables
 
-- Never leak `accessToken`, provider endpoints, or real file paths (errors/logs/status/tool results)
-- Plaintext tokens may only be returned in the lease issuance response (`market.lease.issue` and its `web3.market.lease.issue` proxy), and only once
-- `market.ledger.append` must reject consumer-forged entries (provider-only)
+- Never leak `accessToken`, provider endpoints, or real file paths
+- Plaintext tokens may only appear in successful lease issuance responses and only once, per current contract
+- `market.ledger.append` remains provider-only
 - File + SQLite store modes must behave the same
-- Don't break existing `/pay_status` behavior
+- Keep `/pay_status` and status/reconciliation user flows consistent when evolving deeper market layers
 
 ## Workflow
 
-1. Read `skills/web3-market/references/web3-brain-architecture.md` as the main source of truth.
-2. Use `skills/web3-market/references/web3-market-plan-overview.md` + `web3-market-plan-phase1-execution.md` for execution sequencing.
-3. Start from the checklist in `skills/web3-market/references/web3-market-resource-implementation-checklist.md`.
-4. Implement the minimal Phase order: Core hook → market-core primitives → web3-core orchestration → Provider routes/tools.
-5. Add tests per the matrix (run both store modes).
-6. Confirm operational hooks exist (e.g. `market.lease.expireSweep`) and are observable.
-7. Treat `skills/web3-market/references/web3-market-assessment-2026-02-19.md` as review-only (non-normative).
+1. Classify the task: runtime, protocol, product, or executive planning.
+2. Load the smallest relevant reference set from the map above.
+3. Verify the current repo truth before making claims.
+4. Implement or draft in thin-entry, overlay-first style.
+5. Validate touched runtime/docs as appropriate.
+6. After updating `skills/*`, run `scripts/sync-codebuddy.sh` so the mirrored skill view stays current.
