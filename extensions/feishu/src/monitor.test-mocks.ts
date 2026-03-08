@@ -1,16 +1,45 @@
 import { vi } from "vitest";
 
-// Avoid exporting inferred vitest mock types (TS2742 under pnpm + d.ts emit).
-// oxlint-disable-next-line typescript/no-explicit-any
-type ProbeFeishuMock = import("vitest").Mock<(...args: any[]) => any>;
+export function createFeishuClientMockModule(): {
+  createFeishuWSClient: () => { start: () => void };
+  createEventDispatcher: () => { register: () => void };
+} {
+  return {
+    createFeishuWSClient: vi.fn(() => ({ start: vi.fn() })),
+    createEventDispatcher: vi.fn(() => ({ register: vi.fn() })),
+  };
+}
 
-export const probeFeishuMock: ProbeFeishuMock = vi.hoisted(() => vi.fn());
-
-vi.mock("./probe.js", () => ({
-  probeFeishu: probeFeishuMock,
-}));
-
-vi.mock("./client.js", () => ({
-  createFeishuWSClient: vi.fn(() => ({ start: vi.fn() })),
-  createEventDispatcher: vi.fn(() => ({ register: vi.fn() })),
-}));
+export function createFeishuRuntimeMockModule(): {
+  getFeishuRuntime: () => {
+    channel: {
+      debounce: {
+        resolveInboundDebounceMs: () => number;
+        createInboundDebouncer: () => {
+          enqueue: () => Promise<void>;
+          flushKey: () => Promise<void>;
+        };
+      };
+      text: {
+        hasControlCommand: () => boolean;
+      };
+    };
+  };
+} {
+  return {
+    getFeishuRuntime: () => ({
+      channel: {
+        debounce: {
+          resolveInboundDebounceMs: () => 0,
+          createInboundDebouncer: () => ({
+            enqueue: async () => {},
+            flushKey: async () => {},
+          }),
+        },
+        text: {
+          hasControlCommand: () => false,
+        },
+      },
+    }),
+  };
+}

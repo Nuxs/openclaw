@@ -74,6 +74,7 @@ export function renderChatTab(state: AppViewState) {
     assistantAvatarUrl: chatAvatarUrl,
     messages: state.chatMessages,
     toolMessages: state.chatToolMessages,
+    streamSegments: state.chatStreamSegments,
     stream: state.chatStream,
     streamStartedAt: state.chatStreamStartedAt,
     progress: state.chatProgress,

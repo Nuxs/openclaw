@@ -449,6 +449,7 @@ describe("POST /tools/invoke", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body).toHaveProperty("result");
+    expect(lastCreateOpenClawToolsContext?.allowMediaInvokeCommands).toBe(true);
   });
 
   it("supports tools.alsoAllow in profile and implicit modes", async () => {

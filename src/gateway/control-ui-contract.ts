@@ -9,4 +9,5 @@ export type ControlUiBootstrapConfig = {
   productName?: string;
   /** UI title base (e.g. "OpenClaw"). Optional for backwards compatibility. */
   productTitle?: string;
+  serverVersion?: string;
 };
