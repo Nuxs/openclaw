@@ -20,10 +20,39 @@ const UNSUPPORTED_SESSIONS_SPAWN_PARAM_KEYS = [
   "reply_to",
 ] as const;
 
+function appendMarketReferenceContext(
+  task: string,
+  refs: {
+    taskId?: string;
+    orderId?: string;
+    proofId?: string;
+    settlementId?: string;
+  },
+): string {
+  const pairs = [
+    ["taskId", refs.taskId],
+    ["orderId", refs.orderId],
+    ["proofId", refs.proofId],
+    ["settlementId", refs.settlementId],
+  ].filter(
+    (entry): entry is [string, string] =>
+      typeof entry[1] === "string" && entry[1].trim().length > 0,
+  );
+  if (pairs.length === 0) {
+    return task;
+  }
+  const contextLine = `\n\nMarket references: ${pairs.map(([k, v]) => `${k}=${v}`).join(", ")}.`;
+  return `${task}${contextLine}`;
+}
+
 const SessionsSpawnToolSchema = Type.Object({
   task: Type.String(),
   label: Type.Optional(Type.String()),
   runtime: optionalStringEnum(SESSIONS_SPAWN_RUNTIMES),
+  taskId: Type.Optional(Type.String({ minLength: 1 })),
+  orderId: Type.Optional(Type.String({ minLength: 1 })),
+  proofId: Type.Optional(Type.String({ minLength: 1 })),
+  settlementId: Type.Optional(Type.String({ minLength: 1 })),
   agentId: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()),
   thinking: Type.Optional(Type.String()),
@@ -88,6 +117,13 @@ export function createSessionsSpawnTool(
         );
       }
       const task = readStringParam(params, "task", { required: true });
+      const marketRefs = {
+        taskId: readStringParam(params, "taskId")?.trim() || undefined,
+        orderId: readStringParam(params, "orderId")?.trim() || undefined,
+        proofId: readStringParam(params, "proofId")?.trim() || undefined,
+        settlementId: readStringParam(params, "settlementId")?.trim() || undefined,
+      };
+      const taskWithContext = appendMarketReferenceContext(task, marketRefs);
       const label = typeof params.label === "string" ? params.label.trim() : "";
       const runtime = params.runtime === "acp" ? "acp" : "subagent";
       const requestedAgentId = readStringParam(params, "agentId");
@@ -137,7 +173,7 @@ export function createSessionsSpawnTool(
         }
         const result = await spawnAcpDirect(
           {
-            task,
+            task: taskWithContext,
             label: label || undefined,
             agentId: requestedAgentId,
             cwd,
@@ -160,7 +196,7 @@ export function createSessionsSpawnTool(
 
       const result = await spawnSubagentDirect(
         {
-          task,
+          task: taskWithContext,
           label: label || undefined,
           agentId: requestedAgentId,
           model: modelOverride,

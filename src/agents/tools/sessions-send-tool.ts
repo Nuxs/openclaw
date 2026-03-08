@@ -21,7 +21,11 @@ import {
   resolveVisibleSessionReference,
   stripToolMessages,
 } from "./sessions-helpers.js";
-import { buildAgentToAgentMessageContext, resolvePingPongTurns } from "./sessions-send-helpers.js";
+import {
+  buildAgentToAgentMessageContext,
+  resolvePingPongTurns,
+  type MarketReferenceContext,
+} from "./sessions-send-helpers.js";
 import { runSessionsSendA2AFlow } from "./sessions-send-tool.a2a.js";
 
 const SessionsSendToolSchema = Type.Object({
@@ -30,6 +34,10 @@ const SessionsSendToolSchema = Type.Object({
   agentId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
   message: Type.String(),
   timeoutSeconds: Type.Optional(Type.Number({ minimum: 0 })),
+  taskId: Type.Optional(Type.String({ minLength: 1 })),
+  orderId: Type.Optional(Type.String({ minLength: 1 })),
+  proofId: Type.Optional(Type.String({ minLength: 1 })),
+  settlementId: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 export function createSessionsSendTool(opts?: {
@@ -212,10 +220,17 @@ export function createSessionsSendTool(opts?: {
         });
       }
 
+      const marketRefs: MarketReferenceContext = {
+        taskId: readStringParam(params, "taskId")?.trim() || undefined,
+        orderId: readStringParam(params, "orderId")?.trim() || undefined,
+        proofId: readStringParam(params, "proofId")?.trim() || undefined,
+        settlementId: readStringParam(params, "settlementId")?.trim() || undefined,
+      };
       const agentMessageContext = buildAgentToAgentMessageContext({
         requesterSessionKey: opts?.agentSessionKey,
         requesterChannel: opts?.agentChannel,
         targetSessionKey: displayKey,
+        marketRefs,
       });
       const sendParams = {
         message,
@@ -247,6 +262,7 @@ export function createSessionsSendTool(opts?: {
           requesterChannel,
           roundOneReply,
           waitRunId,
+          marketRefs,
         });
       };
 

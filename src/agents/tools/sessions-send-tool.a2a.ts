@@ -11,6 +11,7 @@ import {
   buildAgentToAgentReplyContext,
   isAnnounceSkip,
   isReplySkip,
+  type MarketReferenceContext,
 } from "./sessions-send-helpers.js";
 
 const log = createSubsystemLogger("agents/sessions-send");
@@ -25,6 +26,7 @@ export async function runSessionsSendA2AFlow(params: {
   requesterChannel?: GatewayMessageChannel;
   roundOneReply?: string;
   waitRunId?: string;
+  marketRefs?: MarketReferenceContext;
 }) {
   const runContextId = params.waitRunId ?? "unknown";
   try {
@@ -76,6 +78,7 @@ export async function runSessionsSendA2AFlow(params: {
           currentRole,
           turn,
           maxTurns: params.maxPingPongTurns,
+          marketRefs: params.marketRefs,
         });
         const replyText = await runAgentStep({
           sessionKey: currentSessionKey,
@@ -107,6 +110,7 @@ export async function runSessionsSendA2AFlow(params: {
       originalMessage: params.message,
       roundOneReply: primaryReply,
       latestReply,
+      marketRefs: params.marketRefs,
     });
     const announceReply = await runAgentStep({
       sessionKey: params.targetSessionKey,

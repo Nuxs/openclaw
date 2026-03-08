@@ -10,6 +10,32 @@ const REPLY_SKIP_TOKEN = "REPLY_SKIP";
 const DEFAULT_PING_PONG_TURNS = 5;
 const MAX_PING_PONG_TURNS = 5;
 
+export type MarketReferenceContext = {
+  taskId?: string;
+  orderId?: string;
+  proofId?: string;
+  settlementId?: string;
+};
+
+function formatMarketReferenceContext(refs?: MarketReferenceContext): string | undefined {
+  if (!refs) {
+    return undefined;
+  }
+  const entries = [
+    ["taskId", refs.taskId],
+    ["orderId", refs.orderId],
+    ["proofId", refs.proofId],
+    ["settlementId", refs.settlementId],
+  ].filter(
+    (entry): entry is [string, string] =>
+      typeof entry[1] === "string" && entry[1].trim().length > 0,
+  );
+  if (entries.length === 0) {
+    return undefined;
+  }
+  return `Market references: ${entries.map(([k, v]) => `${k}=${v}`).join(", ")}.`;
+}
+
 export type AnnounceTarget = {
   channel: string;
   to: string;
@@ -74,6 +100,7 @@ export function buildAgentToAgentMessageContext(params: {
   requesterSessionKey?: string;
   requesterChannel?: string;
   targetSessionKey: string;
+  marketRefs?: MarketReferenceContext;
 }) {
   const lines = [
     "Agent-to-agent message context:",
@@ -84,6 +111,7 @@ export function buildAgentToAgentMessageContext(params: {
       ? `Agent 1 (requester) channel: ${params.requesterChannel}.`
       : undefined,
     `Agent 2 (target) session: ${params.targetSessionKey}.`,
+    formatMarketReferenceContext(params.marketRefs),
   ].filter(Boolean);
   return lines.join("\n");
 }
@@ -96,6 +124,7 @@ export function buildAgentToAgentReplyContext(params: {
   currentRole: "requester" | "target";
   turn: number;
   maxTurns: number;
+  marketRefs?: MarketReferenceContext;
 }) {
   const currentLabel =
     params.currentRole === "requester" ? "Agent 1 (requester)" : "Agent 2 (target)";
@@ -111,6 +140,7 @@ export function buildAgentToAgentReplyContext(params: {
       : undefined,
     `Agent 2 (target) session: ${params.targetSessionKey}.`,
     params.targetChannel ? `Agent 2 (target) channel: ${params.targetChannel}.` : undefined,
+    formatMarketReferenceContext(params.marketRefs),
     `If you want to stop the ping-pong, reply exactly "${REPLY_SKIP_TOKEN}".`,
   ].filter(Boolean);
   return lines.join("\n");
@@ -124,6 +154,7 @@ export function buildAgentToAgentAnnounceContext(params: {
   originalMessage: string;
   roundOneReply?: string;
   latestReply?: string;
+  marketRefs?: MarketReferenceContext;
 }) {
   const lines = [
     "Agent-to-agent announce step:",
@@ -140,6 +171,7 @@ export function buildAgentToAgentAnnounceContext(params: {
       ? `Round 1 reply: ${params.roundOneReply}`
       : "Round 1 reply: (not available).",
     params.latestReply ? `Latest reply: ${params.latestReply}` : "Latest reply: (not available).",
+    formatMarketReferenceContext(params.marketRefs),
     `If you want to remain silent, reply exactly "${ANNOUNCE_SKIP_TOKEN}".`,
     "Any other reply will be posted to the target channel.",
     "After this reply, the agent-to-agent conversation is over.",
