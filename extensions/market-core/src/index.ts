@@ -77,6 +77,26 @@ import {
   createSettlementReleaseHandler,
   createSettlementStatusHandler,
 } from "./market/handlers/index.js";
+import {
+  createTaskPublishHandler,
+  createTaskGetHandler,
+  createTaskListHandler,
+  createTaskCancelHandler,
+  createTaskExpireSweepHandler,
+  createTaskBidPlaceHandler,
+  createTaskBidListHandler,
+  createTaskBidAwardHandler,
+  createTaskResultSubmitHandler,
+  createTaskResultReviewHandler,
+  createTaskReceiptGetHandler,
+  createTaskReceiptListHandler,
+  createConsentListHandler,
+  createConsentGetHandler,
+  createPrivacyAssetListHandler,
+  createPrivacyReplayGenerateHandler,
+  createPrivacyReplayListHandler,
+  createPrivacyEraseHandler,
+} from "./market/handlers/index.js";
 import { flushPendingRewards } from "./market/reward/poller.js";
 import { flushPendingSettlementOperations } from "./market/settlement/poller.js";
 import { MarketStateStore } from "./state/store.js";
@@ -260,6 +280,52 @@ const plugin: OpenClawPluginDefinition = {
       "market.revocation.retry",
       createMarketRevocationRetryHandler(store, config),
     );
+
+    // ── Task Market ──
+    api.registerGatewayMethod("market.task.publish", createTaskPublishHandler(store, config));
+    api.registerGatewayMethod("market.task.get", createTaskGetHandler(store, config));
+    api.registerGatewayMethod("market.task.list", createTaskListHandler(store, config));
+    api.registerGatewayMethod("market.task.cancel", createTaskCancelHandler(store, config));
+    api.registerGatewayMethod(
+      "market.task.expireSweep",
+      createTaskExpireSweepHandler(store, config),
+    );
+    api.registerGatewayMethod("market.task.bid.place", createTaskBidPlaceHandler(store, config));
+    api.registerGatewayMethod("market.task.bid.list", createTaskBidListHandler(store, config));
+    api.registerGatewayMethod("market.task.bid.award", createTaskBidAwardHandler(store, config));
+    api.registerGatewayMethod(
+      "market.task.result.submit",
+      createTaskResultSubmitHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.task.result.review",
+      createTaskResultReviewHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.task.receipt.get",
+      createTaskReceiptGetHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.task.receipt.list",
+      createTaskReceiptListHandler(store, config),
+    );
+
+    // ── Privacy / Consent Replay ──
+    api.registerGatewayMethod("market.consent.list", createConsentListHandler(store, config));
+    api.registerGatewayMethod("market.consent.get", createConsentGetHandler(store, config));
+    api.registerGatewayMethod(
+      "market.privacy.assets",
+      createPrivacyAssetListHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.privacy.replay.generate",
+      createPrivacyReplayGenerateHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.privacy.replay.list",
+      createPrivacyReplayListHandler(store, config),
+    );
+    api.registerGatewayMethod("market.privacy.erase", createPrivacyEraseHandler(store, config));
 
     // ---- Background service: Reward polling & Cleanup ----
     api.registerService({

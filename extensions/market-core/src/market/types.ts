@@ -66,12 +66,22 @@ export type Order = {
   createdAt: string;
   updatedAt: string;
   paymentTxHash?: string;
+  taskId?: string;
+  taskBidId?: string;
 };
 
 export type ConsentScope = {
   purpose: string;
   durationDays?: number;
   scopeHash?: string;
+};
+
+export type ConsentReplayPolicy = {
+  mode: "audit" | "erasure-check" | "retained";
+  allowRedactedReplay?: boolean;
+  deleteAfterRevoke?: boolean;
+  retainUntil?: string;
+  maxReplayViews?: number;
 };
 
 export type Consent = {
@@ -85,6 +95,11 @@ export type Consent = {
   revokedAt?: string;
   revokeReason?: string;
   revokeHash?: string;
+  retentionUntil?: string;
+  replayPolicy?: ConsentReplayPolicy;
+  subjectAssetIds?: string[];
+  erasedAt?: string;
+  eraseReason?: string;
 };
 
 export type DeliveryPayload =
@@ -193,6 +208,16 @@ export type AuditEventKind =
   | "settlement_released"
   | "settlement_refunded"
   | "settlement_over_release_blocked"
+  | "task_published"
+  | "task_bid_submitted"
+  | "task_awarded"
+  | "task_result_submitted"
+  | "task_result_reviewed"
+  | "task_receipt_recorded"
+  | "task_cancelled"
+  | "task_expired"
+  | "privacy_replay_generated"
+  | "privacy_erasure_requested"
   | "dispute_opened"
   | "dispute_evidence_submitted"
   | "dispute_resolved"
@@ -504,4 +529,160 @@ export type ReconciliationSummary = {
   };
   archiveReceipt?: { cid?: string; uri?: string; updatedAt?: string };
   anchorReceipt?: { tx?: string; network?: string; block?: number; updatedAt?: string };
+};
+
+// ── Task Market Types ──
+
+export type TaskOrderStatus =
+  | "task_open"
+  | "task_awarded"
+  | "task_closed"
+  | "task_cancelled"
+  | "task_expired";
+
+export type TaskOrder = {
+  taskId: string;
+  creatorActorId: string;
+  title: string;
+  summary?: string;
+  requirements: string[];
+  budget: { amount: string; currency: string };
+  status: TaskOrderStatus;
+  expiryAt: string;
+  createdAt: string;
+  updatedAt: string;
+  taskHash: string;
+  metadata?: Record<string, unknown>;
+  awardedBidId?: string;
+  orderId?: string;
+  settlementId?: string;
+  resultId?: string;
+  closedAt?: string;
+  cancellationReason?: string;
+};
+
+export type TaskOrderFilter = {
+  taskId?: string;
+  creatorActorId?: string;
+  status?: TaskOrderStatus;
+  limit?: number;
+};
+
+export type TaskBidStatus = "bid_submitted" | "bid_withdrawn" | "bid_accepted" | "bid_rejected";
+
+export type TaskBid = {
+  bidId: string;
+  taskId: string;
+  bidderActorId: string;
+  price: string;
+  currency: string;
+  etaHours?: number;
+  summary?: string;
+  status: TaskBidStatus;
+  bidHash: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TaskBidFilter = {
+  taskId?: string;
+  bidderActorId?: string;
+  status?: TaskBidStatus;
+  limit?: number;
+};
+
+export type TaskResultStatus = "result_submitted" | "result_accepted" | "result_rejected";
+
+export type TaskResult = {
+  resultId: string;
+  taskId: string;
+  bidId: string;
+  delivererActorId: string;
+  summary?: string;
+  artifacts: string[];
+  proofIds?: string[];
+  resultHash: string;
+  status: TaskResultStatus;
+  submittedAt: string;
+  updatedAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+};
+
+export type TaskResultFilter = {
+  taskId?: string;
+  bidId?: string;
+  delivererActorId?: string;
+  status?: TaskResultStatus;
+  limit?: number;
+};
+
+export type TaskReceiptStatus =
+  | "receipt_pending"
+  | "receipt_settled"
+  | "receipt_refunded"
+  | "receipt_disputed";
+
+export type TaskReceipt = {
+  receiptId: string;
+  taskId: string;
+  bidId: string;
+  resultId: string;
+  payerActorId: string;
+  payeeActorId: string;
+  amount: string;
+  currency: string;
+  settlementId: string;
+  status: TaskReceiptStatus;
+  receiptHash: string;
+  createdAt: string;
+  updatedAt: string;
+  settledAt?: string;
+  disputeId?: string;
+};
+
+export type TaskReceiptFilter = {
+  taskId?: string;
+  bidId?: string;
+  payerActorId?: string;
+  payeeActorId?: string;
+  settlementId?: string;
+  status?: TaskReceiptStatus;
+  limit?: number;
+};
+
+// ── Privacy / Consent Replay Types ──
+
+export type PrivacyReplaySummary = {
+  title: string;
+  purpose: string;
+  retentionAction: "delete_on_revoke" | "retain" | "manual_review";
+  redactedFields: string[];
+  evidenceRefs: string[];
+  timeline: Array<{ timestamp: string; kind: string; details?: Record<string, unknown> }>;
+};
+
+export type PrivacyReplayStatus = "replay_generated" | "replay_viewed" | "replay_erased";
+
+export type PrivacyReplay = {
+  replayId: string;
+  consentId: string;
+  orderId: string;
+  taskId?: string;
+  actorId: string;
+  status: PrivacyReplayStatus;
+  summary: PrivacyReplaySummary;
+  replayHash: string;
+  generatedAt: string;
+  updatedAt: string;
+  erasedAt?: string;
+  eraseReason?: string;
+};
+
+export type PrivacyReplayFilter = {
+  consentId?: string;
+  orderId?: string;
+  actorId?: string;
+  status?: PrivacyReplayStatus;
+  limit?: number;
 };

@@ -22,12 +22,22 @@ import type {
   Order,
   RevocationJob,
   RewardGrant,
+  PrivacyReplay,
+  PrivacyReplayFilter,
   RewardNonceRecord,
   ServiceProof,
   ServiceProofFilter,
   Settlement,
   SettlementOperation,
   SettlementOperationFilter,
+  TaskBid,
+  TaskBidFilter,
+  TaskOrder,
+  TaskOrderFilter,
+  TaskReceipt,
+  TaskReceiptFilter,
+  TaskResult,
+  TaskResultFilter,
   TokenEconomyState,
 } from "../market/types.js";
 import { MarketFileStore } from "./file-store.js";
@@ -60,8 +70,14 @@ export class MarketSqliteStore implements MarketStore {
         "CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS consents (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS task_bids (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS task_results (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS task_receipts (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS privacy_replays (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS deliveries (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS settlements (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
+        "CREATE TABLE IF NOT EXISTS settlement_operations (id TEXT PRIMARY KEY, order_id TEXT, status TEXT, next_attempt_at TEXT, idempotency_key TEXT, updated_at TEXT, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS disputes (id TEXT PRIMARY KEY, order_id TEXT, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS service_proofs (id TEXT PRIMARY KEY, order_id TEXT, data TEXT NOT NULL);" +
         "CREATE TABLE IF NOT EXISTS leases (id TEXT PRIMARY KEY, data TEXT NOT NULL);" +
@@ -97,6 +113,11 @@ export class MarketSqliteStore implements MarketStore {
       this.countRows("resources") === 0 &&
       this.countRows("orders") === 0 &&
       this.countRows("consents") === 0 &&
+      this.countRows("tasks") === 0 &&
+      this.countRows("task_bids") === 0 &&
+      this.countRows("task_results") === 0 &&
+      this.countRows("task_receipts") === 0 &&
+      this.countRows("privacy_replays") === 0 &&
       this.countRows("deliveries") === 0 &&
       this.countRows("settlements") === 0 &&
       this.countRows("settlement_operations") === 0 &&
@@ -122,6 +143,11 @@ export class MarketSqliteStore implements MarketStore {
     for (const resource of fileStore.listResources()) this.saveResource(resource);
     for (const order of fileStore.listOrders()) this.saveOrder(order);
     for (const consent of fileStore.listConsents()) this.saveConsent(consent);
+    for (const task of fileStore.listTasks()) this.saveTask(task);
+    for (const bid of fileStore.listTaskBids()) this.saveTaskBid(bid);
+    for (const result of fileStore.listTaskResults()) this.saveTaskResult(result);
+    for (const receipt of fileStore.listTaskReceipts()) this.saveTaskReceipt(receipt);
+    for (const replay of fileStore.listPrivacyReplays()) this.savePrivacyReplay(replay);
     for (const delivery of fileStore.listDeliveries()) this.saveDelivery(delivery);
     for (const settlement of fileStore.listSettlements()) this.saveSettlement(settlement);
     for (const operation of fileStore.listSettlementOperations({ limit: 1_000_000 })) {
@@ -226,6 +252,137 @@ export class MarketSqliteStore implements MarketStore {
 
   saveConsent(consent: Consent): void {
     this.saveTo("consents", consent.consentId, consent);
+  }
+
+  listTasks(filter?: TaskOrderFilter): TaskOrder[] {
+    let tasks = this.listFrom<TaskOrder>("tasks");
+    if (filter?.taskId) {
+      tasks = tasks.filter((entry) => entry.taskId === filter.taskId);
+    }
+    if (filter?.creatorActorId) {
+      tasks = tasks.filter((entry) => entry.creatorActorId === filter.creatorActorId);
+    }
+    if (filter?.status) {
+      tasks = tasks.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.limit !== undefined) {
+      tasks = tasks.slice(0, Math.max(0, filter.limit));
+    }
+    return tasks;
+  }
+
+  getTask(taskId: string): TaskOrder | undefined {
+    return this.getFrom<TaskOrder>("tasks", taskId);
+  }
+
+  saveTask(task: TaskOrder): void {
+    this.saveTo("tasks", task.taskId, task);
+  }
+
+  listTaskBids(filter?: TaskBidFilter): TaskBid[] {
+    let bids = this.listFrom<TaskBid>("task_bids");
+    if (filter?.taskId) {
+      bids = bids.filter((entry) => entry.taskId === filter.taskId);
+    }
+    if (filter?.bidderActorId) {
+      bids = bids.filter((entry) => entry.bidderActorId === filter.bidderActorId);
+    }
+    if (filter?.status) {
+      bids = bids.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.limit !== undefined) {
+      bids = bids.slice(0, Math.max(0, filter.limit));
+    }
+    return bids;
+  }
+
+  getTaskBid(bidId: string): TaskBid | undefined {
+    return this.getFrom<TaskBid>("task_bids", bidId);
+  }
+
+  saveTaskBid(bid: TaskBid): void {
+    this.saveTo("task_bids", bid.bidId, bid);
+  }
+
+  listTaskResults(filter?: TaskResultFilter): TaskResult[] {
+    let results = this.listFrom<TaskResult>("task_results");
+    if (filter?.taskId) {
+      results = results.filter((entry) => entry.taskId === filter.taskId);
+    }
+    if (filter?.bidId) {
+      results = results.filter((entry) => entry.bidId === filter.bidId);
+    }
+    if (filter?.status) {
+      results = results.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.limit !== undefined) {
+      results = results.slice(0, Math.max(0, filter.limit));
+    }
+    return results;
+  }
+
+  getTaskResult(resultId: string): TaskResult | undefined {
+    return this.getFrom<TaskResult>("task_results", resultId);
+  }
+
+  saveTaskResult(result: TaskResult): void {
+    this.saveTo("task_results", result.resultId, result);
+  }
+
+  listTaskReceipts(filter?: TaskReceiptFilter): TaskReceipt[] {
+    let receipts = this.listFrom<TaskReceipt>("task_receipts");
+    if (filter?.taskId) {
+      receipts = receipts.filter((entry) => entry.taskId === filter.taskId);
+    }
+    if (filter?.bidId) {
+      receipts = receipts.filter((entry) => entry.bidId === filter.bidId);
+    }
+    if (filter?.settlementId) {
+      receipts = receipts.filter((entry) => entry.settlementId === filter.settlementId);
+    }
+    if (filter?.status) {
+      receipts = receipts.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.limit !== undefined) {
+      receipts = receipts.slice(0, Math.max(0, filter.limit));
+    }
+    return receipts;
+  }
+
+  getTaskReceipt(receiptId: string): TaskReceipt | undefined {
+    return this.getFrom<TaskReceipt>("task_receipts", receiptId);
+  }
+
+  saveTaskReceipt(receipt: TaskReceipt): void {
+    this.saveTo("task_receipts", receipt.receiptId, receipt);
+  }
+
+  listPrivacyReplays(filter?: PrivacyReplayFilter): PrivacyReplay[] {
+    let replays = this.listFrom<PrivacyReplay>("privacy_replays");
+    if (filter?.consentId) {
+      replays = replays.filter((entry) => entry.consentId === filter.consentId);
+    }
+    if (filter?.orderId) {
+      replays = replays.filter((entry) => entry.orderId === filter.orderId);
+    }
+    if (filter?.actorId) {
+      replays = replays.filter((entry) => entry.actorId === filter.actorId);
+    }
+    if (filter?.status) {
+      replays = replays.filter((entry) => entry.status === filter.status);
+    }
+    if (filter?.limit !== undefined) {
+      replays = replays.slice(0, Math.max(0, filter.limit));
+    }
+    return replays;
+  }
+
+  getPrivacyReplay(replayId: string): PrivacyReplay | undefined {
+    return this.getFrom<PrivacyReplay>("privacy_replays", replayId);
+  }
+
+  savePrivacyReplay(replay: PrivacyReplay): void {
+    this.saveTo("privacy_replays", replay.replayId, replay);
   }
 
   listDeliveries(): Delivery[] {

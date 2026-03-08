@@ -99,3 +99,33 @@ export {
   createOrderBookEntryHandler,
   getOrderBookHandler,
 } from "./pricing.js";
+
+// ── Task Market handlers ──
+export {
+  createTaskPublishHandler,
+  createTaskGetHandler,
+  createTaskListHandler,
+  createTaskCancelHandler,
+  createTaskExpireSweepHandler,
+} from "./task-order.js";
+export {
+  createTaskBidPlaceHandler,
+  createTaskBidListHandler,
+  createTaskBidAwardHandler,
+} from "./task-bid.js";
+export {
+  createTaskResultSubmitHandler,
+  createTaskResultReviewHandler,
+  createTaskReceiptGetHandler,
+  createTaskReceiptListHandler,
+} from "./task-result.js";
+
+// ── Privacy / Consent Replay handlers ──
+export {
+  createConsentListHandler,
+  createConsentGetHandler,
+  createPrivacyAssetListHandler,
+  createPrivacyReplayGenerateHandler,
+  createPrivacyReplayListHandler,
+  createPrivacyEraseHandler,
+} from "./privacy.js";

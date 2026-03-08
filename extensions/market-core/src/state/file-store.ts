@@ -27,12 +27,22 @@ import type {
   Order,
   RevocationJob,
   RewardGrant,
+  PrivacyReplay,
+  PrivacyReplayFilter,
   RewardNonceRecord,
   ServiceProof,
   ServiceProofFilter,
   Settlement,
   SettlementOperation,
   SettlementOperationFilter,
+  TaskBid,
+  TaskBidFilter,
+  TaskOrder,
+  TaskOrderFilter,
+  TaskReceipt,
+  TaskReceiptFilter,
+  TaskResult,
+  TaskResultFilter,
   TokenEconomyState,
 } from "../market/types.js";
 import { runFileStoreTransaction } from "./file-store-transaction.js";
@@ -154,6 +164,135 @@ export class MarketFileStore implements MarketStore {
     const map = this.readMap<Consent>(this.consentsPath);
     map[consent.consentId] = consent;
     this.writeMap(this.consentsPath, map);
+  }
+
+  // ── Task Market (file-backed) ──
+
+  private get tasksPath() {
+    return "tasks.json";
+  }
+
+  listTasks(filter?: TaskOrderFilter): TaskOrder[] {
+    let tasks = Object.values(this.readMap<TaskOrder>(this.tasksPath));
+    if (filter?.taskId) tasks = tasks.filter((t) => t.taskId === filter.taskId);
+    if (filter?.creatorActorId)
+      tasks = tasks.filter((t) => t.creatorActorId === filter.creatorActorId);
+    if (filter?.status) tasks = tasks.filter((t) => t.status === filter.status);
+    if (filter?.limit !== undefined) tasks = tasks.slice(0, Math.max(0, filter.limit));
+    return tasks;
+  }
+
+  getTask(taskId: string): TaskOrder | undefined {
+    return this.readMap<TaskOrder>(this.tasksPath)[taskId];
+  }
+
+  saveTask(task: TaskOrder): void {
+    const map = this.readMap<TaskOrder>(this.tasksPath);
+    map[task.taskId] = task;
+    this.writeMap(this.tasksPath, map);
+  }
+
+  private get taskBidsPath() {
+    return "task-bids.json";
+  }
+
+  listTaskBids(filter?: TaskBidFilter): TaskBid[] {
+    let bids = Object.values(this.readMap<TaskBid>(this.taskBidsPath));
+    if (filter?.taskId) bids = bids.filter((b) => b.taskId === filter.taskId);
+    if (filter?.bidderActorId) bids = bids.filter((b) => b.bidderActorId === filter.bidderActorId);
+    if (filter?.status) bids = bids.filter((b) => b.status === filter.status);
+    if (filter?.limit !== undefined) bids = bids.slice(0, Math.max(0, filter.limit));
+    return bids;
+  }
+
+  getTaskBid(bidId: string): TaskBid | undefined {
+    return this.readMap<TaskBid>(this.taskBidsPath)[bidId];
+  }
+
+  saveTaskBid(bid: TaskBid): void {
+    const map = this.readMap<TaskBid>(this.taskBidsPath);
+    map[bid.bidId] = bid;
+    this.writeMap(this.taskBidsPath, map);
+  }
+
+  private get taskResultsPath() {
+    return "task-results.json";
+  }
+
+  listTaskResults(filter?: TaskResultFilter): TaskResult[] {
+    let results = Object.values(this.readMap<TaskResult>(this.taskResultsPath));
+    if (filter?.taskId) results = results.filter((r) => r.taskId === filter.taskId);
+    if (filter?.bidId) results = results.filter((r) => r.bidId === filter.bidId);
+    if (filter?.delivererActorId)
+      results = results.filter((r) => r.delivererActorId === filter.delivererActorId);
+    if (filter?.status) results = results.filter((r) => r.status === filter.status);
+    if (filter?.limit !== undefined) results = results.slice(0, Math.max(0, filter.limit));
+    return results;
+  }
+
+  getTaskResult(resultId: string): TaskResult | undefined {
+    return this.readMap<TaskResult>(this.taskResultsPath)[resultId];
+  }
+
+  saveTaskResult(result: TaskResult): void {
+    const map = this.readMap<TaskResult>(this.taskResultsPath);
+    map[result.resultId] = result;
+    this.writeMap(this.taskResultsPath, map);
+  }
+
+  private get taskReceiptsPath() {
+    return "task-receipts.json";
+  }
+
+  listTaskReceipts(filter?: TaskReceiptFilter): TaskReceipt[] {
+    let receipts = Object.values(this.readMap<TaskReceipt>(this.taskReceiptsPath));
+    if (filter?.taskId) receipts = receipts.filter((r) => r.taskId === filter.taskId);
+    if (filter?.bidId) receipts = receipts.filter((r) => r.bidId === filter.bidId);
+    if (filter?.payerActorId)
+      receipts = receipts.filter((r) => r.payerActorId === filter.payerActorId);
+    if (filter?.payeeActorId)
+      receipts = receipts.filter((r) => r.payeeActorId === filter.payeeActorId);
+    if (filter?.settlementId)
+      receipts = receipts.filter((r) => r.settlementId === filter.settlementId);
+    if (filter?.status) receipts = receipts.filter((r) => r.status === filter.status);
+    if (filter?.limit !== undefined) receipts = receipts.slice(0, Math.max(0, filter.limit));
+    return receipts;
+  }
+
+  getTaskReceipt(receiptId: string): TaskReceipt | undefined {
+    return this.readMap<TaskReceipt>(this.taskReceiptsPath)[receiptId];
+  }
+
+  saveTaskReceipt(receipt: TaskReceipt): void {
+    const map = this.readMap<TaskReceipt>(this.taskReceiptsPath);
+    map[receipt.receiptId] = receipt;
+    this.writeMap(this.taskReceiptsPath, map);
+  }
+
+  // ── Privacy Replay (file-backed) ──
+
+  private get privacyReplaysPath() {
+    return "privacy-replays.json";
+  }
+
+  listPrivacyReplays(filter?: PrivacyReplayFilter): PrivacyReplay[] {
+    let replays = Object.values(this.readMap<PrivacyReplay>(this.privacyReplaysPath));
+    if (filter?.consentId) replays = replays.filter((r) => r.consentId === filter.consentId);
+    if (filter?.orderId) replays = replays.filter((r) => r.orderId === filter.orderId);
+    if (filter?.actorId) replays = replays.filter((r) => r.actorId === filter.actorId);
+    if (filter?.status) replays = replays.filter((r) => r.status === filter.status);
+    if (filter?.limit !== undefined) replays = replays.slice(0, Math.max(0, filter.limit));
+    return replays;
+  }
+
+  getPrivacyReplay(replayId: string): PrivacyReplay | undefined {
+    return this.readMap<PrivacyReplay>(this.privacyReplaysPath)[replayId];
+  }
+
+  savePrivacyReplay(replay: PrivacyReplay): void {
+    const map = this.readMap<PrivacyReplay>(this.privacyReplaysPath);
+    map[replay.replayId] = replay;
+    this.writeMap(this.privacyReplaysPath, map);
   }
 
   private get deliveriesPath() {
@@ -530,6 +669,11 @@ export class MarketFileStore implements MarketStore {
       this.listResources().length > 0 ||
       this.listOrders().length > 0 ||
       this.listConsents().length > 0 ||
+      this.listTasks({ limit: 1 }).length > 0 ||
+      this.listTaskBids({ limit: 1 }).length > 0 ||
+      this.listTaskResults({ limit: 1 }).length > 0 ||
+      this.listTaskReceipts({ limit: 1 }).length > 0 ||
+      this.listPrivacyReplays({ limit: 1 }).length > 0 ||
       this.listDeliveries().length > 0 ||
       this.listSettlements().length > 0 ||
       this.listSettlementOperations({ limit: 1 }).length > 0 ||

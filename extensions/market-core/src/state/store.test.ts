@@ -328,4 +328,95 @@ describe("MarketStateStore.runInTransaction", () => {
       );
     });
   });
+
+  it("applies zero/negative limit consistently across task and privacy list APIs (both modes)", async () => {
+    await withStoreModes(async ({ store }) => {
+      const now = new Date().toISOString();
+      const later = new Date(Date.now() + 1_000).toISOString();
+
+      store.saveTask({
+        taskId: "task-limit-1",
+        creatorActorId: "creator-1",
+        title: "Task limit",
+        requirements: ["req"],
+        budget: { amount: "1", currency: "USDC" },
+        status: "task_open",
+        expiryAt: later,
+        createdAt: now,
+        updatedAt: now,
+        taskHash: "hash-task-1",
+      });
+
+      store.saveTaskBid({
+        bidId: "bid-limit-1",
+        taskId: "task-limit-1",
+        bidderActorId: "bidder-1",
+        price: "1",
+        currency: "USDC",
+        status: "bid_submitted",
+        bidHash: "hash-bid-1",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.saveTaskResult({
+        resultId: "result-limit-1",
+        taskId: "task-limit-1",
+        bidId: "bid-limit-1",
+        delivererActorId: "bidder-1",
+        artifacts: ["artifact-1"],
+        resultHash: "hash-result-1",
+        status: "result_submitted",
+        submittedAt: now,
+        updatedAt: now,
+      });
+
+      store.saveTaskReceipt({
+        receiptId: "receipt-limit-1",
+        taskId: "task-limit-1",
+        bidId: "bid-limit-1",
+        resultId: "result-limit-1",
+        payerActorId: "creator-1",
+        payeeActorId: "bidder-1",
+        amount: "1",
+        currency: "USDC",
+        settlementId: "settlement-limit-1",
+        status: "receipt_pending",
+        receiptHash: "hash-receipt-1",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      store.savePrivacyReplay({
+        replayId: "replay-limit-1",
+        consentId: "consent-limit-1",
+        orderId: "order-limit-1",
+        actorId: "creator-1",
+        status: "replay_generated",
+        summary: {
+          title: "Replay limit",
+          purpose: "audit",
+          retentionAction: "retain",
+          redactedFields: [],
+          evidenceRefs: [],
+          timeline: [],
+        },
+        replayHash: "sha256:1234",
+        generatedAt: now,
+        updatedAt: now,
+      });
+
+      expect(store.listTasks({ limit: 0 })).toHaveLength(0);
+      expect(store.listTaskBids({ limit: 0 })).toHaveLength(0);
+      expect(store.listTaskResults({ limit: 0 })).toHaveLength(0);
+      expect(store.listTaskReceipts({ limit: 0 })).toHaveLength(0);
+      expect(store.listPrivacyReplays({ limit: 0 })).toHaveLength(0);
+
+      expect(store.listTasks({ limit: -1 })).toHaveLength(0);
+      expect(store.listTaskBids({ limit: -1 })).toHaveLength(0);
+      expect(store.listTaskResults({ limit: -1 })).toHaveLength(0);
+      expect(store.listTaskReceipts({ limit: -1 })).toHaveLength(0);
+      expect(store.listPrivacyReplays({ limit: -1 })).toHaveLength(0);
+    });
+  });
 });

@@ -16,6 +16,8 @@ import type {
   Dispute,
   Offer,
   Order,
+  PrivacyReplay,
+  PrivacyReplayFilter,
   RevocationJob,
   RewardGrant,
   RewardNonceRecord,
@@ -24,6 +26,14 @@ import type {
   Settlement,
   SettlementOperation,
   SettlementOperationFilter,
+  TaskBid,
+  TaskBidFilter,
+  TaskOrder,
+  TaskOrderFilter,
+  TaskReceipt,
+  TaskReceiptFilter,
+  TaskResult,
+  TaskResultFilter,
   TokenEconomyState,
 } from "../market/types.js";
 
@@ -40,6 +50,21 @@ export type MarketStore = {
   listConsents: () => Consent[];
   getConsent: (consentId: string) => Consent | undefined;
   saveConsent: (consent: Consent) => void;
+  listTasks: (filter?: TaskOrderFilter) => TaskOrder[];
+  getTask: (taskId: string) => TaskOrder | undefined;
+  saveTask: (task: TaskOrder) => void;
+  listTaskBids: (filter?: TaskBidFilter) => TaskBid[];
+  getTaskBid: (bidId: string) => TaskBid | undefined;
+  saveTaskBid: (bid: TaskBid) => void;
+  listTaskResults: (filter?: TaskResultFilter) => TaskResult[];
+  getTaskResult: (resultId: string) => TaskResult | undefined;
+  saveTaskResult: (result: TaskResult) => void;
+  listTaskReceipts: (filter?: TaskReceiptFilter) => TaskReceipt[];
+  getTaskReceipt: (receiptId: string) => TaskReceipt | undefined;
+  saveTaskReceipt: (receipt: TaskReceipt) => void;
+  listPrivacyReplays: (filter?: PrivacyReplayFilter) => PrivacyReplay[];
+  getPrivacyReplay: (replayId: string) => PrivacyReplay | undefined;
+  savePrivacyReplay: (replay: PrivacyReplay) => void;
   listDeliveries: () => Delivery[];
   getDelivery: (deliveryId: string) => Delivery | undefined;
   saveDelivery: (delivery: Delivery) => void;

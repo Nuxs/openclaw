@@ -17,6 +17,8 @@ import type {
   Dispute,
   Offer,
   Order,
+  PrivacyReplay,
+  PrivacyReplayFilter,
   RevocationJob,
   RewardGrant,
   RewardNonceRecord,
@@ -25,6 +27,14 @@ import type {
   Settlement,
   SettlementOperation,
   SettlementOperationFilter,
+  TaskBid,
+  TaskBidFilter,
+  TaskOrder,
+  TaskOrderFilter,
+  TaskReceipt,
+  TaskReceiptFilter,
+  TaskResult,
+  TaskResultFilter,
   TokenEconomyState,
 } from "../market/types.js";
 import { MarketFileStore } from "./file-store.js";
@@ -99,6 +109,66 @@ export class MarketStateStore {
 
   saveConsent(consent: Consent): void {
     this.store.saveConsent(consent);
+  }
+
+  listTasks(filter?: TaskOrderFilter): TaskOrder[] {
+    return this.store.listTasks(filter);
+  }
+
+  getTask(taskId: string): TaskOrder | undefined {
+    return this.store.getTask(taskId);
+  }
+
+  saveTask(task: TaskOrder): void {
+    this.store.saveTask(task);
+  }
+
+  listTaskBids(filter?: TaskBidFilter): TaskBid[] {
+    return this.store.listTaskBids(filter);
+  }
+
+  getTaskBid(bidId: string): TaskBid | undefined {
+    return this.store.getTaskBid(bidId);
+  }
+
+  saveTaskBid(bid: TaskBid): void {
+    this.store.saveTaskBid(bid);
+  }
+
+  listTaskResults(filter?: TaskResultFilter): TaskResult[] {
+    return this.store.listTaskResults(filter);
+  }
+
+  getTaskResult(resultId: string): TaskResult | undefined {
+    return this.store.getTaskResult(resultId);
+  }
+
+  saveTaskResult(result: TaskResult): void {
+    this.store.saveTaskResult(result);
+  }
+
+  listTaskReceipts(filter?: TaskReceiptFilter): TaskReceipt[] {
+    return this.store.listTaskReceipts(filter);
+  }
+
+  getTaskReceipt(receiptId: string): TaskReceipt | undefined {
+    return this.store.getTaskReceipt(receiptId);
+  }
+
+  saveTaskReceipt(receipt: TaskReceipt): void {
+    this.store.saveTaskReceipt(receipt);
+  }
+
+  listPrivacyReplays(filter?: PrivacyReplayFilter): PrivacyReplay[] {
+    return this.store.listPrivacyReplays(filter);
+  }
+
+  getPrivacyReplay(replayId: string): PrivacyReplay | undefined {
+    return this.store.getPrivacyReplay(replayId);
+  }
+
+  savePrivacyReplay(replay: PrivacyReplay): void {
+    this.store.savePrivacyReplay(replay);
   }
 
   listDeliveries(): Delivery[] {
