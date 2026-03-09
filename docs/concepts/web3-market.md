@@ -124,6 +124,25 @@ AI 管家会替你完成：
 - **p2p 不等于市场**：p2p 负责传播和发现，市场负责合同、结算、争议与信誉。
 - **MCP 不等于市场**：MCP 更像"怎么接工具"；Web3 Market 解决的是"该调用谁、怎么付钱、怎么验收、出事怎么办"。
 
+## 如果你关心 P2P 协同算力
+
+如果你的目标不是“普通资源市场”，而是进一步探索：
+
+- 多台设备协同提供 AI 能力
+- 可信任的人自动组圈
+- 个人电脑作为子节点
+- P2P 作为云算力之外的补充市场
+
+建议继续阅读下面这组专题文档：
+
+- P2P 协同算力专题总览：[/web3/p2p-openclaw-index](/web3/p2p-openclaw-index)
+- 战略判断：[/web3/p2p-openclaw-thesis](/web3/p2p-openclaw-thesis)
+- 研究索引：[/reference/web3-p2p-research-landscape](/reference/web3-p2p-research-landscape)
+- 架构落地图：[/reference/web3-p2p-openclaw-architecture](/reference/web3-p2p-openclaw-architecture)
+- 验证手册：[/reference/web3-p2p-validation-playbook](/reference/web3-p2p-validation-playbook)
+
+> 这组专题会明确区分：`P2P` 是协同承载层，`Market` 是经济与治理层；并重点讨论为什么 `OpenClaw` 的现实切口应是“可信组圈”，而不是一开始就做开放公网志愿者网络。
+
 ## 相关文档
 
 - `web3-core` 插件：[/plugins/web3-core](/plugins/web3-core)

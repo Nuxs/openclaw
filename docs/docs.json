@@ -1311,6 +1311,8 @@
                     "group": "Guides",
                     "pages": [
                       "concepts/web3-market",
+                      "web3/p2p-openclaw-index",
+                      "web3/p2p-openclaw-thesis",
                       "plugins/agent-wallet",
                       "plugins/web3-core",
                       "plugins/market-core",
@@ -1327,6 +1329,9 @@
                     "pages": [
                       "plugins/web3-core-dev",
                       "reference/web3-market-dev",
+                      "reference/web3-p2p-research-landscape",
+                      "reference/web3-p2p-openclaw-architecture",
+                      "reference/web3-p2p-validation-playbook",
                       "reference/web3-resource-market-api",
                       "reference/web3-dual-stack-payments-and-settlement",
                       "reference/web3-market-output-redaction",

@@ -38,6 +38,23 @@ graph TD
   MKT -->|audit/transparency| TRACE[transparency]
 ```
 
+## P2P 协同算力落位（OpenClaw 视角）
+
+如果你正在把 `Web3 Market` 扩展到“算力池节点 + 个人电脑子节点”的 P2P 协同场景，请坚持以下边界：
+
+- **`web3-core` 是控制面**：对外统一入口、能力发现、监控、计费门禁、状态摘要。
+- **`market-core` 是权威经济层**：资源、租约、账本、结算、争议、奖励、任务与隐私状态机。
+- **执行引擎不必内建在 OpenClaw 内核中**：可由外部运行时承接，例如 `vLLM`、`TensorRT-LLM`、`exo`、`llama.cpp` 一类系统。
+- **优先做可信组圈，不先做开放公网**：这比一开始追求匿名网络更符合隐私、稳定性和产品现实。
+
+如果你要进一步做这条方向，请继续阅读：
+
+- 专题总览：[/web3/p2p-openclaw-index](/web3/p2p-openclaw-index)
+- 战略判断：[/web3/p2p-openclaw-thesis](/web3/p2p-openclaw-thesis)
+- 研究索引：[/reference/web3-p2p-research-landscape](/reference/web3-p2p-research-landscape)
+- 架构落地图：[/reference/web3-p2p-openclaw-architecture](/reference/web3-p2p-openclaw-architecture)
+- 验证手册：[/reference/web3-p2p-validation-playbook](/reference/web3-p2p-validation-playbook)
+
 ## 默认生态选择（基于代码现状）
 
 ### 链：EVM（默认） + TON（已实现的双栈支付入口）
