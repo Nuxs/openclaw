@@ -562,6 +562,20 @@ sui client publish --gas-budget 100000000
 - 链上对象设计不等于算力执行引擎
 - 争议裁决的链下仲裁机制需独立设计
 
+### 10.4 下一轮工业化实现
+
+如果你要把当前草图推进到“可组合 PTB + 权限能力 + 交付闭环 + 治理裁决”的工程阶段，请继续阅读：
+
+- [Sui Move 工业化整改蓝图 — 可组合 PTB API + 权限能力 + 交付闭环](/reference/web3-sui-industrialization-blueprint)
+
+该蓝图补齐了：
+
+- P0 / P1 / P2 工程整改清单
+- `PublisherCap` / `ExecutionRight` / `GovernanceCap` / `RewardIssuerCap` 设计
+- `Receipt` 改为直达 Buyer 的所有权路径
+- `openclaw_trade.move` wrapper + PTB 内核分层 API
+- CI / build / invariant tests 的验收门禁
+
 ---
 
 ## 相关文档

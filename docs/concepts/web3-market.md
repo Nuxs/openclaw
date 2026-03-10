@@ -96,7 +96,10 @@ AI 管家会替你完成：
 - 更明确的 **人在环路验收 / 仲裁 / 预算门禁**
 - 更强的 **Discovery + MCP 接入**，让 Agent 自动发现并安全调用可交易能力
 - **A2A 任务协作**：跨 Agent 任务标识贯通（taskId/orderId/proofId/settlementId）
+- **链策略分层**：当前支付与回执继续遵循 `TON + EVM` 双栈；面向 `AI-to-AI` 对象化交易的下一阶段账本方向，优先考虑 `Sui-first` 的能力/租约/回执/托管/奖励建模
 - **GA 发布门禁与运维 Runbook**：覆盖降级、回滚、值班处置与验收清单
+
+> 也就是说：**现状不改写，方向要写清。** 当前运行时仍以 `EVM + TON` 为事实基础；如果进入 `Agentic Commerce` 的对象化权利层设计，建议阅读 [/reference/web3-sui-first-architecture](/reference/web3-sui-first-architecture)。
 
 ## 用户视角的极简流程
 
@@ -151,6 +154,7 @@ AI 管家会替你完成：
 - Web3 资源共享 API 契约：[/reference/web3-resource-market-api](/reference/web3-resource-market-api)
 - 双栈策略总规划：[/web3/WEB3_DUAL_STACK_STRATEGY](/web3/WEB3_DUAL_STACK_STRATEGY)
 - 双栈支付与结算参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
+- Sui-first 架构草案：[/reference/web3-sui-first-architecture](/reference/web3-sui-first-architecture)
 - EaaS 愿景：[/reference/web3-everything-as-a-service-vision](/reference/web3-everything-as-a-service-vision)
 - EaaS 白皮书：[/reference/web3-eaas-protocol-upgrade-report-2026](/reference/web3-eaas-protocol-upgrade-report-2026)
 - EaaS 协议规范：[/reference/web3-eaas-protocol-spec](/reference/web3-eaas-protocol-spec)

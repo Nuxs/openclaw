@@ -18,7 +18,8 @@ normative: false
 >
 > **定位（权威口径）**：双栈策略与验收标准的统一口径文档。  
 > **用途**：定义支付/回执/汇率/对账摘要的统一口径与验收清单。  
-> **关联**：本文档仅保留对外可验证的"双栈策略 + 统一口径"。内部进度/路线图/走查材料统一收敛在 `skills/web3-market/internal/`。
+> **关联**：本文档仅保留对外可验证的"双栈策略 + 统一口径"。内部进度/路线图/走查材料统一收敛在 `skills/web3-market/internal/`。  
+> **说明**：本文聚焦当前 `TON + EVM` 支付与回执双栈事实；它**不等于**长期 `Agentic Commerce` 主账本选型。若你在设计下一阶段对象化权利与结算层，请继续阅读 [/reference/web3-sui-first-architecture](/reference/web3-sui-first-architecture)。
 
 ---
 

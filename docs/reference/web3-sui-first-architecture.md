@@ -390,8 +390,9 @@ normative: false
   - `openclaw_market.move` — Capability / Lease / Receipt / MarketRegistry
   - `openclaw_escrow.move` — Escrow\<T\> / Reward
 - **协议参考文档**：[Sui Move 协议草图 — 最小对象 Schema + PTB 交易流](/reference/web3-sui-move-protocol)
+- **工业化蓝图**：[Sui Move 工业化整改蓝图 — 可组合 PTB API + 权限能力 + 交付闭环](/reference/web3-sui-industrialization-blueprint)
 
-> 当前为**协议草图阶段**（最小可编译 schema + entry function 签名），不是生产就绪合约。完整实现路线图见协议参考文档 §10。
+> 当前为**协议草图阶段**（最小对象 schema + entry function 签名），不是生产就绪合约。若要进入工业级实现，请继续阅读工业化蓝图文档。
 
 ## 相关文档
 

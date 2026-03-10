@@ -70,6 +70,43 @@ Do not violate these rules:
 - Keep proof, settlement, and dispute tied together; avoid standalone “proof-only” abstractions that cannot reconcile against orders/leases
 - Preserve redaction guarantees: no token/endpoint/path leaks in docs, logs, tool results, dashboards, or capability descriptors
 
+## Chain strategy guardrails
+
+When the task involves chain selection, token design, or agent-to-agent settlement shape, use this split:
+
+- **Current runtime fact**: `EVM` is the default implemented market rail, and `TON` already participates in the current dual-stack payment/receipt path.
+- **Recommended next-stage direction**: for `Agentic Commerce` and objectized rights/lease/receipt design, prefer a **`Sui-first` architecture**.
+- **Role split**:
+  - `Sui` = agent-native commerce ledger for capability/lease/receipt/escrow/reward objects
+  - `EVM` = stablecoin liquidity rail, treasury, bridge, and external DeFi compatibility
+  - `TON` = distribution, lightweight payment entry, Telegram-facing reach
+- **Do not overclaim**: `Sui-first` is a target-state architecture choice, not a statement that the current repo runtime has already migrated away from `EVM + TON`.
+
+Use `Sui-first` when the problem is mainly about:
+
+- AI-to-AI trading of rights, permissions, access windows, service receipts, or machine-verifiable obligations
+- object-like assets with explicit ownership transfer
+- multi-step atomic commerce where `PTB` semantics are valuable
+- low-friction agent settlement that should not be modeled as a pile of mutable mappings
+
+Be more cautious when the problem is mainly about:
+
+- maximum existing liquidity and wallet compatibility
+- direct reuse of mature EVM DeFi rails
+- Telegram-native distribution flows
+- high-contention shared state that could collapse into shared-object bottlenecks on `Sui`
+
+Architectural guardrails:
+
+- Treat chain as the **rights and settlement layer**, not the execution engine.
+- Keep prompt/data/model weights/results off-chain except for hashes, commitments, receipts, and policy anchors.
+- Prefer **off-chain quote/discovery + on-chain lease/settlement/audit** instead of pushing hot-path routing into shared on-chain objects.
+- Default to **stablecoin settlement** for business value; do not rush a native OpenClaw token before staking/slashing/governance are genuinely needed.
+
+First reference for this topic:
+
+- `skills/web3-market/references/openclaw-sui-first-agentic-commerce.md`
+
 ## Reference map
 
 ### Main architecture and execution references
@@ -77,6 +114,7 @@ Do not violate these rules:
 Read these first for architecture or protocol work:
 
 - `skills/web3-market/references/openclaw-private-steward-architecture-2026-2028.md`
+- `skills/web3-market/references/openclaw-sui-first-agentic-commerce.md`
 - `skills/web3-market/references/openclaw-eaas-a2a-mcp-productization.md`
 - `skills/web3-market/references/web3-brain-architecture.md`
 - `skills/web3-market/references/web3-market-plan-overview.md`
@@ -114,6 +152,7 @@ When changing public contracts or public narratives, align with:
 
 - `docs/concepts/web3-market.md`
 - `docs/reference/web3-market-dev.md`
+- `docs/reference/web3-sui-first-architecture.md`
 - `docs/reference/web3-eaas-protocol-spec.md`
 - `docs/reference/web3-eaas-developer-guide.md`
 - `docs/reference/web3-eaas-protocol-upgrade-report-2026.md`

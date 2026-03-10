@@ -55,6 +55,29 @@ graph TD
 - 架构落地图：[/reference/web3-p2p-openclaw-architecture](/reference/web3-p2p-openclaw-architecture)
 - 验证手册：[/reference/web3-p2p-validation-playbook](/reference/web3-p2p-validation-playbook)
 
+## 链策略：当前运行时事实 vs 下一阶段方向
+
+### 当前运行时事实
+
+- 当前默认链路仍是 **`EVM` 主线 + `TON` 双栈支付入口**。
+- 这部分描述的是**现在代码已经在跑的事实**，不是长期唯一方向。
+
+### 下一阶段方向：`Sui-first` Agentic Commerce
+
+如果 `OpenClaw` 要继续往“万物皆可交易 / AI-to-AI 商务流”推进，推荐的长期分工是：
+
+- **`Sui`**：对象化权利与结算语义层（`Capability / Lease / Receipt / Escrow / Reward`）
+- **`EVM`**：稳定币、桥接、金库、外部流动性与 DeFi 兼容
+- **`TON`**：分发、轻量支付、Telegram 场景触达
+
+设计上应坚持：
+
+- **链上只放权利与结算对象，不放真实执行载荷**
+- **发现、报价、调度与执行尽量留在链下**
+- **优先使用 `Owned Object first` 路径，避免把热交易都压进共享对象**
+
+详细架构与对象模型见：[/reference/web3-sui-first-architecture](/reference/web3-sui-first-architecture)
+
 ## 默认生态选择（基于代码现状）
 
 ### 链：EVM（默认） + TON（已实现的双栈支付入口）
@@ -243,6 +266,7 @@ graph TD
 - AI 管家黄金路径：[/web3/ai-steward-golden-path](/web3/ai-steward-golden-path)
 - 双栈总规划（TON+EVM）：`docs/web3/WEB3_DUAL_STACK_STRATEGY.md`
 - 双栈支付与结算参考：[/reference/web3-dual-stack-payments-and-settlement](/reference/web3-dual-stack-payments-and-settlement)
+- Sui-first 架构草案：[/reference/web3-sui-first-architecture](/reference/web3-sui-first-architecture)
 - EaaS 协议规范：[/reference/web3-eaas-protocol-spec](/reference/web3-eaas-protocol-spec)
 - EaaS 开发指南：[/reference/web3-eaas-developer-guide](/reference/web3-eaas-developer-guide)
 - GA 运维 Runbook：[/reference/web3-ga-runbook](/reference/web3-ga-runbook)
