@@ -600,7 +600,10 @@ describe("Multi-chain Integration", () => {
 ### Phase 3: 多链扩展 (6周)
 
 - [ ] Week 7-8: Solana适配器
-- [ ] Week 9-10: Sui适配器
+- [x] Week 9-10: Sui适配器 — **协议草图已就绪** (Move 合约 schema + PTB 交易流)
+  - 合约源码: `contracts/sui/openclaw_protocol/` (openclaw_market.move + openclaw_escrow.move)
+  - 协议文档: `docs/reference/web3-sui-move-protocol.md`
+  - 架构草案: `docs/reference/web3-sui-first-architecture.md`
 - [ ] Week 11-12: Base (EVM) 适配器
 
 ### Phase 4: 优化与上线 (2周)
