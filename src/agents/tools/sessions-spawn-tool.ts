@@ -54,6 +54,12 @@ const SessionsSpawnToolSchema = Type.Object({
   proofId: Type.Optional(Type.String({ minLength: 1 })),
   settlementId: Type.Optional(Type.String({ minLength: 1 })),
   agentId: Type.Optional(Type.String()),
+  resumeSessionId: Type.Optional(
+    Type.String({
+      description:
+        'Resume an existing agent session by its ID (e.g. a Codex session UUID from ~/.codex/sessions/). Requires runtime="acp". The agent replays conversation history via session/load instead of starting fresh.',
+    }),
+  ),
   model: Type.Optional(Type.String()),
   thinking: Type.Optional(Type.String()),
   cwd: Type.Optional(Type.String()),
@@ -127,6 +133,7 @@ export function createSessionsSpawnTool(
       const label = typeof params.label === "string" ? params.label.trim() : "";
       const runtime = params.runtime === "acp" ? "acp" : "subagent";
       const requestedAgentId = readStringParam(params, "agentId");
+      const resumeSessionId = readStringParam(params, "resumeSessionId");
       const modelOverride = readStringParam(params, "model");
       const thinkingOverrideRaw = readStringParam(params, "thinking");
       const cwd = readStringParam(params, "cwd");
@@ -163,6 +170,13 @@ export function createSessionsSpawnTool(
         });
       }
 
+      if (resumeSessionId && runtime !== "acp") {
+        return jsonResult({
+          status: "error",
+          error: `resumeSessionId is only supported for runtime=acp; got runtime=${runtime}`,
+        });
+      }
+
       if (runtime === "acp") {
         if (Array.isArray(attachments) && attachments.length > 0) {
           return jsonResult({
@@ -176,6 +190,7 @@ export function createSessionsSpawnTool(
             task: taskWithContext,
             label: label || undefined,
             agentId: requestedAgentId,
+            resumeSessionId,
             cwd,
             mode: mode && ACP_SPAWN_MODES.includes(mode) ? mode : undefined,
             thread,

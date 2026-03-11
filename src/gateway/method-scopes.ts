@@ -24,7 +24,10 @@ export const CLI_DEFAULT_OPERATOR_SCOPES: OperatorScope[] = [
 const NODE_ROLE_METHODS = new Set([
   "node.invoke.result",
   "node.event",
+  "node.pending.drain",
   "node.canvas.capability.refresh",
+  "node.pending.pull",
+  "node.pending.ack",
   "skills.bins",
 ]);
 
@@ -104,6 +107,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "chat.abort",
     "browser.request",
     "push.test",
+    "node.pending.enqueue",
     // Web3/market methods injected from overlay — see method-scopes-web3.ts
     ...((WEB3_SCOPE_ENTRIES.find((e) => e.scope === WRITE_SCOPE)?.methods as string[]) ?? []),
   ],

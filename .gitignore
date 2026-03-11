@@ -82,6 +82,7 @@ apps/ios/*.mobileprovision
 .local/
 docs/.local/
 .openclaw/
+tmp/
 IDENTITY.md
 USER.md
 .tgz
@@ -134,3 +135,4 @@ dist/protocol.schema.json
 
 # Synthing
 **/.stfolder/
+.dev-state
