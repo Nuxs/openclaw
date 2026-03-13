@@ -25,47 +25,39 @@
     "directory": "extensions/blockchain-adapter"
   },
   "files": [
-    "dist",
+    "src",
     "contracts",
     "blockchain-adapter.config.json",
     "README.md"
   ],
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./providers/ton": {
-      "types": "./dist/providers/ton/index.d.ts",
-      "import": "./dist/providers/ton/index.js",
-      "require": "./dist/providers/ton/index.cjs"
+      "types": "./src/providers/ton/index.ts",
+      "default": "./src/providers/ton/index.ts"
     },
     "./providers/evm": {
-      "types": "./dist/providers/evm/index.d.ts",
-      "import": "./dist/providers/evm/index.js",
-      "require": "./dist/providers/evm/index.cjs"
+      "types": "./src/providers/evm/index.ts",
+      "default": "./src/providers/evm/index.ts"
     },
     "./deps": {
-      "types": "./dist/deps.d.ts",
-      "import": "./dist/deps.js",
-      "require": "./dist/deps.cjs"
+      "types": "./src/deps.ts",
+      "default": "./src/deps.ts"
     },
     "./factory": {
-      "types": "./dist/factory.d.ts",
-      "import": "./dist/factory.js",
-      "require": "./dist/factory.cjs"
+      "types": "./src/factory.ts",
+      "default": "./src/factory.ts"
     }
   },
   "scripts": {
-    "build": "tsup",
-    "clean": "rm -rf dist",
     "contracts:build": "cd contracts/ton && func -o settlement.fif -SPA settlement.fc",
     "contracts:deploy": "node scripts/deploy-contracts.mjs",
-    "dev": "tsup --watch",
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
@@ -85,7 +77,6 @@
     "@typescript-eslint/parser": "^6.13.0",
     "eslint": "^8.54.0",
     "prettier": "^3.1.0",
-    "tsup": "^8.0.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
   },
