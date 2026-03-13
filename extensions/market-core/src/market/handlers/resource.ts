@@ -69,7 +69,10 @@ export function createResourcePublishHandler(
 
       const priceInput = (resourceInput.price ?? {}) as Record<string, unknown>;
       const unit = requireEnum(priceInput, "unit", RESOURCE_PRICE_UNITS[kind]);
-      const amount = requireBigNumberishString(priceInput, "amount", { allowZero: false });
+      const amount = requireBigNumberishString(priceInput, "amount", {
+        allowZero: false,
+        allowDecimal: true,
+      });
       const currency = requireString(priceInput.currency, "currency");
       const tokenAddress = requireOptionalAddress(priceInput, "tokenAddress");
 

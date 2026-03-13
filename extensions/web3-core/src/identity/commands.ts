@@ -43,7 +43,9 @@ export function createWhoamiCommand(store: Web3StateStore): PluginCommandHandler
   return async () => {
     const bindings = store.getBindings();
     if (bindings.length === 0) {
-      return { text: "No wallet bound. Use /bind_wallet 0xAddress to bind one." };
+      return {
+        text: "No wallet bound. Use SIWE verification (web3.siwe.challenge + web3.siwe.verify) to link one.",
+      };
     }
     const lines = bindings.map(
       (b) =>

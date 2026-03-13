@@ -138,12 +138,13 @@ describe("createWeb3DashboardCommand", () => {
     expect(result.text).toContain("Consumer: on");
   });
 
-  it("suggests /bind_wallet when no bindings", async () => {
+  it("suggests SIWE when no bindings", async () => {
     const store = makeStore();
     const config = makeConfig();
     const handler = createWeb3DashboardCommand(store, config);
     const result = await handler({} as any);
-    expect(result.text).toContain("/bind_wallet");
+    expect(result.text).toContain("web3.siwe.challenge");
+    expect(result.text).toContain("web3.siwe.verify");
   });
 
   it("suggests /alerts when critical alerts exist", async () => {

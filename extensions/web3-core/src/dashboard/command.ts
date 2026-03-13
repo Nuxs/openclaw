@@ -132,7 +132,9 @@ export function createWeb3DashboardCommand(
     // Next actions
     const nextActions: string[] = [];
     if (bindings.length === 0) {
-      nextActions.push("/bind_wallet 0x… to link your wallet");
+      nextActions.push(
+        "Use SIWE wallet verification (web3.siwe.challenge + web3.siwe.verify) to link your wallet",
+      );
     }
     if (displayQuota > 0 && remainingCredits / displayQuota < 0.2) {
       nextActions.push("/credits to review usage and top-up");

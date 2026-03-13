@@ -77,10 +77,18 @@ export function createWeb3MarketIndexListTool(config: Web3PluginConfig): AnyAgen
 const LeaseSchema = Type.Object(
   {
     resourceId: Type.String({ description: "Resource ID to lease." }),
+    actorId: Type.String({ description: "Actor ID authorizing the lease request." }),
+    consumerActorId: Type.String({ description: "Consumer actor ID (payer)." }),
+    ttlMs: Type.Number({
+      minimum: 10_000,
+      maximum: 604_800_000,
+      description: "Lease duration in milliseconds.",
+    }),
+    maxCost: Type.Optional(
+      Type.String({ description: "Optional max cost as a numeric string, decimals allowed." }),
+    ),
     // Optional metadata; passed through to web3.resources.lease.
     sessionKey: Type.Optional(Type.String({ description: "Session key for settlement tagging." })),
-    consumerActorId: Type.Optional(Type.String({ description: "Consumer actor ID (payer)." })),
-    actorId: Type.Optional(Type.String({ description: "Optional actor id for access policies." })),
     providerEndpoint: Type.Optional(
       Type.String({ description: "Optional provider endpoint override (will not be returned)." }),
     ),
@@ -90,9 +98,11 @@ const LeaseSchema = Type.Object(
 
 type LeaseParams = {
   resourceId: string;
+  actorId: string;
+  consumerActorId: string;
+  ttlMs: number;
+  maxCost?: string;
   sessionKey?: string;
-  consumerActorId?: string;
-  actorId?: string;
   providerEndpoint?: string;
 };
 
@@ -109,12 +119,18 @@ export function createWeb3MarketLeaseTool(config: Web3PluginConfig): AnyAgentToo
     execute: async (_toolCallId, params: LeaseParams) => {
       try {
         const resourceId = params.resourceId?.trim();
-        if (!resourceId) {
-          return errorResult("resourceId is required", { fields: ["resourceId"] });
+        const actorId = params.actorId?.trim();
+        const consumerActorId = params.consumerActorId?.trim();
+        if (!resourceId || !actorId || !consumerActorId) {
+          return errorResult("resourceId, actorId, and consumerActorId are required", {
+            fields: ["resourceId", "actorId", "consumerActorId"],
+          });
         }
         const result = await callGatewayMethod(config, "web3.resources.lease", {
           ...params,
           resourceId,
+          actorId,
+          consumerActorId,
         });
         return safeResult(result);
       } catch (err) {
@@ -126,12 +142,14 @@ export function createWeb3MarketLeaseTool(config: Web3PluginConfig): AnyAgentToo
 
 const RevokeLeaseSchema = Type.Object(
   {
+    actorId: Type.String({ description: "Actor ID authorizing the revocation." }),
     leaseId: Type.String({ description: "Lease ID to revoke." }),
+    reason: Type.Optional(Type.String({ description: "Optional revocation reason." })),
   },
   { additionalProperties: false },
 );
 
-type RevokeLeaseParams = { leaseId: string };
+type RevokeLeaseParams = { actorId: string; leaseId: string; reason?: string };
 
 export function createWeb3MarketRevokeLeaseTool(config: Web3PluginConfig): AnyAgentTool | null {
   if (!config.resources.enabled) {
@@ -144,11 +162,18 @@ export function createWeb3MarketRevokeLeaseTool(config: Web3PluginConfig): AnyAg
     parameters: RevokeLeaseSchema,
     execute: async (_toolCallId, params: RevokeLeaseParams) => {
       try {
+        const actorId = params.actorId?.trim();
         const leaseId = params.leaseId?.trim();
-        if (!leaseId) {
-          return errorResult("leaseId is required", { fields: ["leaseId"] });
+        if (!actorId || !leaseId) {
+          return errorResult("actorId and leaseId are required", {
+            fields: ["actorId", "leaseId"],
+          });
         }
-        const result = await callGatewayMethod(config, "web3.resources.revokeLease", { leaseId });
+        const result = await callGatewayMethod(config, "web3.resources.revokeLease", {
+          ...params,
+          actorId,
+          leaseId,
+        });
         return safeResult(result);
       } catch (err) {
         return errorResult(err);
@@ -159,6 +184,7 @@ export function createWeb3MarketRevokeLeaseTool(config: Web3PluginConfig): AnyAg
 
 const PublishSchema = Type.Object(
   {
+    actorId: Type.String({ description: "Provider actor ID publishing the resource." }),
     resource: Type.Object(
       {},
       {
@@ -171,7 +197,7 @@ const PublishSchema = Type.Object(
   { additionalProperties: false },
 );
 
-type PublishParams = { resource: Record<string, unknown> };
+type PublishParams = { actorId: string; resource: Record<string, unknown> };
 
 export function createWeb3MarketPublishTool(config: Web3PluginConfig): AnyAgentTool | null {
   if (!config.resources.enabled || !config.resources.advertiseToMarket) {
@@ -185,11 +211,17 @@ export function createWeb3MarketPublishTool(config: Web3PluginConfig): AnyAgentT
     parameters: PublishSchema,
     execute: async (_toolCallId, params: PublishParams) => {
       try {
+        const actorId = params.actorId?.trim();
         const resource = params.resource;
-        if (!resource || typeof resource !== "object") {
-          return errorResult("resource is required", { fields: ["resource"] });
+        if (!actorId || !resource || typeof resource !== "object") {
+          return errorResult("actorId and resource are required", {
+            fields: ["actorId", "resource"],
+          });
         }
-        const result = await callGatewayMethod(config, "web3.resources.publish", resource);
+        const result = await callGatewayMethod(config, "web3.resources.publish", {
+          actorId,
+          resource,
+        });
         return safeResult(result);
       } catch (err) {
         return errorResult(err);
@@ -200,12 +232,13 @@ export function createWeb3MarketPublishTool(config: Web3PluginConfig): AnyAgentT
 
 const UnpublishSchema = Type.Object(
   {
+    actorId: Type.String({ description: "Provider actor ID unpublishing the resource." }),
     resourceId: Type.String({ description: "Resource ID to unpublish." }),
   },
   { additionalProperties: false },
 );
 
-type UnpublishParams = { resourceId: string };
+type UnpublishParams = { actorId: string; resourceId: string };
 
 export function createWeb3MarketUnpublishTool(config: Web3PluginConfig): AnyAgentTool | null {
   if (!config.resources.enabled || !config.resources.advertiseToMarket) {
@@ -218,11 +251,17 @@ export function createWeb3MarketUnpublishTool(config: Web3PluginConfig): AnyAgen
     parameters: UnpublishSchema,
     execute: async (_toolCallId, params: UnpublishParams) => {
       try {
+        const actorId = params.actorId?.trim();
         const resourceId = params.resourceId?.trim();
-        if (!resourceId) {
-          return errorResult("resourceId is required", { fields: ["resourceId"] });
+        if (!actorId || !resourceId) {
+          return errorResult("actorId and resourceId are required", {
+            fields: ["actorId", "resourceId"],
+          });
         }
-        const result = await callGatewayMethod(config, "web3.resources.unpublish", { resourceId });
+        const result = await callGatewayMethod(config, "web3.resources.unpublish", {
+          actorId,
+          resourceId,
+        });
         return safeResult(result);
       } catch (err) {
         return errorResult(err);

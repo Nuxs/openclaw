@@ -61,7 +61,10 @@ export function createLeaseIssueHandler(
       });
       const maxCost =
         input.maxCost !== undefined
-          ? requireBigNumberishString(input, "maxCost", { allowZero: true })
+          ? requireBigNumberishString(input, "maxCost", {
+              allowZero: true,
+              allowDecimal: true,
+            })
           : undefined;
 
       const resource = store.getResource(resourceId);

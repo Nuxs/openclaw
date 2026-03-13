@@ -168,9 +168,15 @@ describe("requireBigNumberishString", () => {
     expect(() => requireBigNumberishString({}, "amount")).toThrow("amount is required");
   });
 
-  it("throws on non-numeric", () => {
+  it("throws on decimal by default", () => {
     expect(() => requireBigNumberishString({ amount: "12.5" }, "amount")).toThrow(
       "must be a numeric string",
+    );
+  });
+
+  it("allows decimal strings when explicitly enabled", () => {
+    expect(requireBigNumberishString({ amount: "12.5" }, "amount", { allowDecimal: true })).toBe(
+      "12.5",
     );
   });
 

@@ -115,19 +115,21 @@ export function requireOptionalPositiveInt(
 export function requireBigNumberishString(
   params: Record<string, unknown>,
   key: string,
-  opts: { allowZero?: boolean } = {},
+  opts: { allowZero?: boolean; allowDecimal?: boolean } = {},
 ): string {
   const raw = params[key];
   if (typeof raw !== "string" || raw.trim().length === 0) {
     throw invalid(`${key} is required`);
   }
-  if (!/^[0-9]+$/.test(raw)) {
+  const normalized = raw.trim();
+  const pattern = opts.allowDecimal ? /^[0-9]+(?:\.[0-9]+)?$/ : /^[0-9]+$/;
+  if (!pattern.test(normalized)) {
     throw invalid(`${key} must be a numeric string`);
   }
-  if (!opts.allowZero && raw === "0") {
+  if (!opts.allowZero && Number(normalized) === 0) {
     throw invalid(`${key} must be greater than 0`);
   }
-  return raw;
+  return normalized;
 }
 
 export function requireOptionalIsoTimestamp(
