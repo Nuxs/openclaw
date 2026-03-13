@@ -49,5 +49,12 @@ export function renderConfigTab(state: AppViewState) {
     onSave: () => saveConfig(state),
     onApply: () => applyConfig(state),
     onUpdate: () => runUpdate(state),
+    version: state.hello?.server?.version ?? "",
+    theme: state.theme,
+    themeMode: state.themeMode,
+    setTheme: (theme, context) => state.setTheme(theme, context),
+    setThemeMode: (mode, context) => state.setThemeMode(mode, context),
+    gatewayUrl: state.settings.gatewayUrl,
+    assistantName: state.assistantName,
   });
 }

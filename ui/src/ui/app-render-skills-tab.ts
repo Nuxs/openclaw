@@ -15,6 +15,7 @@ export function renderSkillsTab(state: AppViewState) {
   }
 
   return renderSkills({
+    connected: state.connected,
     loading: state.skillsLoading,
     report: state.skillsReport,
     error: state.skillsError,

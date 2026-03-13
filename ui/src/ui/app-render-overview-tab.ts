@@ -32,6 +32,8 @@ export function renderOverviewTab(state: AppViewState) {
     attentionItems: state.attentionItems,
     eventLog: state.eventLog,
     overviewLogLines: state.overviewLogLines,
+    showGatewayToken: state.overviewShowGatewayToken,
+    showGatewayPassword: state.overviewShowGatewayPassword,
     streamMode: state.streamMode,
     web3Status: state.overviewWeb3Status,
     web3Error: state.overviewWeb3Error,
@@ -50,8 +52,14 @@ export function renderOverviewTab(state: AppViewState) {
     },
     onConnect: () => state.connect(),
     onRefresh: () => state.loadOverview(),
-    onNavigate: (tab: Tab) => state.setTab(tab),
+    onNavigate: (tab) => state.setTab(tab as Tab),
     onRefreshLogs: () => state.loadOverview(),
+    onToggleGatewayTokenVisibility: () => {
+      state.overviewShowGatewayToken = !state.overviewShowGatewayToken;
+    },
+    onToggleGatewayPasswordVisibility: () => {
+      state.overviewShowGatewayPassword = !state.overviewShowGatewayPassword;
+    },
     onToggleStreamMode: () => {
       state.streamMode = !state.streamMode;
       try {

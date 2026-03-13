@@ -11,27 +11,28 @@ import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
-import type { ThemeMode } from "./theme.ts";
+import type { ResolvedTheme, ThemeMode, ThemeName } from "./theme.ts";
 import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  AttentionItem,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   ConfigUiHints,
-  HealthSnapshot,
+  HealthSummary,
   LogEntry,
   LogLevel,
+  ModelCatalogEntry,
   NostrProfile,
   PresenceEntry,
   SessionsUsageResult,
   CostUsageSummary,
-  AttentionItem,
   SessionUsageTimeSeries,
   SessionsListResult,
   SkillStatusReport,
-  ToolsCatalogResult,
   StatusSummary,
+  ToolsCatalogResult,
 } from "./types.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
@@ -42,12 +43,16 @@ export type AppViewState = AppViewStateCore & Web3ViewState;
 type AppViewStateCore = {
   settings: UiSettings;
   password: string;
+  loginShowGatewayToken: boolean;
+  loginShowGatewayPassword: boolean;
   tab: Tab;
   onboarding: boolean;
   basePath: string;
   connected: boolean;
-  theme: ThemeMode;
-  themeResolved: "light" | "dark";
+  theme: ThemeName;
+  themeMode: ThemeMode;
+  themeResolved: ResolvedTheme;
+  themeOrder: ThemeName[];
   hello: GatewayHelloOk | null;
   lastError: string | null;
   lastErrorCode: string | null;
@@ -120,6 +125,26 @@ type AppViewStateCore = {
   configSearchQuery: string;
   configActiveSection: string | null;
   configActiveSubsection: string | null;
+  communicationsFormMode: "form" | "raw";
+  communicationsSearchQuery: string;
+  communicationsActiveSection: string | null;
+  communicationsActiveSubsection: string | null;
+  appearanceFormMode: "form" | "raw";
+  appearanceSearchQuery: string;
+  appearanceActiveSection: string | null;
+  appearanceActiveSubsection: string | null;
+  automationFormMode: "form" | "raw";
+  automationSearchQuery: string;
+  automationActiveSection: string | null;
+  automationActiveSubsection: string | null;
+  infrastructureFormMode: "form" | "raw";
+  infrastructureSearchQuery: string;
+  infrastructureActiveSection: string | null;
+  infrastructureActiveSubsection: string | null;
+  aiAgentsFormMode: "form" | "raw";
+  aiAgentsSearchQuery: string;
+  aiAgentsActiveSection: string | null;
+  aiAgentsActiveSubsection: string | null;
   channelsLoading: boolean;
   channelsSnapshot: ChannelsStatusSnapshot | null;
   channelsError: string | null;
@@ -165,6 +190,12 @@ type AppViewStateCore = {
   sessionsIncludeGlobal: boolean;
   sessionsIncludeUnknown: boolean;
   sessionsHideCron: boolean;
+  sessionsSearchQuery: string;
+  sessionsSortColumn: "key" | "kind" | "updated" | "tokens";
+  sessionsSortDir: "asc" | "desc";
+  sessionsPage: number;
+  sessionsPageSize: number;
+  sessionsActionsOpenKey: string | null;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
@@ -245,10 +276,13 @@ type AppViewStateCore = {
     skillEdits: Record<string, string>;
     skillMessages: Record<string, SkillMessage>;
     skillsBusyKey: string | null;
+    healthLoading: boolean;
+    healthResult: HealthSummary | null;
+    healthError: string | null;
     debugLoading: boolean;
     debugStatus: StatusSummary | null;
-    debugHealth: HealthSnapshot | null;
-    debugModels: unknown[];
+    debugHealth: HealthSummary | null;
+    debugModels: ModelCatalogEntry[];
     debugHeartbeat: unknown;
     debugCallMethod: string;
     debugCallParams: string;
@@ -268,11 +302,17 @@ type AppViewStateCore = {
     logsMaxBytes: number;
     logsAtBottom: boolean;
     updateAvailable: import("./types.js").UpdateAvailable | null;
+    paletteOpen: boolean;
+    paletteQuery: string;
+    paletteActiveIndex: number;
+    overviewShowGatewayToken: boolean;
+    overviewShowGatewayPassword: boolean;
     client: GatewayBrowserClient | null;
     refreshSessionsAfterChat: Set<string>;
     connect: () => void;
     setTab: (tab: Tab) => void;
-    setTheme: (theme: ThemeMode, context?: ThemeTransitionContext) => void;
+    setTheme: (theme: ThemeName, context?: ThemeTransitionContext) => void;
+    setThemeMode: (mode: ThemeMode, context?: ThemeTransitionContext) => void;
     applySettings: (next: UiSettings) => void;
     loadOverview: () => Promise<void>;
     loadAssistantIdentity: () => Promise<void>;

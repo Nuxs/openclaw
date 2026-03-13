@@ -27,41 +27,54 @@ export function renderAgentsTab(state: AppViewState) {
     null;
 
   return renderAgents({
+    basePath: state.basePath,
     loading: state.agentsLoading,
     error: state.agentsError,
     agentsList: state.agentsList,
     selectedAgentId: resolvedAgentId,
     activePanel: state.agentsPanel,
-    configForm: configValue,
-    configLoading: state.configLoading,
-    configSaving: state.configSaving,
-    configDirty: state.configFormDirty,
-    channelsLoading: state.channelsLoading,
-    channelsError: state.channelsError,
-    channelsSnapshot: state.channelsSnapshot,
-    channelsLastSuccess: state.channelsLastSuccess,
-    cronLoading: state.cronLoading,
-    cronStatus: state.cronStatus,
-    cronJobs: state.cronJobs,
-    cronError: state.cronError,
-    agentFilesLoading: state.agentFilesLoading,
-    agentFilesError: state.agentFilesError,
-    agentFilesList: state.agentFilesList,
-    agentFileActive: state.agentFileActive,
-    agentFileContents: state.agentFileContents,
-    agentFileDrafts: state.agentFileDrafts,
-    agentFileSaving: state.agentFileSaving,
+    config: {
+      form: configValue,
+      loading: state.configLoading,
+      saving: state.configSaving,
+      dirty: state.configFormDirty,
+    },
+    channels: {
+      snapshot: state.channelsSnapshot,
+      loading: state.channelsLoading,
+      error: state.channelsError,
+      lastSuccess: state.channelsLastSuccess,
+    },
+    cron: {
+      status: state.cronStatus,
+      jobs: state.cronJobs,
+      loading: state.cronLoading,
+      error: state.cronError,
+    },
+    agentFiles: {
+      list: state.agentFilesList,
+      loading: state.agentFilesLoading,
+      error: state.agentFilesError,
+      active: state.agentFileActive,
+      contents: state.agentFileContents,
+      drafts: state.agentFileDrafts,
+      saving: state.agentFileSaving,
+    },
     agentIdentityLoading: state.agentIdentityLoading,
     agentIdentityError: state.agentIdentityError,
     agentIdentityById: state.agentIdentityById,
-    agentSkillsLoading: state.agentSkillsLoading,
-    agentSkillsReport: state.agentSkillsReport,
-    agentSkillsError: state.agentSkillsError,
-    agentSkillsAgentId: state.agentSkillsAgentId,
-    toolsCatalogLoading: state.toolsCatalogLoading,
-    toolsCatalogError: state.toolsCatalogError,
-    toolsCatalogResult: state.toolsCatalogResult,
-    skillsFilter: state.skillsFilter,
+    agentSkills: {
+      report: state.agentSkillsReport,
+      loading: state.agentSkillsLoading,
+      error: state.agentSkillsError,
+      agentId: state.agentSkillsAgentId,
+      filter: state.skillsFilter,
+    },
+    toolsCatalog: {
+      loading: state.toolsCatalogLoading,
+      error: state.toolsCatalogError,
+      result: state.toolsCatalogResult,
+    },
     onRefresh: async () => {
       await loadAgents(state);
       const nextSelected =
@@ -69,7 +82,9 @@ export function renderAgentsTab(state: AppViewState) {
         state.agentsList?.defaultId ??
         state.agentsList?.agents?.[0]?.id ??
         null;
-      await loadToolsCatalog(state, nextSelected);
+      if (nextSelected) {
+        await loadToolsCatalog(state, nextSelected);
+      }
       const agentIds = state.agentsList?.agents?.map((entry) => entry.id) ?? [];
       if (agentIds.length > 0) {
         void loadAgentIdentities(state, agentIds);
@@ -112,7 +127,7 @@ export function renderAgentsTab(state: AppViewState) {
           void loadAgentFiles(state, resolvedAgentId);
         }
       }
-      if (panel === "tools") {
+      if (panel === "tools" && resolvedAgentId) {
         void loadToolsCatalog(state, resolvedAgentId);
       }
       if (panel === "skills") {
@@ -211,6 +226,7 @@ export function renderAgentsTab(state: AppViewState) {
     onConfigSave: () => saveConfig(state),
     onChannelsRefresh: () => loadChannels(state, false),
     onCronRefresh: () => state.loadCron(),
+    onCronRunNow: () => {},
     onSkillsFilterChange: (next) => (state.skillsFilter = next),
     onSkillsRefresh: () => {
       if (resolvedAgentId) {
