@@ -7472,6 +7472,41 @@
     },
     {
       "declaredContracts": [
+        "web3.*",
+        "web3.audit.*",
+        "web3.index.*",
+        "web3.market.*",
+        "web3.monitor.*"
+      ],
+      "docLayer": "reference",
+      "normative": false,
+      "path": "docs/reference/web3-p2p-openclaw-architecture.md",
+      "title": "OpenClaw P2P 协同算力架构落地图"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "reference",
+      "normative": false,
+      "path": "docs/reference/web3-p2p-research-landscape.md",
+      "title": "Web3 P2P 协同算力研究索引"
+    },
+    {
+      "declaredContracts": [
+        "web3.*",
+        "web3.index.*",
+        "web3.market.*",
+        "web3.market.privacy.*",
+        "web3.market.task.*",
+        "web3.monitor.*",
+        "web3.reward.*"
+      ],
+      "docLayer": "reference",
+      "normative": false,
+      "path": "docs/reference/web3-p2p-validation-playbook.md",
+      "title": "OpenClaw P2P 协同算力验证手册"
+    },
+    {
+      "declaredContracts": [
         "market.*",
         "market.lease.*",
         "market.lease.expireSweep",
@@ -7508,6 +7543,27 @@
       "title": "Web3 Resource Market API"
     },
     {
+      "declaredContracts": ["market.*", "web3.*"],
+      "docLayer": "reference",
+      "normative": false,
+      "path": "docs/reference/web3-sui-first-architecture.md",
+      "title": "OpenClaw Web3 Sui-first 架构草案"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "reference",
+      "normative": false,
+      "path": "docs/reference/web3-sui-industrialization-blueprint.md",
+      "title": "Sui Move 工业化整改蓝图 — 可组合 PTB API + 权限能力 + 交付闭环"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "reference",
+      "normative": false,
+      "path": "docs/reference/web3-sui-move-protocol.md",
+      "title": "Sui Move 协议草图 — 最小对象 Schema + PTB 交易流"
+    },
+    {
       "declaredContracts": [
         "/audit_status",
         "/bind_wallet",
@@ -7524,6 +7580,20 @@
       "normative": false,
       "path": "docs/web3/ai-steward-golden-path.md",
       "title": "AI Steward Golden Path for Web3 Market"
+    },
+    {
+      "declaredContracts": ["web3.*", "web3.market.*"],
+      "docLayer": "guide",
+      "normative": false,
+      "path": "docs/web3/p2p-openclaw-index.md",
+      "title": "OpenClaw Web3 P2P 协同算力专题总览"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "guide",
+      "normative": false,
+      "path": "docs/web3/p2p-openclaw-thesis.md",
+      "title": "OpenClaw P2P 协同算力战略判断"
     },
     {
       "declaredContracts": ["agent-wallet.balance", "agent-wallet.create", "agent-wallet.send"],

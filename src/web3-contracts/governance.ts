@@ -428,6 +428,122 @@ function collectRuntimeInventory(
   };
 }
 
+function collectRelativeModuleSpecifiers(sourceText: string, fileName: string): string[] {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const specifiers = new Set<string>();
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const specifier = getStringLiteral(statement.moduleSpecifier);
+      if (specifier?.startsWith(".")) {
+        specifiers.add(specifier);
+      }
+      continue;
+    }
+    if (ts.isExportDeclaration(statement) && statement.moduleSpecifier) {
+      const specifier = getStringLiteral(statement.moduleSpecifier);
+      if (specifier?.startsWith(".")) {
+        specifiers.add(specifier);
+      }
+    }
+  }
+
+  return [...specifiers];
+}
+
+async function resolveImportedSourceFile(
+  repoRoot: string,
+  fromRelativePath: string,
+  specifier: string,
+): Promise<string | null> {
+  const fromAbsolutePath = path.join(repoRoot, fromRelativePath);
+  const basePath = path.resolve(path.dirname(fromAbsolutePath), specifier);
+  const ext = path.extname(basePath);
+  const normalizedBase = ext ? basePath.slice(0, -ext.length) : basePath;
+  const candidates = [
+    `${normalizedBase}.ts`,
+    `${normalizedBase}.tsx`,
+    `${normalizedBase}.mts`,
+    `${normalizedBase}.cts`,
+    path.join(normalizedBase, "index.ts"),
+    path.join(normalizedBase, "index.tsx"),
+    path.join(normalizedBase, "index.mts"),
+    path.join(normalizedBase, "index.cts"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return toPosixPath(path.relative(repoRoot, candidate));
+    } catch {
+      // keep trying other candidates
+    }
+  }
+
+  return null;
+}
+
+async function collectRuntimeInventoryFromModuleGraph(
+  repoRoot: string,
+  entryPath: string,
+): Promise<{
+  commands: string[];
+  gatewayMethods: string[];
+  httpRoutes: string[];
+  services: string[];
+}> {
+  const commands = new Set<string>();
+  const gatewayMethods = new Set<string>();
+  const httpRoutes = new Set<string>();
+  const services = new Set<string>();
+  const visited = new Set<string>();
+
+  const visitFile = async (relativePath: string): Promise<void> => {
+    const normalizedPath = toPosixPath(relativePath);
+    if (visited.has(normalizedPath)) {
+      return;
+    }
+    visited.add(normalizedPath);
+
+    const sourceText = await readTextFile(repoRoot, normalizedPath);
+    const inventory = collectRuntimeInventory(sourceText, normalizedPath);
+    for (const name of inventory.commands) {
+      commands.add(name);
+    }
+    for (const name of inventory.gatewayMethods) {
+      gatewayMethods.add(name);
+    }
+    for (const routePath of inventory.httpRoutes) {
+      httpRoutes.add(routePath);
+    }
+    for (const id of inventory.services) {
+      services.add(id);
+    }
+
+    const specifiers = collectRelativeModuleSpecifiers(sourceText, normalizedPath);
+    for (const specifier of specifiers) {
+      const nextRelativePath = await resolveImportedSourceFile(repoRoot, normalizedPath, specifier);
+      if (nextRelativePath) {
+        await visitFile(nextRelativePath);
+      }
+    }
+  };
+
+  await visitFile(entryPath);
+  return {
+    commands: uniqueSorted(commands),
+    gatewayMethods: uniqueSorted(gatewayMethods),
+    httpRoutes: uniqueSorted(httpRoutes),
+    services: uniqueSorted(services),
+  };
+}
+
 async function readTextFile(repoRoot: string, relativePath: string): Promise<string> {
   return fs.readFile(path.join(repoRoot, relativePath), "utf8");
 }
@@ -657,7 +773,6 @@ export function collectGovernanceIssues(snapshot: Web3ContractSnapshot): Contrac
 export async function buildWeb3ContractSnapshot(repoRoot: string): Promise<Web3ContractSnapshot> {
   const plugins = await Promise.all(
     TARGET_PLUGINS.map(async (pluginDef) => {
-      const entrySource = await readTextFile(repoRoot, pluginDef.entryPath);
       const manifestResult = loadPluginManifest(
         path.join(repoRoot, path.dirname(pluginDef.manifestPath)),
       );
@@ -665,7 +780,7 @@ export async function buildWeb3ContractSnapshot(repoRoot: string): Promise<Web3C
         throw new Error(`failed to load manifest for ${pluginDef.id}: ${manifestResult.error}`);
       }
       const manifest = manifestResult.manifest;
-      const runtime = collectRuntimeInventory(entrySource, pluginDef.entryPath);
+      const runtime = await collectRuntimeInventoryFromModuleGraph(repoRoot, pluginDef.entryPath);
       const manifestPaths = extractManifestSchemaPaths(manifest.configSchema);
       const fixturePaths = extractFixturePaths(MANIFEST_FIXTURES[pluginDef.id] ?? {});
       const manifestCoverageMissingPaths = [...fixturePaths].filter(
