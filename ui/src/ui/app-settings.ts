@@ -7,6 +7,7 @@ import {
   stopDebugPolling,
 } from "./app-polling.ts";
 import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
+import { loadMarket, loadWeb3 } from "./app-tab-loaders-web3.ts";
 import type { OpenClawApp } from "./app.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
@@ -200,6 +201,13 @@ export function setThemeMode(
 export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "overview") {
     await loadOverview(host);
+  }
+  // ── private fork tabs ──
+  if (host.tab === "web3") {
+    await loadWeb3(host);
+  }
+  if (host.tab === "market") {
+    await loadMarket(host);
   }
   if (host.tab === "channels") {
     await loadChannelsTab(host);

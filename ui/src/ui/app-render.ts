@@ -5,6 +5,7 @@ import {
 } from "../../../src/routing/session-key.js";
 import { t } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
+import { renderMarketTab } from "./app-render-market-tab.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
 import {
   renderChatControls,
@@ -74,8 +75,8 @@ import {
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills.ts";
-import "./components/dashboard-header.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
+import "./components/dashboard-header.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
 import { agentLogoUrl } from "./views/agents-utils.ts";
@@ -93,6 +94,7 @@ import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderLoginGate } from "./views/login-gate.ts";
 import { renderOverview } from "./views/overview.ts";
+import { renderWeb3 } from "./views/web3.ts";
 
 // Lazy-loaded view modules – deferred so the initial bundle stays small.
 // Each loader resolves once; subsequent calls return the cached module.
@@ -659,6 +661,26 @@ export function renderApp(state: AppViewState) {
               })
             : nothing
         }
+
+        ${
+          // ── private fork tabs ──
+          state.tab === "web3"
+            ? renderWeb3({
+                connected: state.connected,
+                loading: state.web3Loading,
+                error: state.web3Error,
+                status: state.web3Status,
+                billing: state.web3BillingSummary,
+                billingError: state.web3BillingError,
+                marketStatus: state.web3MarketStatus,
+                marketError: state.web3MarketError,
+                lastSuccessAt: state.web3LastSuccess,
+                onRefresh: () => state.loadWeb3(),
+              })
+            : nothing
+        }
+
+        ${renderMarketTab(state)}
 
         ${
           state.tab === "channels"
