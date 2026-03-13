@@ -17,13 +17,19 @@ vi.mock("./leases.js", () => ({
 
 const callGatewayMock = vi.fn().mockResolvedValue({ ok: true, result: {} });
 
-vi.mock("../../../src/gateway/call.js", () => ({
-  callGateway: (...args: unknown[]) => callGatewayMock(...args),
-}));
-
-// Also mock the .ts variant used by loadCallGateway dynamic import
-vi.mock("../../../../src/gateway/call.ts", () => ({
-  callGateway: (...args: unknown[]) => callGatewayMock(...args),
+vi.mock("../core-imports.js", () => ({
+  loadCallGateway:
+    async () =>
+    (...args: unknown[]) =>
+      callGatewayMock(...args),
+  normalizeGatewayResult: (payload: unknown) => {
+    if (payload && typeof payload === "object") {
+      const r = payload as { ok?: boolean; error?: string; result?: unknown };
+      if (r.ok === false) return { ok: false, error: r.error ?? "gateway call failed" };
+      return { ok: true, result: "result" in r ? r.result : payload };
+    }
+    return { ok: true, result: payload };
+  },
 }));
 
 describe("web3 resource storage handlers", () => {

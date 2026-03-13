@@ -1,14 +1,7 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-types";
 import type { PluginCommandHandler, PluginCommandResult } from "openclaw/plugin-sdk/plugin-command";
-import { resolveChannelConfigWrites } from "../../../../src/channels/plugins/config-writes.js";
-import { normalizeChannelId } from "../../../../src/channels/registry.js";
-import { getConfigValueAtPath, setConfigValueAtPath } from "../../../../src/config/config-paths.js";
-import {
-  readConfigFileSnapshot,
-  validateConfigObjectWithPlugins,
-  writeConfigFile,
-} from "../../../../src/config/config.js";
 import type { Web3PluginConfig } from "../config.js";
+import { loadConfigWriteHelpers, type ConfigWriteHelpers } from "../core-imports.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import {
   buildWeb3MarketStatusSummary,
@@ -141,10 +134,15 @@ function normalizeAllowList(value: unknown): string[] {
   return [];
 }
 
-function setIfMissing(root: Record<string, unknown>, path: string[], value: unknown): void {
-  const current = getConfigValueAtPath(root, path);
+function setIfMissing(
+  helpers: ConfigWriteHelpers,
+  root: Record<string, unknown>,
+  path: string[],
+  value: unknown,
+): void {
+  const current = helpers.getConfigValueAtPath(root, path);
   if (current === undefined || current === null) {
-    setConfigValueAtPath(root, path, value);
+    helpers.setConfigValueAtPath(root, path, value);
   }
 }
 
@@ -160,8 +158,9 @@ async function enableWeb3MarketConfig(ctx: {
     return { text: "当前账号没有执行配置变更的权限。" };
   }
 
-  const channelId = ctx.channelId ?? normalizeChannelId(ctx.channel);
-  const allowWrites = resolveChannelConfigWrites({
+  const helpers = await loadConfigWriteHelpers();
+  const channelId = ctx.channelId ?? helpers.normalizeChannelId(ctx.channel);
+  const allowWrites = helpers.resolveChannelConfigWrites({
     cfg: ctx.config,
     channelId,
     accountId: ctx.accountId,
@@ -186,49 +185,52 @@ async function enableWeb3MarketConfig(ctx: {
     };
   }
 
-  const snapshot = await readConfigFileSnapshot();
+  const snapshot = await helpers.readConfigFileSnapshot();
   if (!snapshot.valid || !snapshot.parsed || typeof snapshot.parsed !== "object") {
     return { text: "配置文件无效，请先修复后再启用。" };
   }
 
   const next = structuredClone(snapshot.parsed as Record<string, unknown>);
-  const allow = normalizeAllowList(getConfigValueAtPath(next, ["plugins", "allow"]));
+  const allow = normalizeAllowList(helpers.getConfigValueAtPath(next, ["plugins", "allow"]));
   const allowSet = new Set(allow);
   allowSet.add("web3-core");
   allowSet.add("market-core");
   allowSet.add("agent-wallet");
-  setConfigValueAtPath(next, ["plugins", "enabled"], true);
-  setConfigValueAtPath(next, ["plugins", "allow"], Array.from(allowSet));
-  setConfigValueAtPath(next, ["plugins", "entries", "web3-core", "enabled"], true);
-  setConfigValueAtPath(next, ["plugins", "entries", "market-core", "enabled"], true);
-  setConfigValueAtPath(next, ["plugins", "entries", "agent-wallet", "enabled"], true);
+  helpers.setConfigValueAtPath(next, ["plugins", "enabled"], true);
+  helpers.setConfigValueAtPath(next, ["plugins", "allow"], Array.from(allowSet));
+  helpers.setConfigValueAtPath(next, ["plugins", "entries", "web3-core", "enabled"], true);
+  helpers.setConfigValueAtPath(next, ["plugins", "entries", "market-core", "enabled"], true);
+  helpers.setConfigValueAtPath(next, ["plugins", "entries", "agent-wallet", "enabled"], true);
 
-  setConfigValueAtPath(
+  helpers.setConfigValueAtPath(
     next,
     ["plugins", "entries", "web3-core", "config", "resources", "enabled"],
     true,
   );
-  setConfigValueAtPath(
+  helpers.setConfigValueAtPath(
     next,
     ["plugins", "entries", "web3-core", "config", "resources", "advertiseToMarket"],
     true,
   );
   setIfMissing(
+    helpers,
     next,
     ["plugins", "entries", "web3-core", "config", "resources", "consumer", "enabled"],
     true,
   );
   setIfMissing(
+    helpers,
     next,
     ["plugins", "entries", "web3-core", "config", "resources", "provider", "listen", "enabled"],
     true,
   );
   setIfMissing(
+    helpers,
     next,
     ["plugins", "entries", "web3-core", "config", "resources", "provider", "listen", "bind"],
     "loopback",
   );
-  const listenPort = getConfigValueAtPath(next, [
+  const listenPort = helpers.getConfigValueAtPath(next, [
     "plugins",
     "entries",
     "web3-core",
@@ -239,24 +241,26 @@ async function enableWeb3MarketConfig(ctx: {
     "port",
   ]);
   if (listenPort === undefined || listenPort === null || listenPort === 0) {
-    setConfigValueAtPath(
+    helpers.setConfigValueAtPath(
       next,
       ["plugins", "entries", "web3-core", "config", "resources", "provider", "listen", "port"],
       18790,
     );
   }
 
-  setConfigValueAtPath(
+  helpers.setConfigValueAtPath(
     next,
     ["plugins", "entries", "agent-wallet", "config", "policy", "enabled"],
     true,
   );
   setIfMissing(
+    helpers,
     next,
     ["plugins", "entries", "agent-wallet", "config", "policy", "inlinePolicy", "version"],
     "v1",
   );
   setIfMissing(
+    helpers,
     next,
     [
       "plugins",
@@ -271,6 +275,7 @@ async function enableWeb3MarketConfig(ctx: {
     true,
   );
   setIfMissing(
+    helpers,
     next,
     [
       "plugins",
@@ -285,6 +290,7 @@ async function enableWeb3MarketConfig(ctx: {
     1,
   );
   setIfMissing(
+    helpers,
     next,
     [
       "plugins",
@@ -299,6 +305,7 @@ async function enableWeb3MarketConfig(ctx: {
     "100000000000000000",
   );
   setIfMissing(
+    helpers,
     next,
     [
       "plugins",
@@ -313,6 +320,7 @@ async function enableWeb3MarketConfig(ctx: {
     "100000000000000000",
   );
   setIfMissing(
+    helpers,
     next,
     [
       "plugins",
@@ -327,6 +335,7 @@ async function enableWeb3MarketConfig(ctx: {
     "1000000000000000000",
   );
   setIfMissing(
+    helpers,
     next,
     [
       "plugins",
@@ -341,7 +350,7 @@ async function enableWeb3MarketConfig(ctx: {
     "NATIVE",
   );
 
-  const validated = validateConfigObjectWithPlugins(next);
+  const validated = helpers.validateConfigObjectWithPlugins(next);
   if (!validated.ok) {
     const issue = validated.issues[0];
     return {
@@ -349,7 +358,7 @@ async function enableWeb3MarketConfig(ctx: {
     };
   }
 
-  await writeConfigFile(validated.config);
+  await helpers.writeConfigFile(validated.config);
   return {
     text: [
       "已提交 Web3 市场启用配置。",

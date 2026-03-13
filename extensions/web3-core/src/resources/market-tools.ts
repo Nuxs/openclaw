@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import type { AnyAgentTool } from "openclaw/plugin-sdk/core";
 import type { Web3PluginConfig } from "../config.js";
+import { loadCallGateway, normalizeGatewayResult } from "../core-imports.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode } from "../errors/codes.js";
 import { redactUnknown } from "../utils/redact.js";
@@ -9,52 +10,6 @@ type AgentToolResult = {
   content: Array<{ type: "text"; text: string }>;
   details?: unknown;
 };
-
-type GatewayCallResult = {
-  ok?: boolean;
-  error?: string;
-  result?: unknown;
-};
-
-type CallGatewayFn = (opts: {
-  method: string;
-  params?: unknown;
-  timeoutMs?: number;
-}) => Promise<unknown>;
-
-async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import("../../../../src/gateway/call.ts");
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore
-  }
-
-  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
-  const mod = await import("../../../../dist/gateway/call.js");
-  if (typeof mod.callGateway !== "function") {
-    throw new Error("callGateway is not available");
-  }
-  return mod.callGateway as CallGatewayFn;
-}
-
-function normalizeGatewayResult(payload: unknown): {
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-} {
-  if (payload && typeof payload === "object") {
-    const record = payload as GatewayCallResult;
-    if (record.ok === false) {
-      return { ok: false, error: record.error ?? "gateway call failed" };
-    }
-    const result = "result" in record ? record.result : payload;
-    return { ok: true, result };
-  }
-  return { ok: true, result: payload };
-}
 
 function jsonResult(payload: unknown): AgentToolResult {
   return {

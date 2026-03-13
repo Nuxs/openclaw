@@ -1,29 +1,6 @@
 import type { Web3PluginConfig } from "../config.js";
+import { loadCallGateway, normalizeGatewayResult } from "../core-imports.js";
 import type { PendingSettlement, Web3StateStore } from "../state/store.js";
-
-type CallGatewayFn = (opts: {
-  method: string;
-  params?: unknown;
-  timeoutMs?: number;
-}) => Promise<{ ok?: boolean; error?: string }>;
-
-async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import("../../../../src/gateway/call.ts");
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore
-  }
-
-  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
-  const mod = await import("../../../../dist/gateway/call.js");
-  if (typeof mod.callGateway !== "function") {
-    throw new Error("callGateway is not available");
-  }
-  return mod.callGateway as CallGatewayFn;
-}
 
 /** @internal exported for testing */
 export function isSettlementReady(entry: PendingSettlement): boolean {
@@ -61,8 +38,9 @@ export async function flushPendingSettlements(
         },
         timeoutMs: config.brain.timeoutMs,
       });
-      if (!result?.ok) {
-        throw new Error(result?.error || "settlement lock failed");
+      const normalized = normalizeGatewayResult(result);
+      if (!normalized.ok) {
+        throw new Error(normalized.error ?? "settlement lock failed");
       }
     } catch (err) {
       const attempts = (entry.attempts ?? 0) + 1;

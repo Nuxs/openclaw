@@ -2,41 +2,12 @@ import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
 } from "openclaw/plugin-sdk/gateway-types";
+import { loadCallGateway, type GatewayCallResult } from "../core-imports.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
-
-type CallGatewayFn = (opts: {
-  method: string;
-  params?: unknown;
-  timeoutMs?: number;
-}) => Promise<unknown>;
-
-type GatewayResult = {
-  ok?: boolean;
-  result?: unknown;
-  error?: string;
-};
-
-async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import("../../../../src/gateway/call.ts");
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore
-  }
-
-  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
-  const mod = await import("../../../../dist/gateway/call.js");
-  if (typeof mod.callGateway !== "function") {
-    throw new Error("callGateway is not available");
-  }
-  return mod.callGateway as CallGatewayFn;
-}
 
 function normalizeResult(payload: unknown): { ok: true; result: unknown } {
   if (payload && typeof payload === "object") {
-    const gatewayResult = payload as GatewayResult;
+    const gatewayResult = payload as GatewayCallResult;
     if (gatewayResult.ok === false) {
       throw new Error(gatewayResult.error || "wallet gateway call failed");
     }

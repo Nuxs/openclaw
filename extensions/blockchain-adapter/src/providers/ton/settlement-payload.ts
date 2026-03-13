@@ -1,5 +1,6 @@
 import { Address, beginCell, Cell } from "@ton/core";
 import { sign } from "@ton/crypto";
+import { TonError, ErrorCode } from "../../types/error.js";
 import { deriveTonKeyPairFromMnemonic } from "./mnemonic.js";
 
 export const TON_SETTLEMENT_OP = {
@@ -13,16 +14,19 @@ export type TonSettlementOp = (typeof TON_SETTLEMENT_OP)[keyof typeof TON_SETTLE
 function requireOrderHashUint256(orderHashHex: string): bigint {
   const raw = orderHashHex.trim();
   if (!/^0x[0-9a-fA-F]{64}$/.test(raw)) {
-    throw new Error("orderHash must be a 0x-prefixed 32-byte hex string");
+    throw new TonError(
+      "orderHash must be a 0x-prefixed 32-byte hex string",
+      ErrorCode.INVALID_PARAMS,
+    );
   }
   const value = BigInt(raw);
   if (value < 0n) {
-    throw new Error("orderHash must be non-negative");
+    throw new TonError("orderHash must be non-negative", ErrorCode.INVALID_PARAMS);
   }
   // max = 2^256 - 1
   const max = (1n << 256n) - 1n;
   if (value > max) {
-    throw new Error("orderHash is out of uint256 range");
+    throw new TonError("orderHash is out of uint256 range", ErrorCode.INVALID_PARAMS);
   }
   return value;
 }
@@ -35,7 +39,7 @@ export function decodeBocBase64ToCell(bocBase64: string): Cell {
   const decoded = Buffer.from(bocBase64, "base64");
   const cells = Cell.fromBoc(decoded);
   if (cells.length === 0) {
-    throw new Error("invalid BOC payload: empty");
+    throw new TonError("invalid BOC payload: empty", ErrorCode.INVALID_PARAMS);
   }
   return cells[0];
 }
@@ -70,7 +74,7 @@ export function encodeTonSettlementReleasePayload(args: {
   const queryId = args.queryId ?? 0n;
   const signature = args.signature ?? Buffer.alloc(64);
   if (signature.length !== 64) {
-    throw new Error("signature must be 64 bytes (512 bits)");
+    throw new TonError("signature must be 64 bytes (512 bits)", ErrorCode.INVALID_PARAMS);
   }
 
   const cell = beginCell()

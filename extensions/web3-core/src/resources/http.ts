@@ -12,19 +12,8 @@ import {
 } from "openclaw/plugin-sdk/http-body";
 import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf";
 import type { Web3PluginConfig } from "../config.js";
+import { loadCallGateway, normalizeGatewayResult, type CallGatewayFn } from "../core-imports.js";
 import { validateLeaseAccess } from "./leases.js";
-
-type GatewayCallResult = {
-  ok?: boolean;
-  error?: string;
-  result?: unknown;
-};
-
-type CallGatewayFn = (opts: {
-  method: string;
-  params?: unknown;
-  timeoutMs?: number;
-}) => Promise<unknown>;
 
 type SearchOffer = Web3PluginConfig["resources"]["provider"]["offers"]["search"][number];
 
@@ -120,40 +109,6 @@ function extractLeaseId(req: IncomingMessage): string | null {
   const leaseId = url?.searchParams.get("leaseId");
   if (leaseId && leaseId.trim().length > 0) return leaseId.trim();
   return null;
-}
-
-async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import("../../../../src/gateway/call.ts");
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore
-  }
-
-  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
-  const mod = await import("../../../../dist/gateway/call.js");
-  if (typeof mod.callGateway !== "function") {
-    throw new Error("callGateway is not available");
-  }
-  return mod.callGateway as CallGatewayFn;
-}
-
-function normalizeGatewayResult(payload: unknown): {
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-} {
-  if (payload && typeof payload === "object") {
-    const record = payload as GatewayCallResult;
-    if (record.ok === false) {
-      return { ok: false, error: record.error ?? "gateway call failed" };
-    }
-    const result = "result" in record ? record.result : payload;
-    return { ok: true, result };
-  }
-  return { ok: true, result: payload };
 }
 
 function normalizeBaseUrl(value: string): string {

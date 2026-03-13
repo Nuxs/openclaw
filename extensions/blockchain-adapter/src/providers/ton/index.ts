@@ -10,6 +10,7 @@ import { Address, Cell, internal, type ContractProvider } from "@ton/core";
 import { mnemonicToPrivateKey } from "@ton/crypto";
 import { TonClient, WalletContractV4 } from "@ton/ton";
 import { TonConnect } from "@tonconnect/sdk";
+import { TonError, NotConnectedError, ErrorCode } from "../../types/error.js";
 import type {
   IProviderTON,
   ChainId,
@@ -80,8 +81,9 @@ export class TONProvider implements IProviderTON {
     this.chainId = options.testnet ? "ton-testnet" : "ton-mainnet";
 
     if (options.config && options.config.chainId !== this.chainId) {
-      throw new Error(
+      throw new TonError(
         `TONProvider config chainId mismatch: expected ${this.chainId}, got ${options.config.chainId}`,
+        ErrorCode.INVALID_PARAMS,
       );
     }
 
@@ -134,7 +136,7 @@ export class TONProvider implements IProviderTON {
 
       const walletInfo = this.tonConnect.wallet;
       if (!walletInfo) {
-        throw new Error("Failed to connect wallet");
+        throw new TonError("Failed to connect wallet via TonConnect", ErrorCode.CONNECTION_FAILED);
       }
 
       this.headless = undefined;
@@ -148,7 +150,10 @@ export class TONProvider implements IProviderTON {
     }
 
     if (!config.tonMnemonic) {
-      throw new Error("TON headless connect requires tonMnemonic (or manifestUrl for TonConnect)");
+      throw new TonError(
+        "TON headless connect requires tonMnemonic (or manifestUrl for TonConnect)",
+        ErrorCode.INVALID_PARAMS,
+      );
     }
 
     const words = splitTonMnemonic(config.tonMnemonic);
@@ -199,7 +204,7 @@ export class TONProvider implements IProviderTON {
 
   async getAddress(): Promise<ProviderAddress> {
     if (!this.connectedWallet) {
-      throw new Error("Wallet not connected");
+      throw new NotConnectedError("ton");
     }
     return this.connectedWallet.address;
   }
@@ -231,7 +236,7 @@ export class TONProvider implements IProviderTON {
     }
 
     if (!this.headless) {
-      throw new Error("Wallet not connected");
+      throw new NotConnectedError("ton");
     }
 
     const { wallet, provider, keyPair } = this.headless;
@@ -337,7 +342,7 @@ export class TONProvider implements IProviderTON {
       attempts++;
     }
 
-    throw new Error("Transaction confirmation timeout");
+    throw new TonError("Transaction confirmation timeout", ErrorCode.SETTLEMENT_TIMEOUT);
   }
 
   async getBlockNumber(): Promise<number> {
@@ -352,7 +357,22 @@ export class TONProvider implements IProviderTON {
     try {
       // Searching for transaction with specific hash or message hash.
       // NOTE: For external BOCs returned by transfer(), we might need to search by message hash.
-      const txs = await (this.client as any).getTransactions(address, { limit: 20 });
+      // SAFETY: TonClient exposes getTransactions at runtime but @ton/ton typings
+      // do not declare it on the public interface; targeted cast avoids full `as any`.
+      const txs = await (
+        this.client as unknown as {
+          getTransactions(
+            addr: typeof address,
+            opts: { limit: number },
+          ): Promise<
+            Array<{
+              hash(): Buffer;
+              lt: bigint;
+              inMessage?: { hash(): Buffer };
+            }>
+          >;
+        }
+      ).getTransactions(address, { limit: 20 });
       for (const tx of txs) {
         // Match by tx hash
         if (tx.hash().toString("base64") === txHash || tx.hash().toString("hex") === txHash) {

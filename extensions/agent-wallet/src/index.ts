@@ -1,4 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk/plugin-definition";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const { version: pkgVersion } = JSON.parse(
+  readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
+) as { version: string };
 import { createAutopayRouterHandler } from "./autopay-router.js";
 import type { AgentWalletConfig } from "./config.js";
 import { isTONNetwork, resolveConfig } from "./config.js";
@@ -40,7 +48,7 @@ const plugin: OpenClawPluginDefinition = {
   id: "agent-wallet",
   name: "Agent Wallet",
   description: "Agent-owned wallet for signing and sending transactions",
-  version: "2026.2.16",
+  version: pkgVersion,
   configSchema: agentWalletConfigSchema,
 
   register(api) {

@@ -1,5 +1,6 @@
 import { mnemonicNew, mnemonicToPrivateKey } from "@ton/crypto";
 import { WalletContractV4 } from "@ton/ton";
+import { TonError, ErrorCode } from "../../types/error.js";
 
 export type TonKeyPair = {
   publicKey: Buffer;
@@ -14,7 +15,7 @@ export function splitTonMnemonic(mnemonic: string): string[] {
     .filter((word) => word.length > 0);
 
   if (words.length < 12) {
-    throw new Error("ton mnemonic must have at least 12 words");
+    throw new TonError("ton mnemonic must have at least 12 words", ErrorCode.INVALID_PARAMS);
   }
 
   return words;

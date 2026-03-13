@@ -7,6 +7,7 @@ import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { resolveEnsAddress } from "../identity/ens.js";
 import type { Web3StateStore } from "../state/store.js";
 import { redactUnknown } from "../utils/redact.js";
+import { countByStatus } from "./market-utils.js";
 import { loadCallGateway, normalizeGatewayResult } from "./proxy-utils.js";
 
 type MarketProxyOptions = {
@@ -279,13 +280,7 @@ type ReconciliationInput = {
   includeDisputes?: boolean;
 };
 
-function countByStatus(items: Array<{ status?: string }>): Record<string, number> {
-  return items.reduce<Record<string, number>>((acc, entry) => {
-    const key = entry.status ?? "unknown";
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
-}
+// countByStatus — imported from market-utils.ts (DRY)
 
 type Sha256ArtifactHash = `sha256:${string}`;
 

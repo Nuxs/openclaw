@@ -24,7 +24,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { ChainInfo, EvmChainId } from "../../types/chain.js";
-import { NotConnectedError, EvmError } from "../../types/error.js";
+import { NotConnectedError, NotSupportedError, EvmError, ErrorCode } from "../../types/error.js";
 import type { ConnectionConfig, Wallet } from "../../types/transaction.js";
 
 /**
@@ -65,21 +65,22 @@ export class EvmWallet {
       await this.connectWithPrivateKey(config.privateKey);
     } else if (config.useBrowserWallet) {
       // TODO: 浏览器钱包模式暂时禁用，等待 viem 2.x 稳定
-      throw new Error(
-        "Browser wallet support is temporarily disabled. Use privateKey or remoteSigner.",
-      );
+      throw new NotSupportedError("Browser wallet (use privateKey or remoteSigner instead)", "evm");
     } else if (config.remoteSigner) {
       const { address, signMessage } = config.remoteSigner;
       if (!address || !signMessage) {
-        throw new Error("Invalid remoteSigner config: address and signMessage are required");
+        throw new EvmError(
+          "Invalid remoteSigner config: address and signMessage are required",
+          ErrorCode.INVALID_PARAMS,
+        );
       }
       await this.connectWithRemoteSignature(address, signMessage);
     } else {
-      throw new Error("No wallet configuration provided");
+      throw new EvmError("No wallet configuration provided", ErrorCode.INVALID_PARAMS);
     }
 
     if (!this._address) {
-      throw new Error("Failed to get wallet address");
+      throw new EvmError("Failed to get wallet address after connect", ErrorCode.CONNECTION_FAILED);
     }
 
     this.wallet = {
@@ -140,7 +141,7 @@ export class EvmWallet {
    * 暂时禁用 - viem 2.x 兼容性问题
    */
   private async connectWithBrowserWallet(): Promise<void> {
-    throw new Error("Browser wallet support is temporarily disabled");
+    throw new NotSupportedError("Browser wallet connect", "evm");
   }
 
   /**
@@ -208,26 +209,20 @@ export class EvmWallet {
     }
 
     switch (this.signerMode.type) {
-      case "private-key": {
-        // 后端私钥签名 - 使用 WalletClient (已绑定 account)
-        if (!this.walletClient) {
-          throw new NotConnectedError("evm");
-        }
-        // @ts-expect-error viem 2.x account 类型复杂，运行时绑定
-        return this.walletClient.signMessage({
-          message: message as SignableMessage,
-        });
-      }
-
+      case "private-key":
       case "browser-wallet": {
-        // 浏览器钱包签名 - 通过外部 provider
+        // Both modes sign via WalletClient bound to an account
         if (!this.walletClient) {
           throw new NotConnectedError("evm");
         }
-        // @ts-expect-error viem 2.x account 类型复杂，运行时绑定
-        return this.walletClient.signMessage({
-          message: message as SignableMessage,
-        });
+        // SAFETY: viem 2.x WalletClient requires account at type level, but we
+        // bind it at runtime via connectWithPrivateKey. The cast is unavoidable
+        // until viem exposes a runtime-account-aware overload.
+        return (
+          this.walletClient as unknown as {
+            signMessage(args: { message: SignableMessage }): Promise<`0x${string}`>;
+          }
+        ).signMessage({ message: message as SignableMessage });
       }
 
       case "remote-signature": {
@@ -237,7 +232,7 @@ export class EvmWallet {
       }
 
       default:
-        throw new Error("No signing capability available");
+        throw new EvmError("No signing capability available", ErrorCode.SIGNER_NOT_AVAILABLE);
     }
   }
 
@@ -265,45 +260,40 @@ export class EvmWallet {
     const resolvedPrimaryType = primaryType ?? Object.keys(types)[0];
 
     switch (this.signerMode.type) {
-      case "private-key": {
-        if (!this.walletClient) {
-          throw new NotConnectedError("evm");
-        }
-        // @ts-expect-error viem 2.x signTypedData 类型复杂，运行时绑定
-        return this.walletClient.signTypedData({
-          domain: domain as never,
-          types: types as never,
-          primaryType: resolvedPrimaryType as never,
-          message: value as never,
-        });
-      }
-
+      case "private-key":
       case "browser-wallet": {
         if (!this.walletClient) {
           throw new NotConnectedError("evm");
         }
-        // @ts-expect-error viem 2.x signTypedData 类型复杂，运行时绑定
-        return this.walletClient.signTypedData({
-          domain: domain as never,
-          types: types as never,
-          primaryType: resolvedPrimaryType as never,
-          message: value as never,
+        // SAFETY: viem 2.x signTypedData has deeply recursive generic constraints
+        // that cannot be satisfied with our generic type params. The cast to
+        // Record<string, unknown> is the minimal erasure needed.
+        return (
+          this.walletClient as unknown as {
+            signTypedData(args: Record<string, unknown>): Promise<`0x${string}`>;
+          }
+        ).signTypedData({
+          domain,
+          types,
+          primaryType: resolvedPrimaryType,
+          message: value,
         });
       }
 
       case "remote-signature": {
         // EIP-712: 使用 hashTypedData 生成正确的结构化哈希
+        // SAFETY: hashTypedData has the same deep recursive generics issue as signTypedData
         const messageHash = hashTypedData({
-          domain: domain as any,
-          types: types as any,
+          domain: domain as Record<string, unknown>,
+          types: types as Record<string, { name: string; type: string }[]>,
           primaryType: resolvedPrimaryType,
-          message: value as any,
+          message: value as Record<string, unknown>,
         });
         return this.signerMode.signMessage(messageHash);
       }
 
       default:
-        throw new Error("No signing capability available");
+        throw new EvmError("No signing capability available", ErrorCode.SIGNER_NOT_AVAILABLE);
     }
   }
 
@@ -327,7 +317,7 @@ export class EvmWallet {
     nonce?: number;
   }): Promise<`0x${string}`> {
     // 当前版本请使用 sendTransaction()
-    throw new Error("Use sendTransaction() instead. Full signTransaction coming soon.");
+    throw new NotSupportedError("signTransaction (use sendTransaction instead)", "evm");
   }
 
   // ==================== 交易发送 ====================
@@ -348,7 +338,7 @@ export class EvmWallet {
       throw new NotConnectedError("evm");
     }
     if (this.signerMode.type === "remote-signature") {
-      throw new Error("Remote signer mode does not support sendTransaction yet");
+      throw new NotSupportedError("sendTransaction with remote signer", "evm");
     }
 
     try {
@@ -366,7 +356,7 @@ export class EvmWallet {
       });
       return hash;
     } catch (error) {
-      throw new Error(`Transaction failed: ${error}`);
+      throw new EvmError(`Transaction failed: ${error}`, ErrorCode.TRANSACTION_FAILED, error);
     }
   }
 
@@ -377,7 +367,7 @@ export class EvmWallet {
    */
   async sendRawTransaction(signedTx: `0x${string}`): Promise<Hash> {
     if (!this.publicClient) {
-      throw new Error("PublicClient not initialized");
+      throw new NotConnectedError("evm");
     }
 
     try {
@@ -386,7 +376,11 @@ export class EvmWallet {
         serializedTransaction: signedTx,
       });
     } catch (error) {
-      throw new Error(`Failed to broadcast raw transaction: ${error}`);
+      throw new EvmError(
+        `Failed to broadcast raw transaction: ${error}`,
+        ErrorCode.TRANSACTION_FAILED,
+        error,
+      );
     }
   }
 
@@ -417,7 +411,7 @@ export class EvmWallet {
         data: tx.data as `0x${string}` | undefined,
       });
     } catch (error) {
-      throw new Error(`Gas estimation failed: ${error}`);
+      throw new EvmError(`Gas estimation failed: ${error}`, ErrorCode.INSUFFICIENT_GAS, error);
     }
   }
 }

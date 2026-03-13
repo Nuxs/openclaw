@@ -8,8 +8,16 @@ import {
   createWeb3StoragePutTool,
 } from "./tools.js";
 
-vi.mock("../../../../src/gateway/call.ts", () => ({
-  callGateway: vi.fn().mockResolvedValue({ ok: true, result: {} }),
+vi.mock("../core-imports.js", () => ({
+  loadCallGateway: async () => vi.fn().mockResolvedValue({ ok: true, result: {} }),
+  normalizeGatewayResult: (payload: unknown) => {
+    if (payload && typeof payload === "object") {
+      const r = payload as { ok?: boolean; error?: string; result?: unknown };
+      if (r.ok === false) return { ok: false, error: r.error ?? "gateway call failed" };
+      return { ok: true, result: "result" in r ? r.result : payload };
+    }
+    return { ok: true, result: payload };
+  },
 }));
 
 function makeConfig(overrides: Record<string, unknown> = {}) {

@@ -1,18 +1,18 @@
-import {
-  assertProviderEVM,
-  getEVMProvider,
-  initBlockchainFactory,
-  type IProviderEVM,
-} from "@openclaw/blockchain-adapter";
+import { assertProviderEVM, getEVMProvider, type IProviderEVM } from "@openclaw/blockchain-adapter";
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
 } from "openclaw/plugin-sdk/gateway-types";
 import { getAddress } from "viem";
 import type { AgentWalletConfig } from "./config.js";
-import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
-import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";
-import { addDailySpent, readDailySpent, reserveDailyBudget } from "./state.js";
+import {
+  enforcePolicy,
+  ensureBlockchainFactory,
+  ensureEnabled,
+  parseAmount,
+  requireString,
+  respondError,
+} from "./handler-base.js";
 import { loadOrCreateWallet } from "./wallet.js";
 
 const CHAIN_IDS: Record<string, number> = {
@@ -22,36 +22,6 @@ const CHAIN_IDS: Record<string, number> = {
   arbitrum: 42161,
   sepolia: 11155111,
 };
-
-let blockchainFactoryReady = false;
-
-function ensureBlockchainFactory() {
-  if (!blockchainFactoryReady) {
-    initBlockchainFactory();
-    blockchainFactoryReady = true;
-  }
-}
-
-function ensureEnabled(config: AgentWalletConfig) {
-  if (!config.enabled) {
-    throw new Error("agent-wallet is disabled");
-  }
-}
-
-function requireString(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`${label} is required`);
-  }
-  return value.trim();
-}
-
-function parseAmount(value: unknown, label: string): bigint {
-  const raw = requireString(value, label);
-  if (!/^\d+$/.test(raw)) {
-    throw new Error(`${label} must be an integer string`);
-  }
-  return BigInt(raw);
-}
 
 function parseMethodSelector(data: string | undefined): string | undefined {
   if (!data) {
@@ -76,95 +46,6 @@ async function resolveProvider(
   }
   assertProviderEVM(provider);
   return provider;
-}
-
-async function enforcePolicy(
-  config: AgentWalletConfig,
-  intent: PolicyIntent,
-): Promise<{
-  commitUsage: () => Promise<void>;
-  rollbackUsage: () => Promise<void>;
-  autoPayMaxRetries?: number;
-}> {
-  if (!config.policy.enabled) {
-    return {
-      commitUsage: async () => undefined,
-      rollbackUsage: async () => undefined,
-    };
-  }
-
-  const loadedPolicy = await loadPolicy(config.policy);
-
-  // Pre-flight: check non-budget policy conditions first (scope, perTxCap, ttl, etc.)
-  // to avoid unnecessary file-lock operations when the request would be rejected anyway.
-  const preCheck = checkPolicy(loadedPolicy.policy, intent, { dailySpent: 0n });
-  if (preCheck.result === "rejected" && preCheck.reasonCode !== "budget_daily_exceeded") {
-    try {
-      await appendPolicyDecisionLog(config.policy.decisionLogPath, preCheck);
-    } catch {
-      // Audit log failure does not change the policy decision.
-    }
-    throw new Error(`POLICY_REJECTED:${preCheck.reasonCode}`);
-  }
-
-  // For intents with an amount and a dailyCap configured, use atomic reservation
-  // to eliminate the TOCTOU race between read and commit.
-  let dailySpent: bigint | undefined;
-  let rollback: (() => Promise<void>) | undefined;
-
-  if (typeof intent.amount === "bigint" && loadedPolicy.policy?.budget?.dailyCap) {
-    const dailyCap = BigInt(loadedPolicy.policy.budget.dailyCap);
-    // reserveDailyBudget atomically: lock → read → check → pre-commit
-    // Throws POLICY_REJECTED:budget_daily_exceeded if over cap.
-    const reservation = await reserveDailyBudget({
-      config: config.policy,
-      chainKey: config.chain.network,
-      amount: intent.amount,
-      dailyCap,
-    });
-    dailySpent = reservation.dailySpent;
-    rollback = reservation.rollback;
-  } else if (typeof intent.amount === "bigint") {
-    dailySpent = await readDailySpent({
-      config: config.policy,
-      chainKey: config.chain.network,
-    });
-  }
-
-  const decision = checkPolicy(loadedPolicy.policy, intent, {
-    dailySpent,
-  });
-
-  try {
-    await appendPolicyDecisionLog(config.policy.decisionLogPath, decision);
-  } catch {
-    // 审计日志失败不改变策略判定结果，避免放大故障域。
-  }
-
-  if (decision.result === "rejected") {
-    if (rollback) {
-      await rollback();
-    }
-    throw new Error(`POLICY_REJECTED:${decision.reasonCode}`);
-  }
-
-  const autoPayMaxRetriesRaw = loadedPolicy.policy?.autoPay?.maxRetries;
-  const autoPayMaxRetries =
-    typeof autoPayMaxRetriesRaw === "number" && Number.isFinite(autoPayMaxRetriesRaw)
-      ? Math.max(0, Math.floor(autoPayMaxRetriesRaw))
-      : undefined;
-
-  return {
-    commitUsage: async () => {
-      // Budget already pre-committed in reserveDailyBudget, nothing more to do.
-    },
-    rollbackUsage: rollback ?? (async () => undefined),
-    autoPayMaxRetries,
-  };
-}
-
-function respondError(respond: GatewayRequestHandlerOptions["respond"], err: unknown): void {
-  respond(false, formatAgentWalletGatewayErrorResponse(err));
 }
 
 export function createAgentWalletCreateHandler(config: AgentWalletConfig): GatewayRequestHandler {

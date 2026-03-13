@@ -3,56 +3,17 @@ import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
 } from "openclaw/plugin-sdk/gateway-types";
-import type { SessionEntry } from "../../../../src/config/sessions/types.ts";
 import type { Web3PluginConfig } from "../config.js";
+import type { SessionEntry } from "../core-imports.js";
+import {
+  loadCallGateway,
+  loadCoreConfig,
+  loadSessionStoreHelpers,
+  normalizeGatewayResult,
+  type GatewayCallResult,
+} from "../core-imports.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { clearConsumerLeaseById, saveConsumerLeaseAccess } from "./leases.js";
-
-type GatewayCallResult = {
-  ok?: boolean;
-  error?: string;
-  result?: unknown;
-};
-
-type CallGatewayFn = (opts: {
-  method: string;
-  params?: unknown;
-  timeoutMs?: number;
-}) => Promise<unknown>;
-
-async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import("../../../../src/gateway/call.ts");
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore
-  }
-
-  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
-  const mod = await import("../../../../dist/gateway/call.js");
-  if (typeof mod.callGateway !== "function") {
-    throw new Error("callGateway is not available");
-  }
-  return mod.callGateway as CallGatewayFn;
-}
-
-function normalizeGatewayResult(payload: unknown): {
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-} {
-  if (payload && typeof payload === "object") {
-    const record = payload as GatewayCallResult;
-    if (record.ok === false) {
-      return { ok: false, error: record.error ?? "gateway call failed" };
-    }
-    const result = "result" in record ? record.result : payload;
-    return { ok: true, result };
-  }
-  return { ok: true, result: payload };
-}
 
 type SessionSettlement = {
   orderId: string;
@@ -60,87 +21,6 @@ type SessionSettlement = {
   amount?: string;
   actorId?: string;
 };
-
-type SessionStoreHelpers = {
-  resolveSessionStoreKey: (params: { cfg: OpenClawConfig; sessionKey: string }) => string;
-  resolveStorePath: (store?: string, opts?: { agentId?: string }) => string;
-  updateSessionStoreEntry: (params: {
-    storePath: string;
-    sessionKey: string;
-    update: (entry: SessionEntry) => Promise<Partial<SessionEntry> | null>;
-  }) => Promise<SessionEntry | null>;
-  resolveSessionAgentId: (params: { sessionKey?: string; config?: OpenClawConfig }) => string;
-};
-
-async function loadCoreConfig(): Promise<OpenClawConfig> {
-  try {
-    const mod = await import("../../../../src/config/config.ts");
-    if (typeof mod.loadConfig === "function") {
-      return await mod.loadConfig();
-    }
-  } catch {
-    // ignore
-  }
-
-  const distUrl = new URL("../../../../dist/config/config.js", import.meta.url);
-  const mod = await import(distUrl.href);
-  if (typeof mod.loadConfig !== "function") {
-    throw new Error("loadConfig is not available");
-  }
-  return await mod.loadConfig();
-}
-
-async function loadSessionStoreHelpers(): Promise<SessionStoreHelpers> {
-  try {
-    const [sessionUtils, sessionPaths, sessionStore, agentScope] = await Promise.all([
-      import("../../../../src/gateway/session-utils.ts"),
-      import("../../../../src/config/sessions/paths.ts"),
-      import("../../../../src/config/sessions/store.ts"),
-      import("../../../../src/agents/agent-scope.ts"),
-    ]);
-    if (
-      typeof sessionUtils.resolveSessionStoreKey !== "function" ||
-      typeof sessionPaths.resolveStorePath !== "function" ||
-      typeof sessionStore.updateSessionStoreEntry !== "function" ||
-      typeof agentScope.resolveSessionAgentId !== "function"
-    ) {
-      throw new Error("session store helpers are unavailable");
-    }
-    return {
-      resolveSessionStoreKey: sessionUtils.resolveSessionStoreKey,
-      resolveStorePath: sessionPaths.resolveStorePath,
-      updateSessionStoreEntry: sessionStore.updateSessionStoreEntry,
-      resolveSessionAgentId: agentScope.resolveSessionAgentId,
-    };
-  } catch {
-    const distUrls = {
-      sessionUtils: new URL("../../../../dist/gateway/session-utils.js", import.meta.url).href,
-      sessionPaths: new URL("../../../../dist/config/sessions/paths.js", import.meta.url).href,
-      sessionStore: new URL("../../../../dist/config/sessions/store.js", import.meta.url).href,
-      agentScope: new URL("../../../../dist/agents/agent-scope.js", import.meta.url).href,
-    };
-    const [sessionUtils, sessionPaths, sessionStore, agentScope] = await Promise.all([
-      import(distUrls.sessionUtils),
-      import(distUrls.sessionPaths),
-      import(distUrls.sessionStore),
-      import(distUrls.agentScope),
-    ]);
-    if (
-      typeof sessionUtils.resolveSessionStoreKey !== "function" ||
-      typeof sessionPaths.resolveStorePath !== "function" ||
-      typeof sessionStore.updateSessionStoreEntry !== "function" ||
-      typeof agentScope.resolveSessionAgentId !== "function"
-    ) {
-      throw new Error("session store helpers are unavailable");
-    }
-    return {
-      resolveSessionStoreKey: sessionUtils.resolveSessionStoreKey,
-      resolveStorePath: sessionPaths.resolveStorePath,
-      updateSessionStoreEntry: sessionStore.updateSessionStoreEntry,
-      resolveSessionAgentId: agentScope.resolveSessionAgentId,
-    };
-  }
-}
 
 async function recordLeaseSettlement(params: {
   sessionKey?: string;

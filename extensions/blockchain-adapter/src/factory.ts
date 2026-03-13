@@ -6,7 +6,8 @@
 import { EVM_CHAINS, getChainInfo } from "./config/chains.js";
 import { EVMProvider, type EVMProviderConfig } from "./providers/evm";
 import { TONProvider } from "./providers/ton";
-import type { ChainInfo, TonChainId } from "./types/chain.js";
+import type { ChainInfo, TonChainId, EvmChainId } from "./types/chain.js";
+import { BlockchainError, ErrorCode, NotSupportedError } from "./types/error.js";
 import type { IProvider, ChainType, ChainId } from "./types/provider.js";
 
 /**
@@ -81,7 +82,7 @@ export class BlockchainFactory {
     for (const { id, chainId } of evmChains) {
       const chainInfo = EVM_CHAINS[chainId as keyof typeof EVM_CHAINS];
       if (chainInfo) {
-        this.register(id, new EVMProvider({ chainId: chainId as any, chainInfo }));
+        this.register(id, new EVMProvider({ chainId: chainId as EvmChainId, chainInfo }));
       }
     }
 
@@ -106,15 +107,21 @@ export class BlockchainFactory {
     const targetChainId = chainId || this.defaultChainId;
 
     if (!targetChainId) {
-      throw new Error("No chain specified and no default chain set");
+      throw new BlockchainError(
+        "No chain specified and no default chain set",
+        ErrorCode.INVALID_PARAMS,
+        "evm",
+      );
     }
 
     const provider = this.providers.get(targetChainId);
 
     if (!provider) {
-      throw new Error(
-        `Provider for chain "${targetChainId}" not found. ` +
-          `Supported chains: ${this.getSupportedChains().join(", ")}`,
+      throw new BlockchainError(
+        `Provider for chain "${targetChainId}" not found. Supported chains: ${this.getSupportedChains().join(", ")}`,
+        ErrorCode.NOT_SUPPORTED,
+        "evm",
+        { requestedChain: targetChainId, supported: this.getSupportedChains() },
       );
     }
 
@@ -147,7 +154,12 @@ export class BlockchainFactory {
    */
   setDefaultChain(chainId: ChainId): void {
     if (!this.isSupported(chainId)) {
-      throw new Error(`Chain "${chainId}" is not supported`);
+      throw new BlockchainError(
+        `Chain "${chainId}" is not supported`,
+        ErrorCode.NOT_SUPPORTED,
+        "evm",
+        { requestedChain: chainId, supported: this.getSupportedChains() },
+      );
     }
     this.defaultChainId = chainId;
   }
@@ -171,7 +183,11 @@ export class BlockchainFactory {
         }
       }
     }
-    throw new Error(`No provider found for chain type: ${chainType}`);
+    throw new BlockchainError(
+      `No provider found for chain type: ${chainType}`,
+      ErrorCode.NOT_SUPPORTED,
+      chainType,
+    );
   }
 
   /**

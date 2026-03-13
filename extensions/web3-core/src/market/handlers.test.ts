@@ -9,8 +9,26 @@ import { Web3StateStore } from "../state/store.js";
 const mockCallGateway = vi.fn();
 const resolveEnsAddressMock = vi.fn();
 
-vi.mock("../../../../src/gateway/call.ts", () => ({
-  callGateway: (...args: unknown[]) => mockCallGateway(...args),
+vi.mock("../core-imports.js", () => ({
+  loadCallGateway:
+    async () =>
+    (...args: unknown[]) =>
+      mockCallGateway(...args),
+  normalizeGatewayResult: (payload: unknown) => {
+    if (payload && typeof payload === "object") {
+      const r = payload as { ok?: boolean; error?: string; result?: unknown };
+      if (r.ok === false) return { ok: false, error: r.error ?? "gateway call failed" };
+      return { ok: true, result: "result" in r ? r.result : payload };
+    }
+    return { ok: true, result: payload };
+  },
+  loadCoreConfig: async () => ({}),
+  loadSessionStoreHelpers: async () => ({
+    resolveSessionStoreKey: () => "mock-key",
+    resolveStorePath: () => "/tmp/mock-store",
+    updateSessionStoreEntry: async () => null,
+    resolveSessionAgentId: () => "mock-agent",
+  }),
 }));
 
 vi.mock("../identity/ens.js", async () => {

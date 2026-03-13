@@ -198,11 +198,9 @@ export class EVMProvider implements IProviderEVM {
     TTypes extends Record<string, { name: string; type: string }[]>,
     TValues extends Record<string, unknown>,
   >(domain: TDomain, types: TTypes, value: TValues): Promise<`0x${string}`> {
-    return this.walletClient.signTypedData(
-      domain as any,
-      types as any,
-      value as any,
-    ) as Promise<`0x${string}`>;
+    // SAFETY: EvmWallet.signTypedData accepts compatible generic constraints;
+    // the outer interface restricts domain/types/value to narrower bounds.
+    return this.walletClient.signTypedData(domain, types, value);
   }
 
   async sendTransaction(tx: EvmTransaction): Promise<TxHash> {

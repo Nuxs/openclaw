@@ -41,6 +41,19 @@ import type {
   TokenEconomyState,
 } from "../market/types.js";
 import { MarketFileStore } from "./file-store.js";
+import {
+  filterBridgeTransfersInMemory,
+  filterLeases,
+  filterLedgerEntries,
+  filterPrivacyReplays,
+  filterResources,
+  filterServiceProofs,
+  filterTaskBids,
+  filterTaskReceipts,
+  filterTaskResults,
+  filterTasks,
+  summarizeLedgerEntries,
+} from "./filter-utils.js";
 import { requireNodeSqlite } from "./require-node-sqlite.js";
 import type { MarketStore } from "./store-types.js";
 
@@ -203,23 +216,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listResources(filter?: MarketResourceFilter): MarketResource[] {
-    let resources = this.listFrom<MarketResource>("resources");
-    if (filter?.kind) {
-      resources = resources.filter((entry) => entry.kind === filter.kind);
-    }
-    if (filter?.providerActorId) {
-      resources = resources.filter((entry) => entry.providerActorId === filter.providerActorId);
-    }
-    if (filter?.status) {
-      resources = resources.filter((entry) => entry.status === filter.status);
-    }
-    if (filter?.tag) {
-      resources = resources.filter((entry) => entry.tags?.includes(filter.tag ?? "") ?? false);
-    }
-    if (filter?.limit !== undefined) {
-      resources = resources.slice(0, Math.max(0, filter.limit));
-    }
-    return resources;
+    const resources = this.listFrom<MarketResource>("resources");
+    return filterResources(resources, filter);
   }
 
   getResource(resourceId: string): MarketResource | undefined {
@@ -255,20 +253,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listTasks(filter?: TaskOrderFilter): TaskOrder[] {
-    let tasks = this.listFrom<TaskOrder>("tasks");
-    if (filter?.taskId) {
-      tasks = tasks.filter((entry) => entry.taskId === filter.taskId);
-    }
-    if (filter?.creatorActorId) {
-      tasks = tasks.filter((entry) => entry.creatorActorId === filter.creatorActorId);
-    }
-    if (filter?.status) {
-      tasks = tasks.filter((entry) => entry.status === filter.status);
-    }
-    if (filter?.limit !== undefined) {
-      tasks = tasks.slice(0, Math.max(0, filter.limit));
-    }
-    return tasks;
+    const tasks = this.listFrom<TaskOrder>("tasks");
+    return filterTasks(tasks, filter);
   }
 
   getTask(taskId: string): TaskOrder | undefined {
@@ -280,20 +266,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listTaskBids(filter?: TaskBidFilter): TaskBid[] {
-    let bids = this.listFrom<TaskBid>("task_bids");
-    if (filter?.taskId) {
-      bids = bids.filter((entry) => entry.taskId === filter.taskId);
-    }
-    if (filter?.bidderActorId) {
-      bids = bids.filter((entry) => entry.bidderActorId === filter.bidderActorId);
-    }
-    if (filter?.status) {
-      bids = bids.filter((entry) => entry.status === filter.status);
-    }
-    if (filter?.limit !== undefined) {
-      bids = bids.slice(0, Math.max(0, filter.limit));
-    }
-    return bids;
+    const bids = this.listFrom<TaskBid>("task_bids");
+    return filterTaskBids(bids, filter);
   }
 
   getTaskBid(bidId: string): TaskBid | undefined {
@@ -305,20 +279,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listTaskResults(filter?: TaskResultFilter): TaskResult[] {
-    let results = this.listFrom<TaskResult>("task_results");
-    if (filter?.taskId) {
-      results = results.filter((entry) => entry.taskId === filter.taskId);
-    }
-    if (filter?.bidId) {
-      results = results.filter((entry) => entry.bidId === filter.bidId);
-    }
-    if (filter?.status) {
-      results = results.filter((entry) => entry.status === filter.status);
-    }
-    if (filter?.limit !== undefined) {
-      results = results.slice(0, Math.max(0, filter.limit));
-    }
-    return results;
+    const results = this.listFrom<TaskResult>("task_results");
+    return filterTaskResults(results, filter);
   }
 
   getTaskResult(resultId: string): TaskResult | undefined {
@@ -330,23 +292,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listTaskReceipts(filter?: TaskReceiptFilter): TaskReceipt[] {
-    let receipts = this.listFrom<TaskReceipt>("task_receipts");
-    if (filter?.taskId) {
-      receipts = receipts.filter((entry) => entry.taskId === filter.taskId);
-    }
-    if (filter?.bidId) {
-      receipts = receipts.filter((entry) => entry.bidId === filter.bidId);
-    }
-    if (filter?.settlementId) {
-      receipts = receipts.filter((entry) => entry.settlementId === filter.settlementId);
-    }
-    if (filter?.status) {
-      receipts = receipts.filter((entry) => entry.status === filter.status);
-    }
-    if (filter?.limit !== undefined) {
-      receipts = receipts.slice(0, Math.max(0, filter.limit));
-    }
-    return receipts;
+    const receipts = this.listFrom<TaskReceipt>("task_receipts");
+    return filterTaskReceipts(receipts, filter);
   }
 
   getTaskReceipt(receiptId: string): TaskReceipt | undefined {
@@ -358,23 +305,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listPrivacyReplays(filter?: PrivacyReplayFilter): PrivacyReplay[] {
-    let replays = this.listFrom<PrivacyReplay>("privacy_replays");
-    if (filter?.consentId) {
-      replays = replays.filter((entry) => entry.consentId === filter.consentId);
-    }
-    if (filter?.orderId) {
-      replays = replays.filter((entry) => entry.orderId === filter.orderId);
-    }
-    if (filter?.actorId) {
-      replays = replays.filter((entry) => entry.actorId === filter.actorId);
-    }
-    if (filter?.status) {
-      replays = replays.filter((entry) => entry.status === filter.status);
-    }
-    if (filter?.limit !== undefined) {
-      replays = replays.slice(0, Math.max(0, filter.limit));
-    }
-    return replays;
+    const replays = this.listFrom<PrivacyReplay>("privacy_replays");
+    return filterPrivacyReplays(replays, filter);
   }
 
   getPrivacyReplay(replayId: string): PrivacyReplay | undefined {
@@ -490,14 +422,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listServiceProofs(filter?: ServiceProofFilter): ServiceProof[] {
-    let proofs = this.listFrom<ServiceProof>("service_proofs");
-    if (filter?.orderId) {
-      proofs = proofs.filter((entry) => entry.orderId === filter.orderId);
-    }
-    if (filter?.limit !== undefined) {
-      proofs = proofs.slice(0, Math.max(0, filter.limit));
-    }
-    return proofs;
+    const proofs = this.listFrom<ServiceProof>("service_proofs");
+    return filterServiceProofs(proofs, filter);
   }
 
   getServiceProof(proofId: string): ServiceProof | undefined {
@@ -518,23 +444,8 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listLeases(filter?: MarketLeaseFilter): MarketLease[] {
-    let leases = this.listFrom<MarketLease>("leases");
-    if (filter?.resourceId) {
-      leases = leases.filter((entry) => entry.resourceId === filter.resourceId);
-    }
-    if (filter?.providerActorId) {
-      leases = leases.filter((entry) => entry.providerActorId === filter.providerActorId);
-    }
-    if (filter?.consumerActorId) {
-      leases = leases.filter((entry) => entry.consumerActorId === filter.consumerActorId);
-    }
-    if (filter?.status) {
-      leases = leases.filter((entry) => entry.status === filter.status);
-    }
-    if (filter?.limit !== undefined) {
-      leases = leases.slice(0, Math.max(0, filter.limit));
-    }
-    return leases;
+    const leases = this.listFrom<MarketLease>("leases");
+    return filterLeases(leases, filter);
   }
 
   getLease(leaseId: string): MarketLease | undefined {
@@ -552,56 +463,12 @@ export class MarketSqliteStore implements MarketStore {
   }
 
   listLedger(filter?: MarketLedgerFilter): MarketLedgerEntry[] {
-    let entries = this.listFrom<MarketLedgerEntry>("ledger");
-    if (filter?.leaseId) {
-      entries = entries.filter((entry) => entry.leaseId === filter.leaseId);
-    }
-    if (filter?.resourceId) {
-      entries = entries.filter((entry) => entry.resourceId === filter.resourceId);
-    }
-    if (filter?.providerActorId) {
-      entries = entries.filter((entry) => entry.providerActorId === filter.providerActorId);
-    }
-    if (filter?.consumerActorId) {
-      entries = entries.filter((entry) => entry.consumerActorId === filter.consumerActorId);
-    }
-    if (filter?.since) {
-      const since = Date.parse(filter.since);
-      if (!Number.isNaN(since)) {
-        entries = entries.filter((entry) => Date.parse(entry.timestamp) >= since);
-      }
-    }
-    if (filter?.until) {
-      const until = Date.parse(filter.until);
-      if (!Number.isNaN(until)) {
-        entries = entries.filter((entry) => Date.parse(entry.timestamp) <= until);
-      }
-    }
-    entries.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
-    if (filter?.limit !== undefined) {
-      entries = entries.slice(-Math.max(0, filter.limit));
-    }
-    return entries;
+    const entries = this.listFrom<MarketLedgerEntry>("ledger");
+    return filterLedgerEntries(entries, filter);
   }
 
   summarizeLedger(filter?: MarketLedgerFilter): MarketLedgerSummary {
-    const entries = this.listLedger(filter);
-    const byUnit: Record<string, { quantity: string; cost: string }> = {};
-    let totalCost = 0n;
-    let currency = "";
-    for (const entry of entries) {
-      if (!currency) {
-        currency = entry.currency;
-      }
-      const unitBucket = byUnit[entry.unit] ?? { quantity: "0", cost: "0" };
-      const nextQuantity = BigInt(unitBucket.quantity) + BigInt(entry.quantity);
-      const nextCost = BigInt(unitBucket.cost) + BigInt(entry.cost);
-      unitBucket.quantity = nextQuantity.toString();
-      unitBucket.cost = nextCost.toString();
-      byUnit[entry.unit] = unitBucket;
-      totalCost += BigInt(entry.cost);
-    }
-    return { byUnit, totalCost: totalCost.toString(), currency };
+    return summarizeLedgerEntries(this.listLedger(filter));
   }
 
   listRevocations(): RevocationJob[] {
@@ -649,22 +516,10 @@ export class MarketSqliteStore implements MarketStore {
     const sql = `SELECT data FROM bridge_transfers${where} ORDER BY updated_at ASC`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = this.db.prepare(sql).all(...(params as any[])) as Array<{ data: string }>;
-    let transfers = rows.map((row) => JSON.parse(row.data) as BridgeTransfer);
+    const transfers = rows.map((row) => JSON.parse(row.data) as BridgeTransfer);
 
-    // Remaining filters without dedicated columns — applied in JS
-    if (filter?.fromChain) {
-      transfers = transfers.filter((entry) => entry.fromChain === filter.fromChain);
-    }
-    if (filter?.toChain) {
-      transfers = transfers.filter((entry) => entry.toChain === filter.toChain);
-    }
-    if (filter?.assetSymbol) {
-      transfers = transfers.filter((entry) => entry.assetSymbol === filter.assetSymbol);
-    }
-    if (filter?.limit !== undefined) {
-      transfers = transfers.slice(-Math.max(0, filter.limit));
-    }
-    return transfers;
+    // Remaining filters without dedicated SQL columns — applied in JS
+    return filterBridgeTransfersInMemory(transfers, filter);
   }
 
   getBridgeTransfer(bridgeId: string): BridgeTransfer | undefined {

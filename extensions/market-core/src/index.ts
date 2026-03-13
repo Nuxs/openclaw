@@ -10,7 +10,18 @@
  * - Sensitive data must never leak (tokens, endpoints, real file paths)
  */
 
-import type { OpenClawPluginDefinition } from "openclaw/plugin-sdk/plugin-definition";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type {
+  OpenClawPluginDefinition,
+  OpenClawPluginServiceContext,
+} from "openclaw/plugin-sdk/plugin-definition";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const { version: pkgVersion } = JSON.parse(
+  readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
+) as { version: string };
 import { resolveConfig, type MarketPluginConfig } from "./config.js";
 import { createMarketFacade } from "./facade.js";
 import { createMarketAssistantCommand } from "./market/assistant-command.js";
@@ -101,6 +112,17 @@ import { flushPendingRewards } from "./market/reward/poller.js";
 import { flushPendingSettlementOperations } from "./market/settlement/poller.js";
 import { MarketStateStore } from "./state/store.js";
 
+type MarketBackgroundServiceContext = OpenClawPluginServiceContext & {
+  _rewardInterval?: ReturnType<typeof setInterval>;
+  _settlementInterval?: ReturnType<typeof setInterval>;
+};
+
+function asMarketBackgroundServiceContext(
+  ctx: OpenClawPluginServiceContext,
+): MarketBackgroundServiceContext {
+  return ctx as MarketBackgroundServiceContext;
+}
+
 // Re-export facade types for web3-core to use (optional inter-plugin API)
 export type { MarketFacade } from "./facade.js";
 export { createMarketFacade } from "./facade.js";
@@ -110,7 +132,7 @@ const plugin: OpenClawPluginDefinition = {
   name: "Market Core",
   description:
     "Internal marketplace engine for decentralized resource trading (accessed via web3.market.*)",
-  version: "2026.2.21",
+  version: pkgVersion,
 
   register(api) {
     const config = resolveConfig(api.pluginConfig);
@@ -339,10 +361,10 @@ const plugin: OpenClawPluginDefinition = {
             ctx.logger.warn(`Reward poll error: ${err}`);
           }
         }, 60_000); // Check every minute
-        (ctx as any)._rewardInterval = interval;
+        asMarketBackgroundServiceContext(ctx)._rewardInterval = interval;
       },
       stop(ctx) {
-        const interval = (ctx as any)._rewardInterval;
+        const interval = asMarketBackgroundServiceContext(ctx)._rewardInterval;
         if (interval) clearInterval(interval);
         ctx.logger.info("Market reward poller service stopped");
       },
@@ -359,10 +381,10 @@ const plugin: OpenClawPluginDefinition = {
             ctx.logger.warn(`Settlement poll error: ${err}`);
           }
         }, 30_000);
-        (ctx as any)._settlementInterval = interval;
+        asMarketBackgroundServiceContext(ctx)._settlementInterval = interval;
       },
       stop(ctx) {
-        const interval = (ctx as any)._settlementInterval;
+        const interval = asMarketBackgroundServiceContext(ctx)._settlementInterval;
         if (interval) clearInterval(interval);
         ctx.logger.info("Market settlement poller service stopped");
       },

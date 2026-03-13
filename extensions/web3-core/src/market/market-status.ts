@@ -1,52 +1,7 @@
 import type { Web3PluginConfig } from "../config.js";
-
-type GatewayCallResult = {
-  ok?: boolean;
-  error?: string;
-  result?: unknown;
-};
-
-type CallGatewayFn = (opts: {
-  method: string;
-  params?: unknown;
-  timeoutMs?: number;
-}) => Promise<unknown>;
-
-async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import("../../../../src/gateway/call.ts");
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore
-  }
-
-  // @ts-expect-error — dist fallback only exists after build; unreachable when src import succeeds
-  const mod = await import("../../../../dist/gateway/call.js");
-  if (typeof mod.callGateway !== "function") {
-    throw new Error("callGateway is not available");
-  }
-  return mod.callGateway as CallGatewayFn;
-}
-
-function normalizeGatewayResult(payload: unknown): {
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-} {
-  if (payload && typeof payload === "object") {
-    const record = payload as GatewayCallResult;
-    if (record.ok === false) {
-      return { ok: false, error: record.error ?? "gateway call failed" };
-    }
-    const result = "result" in record ? record.result : payload;
-    return { ok: true, result };
-  }
-  return { ok: true, result: payload };
-}
-
+import { loadCallGateway, normalizeGatewayResult } from "../core-imports.js";
 import { redactString, redactUnknown } from "../utils/redact.js";
+import { countByKind, countByStatus } from "./market-utils.js";
 
 type ResourceSummary = {
   total: number;
@@ -265,29 +220,7 @@ async function callGatewayMethod(
   }
 }
 
-function countByStatus(items: Array<unknown>): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const item of items) {
-    const status =
-      item && typeof item === "object" && typeof (item as { status?: unknown }).status === "string"
-        ? ((item as { status?: string }).status ?? "unknown")
-        : "unknown";
-    out[status] = (out[status] ?? 0) + 1;
-  }
-  return out;
-}
-
-function countByKind(items: Array<unknown>): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const item of items) {
-    const kind =
-      item && typeof item === "object" && typeof (item as { kind?: unknown }).kind === "string"
-        ? ((item as { kind?: string }).kind ?? "unknown")
-        : "unknown";
-    out[kind] = (out[kind] ?? 0) + 1;
-  }
-  return out;
-}
+// countByStatus / countByKind — imported from market-utils.ts (DRY)
 
 export async function buildWeb3MarketStatusSummary(params: {
   config: Web3PluginConfig;

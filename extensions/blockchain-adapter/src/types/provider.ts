@@ -3,6 +3,7 @@
  */
 
 import type { ChainType, ChainId, TokenInfo } from "./chain.js";
+import { BlockchainError, ErrorCode } from "./error.js";
 import type {
   TransferOptions,
   EvmTransaction,
@@ -190,6 +191,10 @@ export function isProviderTON(provider: IProvider): provider is IProviderTON {
  */
 export function assertProviderEVM(provider: IProvider): asserts provider is IProviderEVM {
   if (provider.chainType !== "evm") {
-    throw new Error(`Expected EVM provider, got ${provider.chainType}`);
+    throw new BlockchainError(
+      `Expected EVM provider, got ${provider.chainType}`,
+      ErrorCode.NOT_SUPPORTED,
+      provider.chainType,
+    );
   }
 }

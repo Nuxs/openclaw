@@ -1,8 +1,19 @@
 /**
  * Local state persistence for the web3-core plugin.
- * All plugin state is stored under `stateDir` (typically ~/.openclaw).
  *
- * Files:
+ * This file is now a **facade** that delegates to single-responsibility
+ * sub-stores.  All public method signatures and exported types remain
+ * identical so that the 42+ consumer files require zero import changes.
+ *
+ * Sub-stores:
+ *   IdentityStore   — wallet bindings, SIWE challenges, provider ID, signing key
+ *   AuditStore      — audit log, archive receipts/key, pending archives
+ *   BillingStore    — usage, x402 payment-required, autopay stats
+ *   ResourceStore   — resource index, P2P peers, discovery identity map
+ *   SettlementStore — pending settlements, anchor receipts, pending txs
+ *   MonitorStore    — alerts
+ *
+ * Files on disk (unchanged):
  *   web3/bindings.json            — wallet bindings
  *   web3/audit-log.jsonl          — local audit event log (append-only)
  *   web3/usage.json               — billing / quota state
@@ -13,638 +24,214 @@
  *   web3/pending-tx.json          — pending chain transactions (retry queue)
  */
 
-import { generateKeyPairSync, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { AuditEvent } from "../audit/types.js";
-import type { PaymentResumeToken, PaymentTraceRef, UsageRecord } from "../billing/types.js";
+import type { PaymentTraceRef, UsageRecord } from "../billing/types.js";
 import type { SiweChallenge, WalletBinding } from "../identity/types.js";
 import type { AlertEvent } from "../monitor/types.js";
+import { AuditStore } from "./audit-store.js";
+import { BillingStore } from "./billing-store.js";
+import { IdentityStore } from "./identity-store.js";
+import { MonitorStore } from "./monitor-store.js";
+import { ResourceStore } from "./resource-store.js";
+import { SettlementStore } from "./settlement-store.js";
+import type {
+  AnchorReceipt,
+  ArchiveReceipt,
+  DiscoveryIdentityRecord,
+  IndexSigningKey,
+  IndexedResource,
+  P2pPeerRecord,
+  PaymentRequiredRecord,
+  PendingAnchor,
+  PendingArchive,
+  PendingSettlement,
+  ResourceIndexEntry,
+  X402AutopayStats,
+} from "./store-types.js";
 
-export type PendingAnchor = {
-  anchorId: string;
-  payloadHash: string;
-  createdAt: string;
-  attempts?: number;
-  lastError?: string;
-};
+// ── Re-export every type so existing `import { … } from "../state/store.js"`
+//    statements continue to work without changes. ──
+export type {
+  AnchorReceipt,
+  ArchiveReceipt,
+  DiscoveryIdentityRecord,
+  IndexSigningKey,
+  IndexedResource,
+  P2pPeerRecord,
+  PaymentRequiredRecord,
+  PendingAnchor,
+  PendingArchive,
+  PendingSettlement,
+  ResourceIndexEntry,
+  X402AutopayStats,
+} from "./store-types.js";
 
-export type PendingArchive = {
-  event: AuditEvent;
-  createdAt: string;
-  attempts?: number;
-  lastError?: string;
-};
+export type { IndexedResourceKind, IndexSignature } from "./store-types.js";
 
-export type PendingSettlement = {
-  sessionIdHash: string;
-  createdAt: string;
-  orderId?: string;
-  payer?: string;
-  amount?: string;
-  actorId?: string;
-  attempts?: number;
-  lastError?: string;
-};
-
-export type PaymentRequiredRecord = {
-  idempotencyKey: string;
-  requestId?: string;
-  toolName?: string;
-  invoiceHash: string;
-  resumeToken: PaymentResumeToken;
-  createdAt: string;
-  maxRetries?: number;
-  consumedAt?: string;
-  /** Network identifier from the wallet response (e.g. "base", "ton-testnet"). */
-  network?: string;
-};
-
-export type X402AutopayStats = {
-  attempts: number;
-  successes: number;
-  failures: number;
-  retryCount: number;
-  circuitBreakerTrips: number;
-  lastCircuitBreakerTripAt?: string;
-  attemptEvents: string[];
-  failureEvents: string[];
-  cooldownUntil?: string;
-  updatedAt: string;
-};
-
-export type IndexedResourceKind = "model" | "search" | "storage";
-
-export type IndexedResource = {
-  resourceId: string;
-  kind: IndexedResourceKind;
-  label?: string;
-  description?: string;
-  tags?: string[];
-  price?: string;
-  unit?: string;
-  metadata?: Record<string, unknown>;
-};
-
-export type ResourceIndexEntry = {
-  providerId: string;
-  endpoint?: string;
-  resources: IndexedResource[];
-  updatedAt: string;
-  expiresAt?: string;
-  lastHeartbeatAt?: string;
-  meta?: Record<string, unknown>;
-  signature?: IndexSignature;
-  /** MDL: libp2p peer identifier (present when discovered via DHT/Rendezvous) */
-  peerId?: string;
-  /** MDL: how the provider can be reached */
-  reachability?: "direct" | "relay" | "unknown";
-};
-
-export type IndexSignature = {
-  scheme: "ed25519";
-  publicKey: string;
-  signature: string;
-  payloadHash: string;
-  signedAt: string;
-  /** MDL: signature payload version (2 = includes peerId/reachability) */
-  payloadVersion?: number;
-};
-
-export type IndexSigningKey = {
-  scheme: "ed25519";
-  publicKey: string;
-  privateKey: string;
-  createdAt: string;
-};
-
-export type P2pPeerRecord = {
-  peerId: string;
-  transport: "gossip" | "dht" | "pubsub" | "mdns" | "static";
-  address?: string;
-  lastSeenAt: string;
-  source?: string;
-};
-
-export type DiscoveryIdentityRecord = {
-  providerId: string;
-  peerId: string;
-  actorId: string;
-  did?: string;
-  publicKey?: string;
-  updatedAt: string;
-};
-
-export type AnchorReceipt = {
-  anchorId: string;
-  tx: string;
-  network: string;
-  block?: number;
-  updatedAt: string;
-};
-
-export type ArchiveReceipt = {
-  cid?: string;
-  uri?: string;
-  updatedAt: string;
-};
-
+/**
+ * Unified facade that delegates to domain-specific sub-stores.
+ *
+ * Every public method signature is **identical** to the original monolithic
+ * class so that no consumer code needs to change.  Sub-stores are created
+ * lazily via getters so construction cost is negligible.
+ */
 export class Web3StateStore {
   private readonly dir: string;
+
+  // Sub-store instances (created once, cached)
+  private _identity?: IdentityStore;
+  private _audit?: AuditStore;
+  private _billing?: BillingStore;
+  private _resource?: ResourceStore;
+  private _settlement?: SettlementStore;
+  private _monitor?: MonitorStore;
 
   constructor(stateDir: string) {
     this.dir = join(stateDir, "web3");
     if (!existsSync(this.dir)) mkdirSync(this.dir, { recursive: true });
   }
 
-  // ---- Wallet bindings ----
+  // ── Sub-store accessors (lazy singletons) ────────────────────────
 
-  private get bindingsPath() {
-    return join(this.dir, "bindings.json");
+  get identity(): IdentityStore {
+    return (this._identity ??= new IdentityStore(this.dir));
   }
+
+  get audit(): AuditStore {
+    return (this._audit ??= new AuditStore(this.dir));
+  }
+
+  get billing(): BillingStore {
+    return (this._billing ??= new BillingStore(this.dir));
+  }
+
+  get resource(): ResourceStore {
+    return (this._resource ??= new ResourceStore(this.dir));
+  }
+
+  get settlement(): SettlementStore {
+    return (this._settlement ??= new SettlementStore(this.dir));
+  }
+
+  get monitor(): MonitorStore {
+    return (this._monitor ??= new MonitorStore(this.dir));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  Delegation layer — every method mirrors the original API
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ── Identity ─────────────────────────────────────────────────────
 
   getBindings(): WalletBinding[] {
-    if (!existsSync(this.bindingsPath)) return [];
-    return JSON.parse(readFileSync(this.bindingsPath, "utf-8")) as WalletBinding[];
+    return this.identity.getBindings();
   }
-
   saveBindings(bindings: WalletBinding[]): void {
-    writeFileSync(this.bindingsPath, JSON.stringify(bindings, null, 2));
+    this.identity.saveBindings(bindings);
   }
-
   addBinding(binding: WalletBinding): void {
-    const list = this.getBindings().filter((b) => b.address !== binding.address);
-    list.push(binding);
-    this.saveBindings(list);
+    this.identity.addBinding(binding);
   }
-
   removeBinding(address: string): void {
-    this.saveBindings(this.getBindings().filter((b) => b.address !== address));
-  }
-
-  // ---- SIWE challenges ----
-
-  private get siweChallengesPath() {
-    return join(this.dir, "siwe-challenges.json");
+    this.identity.removeBinding(address);
   }
 
   getSiweChallenge(nonce: string): SiweChallenge | undefined {
-    if (!existsSync(this.siweChallengesPath)) return undefined;
-    const map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
-      string,
-      SiweChallenge
-    >;
-    return map[nonce];
+    return this.identity.getSiweChallenge(nonce);
   }
-
   saveSiweChallenge(challenge: SiweChallenge): void {
-    let map: Record<string, SiweChallenge> = {};
-    if (existsSync(this.siweChallengesPath)) {
-      map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
-        string,
-        SiweChallenge
-      >;
-    }
-    map[challenge.nonce] = challenge;
-    writeFileSync(this.siweChallengesPath, JSON.stringify(map, null, 2));
+    this.identity.saveSiweChallenge(challenge);
   }
-
   deleteSiweChallenge(nonce: string): void {
-    if (!existsSync(this.siweChallengesPath)) return;
-    const map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
-      string,
-      SiweChallenge
-    >;
-    if (!(nonce in map)) return;
-    delete map[nonce];
-    writeFileSync(this.siweChallengesPath, JSON.stringify(map, null, 2));
+    this.identity.deleteSiweChallenge(nonce);
   }
-
   pruneSiweChallenges(now = Date.now()): void {
-    if (!existsSync(this.siweChallengesPath)) return;
-    const map = JSON.parse(readFileSync(this.siweChallengesPath, "utf-8")) as Record<
-      string,
-      SiweChallenge
-    >;
-    let dirty = false;
-    for (const [nonce, challenge] of Object.entries(map)) {
-      const expiresAt = Date.parse(challenge.expiresAt);
-      if (Number.isNaN(expiresAt) || expiresAt <= now) {
-        delete map[nonce];
-        dirty = true;
-      }
-    }
-    if (dirty) {
-      writeFileSync(this.siweChallengesPath, JSON.stringify(map, null, 2));
-    }
-  }
-
-  // ---- Audit log (append-only JSONL) ----
-
-  private get auditLogPath() {
-    return join(this.dir, "audit-log.jsonl");
-  }
-
-  appendAuditEvent(event: AuditEvent): void {
-    appendFileSync(this.auditLogPath, JSON.stringify(event) + "\n");
-  }
-
-  readAuditEvents(limit = 100): AuditEvent[] {
-    if (!existsSync(this.auditLogPath)) return [];
-    const lines = readFileSync(this.auditLogPath, "utf-8").trim().split("\n");
-    return lines.slice(-limit).map((l) => JSON.parse(l) as AuditEvent);
-  }
-
-  // ---- Archive receipts ----
-
-  private get archiveReceiptPath() {
-    return join(this.dir, "archive-receipt.json");
-  }
-
-  getArchiveReceipt(): ArchiveReceipt | null {
-    if (!existsSync(this.archiveReceiptPath)) return null;
-    return JSON.parse(readFileSync(this.archiveReceiptPath, "utf-8")) as ArchiveReceipt;
-  }
-
-  saveArchiveReceipt(receipt: ArchiveReceipt): void {
-    writeFileSync(this.archiveReceiptPath, JSON.stringify(receipt, null, 2));
-  }
-
-  // ---- Archive encryption key ----
-
-  private get archiveKeyPath() {
-    return join(this.dir, "archive-key.json");
-  }
-
-  getArchiveKey(): Buffer {
-    if (existsSync(this.archiveKeyPath)) {
-      const stored = JSON.parse(readFileSync(this.archiveKeyPath, "utf-8")) as { key?: string };
-      if (stored.key) return Buffer.from(stored.key, "base64");
-    }
-    const key = randomBytes(32);
-    writeFileSync(this.archiveKeyPath, JSON.stringify({ key: key.toString("base64") }, null, 2));
-    return key;
-  }
-
-  // ---- Usage / billing ----
-
-  private get usagePath() {
-    return join(this.dir, "usage.json");
-  }
-
-  getUsage(sessionIdHash: string): UsageRecord | undefined {
-    if (!existsSync(this.usagePath)) return undefined;
-    const map = JSON.parse(readFileSync(this.usagePath, "utf-8")) as Record<string, UsageRecord>;
-    return map[sessionIdHash];
-  }
-
-  saveUsage(record: UsageRecord): void {
-    let map: Record<string, UsageRecord> = {};
-    if (existsSync(this.usagePath)) {
-      map = JSON.parse(readFileSync(this.usagePath, "utf-8")) as Record<string, UsageRecord>;
-    }
-    map[record.sessionIdHash] = record;
-    writeFileSync(this.usagePath, JSON.stringify(map, null, 2));
-  }
-
-  listUsageRecords(): UsageRecord[] {
-    if (!existsSync(this.usagePath)) return [];
-    const map = JSON.parse(readFileSync(this.usagePath, "utf-8")) as Record<string, UsageRecord>;
-    return Object.values(map);
-  }
-
-  // ---- Provider identity ----
-
-  private get providerIdPath() {
-    return join(this.dir, "provider-id.json");
+    this.identity.pruneSiweChallenges(now);
   }
 
   getProviderId(): string | null {
-    if (!existsSync(this.providerIdPath)) return null;
-    const stored = JSON.parse(readFileSync(this.providerIdPath, "utf-8")) as {
-      providerId?: string;
-    };
-    return stored.providerId ?? null;
+    return this.identity.getProviderId();
   }
-
   saveProviderId(providerId: string): void {
-    writeFileSync(this.providerIdPath, JSON.stringify({ providerId }, null, 2));
+    this.identity.saveProviderId(providerId);
   }
-
   ensureProviderId(): string {
-    const existing = this.getProviderId();
-    if (existing) return existing;
-    const next = `provider-${randomBytes(6).toString("hex")}`;
-    this.saveProviderId(next);
-    return next;
-  }
-
-  // ---- Index signing ----
-
-  private get indexSigningKeyPath() {
-    return join(this.dir, "index-signing.json");
+    return this.identity.ensureProviderId();
   }
 
   getIndexSigningKey(): IndexSigningKey {
-    if (existsSync(this.indexSigningKeyPath)) {
-      return JSON.parse(readFileSync(this.indexSigningKeyPath, "utf-8")) as IndexSigningKey;
-    }
-    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-    const createdAt = new Date().toISOString();
-    const record: IndexSigningKey = {
-      scheme: "ed25519",
-      publicKey: publicKey.export({ type: "spki", format: "der" }).toString("base64"),
-      privateKey: privateKey.export({ type: "pkcs8", format: "der" }).toString("base64"),
-      createdAt,
-    };
-    writeFileSync(this.indexSigningKeyPath, JSON.stringify(record, null, 2));
-    return record;
+    return this.identity.getIndexSigningKey();
   }
 
-  // ---- Resource index ----
+  // ── Audit ────────────────────────────────────────────────────────
 
-  private get resourceIndexPath() {
-    return join(this.dir, "resource-index.json");
+  appendAuditEvent(event: AuditEvent): void {
+    this.audit.appendAuditEvent(event);
+  }
+  readAuditEvents(limit = 100): AuditEvent[] {
+    return this.audit.readAuditEvents(limit);
   }
 
-  getResourceIndex(): ResourceIndexEntry[] {
-    if (!existsSync(this.resourceIndexPath)) return [];
-    return JSON.parse(readFileSync(this.resourceIndexPath, "utf-8")) as ResourceIndexEntry[];
+  getArchiveReceipt(): ArchiveReceipt | null {
+    return this.audit.getArchiveReceipt();
+  }
+  saveArchiveReceipt(receipt: ArchiveReceipt): void {
+    this.audit.saveArchiveReceipt(receipt);
   }
 
-  saveResourceIndex(entries: ResourceIndexEntry[]): void {
-    writeFileSync(this.resourceIndexPath, JSON.stringify(entries, null, 2));
+  getArchiveKey(): Buffer {
+    return this.audit.getArchiveKey();
   }
 
-  upsertResourceIndex(entry: ResourceIndexEntry): void {
-    const list = this.getResourceIndex();
-    const index = list.findIndex((item) => item.providerId === entry.providerId);
-    if (index >= 0) {
-      list[index] = entry;
-    } else {
-      list.push(entry);
-    }
-    this.saveResourceIndex(list);
+  getPendingArchives(): PendingArchive[] {
+    return this.audit.getPendingArchives();
+  }
+  savePendingArchives(items: PendingArchive[]): void {
+    this.audit.savePendingArchives(items);
+  }
+  upsertPendingArchive(item: PendingArchive): void {
+    this.audit.upsertPendingArchive(item);
+  }
+  removePendingArchive(eventId: string): void {
+    this.audit.removePendingArchive(eventId);
   }
 
-  removeResourceIndex(providerId: string): void {
-    const list = this.getResourceIndex().filter((item) => item.providerId !== providerId);
-    this.saveResourceIndex(list);
+  // ── Billing ──────────────────────────────────────────────────────
+
+  getUsage(sessionIdHash: string): UsageRecord | undefined {
+    return this.billing.getUsage(sessionIdHash);
   }
-
-  // ---- P2P peers ----
-
-  private get p2pPeersPath() {
-    return join(this.dir, "p2p-peers.json");
+  saveUsage(record: UsageRecord): void {
+    this.billing.saveUsage(record);
   }
-
-  private get discoveryIdentityPath() {
-    return join(this.dir, "identity-map.json");
-  }
-
-  getP2pPeers(): P2pPeerRecord[] {
-    if (!existsSync(this.p2pPeersPath)) return [];
-    return JSON.parse(readFileSync(this.p2pPeersPath, "utf-8")) as P2pPeerRecord[];
-  }
-
-  saveP2pPeers(entries: P2pPeerRecord[]): void {
-    writeFileSync(this.p2pPeersPath, JSON.stringify(entries, null, 2));
-  }
-
-  upsertP2pPeer(entry: P2pPeerRecord): void {
-    const list = this.getP2pPeers();
-    const index = list.findIndex((item) => item.peerId === entry.peerId);
-    if (index >= 0) {
-      list[index] = entry;
-    } else {
-      list.push(entry);
-    }
-    this.saveP2pPeers(list);
-  }
-
-  pruneP2pPeers(maxAgeMs: number): number {
-    if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) return 0;
-    const cutoff = Date.now() - maxAgeMs;
-    const list = this.getP2pPeers();
-    const filtered = list.filter((entry) => Date.parse(entry.lastSeenAt) > cutoff);
-    if (filtered.length !== list.length) {
-      this.saveP2pPeers(filtered);
-    }
-    return list.length - filtered.length;
-  }
-
-  getDiscoveryIdentityMap(): DiscoveryIdentityRecord[] {
-    if (!existsSync(this.discoveryIdentityPath)) return [];
-    return JSON.parse(
-      readFileSync(this.discoveryIdentityPath, "utf-8"),
-    ) as DiscoveryIdentityRecord[];
-  }
-
-  saveDiscoveryIdentityMap(entries: DiscoveryIdentityRecord[]): void {
-    writeFileSync(this.discoveryIdentityPath, JSON.stringify(entries, null, 2));
-  }
-
-  upsertDiscoveryIdentity(entry: DiscoveryIdentityRecord): void {
-    const list = this.getDiscoveryIdentityMap();
-    const index = list.findIndex((item) => item.providerId === entry.providerId);
-    if (index >= 0) {
-      list[index] = entry;
-    } else {
-      list.push(entry);
-    }
-    this.saveDiscoveryIdentityMap(list);
-  }
-
-  // ---- Pending settlements (retry queue) ----
-
-  private get pendingSettlementsPath() {
-    return join(this.dir, "pending-settlements.json");
-  }
-
-  getPendingSettlements(): PendingSettlement[] {
-    if (!existsSync(this.pendingSettlementsPath)) return [];
-    return JSON.parse(readFileSync(this.pendingSettlementsPath, "utf-8"));
-  }
-
-  savePendingSettlements(items: PendingSettlement[]): void {
-    writeFileSync(this.pendingSettlementsPath, JSON.stringify(items, null, 2));
-  }
-
-  upsertPendingSettlement(item: PendingSettlement): void {
-    const list = this.getPendingSettlements();
-    const index = list.findIndex((entry) => entry.sessionIdHash === item.sessionIdHash);
-    if (index >= 0) {
-      list[index] = item;
-    } else {
-      list.push(item);
-    }
-    this.savePendingSettlements(list);
-  }
-
-  removePendingSettlement(sessionIdHash: string): void {
-    const list = this.getPendingSettlements().filter(
-      (entry) => entry.sessionIdHash !== sessionIdHash,
-    );
-    this.savePendingSettlements(list);
-  }
-
-  // ---- Payment required (x402 idempotency) ----
-
-  private get paymentRequiredPath() {
-    return join(this.dir, "payment-required.json");
-  }
-
-  private get x402AutopayStatsPath() {
-    return join(this.dir, "x402-autopay-stats.json");
-  }
-
-  private loadPaymentRequiredMap(opts?: {
-    prune?: boolean;
-  }): Record<string, PaymentRequiredRecord> {
-    if (!existsSync(this.paymentRequiredPath)) {
-      return {};
-    }
-    const map = JSON.parse(readFileSync(this.paymentRequiredPath, "utf-8")) as Record<
-      string,
-      PaymentRequiredRecord
-    >;
-    if (!opts?.prune) {
-      return map;
-    }
-    return this.prunePaymentRequiredMap(map).map;
-  }
-
-  private savePaymentRequiredMap(map: Record<string, PaymentRequiredRecord>): void {
-    writeFileSync(this.paymentRequiredPath, JSON.stringify(map, null, 2));
-  }
-
-  private prunePaymentRequiredMap(
-    map: Record<string, PaymentRequiredRecord>,
-    nowMs = Date.now(),
-  ): { map: Record<string, PaymentRequiredRecord>; removed: number } {
-    const MAX_RECORDS = 500;
-    const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-    const entries = Object.entries(map);
-    const retained: Array<[string, PaymentRequiredRecord]> = [];
-
-    for (const [key, record] of entries) {
-      const expiresAt = Date.parse(record.resumeToken.expiresAt);
-      const createdAt = Date.parse(record.createdAt);
-      const expiredByToken = Number.isNaN(expiresAt) || expiresAt <= nowMs;
-      const expiredByTtl = Number.isNaN(createdAt) || nowMs - createdAt > MAX_AGE_MS;
-      if (expiredByToken || expiredByTtl) {
-        continue;
-      }
-      retained.push([key, record]);
-    }
-
-    retained.sort((left, right) => right[1].createdAt.localeCompare(left[1].createdAt));
-    const capped = retained.slice(0, MAX_RECORDS);
-    const nextMap = Object.fromEntries(capped);
-    const removed = entries.length - capped.length;
-
-    if (removed > 0) {
-      this.savePaymentRequiredMap(nextMap);
-    }
-
-    return { map: nextMap, removed };
+  listUsageRecords(): UsageRecord[] {
+    return this.billing.listUsageRecords();
   }
 
   getPaymentRequired(idempotencyKey: string): PaymentRequiredRecord | undefined {
-    const map = this.loadPaymentRequiredMap({ prune: true });
-    return map[idempotencyKey];
+    return this.billing.getPaymentRequired(idempotencyKey);
   }
-
   listPaymentRequiredRecords(): PaymentRequiredRecord[] {
-    return Object.values(this.loadPaymentRequiredMap({ prune: true }));
+    return this.billing.listPaymentRequiredRecords();
   }
-
   listPaymentTraceRefs(limit = 50): PaymentTraceRef[] {
-    const records = this.listPaymentRequiredRecords();
-    return records
-      .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, Math.max(1, Math.floor(limit)))
-      .map((record) => ({
-        requestId: record.requestId,
-        idempotencyKey: record.idempotencyKey,
-        invoiceId: record.resumeToken.invoiceId,
-        paymentReceiptId: record.resumeToken.paymentReceiptId,
-        txHash: record.resumeToken.txHash,
-        toolName: record.toolName,
-        createdAt: record.createdAt,
-      }));
+    return this.billing.listPaymentTraceRefs(limit);
   }
-
   savePaymentRequired(record: PaymentRequiredRecord): void {
-    const map = this.loadPaymentRequiredMap({ prune: true });
-    map[record.idempotencyKey] = record;
-    const next = this.prunePaymentRequiredMap(map).map;
-    this.savePaymentRequiredMap(next);
+    this.billing.savePaymentRequired(record);
   }
-
   removePaymentRequired(idempotencyKey: string): void {
-    const map = this.loadPaymentRequiredMap();
-    if (!(idempotencyKey in map)) return;
-    delete map[idempotencyKey];
-    this.savePaymentRequiredMap(map);
+    this.billing.removePaymentRequired(idempotencyKey);
   }
 
   getX402AutopayStats(): X402AutopayStats {
-    if (!existsSync(this.x402AutopayStatsPath)) {
-      return {
-        attempts: 0,
-        successes: 0,
-        failures: 0,
-        retryCount: 0,
-        circuitBreakerTrips: 0,
-        lastCircuitBreakerTripAt: undefined,
-        attemptEvents: [],
-        failureEvents: [],
-        cooldownUntil: undefined,
-        updatedAt: new Date(0).toISOString(),
-      };
-    }
-    const stored = JSON.parse(readFileSync(this.x402AutopayStatsPath, "utf-8")) as
-      | Partial<X402AutopayStats>
-      | undefined;
-    return {
-      attempts: Number.isFinite(stored?.attempts) ? Math.max(0, Math.floor(stored!.attempts!)) : 0,
-      successes: Number.isFinite(stored?.successes)
-        ? Math.max(0, Math.floor(stored!.successes!))
-        : 0,
-      failures: Number.isFinite(stored?.failures) ? Math.max(0, Math.floor(stored!.failures!)) : 0,
-      retryCount: Number.isFinite(stored?.retryCount)
-        ? Math.max(0, Math.floor(stored!.retryCount!))
-        : 0,
-      circuitBreakerTrips: Number.isFinite(stored?.circuitBreakerTrips)
-        ? Math.max(0, Math.floor(stored!.circuitBreakerTrips!))
-        : 0,
-      lastCircuitBreakerTripAt:
-        typeof stored?.lastCircuitBreakerTripAt === "string" &&
-        stored.lastCircuitBreakerTripAt.length > 0
-          ? stored.lastCircuitBreakerTripAt
-          : undefined,
-      attemptEvents: Array.isArray(stored?.attemptEvents)
-        ? stored!.attemptEvents!.filter((entry): entry is string => typeof entry === "string")
-        : [],
-      failureEvents: Array.isArray(stored?.failureEvents)
-        ? stored!.failureEvents!.filter((entry): entry is string => typeof entry === "string")
-        : [],
-      cooldownUntil:
-        typeof stored?.cooldownUntil === "string" && stored.cooldownUntil.length > 0
-          ? stored.cooldownUntil
-          : undefined,
-      updatedAt:
-        typeof stored?.updatedAt === "string" && stored.updatedAt.length > 0
-          ? stored.updatedAt
-          : new Date(0).toISOString(),
-    };
+    return this.billing.getX402AutopayStats();
   }
-
   saveX402AutopayStats(stats: X402AutopayStats): void {
-    writeFileSync(this.x402AutopayStatsPath, JSON.stringify(stats, null, 2));
+    this.billing.saveX402AutopayStats(stats);
   }
-
   updateX402AutopayStats(
     delta: Partial<
       Pick<
@@ -662,169 +249,94 @@ export class Web3StateStore {
       failureEventAt?: string;
     },
   ): X402AutopayStats {
-    const current = this.getX402AutopayStats();
-    const nowIso = new Date().toISOString();
-    const historyCutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const pruneEvents = (events: string[]): string[] =>
-      events.filter((entry) => {
-        const ts = Date.parse(entry);
-        return !Number.isNaN(ts) && ts >= historyCutoff;
-      });
-
-    const attemptEvents = pruneEvents(current.attemptEvents);
-    if (typeof delta.attemptEventAt === "string") {
-      attemptEvents.push(delta.attemptEventAt);
-    }
-
-    const failureEvents = pruneEvents(current.failureEvents);
-    if (typeof delta.failureEventAt === "string") {
-      failureEvents.push(delta.failureEventAt);
-    }
-
-    const next: X402AutopayStats = {
-      attempts: current.attempts + (delta.attempts ?? 0),
-      successes: current.successes + (delta.successes ?? 0),
-      failures: current.failures + (delta.failures ?? 0),
-      retryCount: current.retryCount + (delta.retryCount ?? 0),
-      circuitBreakerTrips: current.circuitBreakerTrips + (delta.circuitBreakerTrips ?? 0),
-      lastCircuitBreakerTripAt: delta.lastCircuitBreakerTripAt ?? current.lastCircuitBreakerTripAt,
-      attemptEvents: attemptEvents.slice(-1024),
-      failureEvents: failureEvents.slice(-1024),
-      cooldownUntil: "cooldownUntil" in delta ? delta.cooldownUntil : current.cooldownUntil,
-      updatedAt: nowIso,
-    };
-    this.saveX402AutopayStats(next);
-    return next;
+    return this.billing.updateX402AutopayStats(delta);
   }
 
-  // ---- Pending archives (retry queue) ----
+  // ── Resources ────────────────────────────────────────────────────
 
-  private get pendingArchivePath() {
-    return join(this.dir, "pending-archive.json");
+  getResourceIndex(): ResourceIndexEntry[] {
+    return this.resource.getResourceIndex();
+  }
+  saveResourceIndex(entries: ResourceIndexEntry[]): void {
+    this.resource.saveResourceIndex(entries);
+  }
+  upsertResourceIndex(entry: ResourceIndexEntry): void {
+    this.resource.upsertResourceIndex(entry);
+  }
+  removeResourceIndex(providerId: string): void {
+    this.resource.removeResourceIndex(providerId);
   }
 
-  getPendingArchives(): PendingArchive[] {
-    if (!existsSync(this.pendingArchivePath)) return [];
-    return JSON.parse(readFileSync(this.pendingArchivePath, "utf-8"));
+  getP2pPeers(): P2pPeerRecord[] {
+    return this.resource.getP2pPeers();
+  }
+  saveP2pPeers(entries: P2pPeerRecord[]): void {
+    this.resource.saveP2pPeers(entries);
+  }
+  upsertP2pPeer(entry: P2pPeerRecord): void {
+    this.resource.upsertP2pPeer(entry);
+  }
+  pruneP2pPeers(maxAgeMs: number): number {
+    return this.resource.pruneP2pPeers(maxAgeMs);
   }
 
-  savePendingArchives(items: PendingArchive[]): void {
-    writeFileSync(this.pendingArchivePath, JSON.stringify(items, null, 2));
+  getDiscoveryIdentityMap(): DiscoveryIdentityRecord[] {
+    return this.resource.getDiscoveryIdentityMap();
+  }
+  saveDiscoveryIdentityMap(entries: DiscoveryIdentityRecord[]): void {
+    this.resource.saveDiscoveryIdentityMap(entries);
+  }
+  upsertDiscoveryIdentity(entry: DiscoveryIdentityRecord): void {
+    this.resource.upsertDiscoveryIdentity(entry);
   }
 
-  upsertPendingArchive(item: PendingArchive): void {
-    const list = this.getPendingArchives();
-    const index = list.findIndex((entry) => entry.event.id === item.event.id);
-    if (index >= 0) {
-      list[index] = item;
-    } else {
-      list.push(item);
-    }
-    this.savePendingArchives(list);
+  // ── Settlement ───────────────────────────────────────────────────
+
+  getPendingSettlements(): PendingSettlement[] {
+    return this.settlement.getPendingSettlements();
   }
-
-  removePendingArchive(eventId: string): void {
-    const list = this.getPendingArchives().filter((entry) => entry.event.id !== eventId);
-    this.savePendingArchives(list);
+  savePendingSettlements(items: PendingSettlement[]): void {
+    this.settlement.savePendingSettlements(items);
   }
-
-  // ---- Anchor receipts ----
-
-  private get anchorReceiptsPath() {
-    return join(this.dir, "anchor-receipts.json");
+  upsertPendingSettlement(item: PendingSettlement): void {
+    this.settlement.upsertPendingSettlement(item);
+  }
+  removePendingSettlement(sessionIdHash: string): void {
+    this.settlement.removePendingSettlement(sessionIdHash);
   }
 
   getAnchorReceipt(anchorId: string): AnchorReceipt | undefined {
-    if (!existsSync(this.anchorReceiptsPath)) return undefined;
-    const map = JSON.parse(readFileSync(this.anchorReceiptsPath, "utf-8")) as Record<
-      string,
-      AnchorReceipt
-    >;
-    return map[anchorId];
+    return this.settlement.getAnchorReceipt(anchorId);
   }
-
   getLastAnchorReceipt(): AnchorReceipt | null {
-    if (!existsSync(this.anchorReceiptsPath)) return null;
-    const map = JSON.parse(readFileSync(this.anchorReceiptsPath, "utf-8")) as Record<
-      string,
-      AnchorReceipt
-    >;
-    const entries = Object.values(map);
-    if (entries.length === 0) return null;
-    return entries.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+    return this.settlement.getLastAnchorReceipt();
   }
-
   saveAnchorReceipt(receipt: AnchorReceipt): void {
-    let map: Record<string, AnchorReceipt> = {};
-    if (existsSync(this.anchorReceiptsPath)) {
-      map = JSON.parse(readFileSync(this.anchorReceiptsPath, "utf-8")) as Record<
-        string,
-        AnchorReceipt
-      >;
-    }
-    map[receipt.anchorId] = receipt;
-    writeFileSync(this.anchorReceiptsPath, JSON.stringify(map, null, 2));
-  }
-
-  // ---- Pending transactions (retry queue) ----
-
-  private get pendingTxPath() {
-    return join(this.dir, "pending-tx.json");
+    this.settlement.saveAnchorReceipt(receipt);
   }
 
   getPendingTxs(): PendingAnchor[] {
-    if (!existsSync(this.pendingTxPath)) return [];
-    return JSON.parse(readFileSync(this.pendingTxPath, "utf-8"));
+    return this.settlement.getPendingTxs();
   }
-
   savePendingTxs(txs: PendingAnchor[]): void {
-    writeFileSync(this.pendingTxPath, JSON.stringify(txs, null, 2));
+    this.settlement.savePendingTxs(txs);
   }
-
   upsertPendingTx(tx: PendingAnchor): void {
-    const list = this.getPendingTxs();
-    const index = list.findIndex((entry) => entry.anchorId === tx.anchorId);
-    if (index >= 0) {
-      list[index] = tx;
-    } else {
-      list.push(tx);
-    }
-    this.savePendingTxs(list);
+    this.settlement.upsertPendingTx(tx);
   }
-
   removePendingTx(anchorId: string): void {
-    const list = this.getPendingTxs().filter((entry) => entry.anchorId !== anchorId);
-    this.savePendingTxs(list);
+    this.settlement.removePendingTx(anchorId);
   }
 
-  // ---- Alerts ----
-
-  private get alertsPath() {
-    return join(this.dir, "alerts.jsonl");
-  }
+  // ── Monitor ──────────────────────────────────────────────────────
 
   appendAlert(alert: AlertEvent): void {
-    appendFileSync(this.alertsPath, JSON.stringify(alert) + "\n");
+    this.monitor.appendAlert(alert);
   }
-
   getAlerts(limit = 1000): AlertEvent[] {
-    if (!existsSync(this.alertsPath)) return [];
-    const lines = readFileSync(this.alertsPath, "utf-8")
-      .trim()
-      .split("\n")
-      .filter((l) => l);
-    return lines.slice(-limit).map((l) => JSON.parse(l) as AlertEvent);
+    return this.monitor.getAlerts(limit);
   }
-
   updateAlert(alert: AlertEvent): void {
-    const alerts = this.getAlerts();
-    const index = alerts.findIndex((a) => a.id === alert.id);
-    if (index < 0) {
-      throw new Error(`Alert not found: ${alert.id}`);
-    }
-    alerts[index] = alert;
-    // Rewrite entire file (for JSONL we need to update)
-    // In production, consider using a database for updates
-    writeFileSync(this.alertsPath, alerts.map((a) => JSON.stringify(a)).join("\n") + "\n");
+    this.monitor.updateAlert(alert);
   }
 }
