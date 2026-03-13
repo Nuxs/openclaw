@@ -8,6 +8,14 @@ export function renderDebugTab(state: AppViewState) {
     return nothing;
   }
 
+  const methods = Array.isArray(
+    (state.hello as { features?: { methods?: unknown } } | null)?.features?.methods,
+  )
+    ? (
+        (state.hello as { features?: { methods?: unknown[] } } | null)?.features?.methods ?? []
+      ).filter((method): method is string => typeof method === "string")
+    : [];
+
   return renderDebug({
     loading: state.debugLoading,
     status: state.debugStatus,
@@ -17,6 +25,7 @@ export function renderDebugTab(state: AppViewState) {
     web3Audit: state.debugWeb3Audit,
     web3AuditError: state.debugWeb3AuditError,
     eventLog: state.eventLog,
+    methods,
     callMethod: state.debugCallMethod,
     callParams: state.debugCallParams,
     callResult: state.debugCallResult,
