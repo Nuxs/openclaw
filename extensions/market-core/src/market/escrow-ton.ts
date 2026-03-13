@@ -27,9 +27,9 @@ import type { ChainConfig, SettlementConfig } from "../config.js";
 
 let blockchainFactoryReady = false;
 
-function ensureBlockchainFactory() {
+async function ensureBlockchainFactory() {
   if (!blockchainFactoryReady) {
-    initBlockchainFactory();
+    await initBlockchainFactory();
     blockchainFactoryReady = true;
   }
 }
@@ -161,7 +161,7 @@ export class TonEscrowAdapter {
 
   private async loadTonProvider(): Promise<IProviderTON> {
     this.ensureContractReady();
-    ensureBlockchainFactory();
+    await ensureBlockchainFactory();
 
     const provider: IProvider = getProvider(this.chain.network);
     if (!isProviderTON(provider)) {

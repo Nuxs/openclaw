@@ -30,6 +30,7 @@
     "blockchain-adapter.config.json",
     "README.md"
   ],
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -42,6 +43,16 @@
       "types": "./dist/providers/ton/index.d.ts",
       "import": "./dist/providers/ton/index.js",
       "require": "./dist/providers/ton/index.cjs"
+    },
+    "./providers/evm": {
+      "types": "./dist/providers/evm/index.d.ts",
+      "import": "./dist/providers/evm/index.js",
+      "require": "./dist/providers/evm/index.cjs"
+    },
+    "./deps": {
+      "types": "./dist/deps.d.ts",
+      "import": "./dist/deps.js",
+      "require": "./dist/deps.cjs"
     },
     "./factory": {
       "types": "./dist/factory.d.ts",

@@ -2,6 +2,10 @@
  * @openclaw/blockchain-adapter
  *
  * Source entrypoint for the blockchain adapter extension package.
+ *
+ * Design: EVM modules are NOT statically imported here so the package
+ * remains loadable even when `viem` is not installed. Use `loadEvmProvider()`
+ * or the async factory methods to access EVM functionality on demand.
  */
 
 // ==================== 类型导出 ====================
@@ -48,7 +52,7 @@ export {
   NotConnectedError,
 } from "./types/index.js";
 
-// ABI
+// ABI (type-only imports from viem — safe without viem at runtime)
 export { ERC20_ABI, ERC20_SELECTORS } from "./types/index.js";
 export { SETTLEMENT_ABI, SettlementStatus } from "./types/index.js";
 export type { SettlementInfo } from "./types/index.js";
@@ -59,7 +63,13 @@ export { EVM_CHAINS, getChainInfo, COMMON_TOKENS, getTokenAddress } from "./conf
 
 // ==================== Provider 导出 ====================
 
-export { EVMProvider, type EVMProviderConfig } from "./providers/evm/index.js";
+// EVM — type-only re-export (safe: erased at runtime, no viem resolution needed)
+export type { EVMProviderConfig } from "./providers/evm/index.js";
+
+// EVM — dynamic loader (use this instead of static import)
+export { loadEvmProvider } from "./deps.js";
+
+// TON — static export (hard dependencies, always available)
 export { TONProvider, type TONProviderConfig } from "./providers/ton/index.js";
 
 // TON helpers (headless wallet + settlement payload)
@@ -81,12 +91,24 @@ export {
 } from "./providers/ton/settlement-payload.js";
 export { normalizeTonAddress } from "./providers/ton/address.js";
 
+// ==================== 依赖检测导出 ====================
+
+export {
+  isViemAvailable,
+  isSolanaAvailable,
+  isSuiAvailable,
+  getChainAvailability,
+  ensureViemInstalled,
+  assertViemAvailable,
+} from "./deps.js";
+
 // ==================== 工厂导出 ====================
 
 export {
   BlockchainFactory,
   factory,
   initBlockchainFactory,
+  initBlockchainFactorySync,
   getProvider,
   getSupportedChains,
   isChainSupported,

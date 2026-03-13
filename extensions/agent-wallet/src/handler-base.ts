@@ -16,9 +16,9 @@ import { readDailySpent, reserveDailyBudget } from "./state.js";
 
 let blockchainFactoryReady = false;
 
-export function ensureBlockchainFactory(): void {
+export async function ensureBlockchainFactory(): Promise<void> {
   if (!blockchainFactoryReady) {
-    initBlockchainFactory();
+    await initBlockchainFactory();
     blockchainFactoryReady = true;
   }
 }

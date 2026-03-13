@@ -52,9 +52,9 @@ const CHAIN_IDS: Record<string, number> = {
 
 let blockchainFactoryReady = false;
 
-function ensureBlockchainFactory() {
+async function ensureBlockchainFactory() {
   if (!blockchainFactoryReady) {
-    initBlockchainFactory();
+    await initBlockchainFactory();
     blockchainFactoryReady = true;
   }
 }
@@ -91,9 +91,9 @@ export class EscrowAdapter {
 
   private async loadEvmProvider(): Promise<IProviderEVM> {
     this.ensureContractReady();
-    ensureBlockchainFactory();
+    await ensureBlockchainFactory();
 
-    const provider = getEVMProvider(this.chainId) as IProviderEVM;
+    const provider = (await getEVMProvider(this.chainId)) as IProviderEVM;
     if (!provider.isConnected) {
       await provider.connect({ privateKey: this.privateKey as `0x${string}` });
     }

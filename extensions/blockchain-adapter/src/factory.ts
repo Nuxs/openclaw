@@ -1,11 +1,14 @@
 /**
  * Blockchain Provider Factory
  * 统一管理和切换不同区块链的Provider
+ *
+ * EVM providers are loaded lazily via dynamic import so that the package
+ * remains functional (TON, types, config) even when `viem` is not installed.
  */
 
-import { EVM_CHAINS, getChainInfo } from "./config/chains.js";
-import { EVMProvider, type EVMProviderConfig } from "./providers/evm";
-import { TONProvider } from "./providers/ton";
+import { EVM_CHAINS } from "./config/chains.js";
+import { isViemAvailable, loadEvmProvider, ensureViemInstalled } from "./deps.js";
+import { TONProvider } from "./providers/ton/index.js";
 import type { ChainInfo, TonChainId, EvmChainId } from "./types/chain.js";
 import { BlockchainError, ErrorCode, NotSupportedError } from "./types/error.js";
 import type { IProvider, ChainType, ChainId } from "./types/provider.js";
@@ -49,23 +52,88 @@ export class BlockchainFactory {
     return BlockchainFactory.instance;
   }
 
+  /** Whether EVM providers have been registered. */
+  private evmInitialized = false;
+
   /**
-   * 初始化工厂
+   * 初始化工厂 (async — registers TON immediately, EVM lazily)
    */
-  static init(): void {
+  static async init(): Promise<void> {
     const factory = BlockchainFactory.getInstance();
-    factory.registerBuiltInProviders();
+    await factory.registerBuiltInProviders();
   }
 
   /**
-   * 注册内置Provider
+   * 同步初始化 — 仅注册 TON，EVM 需要后续调用 ensureEvmProviders()
    */
-  private registerBuiltInProviders(): void {
-    // TON
-    this.register("ton-mainnet", new TONProvider({ testnet: false }));
-    this.register("ton-testnet", new TONProvider({ testnet: true }));
+  static initSync(): void {
+    const factory = BlockchainFactory.getInstance();
+    factory.registerTonProviders();
+    factory.defaultChainId = "ton-mainnet";
+    // Attempt EVM in background (best-effort, non-blocking)
+    if (isViemAvailable()) {
+      void factory.registerEvmProviders();
+    }
+  }
 
-    // EVM - 从配置表加载
+  /**
+   * 注册内置 Provider (TON 同步 + EVM 按需)
+   */
+  private async registerBuiltInProviders(): Promise<void> {
+    this.registerTonProviders();
+
+    // EVM — only if viem is available
+    if (isViemAvailable()) {
+      await this.registerEvmProviders();
+    }
+
+    this.defaultChainId = "ton-mainnet";
+  }
+
+  /**
+   * 注册 TON providers (同步，无外部依赖)
+   */
+  private registerTonProviders(): void {
+    if (!this.providers.has("ton-mainnet")) {
+      this.register("ton-mainnet", new TONProvider({ testnet: false }));
+    }
+    if (!this.providers.has("ton-testnet")) {
+      this.register("ton-testnet", new TONProvider({ testnet: true }));
+    }
+  }
+
+  /**
+   * 确保 EVM providers 已注册。如果 viem 未安装，尝试自动安装。
+   */
+  async ensureEvmProviders(params?: {
+    log?: (message: string) => void;
+    autoInstall?: boolean;
+  }): Promise<void> {
+    if (this.evmInitialized) return;
+
+    if (!isViemAvailable()) {
+      if (params?.autoInstall !== false) {
+        await ensureViemInstalled({ log: params?.log });
+      } else {
+        throw new BlockchainError(
+          "EVM chain support requires 'viem'. Install it with: npm install viem",
+          ErrorCode.NOT_SUPPORTED,
+          "evm",
+        );
+      }
+    }
+
+    await this.registerEvmProviders();
+  }
+
+  /**
+   * 注册 EVM providers (需要 viem 已安装)
+   */
+  private async registerEvmProviders(): Promise<void> {
+    if (this.evmInitialized) return;
+
+    const { EVMProvider } = await loadEvmProvider();
+
     const evmChains = [
       { id: "ethereum", chainId: 1 },
       { id: "sepolia", chainId: 11155111 },
@@ -86,8 +154,7 @@ export class BlockchainFactory {
       }
     }
 
-    // 设置默认链
-    this.defaultChainId = "ton-mainnet";
+    this.evmInitialized = true;
   }
 
   /**
@@ -191,9 +258,12 @@ export class BlockchainFactory {
   }
 
   /**
-   * 获取EVM Provider (便捷方法)
+   * 获取EVM Provider (便捷方法，自动确保 EVM 已注册)
    */
-  getEVMProvider(chainId?: number): IProvider {
+  async getEVMProvider(chainId?: number): Promise<IProvider> {
+    if (!this.evmInitialized) {
+      await this.ensureEvmProviders();
+    }
     return this.getProviderByType("evm", chainId);
   }
 
@@ -212,10 +282,18 @@ export class BlockchainFactory {
 export const factory = BlockchainFactory.getInstance();
 
 /**
- * 初始化工厂
+ * 初始化工厂 (异步 — 注册 TON + 按需注册 EVM)
  */
-export function initBlockchainFactory(): void {
-  BlockchainFactory.init();
+export async function initBlockchainFactory(): Promise<void> {
+  await BlockchainFactory.init();
+}
+
+/**
+ * 同步初始化工厂 (仅注册 TON，EVM 后台尝试)
+ * 适用于不方便 await 的场景（如插件 onActivate 同步入口）
+ */
+export function initBlockchainFactorySync(): void {
+  BlockchainFactory.initSync();
 }
 
 /**
@@ -240,9 +318,9 @@ export function isChainSupported(chainId: ChainId): boolean {
 }
 
 /**
- * 获取EVM Provider
+ * 获取EVM Provider (异步 — 自动确保 viem 已安装)
  */
-export function getEVMProvider(chainId?: number): IProvider {
+export async function getEVMProvider(chainId?: number): Promise<IProvider> {
   return factory.getEVMProvider(chainId);
 }
 

@@ -38,9 +38,9 @@ async function resolveProvider(
   config: AgentWalletConfig,
   privateKey: `0x${string}`,
 ): Promise<IProviderEVM> {
-  ensureBlockchainFactory();
+  await ensureBlockchainFactory();
   const chainId = CHAIN_IDS[config.chain.network] ?? 8453;
-  const provider = getEVMProvider(chainId);
+  const provider = await getEVMProvider(chainId);
   if (!provider.isConnected) {
     await provider.connect({ privateKey });
   }

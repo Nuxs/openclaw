@@ -26,8 +26,10 @@ import {
 } from "./handler-base.js";
 import { loadOrCreateTonWallet } from "./ton-wallet.js";
 
-function resolveTonProvider(network: AgentWalletConfig["chain"]["network"]): IProviderTON {
-  ensureBlockchainFactory();
+async function resolveTonProvider(
+  network: AgentWalletConfig["chain"]["network"],
+): Promise<IProviderTON> {
+  await ensureBlockchainFactory();
   const provider: IProvider = getProvider(network);
   if (!isProviderTON(provider)) {
     throw new Error(`Expected TON provider for ${network}, got ${provider.chainType}`);
@@ -39,7 +41,7 @@ async function ensureTonConnected(
   config: AgentWalletConfig,
 ): Promise<{ provider: IProviderTON; address: string }> {
   const wallet = await loadOrCreateTonWallet(config);
-  const provider = resolveTonProvider(config.chain.network);
+  const provider = await resolveTonProvider(config.chain.network);
 
   if (!provider.isConnected) {
     await provider.connect({
