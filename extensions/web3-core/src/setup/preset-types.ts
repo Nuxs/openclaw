@@ -1,40 +1,40 @@
 /**
- * Deployment planning / verification types for Web3 Market setup.
+ * Preset preview / baseline verification types for Web3 Market setup.
  *
- * These types are runtime-facing only: they describe how we plan, apply,
- * and verify market deployment presets without changing the public `web3.*`
- * contract shape outside the dedicated deployment methods.
+ * These types describe the compatibility preset layer used to preview,
+ * apply, and verify baseline market configuration without pretending to
+ * be a full topology planner.
  */
 
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-types";
 
-export type MarketDeploymentMode = "single-node" | "trusted-circle" | "hybrid-cloud-edge";
+export type MarketPresetMode = "single-node" | "trusted-circle" | "hybrid-cloud-edge";
 
-export type MarketDeploymentIntent = "consumer" | "provider" | "hybrid";
+export type MarketPresetIntent = "consumer" | "provider" | "hybrid";
 
 export type MarketRuntimeHintKind = "ollama" | "lmstudio" | "openai-compat" | "custom";
 
-export type MarketDeploymentRuntimeHint = {
+export type MarketPresetRuntimeHint = {
   kind: MarketRuntimeHintKind;
   label?: string;
   models?: string[];
   maxConcurrent?: number;
 };
 
-export type MarketDeploymentOperation = {
+export type MarketPresetOperation = {
   op: "set" | "setIfMissing" | "setIfEmpty" | "mergeStringSet";
   path: Array<string | number>;
   value: unknown;
   summary: string;
 };
 
-export type MarketDeploymentRole = {
+export type MarketPresetRole = {
   id: string;
   label: string;
   responsibility: string;
 };
 
-export type MarketDeploymentCheck = {
+export type MarketPresetCheck = {
   name: string;
   status: "pass" | "warn" | "fail";
   detail?: string;
@@ -51,37 +51,37 @@ export type MarketDetectedProvider = {
   note?: string;
 };
 
-export type MarketDeploymentTopology = {
+export type MarketPresetLayout = {
   pattern: string;
   trustDomain: string;
-  roles: MarketDeploymentRole[];
+  roles: MarketPresetRole[];
   validationScenarios: string[];
 };
 
-export type MarketDeploymentPlan = {
-  mode: MarketDeploymentMode;
-  intent: MarketDeploymentIntent;
+export type MarketPresetPreview = {
+  mode: MarketPresetMode;
+  intent: MarketPresetIntent;
   summary: string;
-  topology: MarketDeploymentTopology;
+  layout: MarketPresetLayout;
   detectedProviders: MarketDetectedProvider[];
-  operations: MarketDeploymentOperation[];
-  checks: MarketDeploymentCheck[];
+  operations: MarketPresetOperation[];
+  checks: MarketPresetCheck[];
   nextSteps: string[];
 };
 
-export type MarketDeploymentReadiness = {
+export type MarketPresetReadiness = {
   ready: boolean;
   passCount: number;
   warnCount: number;
   failCount: number;
-  checks: MarketDeploymentCheck[];
+  checks: MarketPresetCheck[];
 };
 
-export type MarketDeploymentVerification = {
-  mode: MarketDeploymentMode;
+export type MarketPresetVerification = {
+  mode: MarketPresetMode;
   healthy: boolean;
   summary: string;
-  readiness: MarketDeploymentReadiness;
+  readiness: MarketPresetReadiness;
   metrics: {
     publishedResources: number;
     activeLeases: number;
@@ -95,10 +95,10 @@ export type MarketDeploymentVerification = {
   recommendedActions: string[];
 };
 
-export type MarketDeploymentPlanParams = {
-  mode?: MarketDeploymentMode;
-  intent?: MarketDeploymentIntent;
+export type MarketPresetPreviewParams = {
+  mode?: MarketPresetMode;
+  intent?: MarketPresetIntent;
   currentConfig?: OpenClawConfig | Record<string, unknown>;
-  runtimeHints?: MarketDeploymentRuntimeHint[];
+  runtimeHints?: MarketPresetRuntimeHint[];
   nodeLabel?: string;
 };

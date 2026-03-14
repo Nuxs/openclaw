@@ -1,49 +1,42 @@
-import type {
-  MarketDeploymentIntent,
-  MarketDeploymentMode,
-  MarketDeploymentTopology,
-} from "./deployment-types.js";
+import type { MarketPresetIntent, MarketPresetLayout, MarketPresetMode } from "./preset-types.js";
 
 /**
- * Legacy filename kept for compatibility.
+ * Preset layout helpers for the Web3 Market compatibility layer.
  *
- * This module does not perform autonomous topology planning. It only exposes
- * preset labels and layout summaries used by the compatibility deployment
- * helpers behind `web3.market.deployment.*` and `/web3-market`.
+ * This module only resolves preset labels and layout summaries used by
+ * `web3.market.preset.*` and `/web3-market`. Multi-node topology policy
+ * and rebalance decisions belong to the steward brain + skill layer.
  */
-const MODE_LABELS: Record<MarketDeploymentMode, string> = {
+const MODE_LABELS: Record<MarketPresetMode, string> = {
   "single-node": "单机自用",
   "trusted-circle": "可信圈组网",
   "hybrid-cloud-edge": "混合云边",
 };
 
-export function resolveDeploymentMode(value: unknown): MarketDeploymentMode {
+export function resolvePresetMode(value: unknown): MarketPresetMode {
   return value === "trusted-circle" || value === "hybrid-cloud-edge" ? value : "single-node";
 }
 
-export function resolveDeploymentIntent(
-  intent: unknown,
-  _mode: MarketDeploymentMode,
-): MarketDeploymentIntent {
+export function resolvePresetIntent(intent: unknown, _mode: MarketPresetMode): MarketPresetIntent {
   if (intent === "consumer" || intent === "provider" || intent === "hybrid") {
     return intent;
   }
   return "hybrid";
 }
 
-export function presetModeLabel(mode: MarketDeploymentMode): string {
+export function presetModeLabel(mode: MarketPresetMode): string {
   return MODE_LABELS[mode];
 }
 
-export function modeLabel(mode: MarketDeploymentMode): string {
+export function modeLabel(mode: MarketPresetMode): string {
   return presetModeLabel(mode);
 }
 
 export function buildPresetLayoutSummary(params: {
-  mode: MarketDeploymentMode;
-  intent: MarketDeploymentIntent;
+  mode: MarketPresetMode;
+  intent: MarketPresetIntent;
   nodeLabel?: string;
-}): MarketDeploymentTopology {
+}): MarketPresetLayout {
   const nodeLabel = params.nodeLabel?.trim() || "当前节点";
 
   if (params.mode === "trusted-circle") {
@@ -137,15 +130,15 @@ export function buildPresetLayoutSummary(params: {
   };
 }
 
-export function buildDeploymentTopology(params: {
-  mode: MarketDeploymentMode;
-  intent: MarketDeploymentIntent;
+export function buildPresetLayout(params: {
+  mode: MarketPresetMode;
+  intent: MarketPresetIntent;
   nodeLabel?: string;
-}): MarketDeploymentTopology {
+}): MarketPresetLayout {
   return buildPresetLayoutSummary(params);
 }
 
-function intentLabel(intent: MarketDeploymentIntent): string {
+function intentLabel(intent: MarketPresetIntent): string {
   switch (intent) {
     case "consumer":
       return "消费优先";

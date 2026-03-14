@@ -1,6 +1,5 @@
 import { nothing } from "lit";
 import type { AppViewState } from "./app-view-state.ts";
-import { pathForTab } from "./navigation.ts";
 import { renderMarket } from "./views/market.ts";
 
 export function renderMarketTab(state: AppViewState) {
@@ -28,10 +27,6 @@ export function renderMarketTab(state: AppViewState) {
     bridgeTransfers: state.marketBridgeTransfers,
     resourceKind: state.marketResourceKind,
     filters: state.marketFilters,
-    enableBusy: state.marketEnableBusy,
-    enableError: state.marketEnableError,
-    enableNotice: state.marketEnableNotice,
-    configPath: pathForTab("config", state.basePath),
     taskSection: {
       loading: state.taskLoading,
       error: state.taskError,
@@ -56,6 +51,5 @@ export function renderMarketTab(state: AppViewState) {
     onResourceKindChange: (next) => (state.marketResourceKind = next),
     onFiltersChange: (next) => (state.marketFilters = next),
     onRefresh: () => state.loadMarket(),
-    onEnable: () => state.handleMarketEnable(),
   });
 }

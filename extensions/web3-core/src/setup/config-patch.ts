@@ -1,19 +1,19 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-types";
 import type { ResourceModelOffer } from "../config.js";
 import type {
-  MarketDeploymentIntent,
-  MarketDeploymentMode,
-  MarketDeploymentOperation,
-} from "./deployment-types.js";
+  MarketPresetIntent,
+  MarketPresetMode,
+  MarketPresetOperation,
+} from "./preset-types.js";
 
-export function buildDeploymentOperations(params: {
+export function buildPresetOperations(params: {
   currentConfig?: OpenClawConfig | Record<string, unknown>;
-  mode: MarketDeploymentMode;
-  intent: MarketDeploymentIntent;
+  mode: MarketPresetMode;
+  intent: MarketPresetIntent;
   suggestedOffers: ResourceModelOffer[];
-}): MarketDeploymentOperation[] {
+}): MarketPresetOperation[] {
   const root = ensureRecord(params.currentConfig);
-  const operations: MarketDeploymentOperation[] = [];
+  const operations: MarketPresetOperation[] = [];
 
   operations.push({
     op: "set",
@@ -273,9 +273,9 @@ export function buildDeploymentOperations(params: {
   return operations;
 }
 
-export function applyDeploymentOperations(
+export function applyPresetOperations(
   currentConfig: OpenClawConfig | Record<string, unknown> | undefined,
-  operations: MarketDeploymentOperation[],
+  operations: MarketPresetOperation[],
 ): Record<string, unknown> {
   const next = structuredClone(ensureRecord(currentConfig));
   for (const operation of operations) {

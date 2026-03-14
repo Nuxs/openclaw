@@ -420,6 +420,35 @@ describe("market-status controller", () => {
               timestamp: "2026-03-13T06:20:00.000Z",
             },
           };
+        case "web3.market.preset.verify":
+          return {
+            result: {
+              mode: "trusted-circle",
+              healthy: false,
+              summary: "可信圈：3 项通过 / 1 项告警 / 0 项失败。",
+              readiness: {
+                ready: true,
+                passCount: 3,
+                warnCount: 1,
+                failCount: 0,
+                checks: [
+                  { name: "resources.enabled", status: "pass", detail: "ok" },
+                  { name: "resource.publish", status: "warn", detail: "missing offer" },
+                ],
+              },
+              metrics: {
+                publishedResources: 0,
+                activeLeases: 0,
+                activeAlerts: 1,
+                discoveryEnabled: true,
+                consumerEnabled: true,
+                advertiseToMarket: true,
+                providerListenEnabled: true,
+                providerBind: "lan",
+              },
+              recommendedActions: ["补齐 provider offers 后执行发布资源。"],
+            },
+          };
         default:
           throw new Error(`Unexpected method: ${method}`);
       }
@@ -453,5 +482,7 @@ describe("market-status controller", () => {
       "settlement",
     ]);
     expect(opsSummary.healthProbes[0]?.status).toBe("degraded");
+    expect(opsSummary.preset?.mode).toBe("trusted-circle");
+    expect(opsSummary.preset?.readiness.warnCount).toBe(1);
   });
 });

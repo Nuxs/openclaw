@@ -63,6 +63,10 @@ import {
   createMarketDisputeRejectHandler,
 } from "./market/handlers.js";
 import {
+  createMarketPresetPreviewHandler,
+  createMarketPresetVerifyHandler,
+} from "./market/preset-handlers.js";
+import {
   createMarketTaskPublishHandler,
   createMarketTaskGetHandler,
   createMarketTaskListHandler,
@@ -100,7 +104,7 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
   // ── Command ──
   api.registerCommand({
     name: "web3-market",
-    description: "Show Web3 Market status or print enable steps",
+    description: "Show Web3 Market status or manage compatibility presets",
     acceptsArgs: true,
     handler: createWeb3MarketCommand(config),
   });
@@ -214,6 +218,8 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
     createMarketReconciliationSummaryHandler(store, config),
   );
   api.registerGatewayMethod("web3.market.status.summary", createMarketStatusSummaryHandler(config));
+  api.registerGatewayMethod("web3.market.preset.preview", createMarketPresetPreviewHandler(config));
+  api.registerGatewayMethod("web3.market.preset.verify", createMarketPresetVerifyHandler(config));
 
   // ── Gateway: Disputes ──
   api.registerGatewayMethod("web3.market.dispute.get", createMarketDisputeGetHandler(config));

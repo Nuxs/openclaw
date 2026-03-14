@@ -25,6 +25,7 @@ TARGET_DIRS=(
 ALLOWED_SKILLS=(
   "web3-market"       # 核心业务架构、协议规范
   "web3-butler"       # 运维/资源管理规范
+  "steward-topology"  # 主脑拓扑规划与多节点编排规范
   "private-fork-dev"  # 私有化开发/合流规范
   "skill-creator"     # Skill 开发模板与规范
   "coding-agent"      # 编码代理行为规范

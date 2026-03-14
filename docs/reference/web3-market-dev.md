@@ -256,6 +256,19 @@ graph TD
 - 必须提供一页式入口：`/web3` 命令 + UI Web3 Tab（身份/计费/审计/市场健康度 + 下一步动作）。
 - 遇到链/存储不可用：必须继续允许 OpenClaw 正常工作，只在 UI 上提示“未锚定/未归档/未结算”。
 
+## 兼容预设与零配置边界
+
+当前仓库新增了两条只读预设入口，用于把“单机 / 可信圈 / 混合云边”三类场景固化成可分享、可校验的兼容预设：
+
+- `web3.market.preset.preview`：生成布局摘要、配置补丁操作、运行时探测摘要与下一步动作。
+- `web3.market.preset.verify`：基于 `market.status.summary`、`web3.monitor.health`、`web3.index.stats` 等现有能力生成 release gates。
+
+它们的定位是 **preset preview / verify**，不是新的权威状态机：
+
+- 配置写入仍通过 `config.apply` 完成；
+- 权威交易状态仍由 `market-core` 管理；
+- 对外输出仍必须保持 paste-safe，不泄露 token、endpoint 或真实路径。
+
 ## 相关文档
 
 - `web3-core` 插件：[/plugins/web3-core](/plugins/web3-core)

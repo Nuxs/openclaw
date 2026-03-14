@@ -50,17 +50,12 @@ type MarketProps = {
   bridgeTransfers: BridgeTransfer[];
   resourceKind: MarketResourceKind | "all";
   filters: MarketFilters;
-  enableBusy: boolean;
-  enableError: string | null;
-  enableNotice: string | null;
-  configPath: string;
   taskSection?: TaskSectionProps;
   privacySection?: PrivacySectionProps;
   opsSection?: OpsSectionProps;
   onResourceKindChange: (next: MarketResourceKind | "all") => void;
   onFiltersChange: (next: MarketFilters) => void;
   onRefresh: () => void;
-  onEnable: () => void;
 };
 
 const RESOURCE_KINDS: Array<{ key: MarketProps["resourceKind"]; label: string }> = [
@@ -148,14 +143,11 @@ export function renderMarket(props: MarketProps) {
       resource.resourceId,
       resource.label,
       resource.providerActorId,
-      resource.tags?.join(" "),
+      resource.providerLabel,
+      resource.kind,
     ]),
   );
-  const sortedResources = sortByTime(
-    filteredResources,
-    (resource) => resource.updatedAt,
-    filters.resourceSort === "updated_desc" ? "desc" : "asc",
-  );
+  const sortedResources = sortResources(filteredResources, filters.resourceSort);
 
   const leasesByStatus =
     filters.leaseStatus === "all"
@@ -165,46 +157,35 @@ export function renderMarket(props: MarketProps) {
     matchesText(filters.leaseSearch, [
       lease.leaseId,
       lease.resourceId,
-      lease.consumerActorId,
-      lease.providerActorId,
-      lease.orderId,
+      lease.consumerId,
+      lease.providerId,
+      lease.status,
     ]),
   );
-  const sortedLeases = sortByTime(
-    filteredLeases,
-    (lease) => lease.issuedAt,
-    filters.leaseSort === "issued_desc" ? "desc" : "asc",
-  );
+  const sortedLeases = sortLeases(filteredLeases, filters.leaseSort);
 
-  const disputesByStatusFilter =
+  const disputesFiltered =
     filters.disputeStatus === "all"
       ? props.disputes
       : props.disputes.filter((dispute) => dispute.status === filters.disputeStatus);
-  const filteredDisputes = disputesByStatusFilter.filter((dispute) =>
+  const filteredDisputes = disputesFiltered.filter((dispute) =>
     matchesText(filters.disputeSearch, [
       dispute.disputeId,
-      dispute.orderId,
-      dispute.initiatorActorId,
-      dispute.respondentActorId,
+      dispute.leaseId,
       dispute.reason,
+      dispute.status,
     ]),
   );
-  const sortedDisputes = sortByTime(
-    filteredDisputes,
-    (dispute) => dispute.openedAt,
-    filters.disputeSort === "opened_desc" ? "desc" : "asc",
-  );
+  const sortedDisputes = sortDisputes(filteredDisputes, filters.disputeSort);
 
   const resourceEmptyLabel =
     props.resources.length === 0
-      ? "No resources reported yet."
+      ? "No resources published yet."
       : "No resources match current filters.";
   const leaseEmptyLabel =
-    props.leases.length === 0 ? "No leases reported yet." : "No leases match current filters.";
+    props.leases.length === 0 ? "No leases yet." : "No leases match current filters.";
   const disputeEmptyLabel =
-    props.disputes.length === 0
-      ? "No disputes reported yet."
-      : "No disputes match current filters.";
+    props.disputes.length === 0 ? "No disputes recorded." : "No disputes match current filters.";
   const ledgerEmptyLabel =
     props.ledgerEntries.length === 0
       ? "No ledger entries yet."
@@ -227,34 +208,6 @@ export function renderMarket(props: MarketProps) {
             ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
             : nothing
         }
-        ${
-          props.enableError
-            ? html`<div class="callout danger" style="margin-top: 12px;">${props.enableError}</div>`
-            : nothing
-        }
-        ${
-          props.enableNotice
-            ? html`<div class="callout info" style="margin-top: 12px;">${props.enableNotice}</div>`
-            : nothing
-        }
-        ${
-          props.error && props.error.includes("市场 API 未就绪")
-            ? html`
-              <div class="callout info" style="margin-top: 12px;">
-                <div style="font-weight: 600;">一键启用 Web3 市场</div>
-                <div style="margin-top: 6px;">
-                  这会启用 web3-core / market-core，并开启资源能力（不包含模型 offer）。
-                </div>
-                <div class="row" style="margin-top: 10px; gap: 8px;">
-                  <button class="btn btn--sm" ?disabled=${props.enableBusy} @click=${props.onEnable}>
-                    ${props.enableBusy ? "处理中…" : "一键启用"}
-                  </button>
-                  <a class="btn btn--sm" href=${props.configPath}>打开配置页</a>
-                </div>
-              </div>
-            `
-            : nothing
-        }
         <div class="muted" style="margin-top: 10px;">Last update: ${lastSuccessLabel}</div>
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
@@ -268,217 +221,152 @@ export function renderMarket(props: MarketProps) {
             ${renderStatusPills(status?.orders ?? {})}
           </div>
           <div class="stat">
-            <div class="stat-label">Deliveries</div>
-            <div class="stat-value">${status?.totals?.deliveries ?? 0}</div>
-            ${renderStatusPills(status?.deliveries ?? {})}
+            <div class="stat-label">Leases</div>
+            <div class="stat-value">${status?.totals?.leases ?? 0}</div>
+            ${renderStatusPills(status?.leases ?? {})}
           </div>
           <div class="stat">
-            <div class="stat-label">Settlements</div>
-            <div class="stat-value">${status?.totals?.settlements ?? 0}</div>
-            ${renderStatusPills(status?.settlements ?? {})}
+            <div class="stat-label">Ledger entries</div>
+            <div class="stat-value">${status?.totals?.ledgerEntries ?? 0}</div>
+            ${renderStatusPills(status?.ledger ?? {})}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Activity Health</div>
+        <div class="card-sub">Current alerts, lease activity, and dispute distribution.</div>
+        <div class="stat-grid" style="margin-top: 16px;">
+          <div class="stat">
+            <div class="stat-label">Active alerts</div>
+            <div class="stat-value">${activeAlerts.length}</div>
+            ${renderAlertPreview(activeAlerts)}
+          </div>
+          <div class="stat">
+            <div class="stat-label">Active leases</div>
+            <div class="stat-value">${activeLeases}</div>
+            <div class="stat-sub">Expired ${expiredLeases} · Revoked ${revokedLeases}</div>
           </div>
           <div class="stat">
             <div class="stat-label">Disputes</div>
             <div class="stat-value">${totalDisputes}</div>
-            ${renderStatusPills(disputesByStatus)}
+            <div class="stat-sub">Open ${disputesByStatus.open} · Resolved ${disputesByStatus.resolved}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Settlement volume</div>
+            <div class="stat-value">${props.ledger?.totals.entries ?? 0}</div>
+            <div class="stat-sub">Credits ${props.ledger?.totals.credits ?? 0}</div>
           </div>
         </div>
       </div>
-
-      <div class="card">
-        <div class="card-title">Leases & Ledger</div>
-        <div class="card-sub">Current lease health and recent revenue summary.</div>
-        <div class="stat-grid" style="margin-top: 16px;">
-          <div class="stat">
-            <div class="stat-label">Active leases</div>
-            <div class="stat-value">${activeLeases}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Expired leases</div>
-            <div class="stat-value">${expiredLeases}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Revoked leases</div>
-            <div class="stat-value">${revokedLeases}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Ledger total</div>
-            <div class="stat-value">${props.ledger?.totalCost ?? "0"}</div>
-            <div class="muted">${props.ledger?.currency ?? "n/a"}</div>
-          </div>
-        </div>
-        ${renderLedgerUnits(props.ledger)}
-      </div>
     </section>
 
-    <section class="grid grid-cols-2" style="margin-top: 18px;">
-      <div class="card">
-        <div class="card-title">Market Signals</div>
-        <div class="card-sub">Key metrics from the latest market snapshot.</div>
-        ${renderMetricsSnapshot(metrics)}
-      </div>
-      <div class="card">
-        <div class="card-title">Alerts</div>
-        <div class="card-sub">Triggered rules that need attention.</div>
-        ${renderAlerts(activeAlerts, metrics?.alerts ?? [])}
-      </div>
+    <section class="grid grid-cols-2" style="margin-top: 16px;">
+      ${renderIndexOverview(props.indexStats, props.indexEntries)}
+      ${renderMonitorOverview(props.monitor)}
     </section>
 
-    <section class="grid grid-cols-2" style="margin-top: 18px;">
-      ${renderReputationCard(props.reputation, props.loading)}
-      ${renderTokenEconomyCard(props.tokenEconomy, props.loading)}
+    <section class="grid grid-cols-2" style="margin-top: 16px;">
+      ${renderResourceCard(props, sortedResources, resourceEmptyLabel)}
+      ${renderLeaseCard(props, sortedLeases, leaseEmptyLabel)}
     </section>
 
-    <section class="grid grid-cols-2" style="margin-top: 18px;">
-      ${renderBridgeRoutesCard(props.bridgeRoutes, props.loading)}
-      ${renderBridgeTransfersCard(props.bridgeTransfers, props.loading)}
+    <section class="grid grid-cols-2" style="margin-top: 16px;">
+      ${renderDisputeCard(props, sortedDisputes, disputeEmptyLabel)}
+      ${renderLedgerCard(props, ledgerPreview, ledgerEntryCount, ledgerEmptyLabel)}
     </section>
 
-    <section class="grid grid-cols-2" style="margin-top: 18px;">
-      ${props.taskSection ? renderTaskSection(props.taskSection) : nothing}
-      ${props.privacySection ? renderPrivacySection(props.privacySection) : nothing}
+    <section class="grid grid-cols-2" style="margin-top: 16px;">
+      ${renderReputationCard(props.reputation)}
+      ${renderTokenEconomyCard(props.tokenEconomy)}
     </section>
 
-    ${
-      props.opsSection
-        ? html`
-      <section style="margin-top: 18px;">
-        ${renderOpsSection(props.opsSection)}
-      </section>
-    `
-        : nothing
-    }
-
-    <section class="grid grid-cols-2" style="margin-top: 18px;">
-      ${renderIndexOverview({
-        loading: props.loading,
-        indexEntries: props.indexEntries,
-        indexStats: props.indexStats,
-      })}
-      ${renderMonitorOverview({
-        loading: props.loading,
-        monitor: props.monitor,
-      })}
+    <section class="grid grid-cols-2" style="margin-top: 16px;">
+      ${renderBridgeRoutesCard(props.bridgeRoutes)}
+      ${renderBridgeTransfersCard(props.bridgeTransfers)}
     </section>
 
-    <section class="card" style="margin-top: 18px;">
-      <div class="row" style="justify-content: space-between; align-items: center;">
+    ${props.taskSection ? renderTaskSection(props.taskSection) : nothing}
+    ${props.privacySection ? renderPrivacySection(props.privacySection) : nothing}
+    ${props.opsSection ? renderOpsSection(props.opsSection) : nothing}
+  `;
+}
+
+function renderStatusPills(summary: Record<string, number>) {
+  const entries = Object.entries(summary).filter(([, value]) => value > 0);
+  if (entries.length === 0) {
+    return html`
+      <div class="stat-sub">No activity</div>
+    `;
+  }
+  return html`
+    <div class="pill-row" style="margin-top: 10px;">
+      ${entries.map(
+        ([label, value]) => html`<span class="pill">${formatStatusLabel(label)} · ${value}</span>`,
+      )}
+    </div>
+  `;
+}
+
+function renderAlertPreview(alerts: MarketAlert[]) {
+  if (alerts.length === 0) {
+    return html`
+      <div class="stat-sub">No active alerts</div>
+    `;
+  }
+  return html`
+    <div class="pill-row" style="margin-top: 10px;">
+      ${alerts.slice(0, 3).map((alert) => html`<span class="pill">${alert.level} · ${alert.name}</span>`)}
+    </div>
+  `;
+}
+
+function renderResourceCard(props: MarketProps, resources: MarketResource[], emptyLabel: string) {
+  return html`
+    <div class="card card--stretch">
+      <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 16px;">
         <div>
-          <div class="card-title">Ledger Entries</div>
-          <div class="card-sub">Latest usage charges and consumption (latest 50).</div>
+          <div class="card-title">Resources</div>
+          <div class="card-sub">Published capacity, pricing, and provider metadata.</div>
         </div>
-        <div class="muted">${ledgerEntryCount} entries</div>
-      </div>
-      <div class="filters" style="margin-top: 12px;">
-        <label class="field" style="flex: 1; min-width: 220px;">
-          <span>Search</span>
-          <input
-            .value=${filters.ledgerSearch}
-            placeholder="Lease, resource, session, run"
-            @input=${(e: Event) =>
-              props.onFiltersChange({
-                ...filters,
-                ledgerSearch: (e.target as HTMLInputElement).value,
-              })}
-          />
-        </label>
-        <label class="field">
-          <span>Unit</span>
+        <label class="field" style="min-width: 120px;">
+          <span class="field__label">Kind</span>
           <select
-            .value=${filters.ledgerUnit}
-            @change=${(e: Event) =>
-              props.onFiltersChange({
-                ...filters,
-                ledgerUnit: (e.target as HTMLSelectElement).value as MarketFilters["ledgerUnit"],
-              })}
+            .value=${props.resourceKind}
+            @change=${(event: Event) => {
+              const value = (event.target as HTMLSelectElement)
+                .value as MarketProps["resourceKind"];
+              props.onResourceKindChange(value);
+            }}
           >
-            ${LEDGER_UNIT_OPTIONS.map(
-              (option) => html`<option value=${option.value}>${option.label}</option>`,
+            ${RESOURCE_KINDS.map(
+              (option) => html`<option value=${option.key}>${option.label}</option>`,
             )}
           </select>
         </label>
+      </div>
+      <div class="filters filters--four" style="margin-top: 16px;">
         <label class="field">
-          <span>Sort</span>
-          <select
-            .value=${filters.ledgerSort}
-            @change=${(e: Event) =>
-              props.onFiltersChange({
-                ...filters,
-                ledgerSort: (e.target as HTMLSelectElement).value as MarketFilters["ledgerSort"],
-              })}
-          >
-            <option value="time_desc">Newest</option>
-            <option value="time_asc">Oldest</option>
-          </select>
-        </label>
-      </div>
-      ${
-        ledgerEntryCount === 0
-          ? renderEmptyState(props.loading, ledgerEmptyLabel, "Loading ledger entries…")
-          : html`
-              <div class="table" style="margin-top: 16px;">
-                <div class="table-head">
-                  <div>Time</div>
-                  <div>Lease</div>
-                  <div>Resource</div>
-                  <div>Unit</div>
-                  <div>Quantity</div>
-                  <div>Cost</div>
-                </div>
-                ${ledgerPreview.map((entry) => renderLedgerEntryRow(entry))}
-              </div>
-              ${
-                ledgerEntryCount > ledgerPreview.length
-                  ? html`
-                      <div class="muted" style="margin-top: 12px;">
-                        Showing ${ledgerPreview.length} of ${ledgerEntryCount} entries.
-                      </div>
-                    `
-                  : nothing
-              }
-            `
-      }
-      ${renderFilterSummary(ledgerEntryCount, props.ledgerEntries.length)}
-    </section>
-
-    <section class="card" style="margin-top: 18px;">
-      <div class="row" style="justify-content: space-between; align-items: center;">
-        <div>
-          <div class="card-title">Resources</div>
-          <div class="card-sub">Published market resources and pricing details.</div>
-        </div>
-        <div class="row" style="gap: 6px;">
-          ${RESOURCE_KINDS.map((entry) =>
-            renderFilterButton(
-              entry.key,
-              entry.label,
-              props.resourceKind,
-              props.onResourceKindChange,
-            ),
-          )}
-        </div>
-      </div>
-      <div class="filters" style="margin-top: 12px;">
-        <label class="field" style="flex: 1; min-width: 220px;">
-          <span>Search</span>
+          <span class="field__label">Search</span>
           <input
-            .value=${filters.resourceSearch}
-            placeholder="Resource ID, label, provider"
-            @input=${(e: Event) =>
+            type="search"
+            placeholder="Resource, provider, or ID"
+            .value=${props.filters.resourceSearch}
+            @input=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                resourceSearch: (e.target as HTMLInputElement).value,
+                ...props.filters,
+                resourceSearch: (event.target as HTMLInputElement).value,
               })}
           />
         </label>
         <label class="field">
-          <span>Status</span>
+          <span class="field__label">Status</span>
           <select
-            .value=${filters.resourceStatus}
-            @change=${(e: Event) =>
+            .value=${props.filters.resourceStatus}
+            @change=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                resourceStatus: (e.target as HTMLSelectElement)
+                ...props.filters,
+                resourceStatus: (event.target as HTMLSelectElement)
                   .value as MarketFilters["resourceStatus"],
               })}
           >
@@ -488,65 +376,88 @@ export function renderMarket(props: MarketProps) {
           </select>
         </label>
         <label class="field">
-          <span>Sort</span>
+          <span class="field__label">Sort</span>
           <select
-            .value=${filters.resourceSort}
-            @change=${(e: Event) =>
+            .value=${props.filters.resourceSort}
+            @change=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                resourceSort: (e.target as HTMLSelectElement)
+                ...props.filters,
+                resourceSort: (event.target as HTMLSelectElement)
                   .value as MarketFilters["resourceSort"],
               })}
           >
-            <option value="updated_desc">Updated (newest)</option>
-            <option value="updated_asc">Updated (oldest)</option>
+            <option value="updated_desc">Updated ↓</option>
+            <option value="updated_asc">Updated ↑</option>
+            <option value="price_desc">Price ↓</option>
+            <option value="price_asc">Price ↑</option>
           </select>
         </label>
+        <div class="field field--summary">
+          <span class="field__label">Visible</span>
+          <div class="field__value">${resources.length}</div>
+        </div>
       </div>
-      ${
-        sortedResources.length === 0
-          ? renderEmptyState(props.loading, resourceEmptyLabel, "Loading resources…")
-          : html`
-              <div class="table" style="margin-top: 16px;">
-                <div class="table-head">
-                  <div>Resource</div>
-                  <div>Kind</div>
-                  <div>Provider</div>
-                  <div>Price</div>
-                  <div>Status</div>
-                  <div>Updated</div>
-                </div>
-                ${sortedResources.map((resource) => renderResourceRow(resource))}
-              </div>
-            `
-      }
-      ${renderFilterSummary(sortedResources.length, props.resources.length)}
-    </section>
+      <div class="list list--dense" style="margin-top: 16px;">
+        ${
+          resources.length === 0
+            ? html`<div class="muted">${emptyLabel}</div>`
+            : resources.map(
+                (resource) => html`
+                <article class="list-item list-item--stacked">
+                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                    <div>
+                      <div class="list-item__title">${resource.label}</div>
+                      <div class="muted">${resource.resourceId}</div>
+                    </div>
+                    <span class="pill">${resource.kind}</span>
+                  </div>
+                  <div class="list-item__meta">
+                    <span>${resource.status}</span>
+                    <span>${formatPrice(resource.price)}</span>
+                    <span>${clampText(resource.providerLabel ?? resource.providerActorId ?? "unknown", 32)}</span>
+                  </div>
+                  ${
+                    resource.description
+                      ? html`<div class="list-item__body">${clampText(resource.description, 180)}</div>`
+                      : nothing
+                  }
+                </article>
+              `,
+              )
+        }
+      </div>
+    </div>
+  `;
+}
 
-    <section class="card" style="margin-top: 18px;">
+function renderLeaseCard(props: MarketProps, leases: MarketLease[], emptyLabel: string) {
+  return html`
+    <div class="card card--stretch">
       <div class="card-title">Leases</div>
-      <div class="card-sub">Active and recent leases (latest 50).</div>
-      <div class="filters" style="margin-top: 12px;">
-        <label class="field" style="flex: 1; min-width: 220px;">
-          <span>Search</span>
+      <div class="card-sub">Consumer/provider bindings with status, windows, and access posture.</div>
+      <div class="filters filters--four" style="margin-top: 16px;">
+        <label class="field">
+          <span class="field__label">Search</span>
           <input
-            .value=${filters.leaseSearch}
-            placeholder="Lease, resource, consumer"
-            @input=${(e: Event) =>
+            type="search"
+            placeholder="Lease, resource, or actor"
+            .value=${props.filters.leaseSearch}
+            @input=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                leaseSearch: (e.target as HTMLInputElement).value,
+                ...props.filters,
+                leaseSearch: (event.target as HTMLInputElement).value,
               })}
           />
         </label>
         <label class="field">
-          <span>Status</span>
+          <span class="field__label">Status</span>
           <select
-            .value=${filters.leaseStatus}
-            @change=${(e: Event) =>
+            .value=${props.filters.leaseStatus}
+            @change=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                leaseStatus: (e.target as HTMLSelectElement).value as MarketFilters["leaseStatus"],
+                ...props.filters,
+                leaseStatus: (event.target as HTMLSelectElement)
+                  .value as MarketFilters["leaseStatus"],
               })}
           >
             ${LEASE_STATUS_OPTIONS.map(
@@ -555,64 +466,81 @@ export function renderMarket(props: MarketProps) {
           </select>
         </label>
         <label class="field">
-          <span>Sort</span>
+          <span class="field__label">Sort</span>
           <select
-            .value=${filters.leaseSort}
-            @change=${(e: Event) =>
+            .value=${props.filters.leaseSort}
+            @change=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                leaseSort: (e.target as HTMLSelectElement).value as MarketFilters["leaseSort"],
+                ...props.filters,
+                leaseSort: (event.target as HTMLSelectElement).value as MarketFilters["leaseSort"],
               })}
           >
-            <option value="issued_desc">Issued (newest)</option>
-            <option value="issued_asc">Issued (oldest)</option>
+            <option value="issued_desc">Issued ↓</option>
+            <option value="issued_asc">Issued ↑</option>
+            <option value="expires_desc">Expires ↓</option>
+            <option value="expires_asc">Expires ↑</option>
           </select>
         </label>
+        <div class="field field--summary">
+          <span class="field__label">Visible</span>
+          <div class="field__value">${leases.length}</div>
+        </div>
       </div>
-      ${
-        sortedLeases.length === 0
-          ? renderEmptyState(props.loading, leaseEmptyLabel, "Loading leases…")
-          : html`
-              <div class="table" style="margin-top: 16px;">
-                <div class="table-head">
-                  <div>Lease</div>
-                  <div>Resource</div>
-                  <div>Consumer</div>
-                  <div>Status</div>
-                  <div>Issued</div>
-                  <div>Expires</div>
-                </div>
-                ${sortedLeases.map((lease) => renderLeaseRow(lease))}
-              </div>
-            `
-      }
-      ${renderFilterSummary(sortedLeases.length, props.leases.length)}
-    </section>
+      <div class="list list--dense" style="margin-top: 16px;">
+        ${
+          leases.length === 0
+            ? html`<div class="muted">${emptyLabel}</div>`
+            : leases.map(
+                (lease) => html`
+                <article class="list-item list-item--stacked">
+                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                    <div>
+                      <div class="list-item__title">${lease.leaseId}</div>
+                      <div class="muted">${lease.resourceId}</div>
+                    </div>
+                    <span class="pill">${lease.status}</span>
+                  </div>
+                  <div class="list-item__meta">
+                    <span>${lease.consumerId}</span>
+                    <span>${lease.providerId}</span>
+                    <span>${lease.unitPrice} / ${lease.unit}</span>
+                  </div>
+                </article>
+              `,
+              )
+        }
+      </div>
+    </div>
+  `;
+}
 
-    <section class="card" style="margin-top: 18px;">
+function renderDisputeCard(props: MarketProps, disputes: MarketDispute[], emptyLabel: string) {
+  return html`
+    <div class="card card--stretch">
       <div class="card-title">Disputes</div>
-      <div class="card-sub">Open and resolved disputes (latest 50).</div>
-      <div class="filters" style="margin-top: 12px;">
-        <label class="field" style="flex: 1; min-width: 220px;">
-          <span>Search</span>
+      <div class="card-sub">Arbitration queue and evidence snapshots.</div>
+      <div class="filters filters--four" style="margin-top: 16px;">
+        <label class="field">
+          <span class="field__label">Search</span>
           <input
-            .value=${filters.disputeSearch}
-            placeholder="Dispute, order, initiator"
-            @input=${(e: Event) =>
+            type="search"
+            placeholder="Dispute, lease, or reason"
+            .value=${props.filters.disputeSearch}
+            @input=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                disputeSearch: (e.target as HTMLInputElement).value,
+                ...props.filters,
+                disputeSearch: (event.target as HTMLInputElement).value,
               })}
           />
         </label>
         <label class="field">
-          <span>Status</span>
+          <span class="field__label">Status</span>
           <select
-            .value=${filters.disputeStatus}
-            @change=${(e: Event) =>
+            .value=${props.filters.disputeStatus}
+            @change=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                disputeStatus: (e.target as HTMLSelectElement)
+                ...props.filters,
+                disputeStatus: (event.target as HTMLSelectElement)
                   .value as MarketFilters["disputeStatus"],
               })}
           >
@@ -622,349 +550,245 @@ export function renderMarket(props: MarketProps) {
           </select>
         </label>
         <label class="field">
-          <span>Sort</span>
+          <span class="field__label">Sort</span>
           <select
-            .value=${filters.disputeSort}
-            @change=${(e: Event) =>
+            .value=${props.filters.disputeSort}
+            @change=${(event: Event) =>
               props.onFiltersChange({
-                ...filters,
-                disputeSort: (e.target as HTMLSelectElement).value as MarketFilters["disputeSort"],
+                ...props.filters,
+                disputeSort: (event.target as HTMLSelectElement)
+                  .value as MarketFilters["disputeSort"],
               })}
           >
-            <option value="opened_desc">Opened (newest)</option>
-            <option value="opened_asc">Opened (oldest)</option>
+            <option value="opened_desc">Opened ↓</option>
+            <option value="opened_asc">Opened ↑</option>
+            <option value="updated_desc">Updated ↓</option>
+            <option value="updated_asc">Updated ↑</option>
           </select>
         </label>
+        <div class="field field--summary">
+          <span class="field__label">Visible</span>
+          <div class="field__value">${disputes.length}</div>
+        </div>
       </div>
-      ${
-        sortedDisputes.length === 0
-          ? renderEmptyState(props.loading, disputeEmptyLabel, "Loading disputes…")
-          : html`
-              <div class="table" style="margin-top: 16px;">
-                <div class="table-head">
-                  <div>Dispute</div>
-                  <div>Order</div>
-                  <div>Initiator</div>
-                  <div>Reason</div>
-                  <div>Status</div>
-                  <div>Opened</div>
-                </div>
-                ${sortedDisputes.map((dispute) => renderDisputeRow(dispute))}
-              </div>
-            `
-      }
-      ${renderFilterSummary(sortedDisputes.length, props.disputes.length)}
-    </section>
+      <div class="list list--dense" style="margin-top: 16px;">
+        ${
+          disputes.length === 0
+            ? html`<div class="muted">${emptyLabel}</div>`
+            : disputes.map(
+                (dispute) => html`
+                <article class="list-item list-item--stacked">
+                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                    <div>
+                      <div class="list-item__title">${dispute.disputeId}</div>
+                      <div class="muted">${dispute.leaseId}</div>
+                    </div>
+                    <span class="pill">${dispute.status}</span>
+                  </div>
+                  <div class="list-item__body">${clampText(dispute.reason, 220)}</div>
+                </article>
+              `,
+              )
+        }
+      </div>
+    </div>
   `;
 }
 
-function matchesText(query: string, values: Array<string | undefined | null>) {
-  if (!query) {
-    return true;
+function renderLedgerCard(
+  props: MarketProps,
+  ledgerEntries: MarketLedgerEntry[],
+  ledgerEntryCount: number,
+  emptyLabel: string,
+) {
+  return html`
+    <div class="card card--stretch">
+      <div class="card-title">Ledger</div>
+      <div class="card-sub">Recent billing and settlement events.</div>
+      <div class="filters filters--four" style="margin-top: 16px;">
+        <label class="field">
+          <span class="field__label">Search</span>
+          <input
+            type="search"
+            placeholder="Lease, resource, or run"
+            .value=${props.filters.ledgerSearch}
+            @input=${(event: Event) =>
+              props.onFiltersChange({
+                ...props.filters,
+                ledgerSearch: (event.target as HTMLInputElement).value,
+              })}
+          />
+        </label>
+        <label class="field">
+          <span class="field__label">Unit</span>
+          <select
+            .value=${props.filters.ledgerUnit}
+            @change=${(event: Event) =>
+              props.onFiltersChange({
+                ...props.filters,
+                ledgerUnit: (event.target as HTMLSelectElement)
+                  .value as MarketFilters["ledgerUnit"],
+              })}
+          >
+            ${LEDGER_UNIT_OPTIONS.map(
+              (option) => html`<option value=${option.value}>${option.label}</option>`,
+            )}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">Sort</span>
+          <select
+            .value=${props.filters.ledgerSort}
+            @change=${(event: Event) =>
+              props.onFiltersChange({
+                ...props.filters,
+                ledgerSort: (event.target as HTMLSelectElement)
+                  .value as MarketFilters["ledgerSort"],
+              })}
+          >
+            <option value="time_desc">Time ↓</option>
+            <option value="time_asc">Time ↑</option>
+          </select>
+        </label>
+        <div class="field field--summary">
+          <span class="field__label">Visible</span>
+          <div class="field__value">${ledgerEntryCount}</div>
+        </div>
+      </div>
+      <div class="list list--dense" style="margin-top: 16px;">
+        ${
+          ledgerEntries.length === 0
+            ? html`<div class="muted">${emptyLabel}</div>`
+            : ledgerEntries.map(
+                (entry) => html`
+                <article class="list-item list-item--stacked">
+                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                    <div>
+                      <div class="list-item__title">${entry.entryId}</div>
+                      <div class="muted">${entry.leaseId ?? entry.resourceId ?? entry.runId ?? "n/a"}</div>
+                    </div>
+                    <span class="pill">${entry.unit}</span>
+                  </div>
+                  <div class="list-item__meta">
+                    <span>${entry.amount}</span>
+                    <span>${entry.direction}</span>
+                    <span>${entry.timestamp}</span>
+                  </div>
+                </article>
+              `,
+              )
+        }
+      </div>
+    </div>
+  `;
+}
+
+function sortResources(resources: MarketResource[], mode: MarketFilters["resourceSort"]) {
+  const copy = [...resources];
+  switch (mode) {
+    case "updated_asc":
+      return copy.toSorted((a, b) => compareValues(a.updatedAt, b.updatedAt));
+    case "price_desc":
+      return copy.toSorted((a, b) => compareValues(b.price?.value ?? 0, a.price?.value ?? 0));
+    case "price_asc":
+      return copy.toSorted((a, b) => compareValues(a.price?.value ?? 0, b.price?.value ?? 0));
+    case "updated_desc":
+    default:
+      return copy.toSorted((a, b) => compareValues(b.updatedAt, a.updatedAt));
   }
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) {
-    return true;
+}
+
+function sortLeases(leases: MarketLease[], mode: MarketFilters["leaseSort"]) {
+  const copy = [...leases];
+  switch (mode) {
+    case "issued_asc":
+      return copy.toSorted((a, b) => compareValues(a.issuedAt, b.issuedAt));
+    case "expires_desc":
+      return copy.toSorted((a, b) => compareValues(b.expiresAt, a.expiresAt));
+    case "expires_asc":
+      return copy.toSorted((a, b) => compareValues(a.expiresAt, b.expiresAt));
+    case "issued_desc":
+    default:
+      return copy.toSorted((a, b) => compareValues(b.issuedAt, a.issuedAt));
   }
-  return values.some((value) =>
-    typeof value === "string" ? value.toLowerCase().includes(normalized) : false,
-  );
+}
+
+function sortDisputes(disputes: MarketDispute[], mode: MarketFilters["disputeSort"]) {
+  const copy = [...disputes];
+  switch (mode) {
+    case "opened_asc":
+      return copy.toSorted((a, b) => compareValues(a.openedAt, b.openedAt));
+    case "updated_desc":
+      return copy.toSorted((a, b) =>
+        compareValues(b.updatedAt ?? b.openedAt, a.updatedAt ?? a.openedAt),
+      );
+    case "updated_asc":
+      return copy.toSorted((a, b) =>
+        compareValues(a.updatedAt ?? a.openedAt, b.updatedAt ?? b.openedAt),
+      );
+    case "opened_desc":
+    default:
+      return copy.toSorted((a, b) => compareValues(b.openedAt, a.openedAt));
+  }
 }
 
 function sortByTime<T>(
-  items: T[],
-  getValue: (item: T) => string | undefined,
+  entries: T[],
+  pick: (entry: T) => string | number | null | undefined,
   direction: "asc" | "desc",
 ) {
-  return items.toSorted((a, b) => {
-    const aTime = parseTimestamp(getValue(a));
-    const bTime = parseTimestamp(getValue(b));
-    if (direction === "desc") {
-      return bTime - aTime;
-    }
-    return aTime - bTime;
+  const copy = [...entries];
+  copy.sort((a, b) => {
+    const result = compareValues(pick(a), pick(b));
+    return direction === "asc" ? result : -result;
   });
+  return copy;
 }
 
-function parseTimestamp(value?: string) {
-  if (!value) {
-    return 0;
-  }
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) {
-    return 0;
-  }
-  return parsed;
-}
-
-function renderFilterSummary(current: number, total: number) {
-  if (total === 0 || current === total) {
-    return nothing;
-  }
-  return html`
-    <div class="muted" style="margin-top: 12px;">Showing ${current} of ${total} items.</div>
-  `;
-}
-
-function renderEmptyState(loading: boolean, emptyLabel: string, loadingLabel: string) {
-  return html`
-    <div class="muted" style="margin-top: 12px;">
-      ${loading ? loadingLabel : emptyLabel}
-    </div>
-  `;
-}
-
-function renderFilterButton(
-  key: MarketProps["resourceKind"],
-  label: string,
-  active: MarketProps["resourceKind"],
-  onChange: MarketProps["onResourceKindChange"],
+function compareValues(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
 ) {
-  const isActive = key === active;
-  return html`
-    <button class="btn btn--sm ${isActive ? "primary" : ""}" @click=${() => onChange(key)}>
-      ${label}
-    </button>
-  `;
-}
-
-function renderStatusPills(statuses: Record<string, number>) {
-  const entries = Object.entries(statuses);
-  if (entries.length === 0) {
-    return html`
-      <div class="muted" style="margin-top: 6px">No status data</div>
-    `;
+  if (typeof a === "number" && typeof b === "number") {
+    return a - b;
   }
-  return html`
-    <div class="row" style="gap: 6px; flex-wrap: wrap; margin-top: 8px;">
-      ${entries.map(([status, count]) => {
-        const tone = resolveStatusTone(status);
-        return html`<span class="pill pill--sm ${tone}">${status} · ${count}</span>`;
-      })}
-    </div>
-  `;
+  return String(a ?? "").localeCompare(String(b ?? ""));
 }
 
-function renderResourceRow(resource: MarketResource) {
-  return html`
-    <div class="table-row">
-      <div class="mono">${clampText(resource.resourceId, 16)}</div>
-      <div><span class="chip">${resource.kind}</span></div>
-      <div class="mono">${clampText(resource.providerActorId, 16)}</div>
-      <div>${resource.price.amount} ${resource.price.unit}</div>
-      <div>${renderStatusBadge(resource.status)}</div>
-      <div>${formatIsoRelative(resource.updatedAt)}</div>
-    </div>
-  `;
-}
-
-function renderLeaseRow(lease: MarketLease) {
-  return html`
-    <div class="table-row">
-      <div class="mono">${clampText(lease.leaseId, 14)}</div>
-      <div class="mono">${clampText(lease.resourceId, 14)}</div>
-      <div class="mono">${clampText(lease.consumerActorId, 14)}</div>
-      <div>${renderStatusBadge(lease.status)}</div>
-      <div>${formatIsoRelative(lease.issuedAt)}</div>
-      <div>${formatIsoRelative(lease.expiresAt)}</div>
-    </div>
-  `;
-}
-
-function renderDisputeRow(dispute: MarketDispute) {
-  return html`
-    <div class="table-row">
-      <div class="mono">${clampText(dispute.disputeId, 14)}</div>
-      <div class="mono">${clampText(dispute.orderId, 14)}</div>
-      <div class="mono">${clampText(dispute.initiatorActorId, 14)}</div>
-      <div>${clampText(dispute.reason, 42)}</div>
-      <div>${renderStatusBadge(dispute.status)}</div>
-      <div>${formatIsoRelative(dispute.openedAt)}</div>
-    </div>
-  `;
-}
-
-function renderLedgerUnits(summary: MarketLedgerSummary | null) {
-  const units = summary?.byUnit ? Object.entries(summary.byUnit) : [];
-  if (units.length === 0) {
-    return html`
-      <div class="muted" style="margin-top: 12px">No ledger entries yet.</div>
-    `;
+function matchesText(search: string | undefined, values: Array<string | null | undefined>) {
+  const needle = search?.trim().toLowerCase();
+  if (!needle) {
+    return true;
   }
-  return html`
-    <div class="grid grid-cols-2" style="margin-top: 16px;">
-      ${units.map(
-        ([unit, data]) => html`
-        <div class="card" style="padding: 12px;">
-          <div class="card-title" style="font-size: 13px;">${unit}</div>
-          <div class="stat-value" style="margin-top: 6px;">${data.quantity}</div>
-          <div class="muted">Cost ${data.cost}</div>
-        </div>
-      `,
-      )}
-    </div>
-  `;
+  return values.some((value) =>
+    String(value ?? "")
+      .toLowerCase()
+      .includes(needle),
+  );
 }
 
-function renderMetricsSnapshot(metrics: MarketMetricsSnapshot | null) {
-  if (!metrics) {
-    return html`
-      <div class="muted" style="margin-top: 12px">No metrics snapshot yet.</div>
-    `;
-  }
-  return html`
-    <div class="stat-grid" style="margin-top: 16px;">
-      <div class="stat">
-        <div class="stat-label">Settlement failure rate</div>
-        <div class="stat-value">${formatPercent(metrics.settlements.failureRate)}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Pending anchors</div>
-        <div class="stat-value">${metrics.audit.anchorPending}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Revocations pending</div>
-        <div class="stat-value">${metrics.revocations.pending}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Revocations failed</div>
-        <div class="stat-value">${metrics.revocations.failed}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Disputes open</div>
-        <div class="stat-value">${metrics.disputes.open}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Active leases</div>
-        <div class="stat-value">${metrics.leases.active}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Audit events</div>
-        <div class="stat-value">${metrics.audit.events}</div>
-      </div>
-    </div>
-  `;
-}
-
-function renderAlerts(activeAlerts: MarketAlert[], allAlerts: MarketAlert[]) {
-  if (allAlerts.length === 0) {
-    return html`
-      <div class="muted" style="margin-top: 12px">No alert data available.</div>
-    `;
-  }
-  if (activeAlerts.length === 0) {
-    return html`
-      <div class="callout success" style="margin-top: 12px">
-        No active alerts. Market rules are within expected thresholds.
-      </div>
-    `;
-  }
-  return html`
-    <div class="stack" style="margin-top: 12px;">
-      ${activeAlerts.map((alert) => renderAlertRow(alert))}
-    </div>
-  `;
-}
-
-function renderAlertRow(alert: MarketAlert) {
-  const tone = alert.severity === "p0" ? "pill--danger" : "pill--warn";
-  return html`
-    <div class="row" style="justify-content: space-between;">
-      <div>
-        <div class="card-title" style="font-size: 13px;">${formatAlertLabel(alert.rule)}</div>
-        <div class="muted">Rule: ${alert.rule}</div>
-      </div>
-      <div class="row" style="gap: 8px;">
-        <span class="pill pill--sm ${tone}">${alert.severity.toUpperCase()}</span>
-        <span class="pill pill--sm">${formatAlertValue(alert)}</span>
-      </div>
-    </div>
-  `;
-}
-
-function renderLedgerEntryRow(entry: MarketLedgerEntry) {
-  return html`
-    <div class="table-row">
-      <div>${formatIsoRelative(entry.timestamp)}</div>
-      <div class="mono">${clampText(entry.leaseId, 14)}</div>
-      <div class="mono">${clampText(entry.resourceId, 14)}</div>
-      <div>${entry.unit}</div>
-      <div>${entry.quantity}</div>
-      <div>${entry.cost} ${entry.currency}</div>
-    </div>
-  `;
-}
-
-function formatAlertLabel(rule: string) {
-  switch (rule) {
-    case "settlement_failure_rate":
-      return "Settlement failure rate";
-    case "anchor_pending":
-      return "Anchors pending";
-    case "dispute_unresolved_24h":
-      return "Disputes unresolved (24h+)";
-    case "revocation_failed":
-      return "Revocations failed";
-    case "revocation_pending":
-      return "Revocations pending";
-    default:
-      return rule;
-  }
-}
-
-function formatAlertValue(alert: MarketAlert) {
-  if (alert.rule === "settlement_failure_rate") {
-    return formatPercent(alert.value);
-  }
-  return String(alert.value);
-}
-
-function formatPercent(value: number) {
-  if (!Number.isFinite(value)) {
-    return "0%";
-  }
-  return `${(value * 100).toFixed(2)}%`;
-}
-
-function renderStatusBadge(status: string) {
-  const tone = resolveStatusTone(status);
-  return html`<span class="pill pill--sm ${tone}">${status}</span>`;
-}
-
-function resolveStatusTone(status: string): string {
-  const lower = status.toLowerCase();
-  if (lower.includes("failed") || lower.includes("rejected") || lower.includes("revoked")) {
-    return "pill--danger";
-  }
-  if (
-    lower.includes("pending") ||
-    lower.includes("open") ||
-    lower.includes("evidence") ||
-    lower.includes("requested") ||
-    lower.includes("in_flight")
-  ) {
-    return "pill--warn";
-  }
-  return "pill--ok";
-}
-
-function formatIsoRelative(value?: string) {
-  if (!value) {
-    return "n/a";
-  }
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) {
-    return value;
-  }
-  return formatRelativeTimestamp(parsed);
-}
-
-function countByStatus<T extends { status: string }>(items: T[]): Record<string, number> {
-  return items.reduce(
-    (acc, item) => {
-      acc[item.status] = (acc[item.status] ?? 0) + 1;
+function countByStatus(disputes: MarketDispute[]) {
+  return disputes.reduce(
+    (acc, dispute) => {
+      if (dispute.status === "dispute_opened") {
+        acc.open += 1;
+      }
+      if (dispute.status === "dispute_resolved") {
+        acc.resolved += 1;
+      }
       return acc;
     },
-    {} as Record<string, number>,
+    { open: 0, resolved: 0 },
   );
+}
+
+function formatStatusLabel(label: string) {
+  return clampText(label.replaceAll("_", " "), 24);
+}
+
+function formatPrice(price: MarketResource["price"]) {
+  if (!price) {
+    return "No price";
+  }
+  return `${price.value} ${price.currency} / ${price.unit}`;
 }

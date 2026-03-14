@@ -76,6 +76,7 @@ normative: false
 - 一份节点角色表
 - 一份工作负载分级表
 - 一份“当前事实 vs 目标态”清单
+- 一份基于 `web3.market.preset.preview` 的兼容预设草案（单机 / 可信圈 / 混合云边）
 
 #### 通过标准
 

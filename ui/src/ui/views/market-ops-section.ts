@@ -93,6 +93,41 @@ export function renderOpsSection(props: OpsSectionProps) {
                 `
                 : nothing
             }
+
+            ${
+              summary.preset
+                ? html`
+                    <div style="margin-top:16px;">
+                      <div class="card-sub" style="font-weight:600;margin-bottom:8px;">
+                        Preset Baseline Gates
+                      </div>
+                      <div class="muted" style="margin-bottom:8px;">
+                        ${summary.preset.summary}
+                      </div>
+                      <table class="data-table">
+                        <thead>
+                          <tr>
+                            <th>Check</th>
+                            <th>Status</th>
+                            <th>Detail</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${summary.preset.readiness.checks.map(
+                            (check) => html`
+                              <tr>
+                                <td>${check.name}</td>
+                                <td>${check.status.toUpperCase()}</td>
+                                <td>${check.detail ?? "—"}</td>
+                              </tr>
+                            `,
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  `
+                : nothing
+            }
           `
           : loading
             ? html`

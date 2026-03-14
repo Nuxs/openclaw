@@ -1,9 +1,9 @@
 import type { ResourceModelOffer, Web3PluginConfig } from "../config.js";
-import type { MarketDeploymentRuntimeHint, MarketDetectedProvider } from "./deployment-types.js";
+import type { MarketPresetRuntimeHint, MarketDetectedProvider } from "./preset-types.js";
 
-export function detectDeploymentProviders(params: {
+export function detectPresetProviders(params: {
   config: Web3PluginConfig;
-  runtimeHints?: MarketDeploymentRuntimeHint[];
+  runtimeHints?: MarketPresetRuntimeHint[];
 }): {
   providers: MarketDetectedProvider[];
   suggestedOffers: ResourceModelOffer[];
@@ -81,7 +81,7 @@ function normalizeRuntimeKind(backend: string): MarketDetectedProvider["runtime"
   }
 }
 
-function defaultHintLabel(kind: MarketDeploymentRuntimeHint["kind"]): string {
+function defaultHintLabel(kind: MarketPresetRuntimeHint["kind"]): string {
   switch (kind) {
     case "lmstudio":
       return "LM Studio";
@@ -94,7 +94,7 @@ function defaultHintLabel(kind: MarketDeploymentRuntimeHint["kind"]): string {
   }
 }
 
-function defaultBaseUrlForHint(kind: MarketDeploymentRuntimeHint["kind"]): string {
+function defaultBaseUrlForHint(kind: MarketPresetRuntimeHint["kind"]): string {
   switch (kind) {
     case "lmstudio":
       return "http://127.0.0.1:1234";

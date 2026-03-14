@@ -620,6 +620,63 @@ export type OpsHealthProbe = {
   details?: string;
 };
 
+export type MarketPresetMode = "single-node" | "trusted-circle" | "hybrid-cloud-edge";
+
+export type MarketPresetOperation = {
+  op: "set" | "setIfMissing" | "setIfEmpty" | "mergeStringSet";
+  path: Array<string | number>;
+  value: unknown;
+  summary: string;
+};
+
+export type MarketPresetRole = {
+  id: string;
+  label: string;
+  responsibility: string;
+};
+
+export type MarketPresetPreview = {
+  mode: MarketPresetMode;
+  intent: "consumer" | "provider" | "hybrid";
+  summary: string;
+  layout: {
+    pattern: string;
+    trustDomain: string;
+    roles: MarketPresetRole[];
+    validationScenarios: string[];
+  };
+  detectedProviders: Array<{
+    label: string;
+    source: "configured" | "hint";
+    runtime: "ollama" | "lmstudio" | "openai-compat" | "custom";
+    offerBackend: "openai-compat" | "custom";
+    models: string[];
+    publishable: boolean;
+    note?: string;
+  }>;
+  operations: MarketPresetOperation[];
+  checks: GaReadinessCheck[];
+  nextSteps: string[];
+};
+
+export type MarketPresetVerification = {
+  mode: MarketPresetMode;
+  healthy: boolean;
+  summary: string;
+  readiness: GaReadiness;
+  metrics: {
+    publishedResources: number;
+    activeLeases: number;
+    activeAlerts: number;
+    discoveryEnabled: boolean;
+    consumerEnabled: boolean;
+    advertiseToMarket: boolean;
+    providerListenEnabled: boolean;
+    providerBind?: string;
+  };
+  recommendedActions: string[];
+};
+
 export type MarketOpsSummary = {
   activeAlerts: number;
   alertsByLevel: Record<string, number>;
@@ -627,6 +684,7 @@ export type MarketOpsSummary = {
   discoveryHealthy: boolean;
   paymentHealthy: boolean;
   settlementHealthy: boolean;
+  preset: MarketPresetVerification | null;
 };
 
 // ── GA Readiness ──

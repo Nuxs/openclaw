@@ -3,15 +3,15 @@ import type { PluginCommandHandler, PluginCommandResult } from "openclaw/plugin-
 import type { Web3PluginConfig } from "../config.js";
 import { loadConfigWriteHelpers } from "../core-imports.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
-import type { MarketDeploymentMode } from "../setup/deployment-types.js";
 import {
-  applyPlanToConfig,
-  buildMarketDeploymentPlan,
-  formatMarketDeploymentPlan,
-  formatMarketDeploymentVerification,
-  verifyMarketDeployment,
+  applyPresetToConfig,
+  buildMarketPresetPreview,
+  formatMarketPresetPreview,
+  formatMarketPresetVerification,
+  verifyMarketPresetBaseline,
 } from "../setup/orchestrator.js";
-import { modeLabel, resolveDeploymentMode } from "../setup/topology-planner.js";
+import { modeLabel, resolvePresetMode } from "../setup/preset-layout.js";
+import type { MarketPresetMode } from "../setup/preset-types.js";
 import {
   buildWeb3MarketStatusSummary,
   formatWeb3MarketStatusMessage,
@@ -23,7 +23,7 @@ type MarketAction = "status" | "help" | "start" | "enable" | "plan" | "verify";
 type Parsed = {
   action: MarketAction;
   profile: Web3MarketStatusProfile;
-  mode: MarketDeploymentMode;
+  mode: MarketPresetMode;
 };
 
 function parseArgs(argsRaw: string | undefined): Parsed {
@@ -49,7 +49,7 @@ function parseArgs(argsRaw: string | undefined): Parsed {
   const profile: Web3MarketStatusProfile = tokens.some((token) => token.toLowerCase() === "deep")
     ? "deep"
     : "fast";
-  const mode = resolveDeploymentMode(
+  const mode = resolvePresetMode(
     tokens.find(
       (token) =>
         token === "single-node" || token === "trusted-circle" || token === "hybrid-cloud-edge",
@@ -92,10 +92,10 @@ function summarizeConfig(cfg: OpenClawConfig | undefined): {
 function formatPresetInstructions(
   fullConfig: OpenClawConfig | undefined,
   runtimeConfig: Web3PluginConfig,
-  mode: MarketDeploymentMode,
+  mode: MarketPresetMode,
 ): string {
   const summary = summarizeConfig(fullConfig);
-  const plan = buildMarketDeploymentPlan(runtimeConfig, {
+  const plan = buildMarketPresetPreview(runtimeConfig, {
     mode,
     currentConfig: fullConfig,
   });
@@ -105,7 +105,7 @@ function formatPresetInstructions(
   );
   lines.push("说明：该命令只提供兼容预设预览/应用；多机拓扑决策应交给主脑 + skill。");
   lines.push("");
-  lines.push(formatMarketDeploymentPlan(plan));
+  lines.push(formatMarketPresetPreview(plan));
   lines.push("");
   lines.push(`若仍需直接应用该兼容预设：/web3-market enable ${mode} ok`);
   lines.push(`若要验证该预设基线：/web3-market verify ${mode}`);
@@ -130,7 +130,7 @@ async function enableWeb3MarketConfig(ctx: {
   accountId?: string;
   isAuthorizedSender: boolean;
   args?: string;
-  mode: MarketDeploymentMode;
+  mode: MarketPresetMode;
 }): Promise<PluginCommandResult> {
   if (!ctx.isAuthorizedSender) {
     return { text: "当前账号没有执行配置变更的权限。" };
@@ -170,7 +170,7 @@ async function enableWeb3MarketConfig(ctx: {
     return { text: "配置文件无效，请先修复后再启用。" };
   }
 
-  const { plan, nextConfig } = applyPlanToConfig({
+  const { preset, nextConfig } = applyPresetToConfig({
     currentConfig: snapshot.parsed as Record<string, unknown>,
     runtimeConfig: ctx.runtimeConfig,
     planParams: {
@@ -190,7 +190,7 @@ async function enableWeb3MarketConfig(ctx: {
   return {
     text: [
       `已提交 ${modeLabel(ctx.mode)} 兼容预设配置。`,
-      plan.summary,
+      preset.summary,
       "已补齐 agent-wallet policy 与资源共享基线。",
       "下一步：重启 Gateway，然后执行 /web3-market verify 查看预设基线状态。",
     ].join("\n"),
@@ -233,11 +233,11 @@ export function createWeb3MarketCommand(config: Web3PluginConfig): PluginCommand
 
     if (parsed.action === "verify") {
       try {
-        const verification = await verifyMarketDeployment({
+        const verification = await verifyMarketPresetBaseline({
           config,
           mode: parsed.mode,
         });
-        return { text: formatMarketDeploymentVerification(verification) };
+        return { text: formatMarketPresetVerification(verification) };
       } catch (error) {
         const normalized = formatWeb3GatewayErrorResponse(error);
         return {

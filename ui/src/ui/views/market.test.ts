@@ -29,10 +29,6 @@ describe("market view", () => {
         disputeStatus: "all" as const,
         ledgerUnit: "all" as const,
       },
-      enableBusy: false,
-      enableError: null,
-      enableNotice: null,
-      configPath: "",
       taskSection: {
         loading: false,
         summary: {
@@ -71,13 +67,13 @@ describe("market view", () => {
           discoveryHealthy: true,
           paymentHealthy: true,
           settlementHealthy: true,
+          preset: null,
         },
         alerts: [],
       },
       onResourceKindChange: () => {},
       onFiltersChange: () => {},
       onRefresh: () => {},
-      onEnable: () => {},
     };
 
     // Verify the props structure includes task/privacy/ops section data

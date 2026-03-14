@@ -182,6 +182,7 @@ git commit -m "revert: rollback Web3 GA changes"
 - [ ] AI 助手：任务市场意图（发布/查询/投标/提交/验收）→ 正确路由 → 脱敏输出
 - [ ] AI 助手：隐私意图（授权查询/回放/删除）→ scope-aware 展示 → 脱敏输出
 - [ ] AI 助手：运营意图（状态总览/告警）→ 并行数据抓取 → 全景摘要
+- [ ] AI 助手：预设意图（预览 / 应用 / 验证）→ 走 `web3.market.preset.*` + `config.apply` 闭环
 
 ### 5.2 安全验收
 

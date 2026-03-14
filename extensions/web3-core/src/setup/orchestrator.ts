@@ -2,45 +2,45 @@ import type { OpenClawConfig } from "openclaw/plugin-sdk/config-types";
 import { resolveConfig, type Web3PluginConfig } from "../config.js";
 import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.js";
 import { redactString } from "../utils/redact.js";
-import { applyDeploymentOperations, buildDeploymentOperations } from "./config-patch.js";
-import type {
-  MarketDeploymentCheck,
-  MarketDeploymentMode,
-  MarketDeploymentPlan,
-  MarketDeploymentPlanParams,
-  MarketDeploymentReadiness,
-  MarketDeploymentVerification,
-} from "./deployment-types.js";
-import { detectDeploymentProviders } from "./resource-detectors.js";
+import { applyPresetOperations, buildPresetOperations } from "./config-patch.js";
 import {
-  buildDeploymentTopology,
+  buildPresetLayout,
   modeLabel,
-  resolveDeploymentIntent,
-  resolveDeploymentMode,
-} from "./topology-planner.js";
+  resolvePresetIntent,
+  resolvePresetMode,
+} from "./preset-layout.js";
+import type {
+  MarketPresetCheck,
+  MarketPresetMode,
+  MarketPresetPreview,
+  MarketPresetPreviewParams,
+  MarketPresetReadiness,
+  MarketPresetVerification,
+} from "./preset-types.js";
+import { detectPresetProviders } from "./resource-detectors.js";
 
-export function buildMarketDeploymentPlan(
+export function buildMarketPresetPreview(
   runtimeConfig: Web3PluginConfig,
-  params: MarketDeploymentPlanParams = {},
-): MarketDeploymentPlan {
-  const mode = resolveDeploymentMode(params.mode);
-  const intent = resolveDeploymentIntent(params.intent, mode);
+  params: MarketPresetPreviewParams = {},
+): MarketPresetPreview {
+  const mode = resolvePresetMode(params.mode);
+  const intent = resolvePresetIntent(params.intent, mode);
   const currentConfig = ensureRecord(params.currentConfig);
   const resolvedRuntimeConfig = resolveConfig(
     extractWeb3PluginConfig(currentConfig) ?? runtimeConfig,
   );
-  const topology = buildDeploymentTopology({ mode, intent, nodeLabel: params.nodeLabel });
-  const detected = detectDeploymentProviders({
+  const layout = buildPresetLayout({ mode, intent, nodeLabel: params.nodeLabel });
+  const detected = detectPresetProviders({
     config: resolvedRuntimeConfig,
     runtimeHints: params.runtimeHints,
   });
-  const operations = buildDeploymentOperations({
+  const operations = buildPresetOperations({
     currentConfig,
     mode,
     intent,
     suggestedOffers: detected.suggestedOffers,
   });
-  const checks = buildPlanChecks({
+  const checks = buildPresetChecks({
     mode,
     intent,
     config: resolvedRuntimeConfig,
@@ -51,8 +51,8 @@ export function buildMarketDeploymentPlan(
   return {
     mode,
     intent,
-    summary: summarizePlan(mode, intent, detected.providers.length),
-    topology,
+    summary: summarizePreset(mode, intent, detected.providers.length),
+    layout,
     detectedProviders: detected.providers,
     operations,
     checks,
@@ -60,12 +60,12 @@ export function buildMarketDeploymentPlan(
   };
 }
 
-export async function verifyMarketDeployment(params: {
+export async function verifyMarketPresetBaseline(params: {
   config: Web3PluginConfig;
-  mode?: MarketDeploymentMode;
-}): Promise<MarketDeploymentVerification> {
-  const mode = resolveDeploymentMode(params.mode);
-  const checks: MarketDeploymentCheck[] = [];
+  mode?: MarketPresetMode;
+}): Promise<MarketPresetVerification> {
+  const mode = resolvePresetMode(params.mode);
+  const checks: MarketPresetCheck[] = [];
   const runtimeConfig = params.config;
   const metrics = {
     publishedResources: 0,
@@ -269,13 +269,13 @@ export async function verifyMarketDeployment(params: {
   };
 }
 
-export function formatMarketDeploymentPlan(plan: MarketDeploymentPlan): string {
+export function formatMarketPresetPreview(plan: MarketPresetPreview): string {
   const lines: string[] = [];
   lines.push(`🧭 兼容预设预览：${modeLabel(plan.mode)} / ${plan.intent}`);
   lines.push(plan.summary);
   lines.push("");
-  lines.push(`布局摘要：${plan.topology.pattern}`);
-  lines.push(`信任边界：${plan.topology.trustDomain}`);
+  lines.push(`布局摘要：${plan.layout.pattern}`);
+  lines.push(`信任边界：${plan.layout.trustDomain}`);
   if (plan.detectedProviders.length > 0) {
     lines.push("");
     lines.push("探测到的 Provider / 运行时：");
@@ -302,9 +302,7 @@ export function formatMarketDeploymentPlan(plan: MarketDeploymentPlan): string {
   return lines.join("\n");
 }
 
-export function formatMarketDeploymentVerification(
-  verification: MarketDeploymentVerification,
-): string {
+export function formatMarketPresetVerification(verification: MarketPresetVerification): string {
   const lines: string[] = [];
   lines.push(`🩺 预设基线验证：${modeLabel(verification.mode)}`);
   lines.push(verification.summary);
@@ -326,26 +324,26 @@ export function formatMarketDeploymentVerification(
   return lines.join("\n");
 }
 
-export function applyPlanToConfig(params: {
+export function applyPresetToConfig(params: {
   currentConfig?: OpenClawConfig | Record<string, unknown>;
   runtimeConfig: Web3PluginConfig;
-  planParams?: MarketDeploymentPlanParams;
-}): { plan: MarketDeploymentPlan; nextConfig: Record<string, unknown> } {
-  const plan = buildMarketDeploymentPlan(params.runtimeConfig, params.planParams);
+  planParams?: MarketPresetPreviewParams;
+}): { preset: MarketPresetPreview; nextConfig: Record<string, unknown> } {
+  const preset = buildMarketPresetPreview(params.runtimeConfig, params.planParams);
   return {
-    plan,
-    nextConfig: applyDeploymentOperations(params.currentConfig, plan.operations),
+    preset,
+    nextConfig: applyPresetOperations(params.currentConfig, preset.operations),
   };
 }
 
-function buildPlanChecks(params: {
-  mode: MarketDeploymentMode;
+function buildPresetChecks(params: {
+  mode: MarketPresetMode;
   intent: string;
   config: Web3PluginConfig;
-  detectedProviders: ReturnType<typeof detectDeploymentProviders>["providers"];
+  detectedProviders: ReturnType<typeof detectPresetProviders>["providers"];
   hasSuggestedOffers: boolean;
-}): MarketDeploymentCheck[] {
-  const checks: MarketDeploymentCheck[] = [];
+}): MarketPresetCheck[] {
+  const checks: MarketPresetCheck[] = [];
   checks.push(
     checkFromBoolean(
       "resources.enabled",
@@ -399,14 +397,14 @@ function buildPlanChecks(params: {
   return checks;
 }
 
-function summarizePlan(mode: MarketDeploymentMode, intent: string, detectedCount: number): string {
+function summarizePreset(mode: MarketPresetMode, intent: string, detectedCount: number): string {
   return `${modeLabel(mode)} 兼容预设会按 ${intent} 角色补齐 Web3 Market 基线，并${detectedCount > 0 ? `复用 ${detectedCount} 个已识别运行时/offer 线索` : "保持现有 offer 配置"}。`;
 }
 
 function buildNextSteps(
-  mode: MarketDeploymentMode,
+  mode: MarketPresetMode,
   intent: string,
-  checks: MarketDeploymentCheck[],
+  checks: MarketPresetCheck[],
 ): string[] {
   const steps = [
     `应用 ${modeLabel(mode)} 兼容预设配置。`,
@@ -422,7 +420,7 @@ function buildNextSteps(
   return steps;
 }
 
-function summarizeReadiness(checks: MarketDeploymentCheck[]): MarketDeploymentReadiness {
+function summarizeReadiness(checks: MarketPresetCheck[]): MarketPresetReadiness {
   const passCount = checks.filter((check) => check.status === "pass").length;
   const warnCount = checks.filter((check) => check.status === "warn").length;
   const failCount = checks.filter((check) => check.status === "fail").length;
@@ -441,7 +439,7 @@ function checkFromBoolean(
   passDetail: string,
   failDetail: string,
   failStatus: "warn" | "fail" = "fail",
-): MarketDeploymentCheck {
+): MarketPresetCheck {
   return {
     name,
     status: value ? "pass" : failStatus,

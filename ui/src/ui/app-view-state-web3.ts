@@ -82,12 +82,8 @@ export type Web3ViewState = {
   opsAlerts: OpsAlertView[];
   marketResourceKind: MarketResourceKind | "all";
   marketFilters: MarketFilters;
-  marketEnableBusy: boolean;
-  marketEnableError: string | null;
-  marketEnableNotice: string | null;
   debugWeb3Audit: unknown;
   debugWeb3AuditError: string | null;
-  handleMarketEnable(): void;
   loadMarket(): Promise<void>;
   loadWeb3(): Promise<void>;
 };

@@ -307,6 +307,65 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
       risk: { level: "low" },
     },
     {
+      name: "web3.market.preset.preview",
+      summary:
+        "Preview a market compatibility preset for single-node, trusted-circle, or hybrid-cloud-edge setups.",
+      kind: "gateway",
+      group: "market",
+      availability: availability(true),
+      paramsSchema: {
+        type: "object",
+        properties: {
+          mode: {
+            type: "string",
+            enum: ["single-node", "trusted-circle", "hybrid-cloud-edge"],
+          },
+          intent: {
+            type: "string",
+            enum: ["consumer", "provider", "hybrid"],
+          },
+          currentConfig: { type: "object" },
+          runtimeHints: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                kind: {
+                  type: "string",
+                  enum: ["ollama", "lmstudio", "openai-compat", "custom"],
+                },
+                label: { type: "string" },
+                models: { type: "array", items: { type: "string" } },
+                maxConcurrent: { type: "number", minimum: 1, maximum: 8 },
+              },
+            },
+          },
+          nodeLabel: { type: "string" },
+        },
+      },
+      returns: "Preset layout summary, config patch operations, readiness checks, and next steps.",
+      risk: { level: "low" },
+    },
+    {
+      name: "web3.market.preset.verify",
+      summary:
+        "Verify the preset baseline across resources, discovery, monitor health, and lease flow.",
+      kind: "gateway",
+      group: "market",
+      availability: availability(true),
+      paramsSchema: {
+        type: "object",
+        properties: {
+          mode: {
+            type: "string",
+            enum: ["single-node", "trusted-circle", "hybrid-cloud-edge"],
+          },
+        },
+      },
+      returns: "Preset baseline verification summary with release gates and recommended actions.",
+      risk: { level: "low" },
+    },
+    {
       name: "web3.market.resource.publish",
       summary: "Market entrypoint for resource publish (proxy to market-core).",
       kind: "gateway",
