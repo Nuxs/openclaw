@@ -181,7 +181,7 @@ if [[ "$STRATEGY" == "rebase" ]]; then
     echo "  1. 解决冲突文件（git status 查看）"
     echo "  2. git add <已解决的文件>"
     echo "  3. git rebase --continue"
-    echo "  4. 如果 pnpm-lock.yaml 冲突: 接受上游版本后运行 pnpm install"
+    echo "  4. 如果 pnpm-lock.yaml 冲突: 接受上游版本后运行 pnpm install --lockfile-only --no-frozen-lockfile"
     echo ""
     echo "放弃: git rebase --abort"
     exit 1
@@ -192,15 +192,15 @@ else
     echo "❌ Merge 遇到冲突！"
     echo ""
 
-    # pnpm-lock.yaml 自动处理（生成文件，accept theirs + pnpm install 即可）
+    # pnpm-lock.yaml 自动处理（生成文件，accept theirs + 刷新 lockfile 即可）
     if git diff --name-only --diff-filter=U | grep -q "pnpm-lock.yaml"; then
       echo "🔧 检测到 pnpm-lock.yaml 冲突，尝试自动解决..."
       git checkout --theirs pnpm-lock.yaml
-      pnpm install --no-frozen-lockfile 2>/dev/null && {
+      pnpm install --lockfile-only --no-frozen-lockfile 2>/dev/null && {
         git add pnpm-lock.yaml
         echo "  ✅ pnpm-lock.yaml 已自动解决"
       } || {
-        echo "  ⚠️  pnpm install 失败，请手动处理 pnpm-lock.yaml"
+        echo "  ⚠️  lockfile 刷新失败，请手动处理 pnpm-lock.yaml"
       }
     fi
 
@@ -344,7 +344,7 @@ echo ""
 echo "✅ 同步完成！"
 echo ""
 echo "📋 后续步骤:"
-echo "  1. pnpm install      # 更新依赖"
+echo "  1. pnpm install --frozen-lockfile  # 按仓库已提交的 lockfile 安装依赖"
 echo "  2. pnpm build        # 重新构建"
 echo "  3. pnpm test         # 运行测试确认无回归"
 echo "  4. 检查 private/brand.json 是否需要更新（上游可能新增了品牌位置）"

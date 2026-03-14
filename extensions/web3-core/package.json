@@ -12,6 +12,7 @@
     "@libp2p/kad-dht": "^16.1.5",
     "@libp2p/tcp": "^11.0.12",
     "@multiformats/multiaddr": "^13.0.1",
+    "@sinclair/typebox": "0.34.48",
     "arweave": "1.15.7",
     "ethers": "6.16.0",
     "libp2p": "^3.1.5",
