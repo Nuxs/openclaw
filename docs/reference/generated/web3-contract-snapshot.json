@@ -782,9 +782,183 @@
         },
         "group": "market",
         "kind": "gateway",
+        "name": "web3.market.consent.grant",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "consentScope": {
+              "description": "Purpose, duration and retention scope.",
+              "type": "object"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "signature": {
+              "description": "0x-prefixed signature of the consent message.",
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId", "signature", "consentScope"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns consentId, consentHash and the granted status.",
+        "risk": {
+          "level": "high",
+          "notes": ["Grants usage authorization and advances the order toward delivery."]
+        },
+        "stability": "experimental",
+        "summary": "Grant buyer consent for an order with a signed scope payload."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
         "name": "web3.market.consent.list",
         "stability": "experimental",
         "summary": "List all consent records with status, scope and retention info."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.consent.revoke",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "consentId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "consentId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns consentId, revokedAt and revokeHash.",
+        "risk": {
+          "level": "high",
+          "notes": ["Revocation can deactivate downstream delivery access and spawn retry jobs."]
+        },
+        "stability": "experimental",
+        "summary": "Revoke previously granted buyer consent and trigger downstream delivery revocation when required."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.delivery.complete",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "deliveryId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "deliveryId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns deliveryId and the completed status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Moves delivery and order state into completed status."]
+        },
+        "stability": "experimental",
+        "summary": "Mark delivery as completed so the order can advance to final acceptance and settlement release."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.delivery.issue",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "payload": {
+              "description": "Delivery payload. Sensitive secrets will be stored securely.",
+              "type": "object"
+            }
+          },
+          "required": ["actorId", "orderId", "payload"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["seller actor identity", "order in a delivery-ready transition path"],
+        "returns": "Returns deliveryId, deliveryHash and the ready status.",
+        "risk": {
+          "level": "high",
+          "notes": ["Delivery may place credentials into the secure credentials store."]
+        },
+        "stability": "experimental",
+        "summary": "Issue seller delivery payload for an order after consent and settlement preconditions are met."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.delivery.revoke",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "deliveryId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "deliveryId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns deliveryId, revokedAt and downstream revoke status metadata.",
+        "risk": {
+          "level": "high",
+          "notes": ["May create revocation retry jobs and change buyer access state."]
+        },
+        "stability": "experimental",
+        "summary": "Revoke previously issued delivery and enqueue retry work if downstream revocation fails."
       },
       {
         "availability": {
@@ -1381,6 +1555,259 @@
           "level": "low"
         },
         "summary": "Snapshot market metrics for monitoring dashboards."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.close",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "offerId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "offerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns offerId and the closed status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Closing an offer is a seller-side availability change."]
+        },
+        "stability": "experimental",
+        "summary": "Close an offer and prevent future orders from using it."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.create",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "description": "Seller actor ID.",
+              "type": "string"
+            },
+            "assetId": {
+              "description": "Seller-defined asset identifier.",
+              "type": "string"
+            },
+            "assetMeta": {
+              "description": "Non-secret metadata shown to buyers. Do not include credentials.",
+              "type": "object"
+            },
+            "assetType": {
+              "description": "Asset type, such as model, search, data or workflow.",
+              "type": "string"
+            },
+            "currency": {
+              "description": "Settlement currency code or token symbol.",
+              "type": "string"
+            },
+            "deliveryType": {
+              "description": "Delivery mode, such as api, file or credential.",
+              "type": "string"
+            },
+            "price": {
+              "description": "Unit price for the offer.",
+              "minimum": 1e-7,
+              "type": "number"
+            },
+            "usageScope": {
+              "description": "Allowed usage scope, purpose and retention window.",
+              "type": "object"
+            }
+          },
+          "required": [
+            "actorId",
+            "assetId",
+            "assetType",
+            "price",
+            "currency",
+            "usageScope",
+            "deliveryType"
+          ],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": [
+          "resources enabled",
+          "advertiseToMarket enabled",
+          "seller actor identity"
+        ],
+        "returns": "Returns offerId, offerHash and the new offer status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Creates a draft offer visible only after publish."]
+        },
+        "stability": "experimental",
+        "summary": "Create a seller offer for a market asset before publication."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.publish",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "offerId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "offerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["Offer already created", "seller actor identity"],
+        "returns": "Returns offerId and the published status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Makes the offer available to buyers."]
+        },
+        "stability": "experimental",
+        "summary": "Publish a draft seller offer so buyers can order it."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.update",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "assetMeta": {
+              "type": "object"
+            },
+            "deliveryType": {
+              "type": "string"
+            },
+            "offerId": {
+              "type": "string"
+            },
+            "price": {
+              "minimum": 1e-7,
+              "type": "number"
+            },
+            "usageScope": {
+              "type": "object"
+            }
+          },
+          "required": ["actorId", "offerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["Offer already created", "seller actor identity"],
+        "returns": "Returns offerId, updated offerHash and the current status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Changing offer terms affects future orders."]
+        },
+        "stability": "experimental",
+        "summary": "Update price, usage scope, delivery type or metadata of an existing offer."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.order.cancel",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns orderId and the cancelled status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Cancels buyer-side commercial intent."]
+        },
+        "stability": "experimental",
+        "summary": "Cancel an existing buyer order before the terminal settlement path completes."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.order.create",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "description": "Actor authorizing the order.",
+              "type": "string"
+            },
+            "buyerId": {
+              "description": "Buyer wallet / actor address.",
+              "type": "string"
+            },
+            "offerId": {
+              "description": "Published offer ID.",
+              "type": "string"
+            },
+            "quantity": {
+              "description": "Optional quantity; defaults to 1.",
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          "required": ["actorId", "offerId", "buyerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["resources consumer enabled", "published offer", "buyer actor identity"],
+        "returns": "Returns orderId, orderHash and the initial order status.",
+        "risk": {
+          "level": "high",
+          "notes": ["Creates a commercial order that may later lock payment or grant access."]
+        },
+        "stability": "experimental",
+        "summary": "Create a buyer order against a published offer."
       },
       {
         "availability": {
@@ -2299,6 +2726,17 @@
         "name": "web3.market.task.receipt.list",
         "stability": "experimental",
         "summary": "List task receipts with optional filters."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.result.list",
+        "stability": "experimental",
+        "summary": "List submitted task results with optional task, bid, deliverer or status filters."
       },
       {
         "availability": {
@@ -4304,9 +4742,178 @@
         },
         "group": "market",
         "kind": "gateway",
+        "name": "web3.market.consent.grant",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "consentScope": {
+              "description": "Purpose, duration and retention scope.",
+              "type": "object"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "signature": {
+              "description": "0x-prefixed signature of the consent message.",
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId", "signature", "consentScope"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns consentId, consentHash and the granted status.",
+        "risk": {
+          "level": "high",
+          "notes": ["Grants usage authorization and advances the order toward delivery."]
+        },
+        "stability": "experimental",
+        "summary": "Grant buyer consent for an order with a signed scope payload."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
         "name": "web3.market.consent.list",
         "stability": "experimental",
         "summary": "List all consent records with status, scope and retention info."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.consent.revoke",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "consentId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "consentId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns consentId, revokedAt and revokeHash.",
+        "risk": {
+          "level": "high",
+          "notes": ["Revocation can deactivate downstream delivery access and spawn retry jobs."]
+        },
+        "stability": "experimental",
+        "summary": "Revoke previously granted buyer consent and trigger downstream delivery revocation when required."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.delivery.complete",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "deliveryId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "deliveryId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns deliveryId and the completed status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Moves delivery and order state into completed status."]
+        },
+        "stability": "experimental",
+        "summary": "Mark delivery as completed so the order can advance to final acceptance and settlement release."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.delivery.issue",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "payload": {
+              "description": "Delivery payload. Sensitive secrets will be stored securely.",
+              "type": "object"
+            }
+          },
+          "required": ["actorId", "orderId", "payload"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["seller actor identity", "order in a delivery-ready transition path"],
+        "returns": "Returns deliveryId, deliveryHash and the ready status.",
+        "risk": {
+          "level": "high",
+          "notes": ["Delivery may place credentials into the secure credentials store."]
+        },
+        "stability": "experimental",
+        "summary": "Issue seller delivery payload for an order after consent and settlement preconditions are met."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.delivery.revoke",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "deliveryId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "deliveryId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns deliveryId, revokedAt and downstream revoke status metadata.",
+        "risk": {
+          "level": "high",
+          "notes": ["May create revocation retry jobs and change buyer access state."]
+        },
+        "stability": "experimental",
+        "summary": "Revoke previously issued delivery and enqueue retry work if downstream revocation fails."
       },
       {
         "availability": {
@@ -4885,6 +5492,253 @@
           "level": "low"
         },
         "summary": "Snapshot market metrics for monitoring dashboards."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.close",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "offerId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "offerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns offerId and the closed status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Closing an offer is a seller-side availability change."]
+        },
+        "stability": "experimental",
+        "summary": "Close an offer and prevent future orders from using it."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.create",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "description": "Seller actor ID.",
+              "type": "string"
+            },
+            "assetId": {
+              "description": "Seller-defined asset identifier.",
+              "type": "string"
+            },
+            "assetMeta": {
+              "description": "Non-secret metadata shown to buyers. Do not include credentials.",
+              "type": "object"
+            },
+            "assetType": {
+              "description": "Asset type, such as model, search, data or workflow.",
+              "type": "string"
+            },
+            "currency": {
+              "description": "Settlement currency code or token symbol.",
+              "type": "string"
+            },
+            "deliveryType": {
+              "description": "Delivery mode, such as api, file or credential.",
+              "type": "string"
+            },
+            "price": {
+              "description": "Unit price for the offer.",
+              "minimum": 1e-7,
+              "type": "number"
+            },
+            "usageScope": {
+              "description": "Allowed usage scope, purpose and retention window.",
+              "type": "object"
+            }
+          },
+          "required": [
+            "actorId",
+            "assetId",
+            "assetType",
+            "price",
+            "currency",
+            "usageScope",
+            "deliveryType"
+          ],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": [
+          "resources enabled",
+          "advertiseToMarket enabled",
+          "seller actor identity"
+        ],
+        "returns": "Returns offerId, offerHash and the new offer status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Creates a draft offer visible only after publish."]
+        },
+        "stability": "experimental",
+        "summary": "Create a seller offer for a market asset before publication."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.publish",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "offerId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "offerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["Offer already created", "seller actor identity"],
+        "returns": "Returns offerId and the published status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Makes the offer available to buyers."]
+        },
+        "stability": "experimental",
+        "summary": "Publish a draft seller offer so buyers can order it."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.update",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "assetMeta": {
+              "type": "object"
+            },
+            "deliveryType": {
+              "type": "string"
+            },
+            "offerId": {
+              "type": "string"
+            },
+            "price": {
+              "minimum": 1e-7,
+              "type": "number"
+            },
+            "usageScope": {
+              "type": "object"
+            }
+          },
+          "required": ["actorId", "offerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["Offer already created", "seller actor identity"],
+        "returns": "Returns offerId, updated offerHash and the current status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Changing offer terms affects future orders."]
+        },
+        "stability": "experimental",
+        "summary": "Update price, usage scope, delivery type or metadata of an existing offer."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.order.cancel",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "returns": "Returns orderId and the cancelled status.",
+        "risk": {
+          "level": "medium",
+          "notes": ["Cancels buyer-side commercial intent."]
+        },
+        "stability": "experimental",
+        "summary": "Cancel an existing buyer order before the terminal settlement path completes."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.order.create",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "description": "Actor authorizing the order.",
+              "type": "string"
+            },
+            "buyerId": {
+              "description": "Buyer wallet / actor address.",
+              "type": "string"
+            },
+            "offerId": {
+              "description": "Published offer ID.",
+              "type": "string"
+            },
+            "quantity": {
+              "description": "Optional quantity; defaults to 1.",
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          "required": ["actorId", "offerId", "buyerId"],
+          "type": "object"
+        },
+        "permissions": {
+          "requiresIdentity": true
+        },
+        "prerequisites": ["resources consumer enabled", "published offer", "buyer actor identity"],
+        "returns": "Returns orderId, orderHash and the initial order status.",
+        "risk": {
+          "level": "high",
+          "notes": ["Creates a commercial order that may later lock payment or grant access."]
+        },
+        "stability": "experimental",
+        "summary": "Create a buyer order against a published offer."
       },
       {
         "availability": {
@@ -5778,6 +6632,16 @@
         "name": "web3.market.task.receipt.list",
         "stability": "experimental",
         "summary": "List task receipts with optional filters."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.task.result.list",
+        "stability": "experimental",
+        "summary": "List submitted task results with optional task, bid, deliverer or status filters."
       },
       {
         "availability": {
@@ -8237,6 +9101,7 @@
           "market.task.publish",
           "market.task.receipt.get",
           "market.task.receipt.list",
+          "market.task.result.list",
           "market.task.result.review",
           "market.task.result.submit",
           "market.tokenEconomy.burn",
@@ -9097,7 +9962,12 @@
           "web3.market.bridge.status",
           "web3.market.bridge.update",
           "web3.market.consent.get",
+          "web3.market.consent.grant",
           "web3.market.consent.list",
+          "web3.market.consent.revoke",
+          "web3.market.delivery.complete",
+          "web3.market.delivery.issue",
+          "web3.market.delivery.revoke",
           "web3.market.dispute.get",
           "web3.market.dispute.list",
           "web3.market.dispute.open",
@@ -9112,6 +9982,12 @@
           "web3.market.ledger.list",
           "web3.market.ledger.summary",
           "web3.market.metrics.snapshot",
+          "web3.market.offer.close",
+          "web3.market.offer.create",
+          "web3.market.offer.publish",
+          "web3.market.offer.update",
+          "web3.market.order.cancel",
+          "web3.market.order.create",
           "web3.market.order.list",
           "web3.market.privacy.assets",
           "web3.market.privacy.erase",
@@ -9138,6 +10014,7 @@
           "web3.market.task.publish",
           "web3.market.task.receipt.get",
           "web3.market.task.receipt.list",
+          "web3.market.task.result.list",
           "web3.market.task.result.review",
           "web3.market.task.result.submit",
           "web3.market.tokenEconomy.burn",

@@ -192,8 +192,9 @@ When adding new market capabilities to already-large files, prefer creating leaf
 
 1. Read `openclaw-eaas-a2a-mcp-productization.md`.
 2. Anchor every claim to a current runtime fact or clearly label it as roadmap.
-3. Present `Private Steward` as the product and `Web3 Market` as the accountable economic substrate.
-4. Explain `MCP`, `A2A`, and `Market` as complementary layers, not mutually exclusive bets.
+3. Read `WEB3_DIGITAL_SERVICE_MARKET_V1_EXECUTION_PLAN.md` first when the task is about productization, go-live scope, backlog, or launch gating.
+4. Present `Private Steward` as the product and `Web3 Market` as the accountable economic substrate.
+5. Explain `MCP`, `A2A`, and `Market` as complementary layers, not mutually exclusive bets.
 
 ### For A2A / MCP integration design
 
