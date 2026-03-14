@@ -962,86 +962,6 @@
       },
       {
         "availability": {
-          "enabled": true
-        },
-        "group": "market",
-        "kind": "gateway",
-        "name": "web3.market.preset.preview",
-        "paramsSchema": {
-          "properties": {
-            "currentConfig": {
-              "type": "object"
-            },
-            "intent": {
-              "enum": ["consumer", "provider", "hybrid"],
-              "type": "string"
-            },
-            "mode": {
-              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
-              "type": "string"
-            },
-            "nodeLabel": {
-              "type": "string"
-            },
-            "runtimeHints": {
-              "items": {
-                "properties": {
-                  "kind": {
-                    "enum": ["ollama", "lmstudio", "openai-compat", "custom"],
-                    "type": "string"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "maxConcurrent": {
-                    "maximum": 8,
-                    "minimum": 1,
-                    "type": "number"
-                  },
-                  "models": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            }
-          },
-          "type": "object"
-        },
-        "returns": "Preset layout summary, config patch operations, readiness checks, and next steps.",
-        "risk": {
-          "level": "low"
-        },
-        "summary": "Preview a market compatibility preset for single-node, trusted-circle, or hybrid-cloud-edge setups."
-      },
-      {
-        "availability": {
-          "enabled": true
-        },
-        "group": "market",
-        "kind": "gateway",
-        "name": "web3.market.preset.verify",
-        "paramsSchema": {
-          "properties": {
-            "mode": {
-              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "returns": "Preset baseline verification summary with release gates and recommended actions.",
-        "risk": {
-          "level": "low"
-        },
-        "summary": "Verify the preset baseline across resources, discovery, monitor health, and lease flow."
-      },
-      {
-        "availability": {
           "enabled": false,
           "reason": "resources disabled"
         },
@@ -1941,6 +1861,86 @@
           "level": "low"
         },
         "summary": "List market orders with status/actor filters."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.preset.preview",
+        "paramsSchema": {
+          "properties": {
+            "currentConfig": {
+              "type": "object"
+            },
+            "intent": {
+              "enum": ["consumer", "provider", "hybrid"],
+              "type": "string"
+            },
+            "mode": {
+              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
+              "type": "string"
+            },
+            "nodeLabel": {
+              "type": "string"
+            },
+            "runtimeHints": {
+              "items": {
+                "properties": {
+                  "kind": {
+                    "enum": ["ollama", "lmstudio", "openai-compat", "custom"],
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "maxConcurrent": {
+                    "maximum": 8,
+                    "minimum": 1,
+                    "type": "number"
+                  },
+                  "models": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Preset layout summary, config patch operations, readiness checks, and next steps.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Preview a market compatibility preset for single-node, trusted-circle, or hybrid-cloud-edge setups."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.preset.verify",
+        "paramsSchema": {
+          "properties": {
+            "mode": {
+              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Preset baseline verification summary with release gates and recommended actions.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Verify the preset baseline across resources, discovery, monitor health, and lease flow."
       },
       {
         "availability": {
@@ -4999,86 +4999,6 @@
         "availability": {
           "enabled": true
         },
-        "group": "market",
-        "kind": "gateway",
-        "name": "web3.market.preset.preview",
-        "paramsSchema": {
-          "properties": {
-            "currentConfig": {
-              "type": "object"
-            },
-            "intent": {
-              "enum": ["consumer", "provider", "hybrid"],
-              "type": "string"
-            },
-            "mode": {
-              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
-              "type": "string"
-            },
-            "nodeLabel": {
-              "type": "string"
-            },
-            "runtimeHints": {
-              "items": {
-                "properties": {
-                  "kind": {
-                    "enum": ["ollama", "lmstudio", "openai-compat", "custom"],
-                    "type": "string"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "maxConcurrent": {
-                    "maximum": 8,
-                    "minimum": 1,
-                    "type": "number"
-                  },
-                  "models": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            }
-          },
-          "type": "object"
-        },
-        "returns": "Preset layout summary, config patch operations, readiness checks, and next steps.",
-        "risk": {
-          "level": "low"
-        },
-        "summary": "Preview a market compatibility preset for single-node, trusted-circle, or hybrid-cloud-edge setups."
-      },
-      {
-        "availability": {
-          "enabled": true
-        },
-        "group": "market",
-        "kind": "gateway",
-        "name": "web3.market.preset.verify",
-        "paramsSchema": {
-          "properties": {
-            "mode": {
-              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "returns": "Preset baseline verification summary with release gates and recommended actions.",
-        "risk": {
-          "level": "low"
-        },
-        "summary": "Verify the preset baseline across resources, discovery, monitor health, and lease flow."
-      },
-      {
-        "availability": {
-          "enabled": true
-        },
         "group": "dispute",
         "kind": "gateway",
         "name": "web3.market.dispute.get",
@@ -5951,6 +5871,86 @@
           "level": "low"
         },
         "summary": "List market orders with status/actor filters."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.preset.preview",
+        "paramsSchema": {
+          "properties": {
+            "currentConfig": {
+              "type": "object"
+            },
+            "intent": {
+              "enum": ["consumer", "provider", "hybrid"],
+              "type": "string"
+            },
+            "mode": {
+              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
+              "type": "string"
+            },
+            "nodeLabel": {
+              "type": "string"
+            },
+            "runtimeHints": {
+              "items": {
+                "properties": {
+                  "kind": {
+                    "enum": ["ollama", "lmstudio", "openai-compat", "custom"],
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "maxConcurrent": {
+                    "maximum": 8,
+                    "minimum": 1,
+                    "type": "number"
+                  },
+                  "models": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Preset layout summary, config patch operations, readiness checks, and next steps.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Preview a market compatibility preset for single-node, trusted-circle, or hybrid-cloud-edge setups."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.preset.verify",
+        "paramsSchema": {
+          "properties": {
+            "mode": {
+              "enum": ["single-node", "trusted-circle", "hybrid-cloud-edge"],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Preset baseline verification summary with release gates and recommended actions.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Verify the preset baseline across resources, discovery, monitor health, and lease flow."
       },
       {
         "availability": {
@@ -8416,13 +8416,13 @@
         "web3.index.*",
         "web3.index.stats",
         "web3.market.bridge.*",
-        "web3.market.preset.preview",
-        "web3.market.preset.verify",
         "web3.market.dispute.*",
         "web3.market.lease.*",
         "web3.market.ledger.*",
         "web3.market.metrics.snapshot",
         "web3.market.order.list",
+        "web3.market.preset.preview",
+        "web3.market.preset.verify",
         "web3.market.privacy.assets",
         "web3.market.privacy.erase",
         "web3.market.reconciliation.summary",
@@ -10134,8 +10134,6 @@
           "web3.market.delivery.complete",
           "web3.market.delivery.issue",
           "web3.market.delivery.revoke",
-          "web3.market.preset.preview",
-          "web3.market.preset.verify",
           "web3.market.dispute.get",
           "web3.market.dispute.list",
           "web3.market.dispute.open",
@@ -10157,6 +10155,8 @@
           "web3.market.order.cancel",
           "web3.market.order.create",
           "web3.market.order.list",
+          "web3.market.preset.preview",
+          "web3.market.preset.verify",
           "web3.market.privacy.assets",
           "web3.market.privacy.erase",
           "web3.market.privacy.replay.generate",
