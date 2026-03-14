@@ -7,15 +7,16 @@ import type {
   MarketLedgerEntry,
   MarketLedgerSummary,
   MarketLease,
-  MarketPresetVerification,
   MarketMetricsSnapshot,
   MarketOpsSummary,
+  MarketPresetVerification,
   MarketPrivacySummary,
   MarketReputationSummary,
   MarketResource,
   MarketStatusSummary,
   MarketTaskSummary,
   OpsAlertView,
+  OpsHealthProbe,
   PrivacyAssetView,
   PrivacyReplayView,
   TaskBidView,
@@ -51,20 +52,14 @@ type MarketStatusState = {
 };
 
 export async function loadMarketStatus(state: MarketStatusState & { hello?: unknown }) {
-  if (!state.client || !state.connected) {
-    return;
-  }
-  if (state.marketLoading) {
+  if (!state.client || !state.connected || state.marketLoading) {
     return;
   }
   state.marketLoading = true;
   state.marketError = null;
 
-  // If the gateway hasn't registered these methods, fail fast with an actionable message.
-  // This typically means the running gateway hasn't loaded `web3-core` (or it's outdated),
-  // so the UI would otherwise just show "unknown method".
   const hello = state.hello as { features?: { methods?: unknown } } | undefined;
-  const methods = Array.isArray(hello?.features?.methods) ? hello?.features?.methods : null;
+  const methods = Array.isArray(hello?.features?.methods) ? hello.features.methods : null;
   const requiredMethods = [
     "web3.market.status.summary",
     "web3.market.metrics.snapshot",
@@ -117,19 +112,19 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       }),
     ]);
 
-    state.marketStatus = normalizePayload(status);
-    state.marketMetrics = normalizePayload(metrics);
+    state.marketStatus = normalizePayload<MarketStatusSummary>(status);
+    state.marketMetrics = normalizePayload<MarketMetricsSnapshot>(metrics);
     state.marketIndexEntries = normalizeListPayload<Web3IndexEntry>(indexList, "entries");
-    state.marketIndexStats = normalizePayload(indexStats);
-    state.marketMonitor = normalizePayload(monitor);
+    state.marketIndexStats = normalizePayload<Web3IndexStats>(indexStats);
+    state.marketMonitor = normalizePayload<Web3MonitorSnapshot>(monitor);
     state.marketResources = normalizeListPayload<MarketResource>(resources, "resources");
     state.marketLeases = normalizeListPayload<MarketLease>(leases, "leases");
-    state.marketLedgerSummary = normalizePayload(ledgerSummary);
+    state.marketLedgerSummary = normalizePayload<MarketLedgerSummary>(ledgerSummary);
     state.marketLedgerEntries = normalizeListPayload<MarketLedgerEntry>(ledgerEntries, "entries");
     state.marketDisputes = normalizeListPayload<MarketDispute>(disputes, "disputes");
-    state.marketReputation = normalizePayload(reputation);
-    state.marketTokenEconomy = normalizePayload(tokenEconomy);
-    state.marketBridgeRoutes = normalizePayload(bridgeRoutes);
+    state.marketReputation = normalizePayload<MarketReputationSummary>(reputation);
+    state.marketTokenEconomy = normalizePayload<TokenEconomyState>(tokenEconomy);
+    state.marketBridgeRoutes = normalizePayload<BridgeRoutesSnapshot>(bridgeRoutes);
     state.marketBridgeTransfers = normalizeListPayload<BridgeTransfer>(
       bridgeTransfers,
       "transfers",
@@ -169,7 +164,7 @@ export async function loadMarketTasks(state: TaskState) {
       state.client.request<{ receipts?: unknown[] }>("web3.market.receipt.list", { limit: 100 }),
     ]);
 
-    state.taskSummary = normalizePayload(summary);
+    state.taskSummary = normalizePayload<MarketTaskSummary>(summary);
     state.taskOrders = normalizeListPayload<TaskOrderView>(orders, "tasks");
     state.taskBids = normalizeListPayload<TaskBidView>(bids, "bids");
     state.taskResults = normalizeListPayload<TaskResultView>(results, "results");
@@ -204,7 +199,7 @@ export async function loadMarketPrivacy(state: PrivacyState) {
       state.client.request<{ replays?: unknown[] }>("web3.market.replay.list", { limit: 100 }),
     ]);
 
-    state.privacySummary = normalizePayload(summary);
+    state.privacySummary = normalizePayload<MarketPrivacySummary>(summary);
     state.privacyConsents = normalizeListPayload<ConsentView>(consents, "consents");
     state.privacyAssets = normalizeListPayload<PrivacyAssetView>(assets, "assets");
     state.privacyReplays = normalizeListPayload<PrivacyReplayView>(replays, "replays");
@@ -213,7 +208,7 @@ export async function loadMarketPrivacy(state: PrivacyState) {
   }
 }
 
-type OpsState = {
+export type MarketOpsState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
   opsLoading: boolean;
@@ -221,7 +216,7 @@ type OpsState = {
   opsAlerts: OpsAlertView[];
 };
 
-export async function loadMarketOps(state: OpsState) {
+export async function loadMarketOps(state: MarketOpsState) {
   if (!state.client || !state.connected || state.opsLoading) {
     return;
   }
@@ -237,44 +232,54 @@ export async function loadMarketOps(state: OpsState) {
     ]);
 
     const normalizedAlerts = normalizeListPayload<OpsAlertView>(alerts, "alerts");
-    const normalizedHealth = normalizePayload(health);
-    const normalizedPreset = normalizePayload(preset);
+    const normalizedHealth = normalizePayload<MonitorHealthResponse>(health);
+    const normalizedPreset = normalizePayload<MarketPresetVerification>(preset);
     const activeAlerts = normalizedAlerts.filter((alert) => alert.status !== "resolved");
     const hasActiveAlerts = activeAlerts.length > 0;
-    const status = mapMonitorStatus(
+    const monitorStatus = mapMonitorStatus(
       normalizedHealth?.status,
       normalizedHealth?.healthy,
       hasActiveAlerts,
     );
+    const observedAt = new Date().toISOString();
+    const healthProbes: OpsHealthProbe[] = [
+      {
+        name: "monitor",
+        status: monitorStatus,
+        lastCheck: normalizedHealth?.lastActivity ?? observedAt,
+        details: formatMonitorDetails(normalizedHealth),
+      },
+      {
+        name: "discovery",
+        status:
+          normalizedPreset?.metrics.discoveryEnabled === false
+            ? "degraded"
+            : normalizedPreset?.healthy
+              ? "healthy"
+              : "degraded",
+        lastCheck: observedAt,
+        details: normalizedPreset?.summary,
+      },
+      {
+        name: "payment",
+        status: normalizedHealth?.healthy === false ? "degraded" : "healthy",
+        lastCheck: normalizedHealth?.lastActivity ?? observedAt,
+        details: hasActiveAlerts ? `${activeAlerts.length} active alerts` : undefined,
+      },
+      {
+        name: "settlement",
+        status: normalizedPreset?.healthy ? "healthy" : "degraded",
+        lastCheck: observedAt,
+        details: formatPresetDetails(normalizedPreset),
+      },
+    ];
 
     state.opsSummary = {
       activeAlerts: activeAlerts.length,
       alertsByLevel: countAlertsByLevel(normalizedAlerts),
-      healthProbes: [
-        {
-          id: "monitor",
-          label: "Monitor",
-          status,
-          details: formatMonitorDetails(normalizedHealth),
-        },
-        {
-          id: "discovery",
-          label: "Discovery",
-          status:
-            normalizedPreset?.metrics.discoveryEnabled === false
-              ? "degraded"
-              : normalizedPreset?.healthy
-                ? "healthy"
-                : "degraded",
-        },
-        {
-          id: "settlement",
-          label: "Settlement",
-          status: normalizedPreset?.healthy ? "healthy" : "degraded",
-        },
-      ],
+      healthProbes,
       discoveryHealthy: normalizedPreset?.metrics.discoveryEnabled ?? false,
-      paymentHealthy: normalizedHealth?.healthy ?? normalizedPreset?.healthy ?? false,
+      paymentHealthy: normalizedHealth?.healthy ?? false,
       settlementHealthy: normalizedPreset?.healthy ?? false,
       preset: normalizedPreset,
     };
@@ -348,4 +353,12 @@ function formatMonitorDetails(health: MonitorHealthResponse | null): string | un
     return `${health.criticalAlerts} critical alerts`;
   }
   return undefined;
+}
+
+function formatPresetDetails(preset: MarketPresetVerification | null): string | undefined {
+  if (!preset) {
+    return undefined;
+  }
+  const { passCount, warnCount, failCount } = preset.readiness;
+  return `pass ${passCount} · warn ${warnCount} · fail ${failCount}`;
 }

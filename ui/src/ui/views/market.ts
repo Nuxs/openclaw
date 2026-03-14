@@ -101,95 +101,83 @@ const LEDGER_UNIT_OPTIONS: Array<{ value: MarketFilters["ledgerUnit"]; label: st
 export function renderMarket(props: MarketProps) {
   const status = props.status;
   const metrics = props.metrics;
-  const activeAlerts = metrics?.alerts.filter((alert) => alert.triggered) ?? [];
-  const disputesByStatus = countByStatus(props.disputes);
-  const totalDisputes = props.disputes.length;
-  const activeLeases = props.leases.filter((lease) => lease.status === "lease_active").length;
-  const expiredLeases = props.leases.filter((lease) => lease.status === "lease_expired").length;
-  const revokedLeases = props.leases.filter((lease) => lease.status === "lease_revoked").length;
+  const filters = props.filters;
   const lastSuccessLabel = props.lastSuccessAt
     ? formatRelativeTimestamp(props.lastSuccessAt)
     : "n/a";
-  const filters = props.filters;
-  const ledgerEntriesByFilter = props.ledgerEntries.filter((entry) => {
-    if (filters.ledgerUnit !== "all" && entry.unit !== filters.ledgerUnit) {
-      return false;
-    }
-    return matchesText(filters.ledgerSearch, [
-      entry.leaseId,
-      entry.resourceId,
-      entry.sessionId,
-      entry.runId,
-    ]);
-  });
-  const sortedLedgerEntries = sortByTime(
-    ledgerEntriesByFilter,
-    (entry) => entry.timestamp,
-    filters.ledgerSort === "time_desc" ? "desc" : "asc",
-  );
-  const ledgerEntryCount = sortedLedgerEntries.length;
-  const ledgerPreview = sortedLedgerEntries.slice(0, 12);
+  const activeAlerts = metrics?.alerts.filter((alert) => alert.triggered) ?? [];
 
-  const resourcesByKind =
-    props.resourceKind === "all"
-      ? props.resources
-      : props.resources.filter((resource) => resource.kind === props.resourceKind);
-  const resourcesByStatus =
-    filters.resourceStatus === "all"
-      ? resourcesByKind
-      : resourcesByKind.filter((resource) => resource.status === filters.resourceStatus);
-  const filteredResources = resourcesByStatus.filter((resource) =>
-    matchesText(filters.resourceSearch, [
-      resource.resourceId,
-      resource.label,
-      resource.providerActorId,
-      resource.providerLabel,
-      resource.kind,
-    ]),
+  const filteredResources = sortResources(
+    props.resources
+      .filter((resource) => props.resourceKind === "all" || resource.kind === props.resourceKind)
+      .filter(
+        (resource) =>
+          filters.resourceStatus === "all" || resource.status === filters.resourceStatus,
+      )
+      .filter((resource) =>
+        matchesText(filters.resourceSearch, [
+          resource.resourceId,
+          resource.label,
+          resource.providerActorId,
+          resource.offerId,
+          resource.kind,
+          ...(resource.tags ?? []),
+        ]),
+      ),
+    filters.resourceSort,
   );
-  const sortedResources = sortResources(filteredResources, filters.resourceSort);
 
-  const leasesByStatus =
-    filters.leaseStatus === "all"
-      ? props.leases
-      : props.leases.filter((lease) => lease.status === filters.leaseStatus);
-  const filteredLeases = leasesByStatus.filter((lease) =>
-    matchesText(filters.leaseSearch, [
-      lease.leaseId,
-      lease.resourceId,
-      lease.consumerId,
-      lease.providerId,
-      lease.status,
-    ]),
+  const filteredLeases = sortLeases(
+    props.leases
+      .filter((lease) => filters.leaseStatus === "all" || lease.status === filters.leaseStatus)
+      .filter((lease) =>
+        matchesText(filters.leaseSearch, [
+          lease.leaseId,
+          lease.resourceId,
+          lease.consumerActorId,
+          lease.providerActorId,
+          lease.orderId,
+          lease.status,
+        ]),
+      ),
+    filters.leaseSort,
   );
-  const sortedLeases = sortLeases(filteredLeases, filters.leaseSort);
 
-  const disputesFiltered =
-    filters.disputeStatus === "all"
-      ? props.disputes
-      : props.disputes.filter((dispute) => dispute.status === filters.disputeStatus);
-  const filteredDisputes = disputesFiltered.filter((dispute) =>
-    matchesText(filters.disputeSearch, [
-      dispute.disputeId,
-      dispute.leaseId,
-      dispute.reason,
-      dispute.status,
-    ]),
+  const filteredDisputes = sortDisputes(
+    props.disputes
+      .filter(
+        (dispute) => filters.disputeStatus === "all" || dispute.status === filters.disputeStatus,
+      )
+      .filter((dispute) =>
+        matchesText(filters.disputeSearch, [
+          dispute.disputeId,
+          dispute.orderId,
+          dispute.initiatorActorId,
+          dispute.respondentActorId,
+          dispute.reason,
+          dispute.status,
+        ]),
+      ),
+    filters.disputeSort,
   );
-  const sortedDisputes = sortDisputes(filteredDisputes, filters.disputeSort);
 
-  const resourceEmptyLabel =
-    props.resources.length === 0
-      ? "No resources published yet."
-      : "No resources match current filters.";
-  const leaseEmptyLabel =
-    props.leases.length === 0 ? "No leases yet." : "No leases match current filters.";
-  const disputeEmptyLabel =
-    props.disputes.length === 0 ? "No disputes recorded." : "No disputes match current filters.";
-  const ledgerEmptyLabel =
-    props.ledgerEntries.length === 0
-      ? "No ledger entries yet."
-      : "No ledger entries match current filters.";
+  const filteredLedgerEntries = sortLedgerEntries(
+    props.ledgerEntries
+      .filter((entry) => filters.ledgerUnit === "all" || entry.unit === filters.ledgerUnit)
+      .filter((entry) =>
+        matchesText(filters.ledgerSearch, [
+          entry.ledgerId,
+          entry.leaseId,
+          entry.resourceId,
+          entry.providerActorId,
+          entry.consumerActorId,
+          entry.sessionId,
+          entry.runId,
+          entry.entryHash,
+        ]),
+      ),
+    filters.ledgerSort,
+  );
 
   return html`
     <section class="grid grid-cols-2">
@@ -197,7 +185,7 @@ export function renderMarket(props: MarketProps) {
         <div class="row" style="justify-content: space-between;">
           <div>
             <div class="card-title">Market Overview</div>
-            <div class="card-sub">Key totals and status distributions for live market activity.</div>
+            <div class="card-sub">Key totals and live status distributions for market activity.</div>
           </div>
           <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onRefresh}>
             ${props.loading ? "Refreshing…" : "Refresh"}
@@ -212,30 +200,30 @@ export function renderMarket(props: MarketProps) {
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
             <div class="stat-label">Offers</div>
-            <div class="stat-value">${status?.totals?.offers ?? 0}</div>
-            ${renderStatusPills(status?.offers ?? {})}
+            <div class="stat-value">${status?.totals.offers ?? 0}</div>
+            ${renderStatusPills(status?.offers)}
           </div>
           <div class="stat">
             <div class="stat-label">Orders</div>
-            <div class="stat-value">${status?.totals?.orders ?? 0}</div>
-            ${renderStatusPills(status?.orders ?? {})}
+            <div class="stat-value">${status?.totals.orders ?? 0}</div>
+            ${renderStatusPills(status?.orders)}
           </div>
           <div class="stat">
-            <div class="stat-label">Leases</div>
-            <div class="stat-value">${status?.totals?.leases ?? 0}</div>
-            ${renderStatusPills(status?.leases ?? {})}
+            <div class="stat-label">Deliveries</div>
+            <div class="stat-value">${status?.totals.deliveries ?? 0}</div>
+            ${renderStatusPills(status?.deliveries)}
           </div>
           <div class="stat">
-            <div class="stat-label">Ledger entries</div>
-            <div class="stat-value">${status?.totals?.ledgerEntries ?? 0}</div>
-            ${renderStatusPills(status?.ledger ?? {})}
+            <div class="stat-label">Settlements</div>
+            <div class="stat-value">${status?.totals.settlements ?? 0}</div>
+            ${renderStatusPills(status?.settlements)}
           </div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-title">Activity Health</div>
-        <div class="card-sub">Current alerts, lease activity, and dispute distribution.</div>
+        <div class="card-sub">Alerts, lease posture, dispute queue, and billing totals.</div>
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
             <div class="stat-label">Active alerts</div>
@@ -243,47 +231,55 @@ export function renderMarket(props: MarketProps) {
             ${renderAlertPreview(activeAlerts)}
           </div>
           <div class="stat">
-            <div class="stat-label">Active leases</div>
-            <div class="stat-value">${activeLeases}</div>
-            <div class="stat-sub">Expired ${expiredLeases} · Revoked ${revokedLeases}</div>
+            <div class="stat-label">Leases</div>
+            <div class="stat-value">${status?.leases.total ?? props.leases.length}</div>
+            <div class="stat-sub">
+              Active ${status?.leases.active ?? 0} · Expired ${status?.leases.expired ?? 0} · Revoked ${status?.leases.revoked ?? 0}
+            </div>
           </div>
           <div class="stat">
             <div class="stat-label">Disputes</div>
-            <div class="stat-value">${totalDisputes}</div>
-            <div class="stat-sub">Open ${disputesByStatus.open} · Resolved ${disputesByStatus.resolved}</div>
+            <div class="stat-value">${status?.disputes.total ?? props.disputes.length}</div>
+            <div class="stat-sub">
+              Open ${status?.disputes.open ?? 0} · Resolved ${status?.disputes.resolved ?? 0} · Rejected ${status?.disputes.rejected ?? 0}
+            </div>
           </div>
           <div class="stat">
-            <div class="stat-label">Settlement volume</div>
-            <div class="stat-value">${props.ledger?.totals.entries ?? 0}</div>
-            <div class="stat-sub">Credits ${props.ledger?.totals.credits ?? 0}</div>
+            <div class="stat-label">Ledger total</div>
+            <div class="stat-value">${formatLedgerTotal(props.ledger)}</div>
+            <div class="stat-sub">${formatLedgerUnits(props.ledger)}</div>
           </div>
         </div>
       </div>
     </section>
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
-      ${renderIndexOverview(props.indexStats, props.indexEntries)}
-      ${renderMonitorOverview(props.monitor)}
+      ${renderIndexOverview({
+        loading: props.loading,
+        indexEntries: props.indexEntries,
+        indexStats: props.indexStats,
+      })}
+      ${renderMonitorOverview({ loading: props.loading, monitor: props.monitor })}
     </section>
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
-      ${renderResourceCard(props, sortedResources, resourceEmptyLabel)}
-      ${renderLeaseCard(props, sortedLeases, leaseEmptyLabel)}
+      ${renderResourceCard(props, filteredResources)}
+      ${renderLeaseCard(props, filteredLeases)}
     </section>
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
-      ${renderDisputeCard(props, sortedDisputes, disputeEmptyLabel)}
-      ${renderLedgerCard(props, ledgerPreview, ledgerEntryCount, ledgerEmptyLabel)}
+      ${renderDisputeCard(props, filteredDisputes)}
+      ${renderLedgerCard(props, filteredLedgerEntries)}
     </section>
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
-      ${renderReputationCard(props.reputation)}
-      ${renderTokenEconomyCard(props.tokenEconomy)}
+      ${renderReputationCard(props.reputation, props.loading)}
+      ${renderTokenEconomyCard(props.tokenEconomy, props.loading)}
     </section>
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
-      ${renderBridgeRoutesCard(props.bridgeRoutes)}
-      ${renderBridgeTransfersCard(props.bridgeTransfers)}
+      ${renderBridgeRoutesCard(props.bridgeRoutes, props.loading)}
+      ${renderBridgeTransfersCard(props.bridgeTransfers, props.loading)}
     </section>
 
     ${props.taskSection ? renderTaskSection(props.taskSection) : nothing}
@@ -292,8 +288,8 @@ export function renderMarket(props: MarketProps) {
   `;
 }
 
-function renderStatusPills(summary: Record<string, number>) {
-  const entries = Object.entries(summary).filter(([, value]) => value > 0);
+function renderStatusPills(summary?: Record<string, number> | null) {
+  const entries = Object.entries(summary ?? {}).filter(([, value]) => value > 0);
   if (entries.length === 0) {
     return html`
       <div class="stat-sub">No activity</div>
@@ -316,12 +312,22 @@ function renderAlertPreview(alerts: MarketAlert[]) {
   }
   return html`
     <div class="pill-row" style="margin-top: 10px;">
-      ${alerts.slice(0, 3).map((alert) => html`<span class="pill">${alert.level} · ${alert.name}</span>`)}
+      ${alerts
+        .slice(0, 3)
+        .map(
+          (alert) =>
+            html`<span class="pill">${alert.severity.toUpperCase()} · ${alert.rule}</span>`,
+        )}
     </div>
   `;
 }
 
-function renderResourceCard(props: MarketProps, resources: MarketResource[], emptyLabel: string) {
+function renderResourceCard(props: MarketProps, resources: MarketResource[]) {
+  const emptyLabel =
+    props.resources.length === 0
+      ? "No resources published yet."
+      : "No resources match current filters.";
+
   return html`
     <div class="card card--stretch">
       <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 16px;">
@@ -333,11 +339,10 @@ function renderResourceCard(props: MarketProps, resources: MarketResource[], emp
           <span class="field__label">Kind</span>
           <select
             .value=${props.resourceKind}
-            @change=${(event: Event) => {
-              const value = (event.target as HTMLSelectElement)
-                .value as MarketProps["resourceKind"];
-              props.onResourceKindChange(value);
-            }}
+            @change=${(event: Event) =>
+              props.onResourceKindChange(
+                (event.target as HTMLSelectElement).value as MarketProps["resourceKind"],
+              )}
           >
             ${RESOURCE_KINDS.map(
               (option) => html`<option value=${option.key}>${option.label}</option>`,
@@ -388,8 +393,6 @@ function renderResourceCard(props: MarketProps, resources: MarketResource[], emp
           >
             <option value="updated_desc">Updated ↓</option>
             <option value="updated_asc">Updated ↑</option>
-            <option value="price_desc">Price ↓</option>
-            <option value="price_asc">Price ↑</option>
           </select>
         </label>
         <div class="field field--summary">
@@ -403,26 +406,26 @@ function renderResourceCard(props: MarketProps, resources: MarketResource[], emp
             ? html`<div class="muted">${emptyLabel}</div>`
             : resources.map(
                 (resource) => html`
-                <article class="list-item list-item--stacked">
-                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
-                    <div>
-                      <div class="list-item__title">${resource.label}</div>
-                      <div class="muted">${resource.resourceId}</div>
+                  <article class="list-item list-item--stacked">
+                    <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                      <div>
+                        <div class="list-item__title">${resource.label}</div>
+                        <div class="muted">${resource.resourceId}</div>
+                      </div>
+                      <span class="pill">${resource.kind}</span>
                     </div>
-                    <span class="pill">${resource.kind}</span>
-                  </div>
-                  <div class="list-item__meta">
-                    <span>${resource.status}</span>
-                    <span>${formatPrice(resource.price)}</span>
-                    <span>${clampText(resource.providerLabel ?? resource.providerActorId ?? "unknown", 32)}</span>
-                  </div>
-                  ${
-                    resource.description
-                      ? html`<div class="list-item__body">${clampText(resource.description, 180)}</div>`
-                      : nothing
-                  }
-                </article>
-              `,
+                    <div class="list-item__meta">
+                      <span>${resource.status}</span>
+                      <span>${formatPrice(resource.price)}</span>
+                      <span>${clampText(resource.providerActorId, 32)}</span>
+                    </div>
+                    ${
+                      resource.description
+                        ? html`<div class="list-item__body">${clampText(resource.description, 180)}</div>`
+                        : nothing
+                    }
+                  </article>
+                `,
               )
         }
       </div>
@@ -430,11 +433,14 @@ function renderResourceCard(props: MarketProps, resources: MarketResource[], emp
   `;
 }
 
-function renderLeaseCard(props: MarketProps, leases: MarketLease[], emptyLabel: string) {
+function renderLeaseCard(props: MarketProps, leases: MarketLease[]) {
+  const emptyLabel =
+    props.leases.length === 0 ? "No leases yet." : "No leases match current filters.";
+
   return html`
     <div class="card card--stretch">
       <div class="card-title">Leases</div>
-      <div class="card-sub">Consumer/provider bindings with status, windows, and access posture.</div>
+      <div class="card-sub">Consumer/provider bindings with status and window metadata.</div>
       <div class="filters filters--four" style="margin-top: 16px;">
         <label class="field">
           <span class="field__label">Search</span>
@@ -477,8 +483,6 @@ function renderLeaseCard(props: MarketProps, leases: MarketLease[], emptyLabel: 
           >
             <option value="issued_desc">Issued ↓</option>
             <option value="issued_asc">Issued ↑</option>
-            <option value="expires_desc">Expires ↓</option>
-            <option value="expires_asc">Expires ↑</option>
           </select>
         </label>
         <div class="field field--summary">
@@ -492,21 +496,21 @@ function renderLeaseCard(props: MarketProps, leases: MarketLease[], emptyLabel: 
             ? html`<div class="muted">${emptyLabel}</div>`
             : leases.map(
                 (lease) => html`
-                <article class="list-item list-item--stacked">
-                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
-                    <div>
-                      <div class="list-item__title">${lease.leaseId}</div>
-                      <div class="muted">${lease.resourceId}</div>
+                  <article class="list-item list-item--stacked">
+                    <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                      <div>
+                        <div class="list-item__title">${lease.leaseId}</div>
+                        <div class="muted">${lease.resourceId}</div>
+                      </div>
+                      <span class="pill">${lease.status}</span>
                     </div>
-                    <span class="pill">${lease.status}</span>
-                  </div>
-                  <div class="list-item__meta">
-                    <span>${lease.consumerId}</span>
-                    <span>${lease.providerId}</span>
-                    <span>${lease.unitPrice} / ${lease.unit}</span>
-                  </div>
-                </article>
-              `,
+                    <div class="list-item__meta">
+                      <span>${clampText(lease.consumerActorId, 24)}</span>
+                      <span>${clampText(lease.providerActorId, 24)}</span>
+                      <span>${formatIsoRelative(lease.issuedAt)} → ${formatIsoRelative(lease.expiresAt)}</span>
+                    </div>
+                  </article>
+                `,
               )
         }
       </div>
@@ -514,17 +518,20 @@ function renderLeaseCard(props: MarketProps, leases: MarketLease[], emptyLabel: 
   `;
 }
 
-function renderDisputeCard(props: MarketProps, disputes: MarketDispute[], emptyLabel: string) {
+function renderDisputeCard(props: MarketProps, disputes: MarketDispute[]) {
+  const emptyLabel =
+    props.disputes.length === 0 ? "No disputes recorded." : "No disputes match current filters.";
+
   return html`
     <div class="card card--stretch">
       <div class="card-title">Disputes</div>
-      <div class="card-sub">Arbitration queue and evidence snapshots.</div>
+      <div class="card-sub">Arbitration queue and respondent posture.</div>
       <div class="filters filters--four" style="margin-top: 16px;">
         <label class="field">
           <span class="field__label">Search</span>
           <input
             type="search"
-            placeholder="Dispute, lease, or reason"
+            placeholder="Dispute, order, or actor"
             .value=${props.filters.disputeSearch}
             @input=${(event: Event) =>
               props.onFiltersChange({
@@ -562,8 +569,6 @@ function renderDisputeCard(props: MarketProps, disputes: MarketDispute[], emptyL
           >
             <option value="opened_desc">Opened ↓</option>
             <option value="opened_asc">Opened ↑</option>
-            <option value="updated_desc">Updated ↓</option>
-            <option value="updated_asc">Updated ↑</option>
           </select>
         </label>
         <div class="field field--summary">
@@ -577,17 +582,22 @@ function renderDisputeCard(props: MarketProps, disputes: MarketDispute[], emptyL
             ? html`<div class="muted">${emptyLabel}</div>`
             : disputes.map(
                 (dispute) => html`
-                <article class="list-item list-item--stacked">
-                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
-                    <div>
-                      <div class="list-item__title">${dispute.disputeId}</div>
-                      <div class="muted">${dispute.leaseId}</div>
+                  <article class="list-item list-item--stacked">
+                    <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                      <div>
+                        <div class="list-item__title">${dispute.disputeId}</div>
+                        <div class="muted">${dispute.orderId}</div>
+                      </div>
+                      <span class="pill">${dispute.status}</span>
                     </div>
-                    <span class="pill">${dispute.status}</span>
-                  </div>
-                  <div class="list-item__body">${clampText(dispute.reason, 220)}</div>
-                </article>
-              `,
+                    <div class="list-item__meta">
+                      <span>${clampText(dispute.initiatorActorId, 24)}</span>
+                      <span>${clampText(dispute.respondentActorId, 24)}</span>
+                      <span>${formatIsoRelative(dispute.openedAt)}</span>
+                    </div>
+                    <div class="list-item__body">${clampText(dispute.reason, 220)}</div>
+                  </article>
+                `,
               )
         }
       </div>
@@ -595,12 +605,12 @@ function renderDisputeCard(props: MarketProps, disputes: MarketDispute[], emptyL
   `;
 }
 
-function renderLedgerCard(
-  props: MarketProps,
-  ledgerEntries: MarketLedgerEntry[],
-  ledgerEntryCount: number,
-  emptyLabel: string,
-) {
+function renderLedgerCard(props: MarketProps, entries: MarketLedgerEntry[]) {
+  const emptyLabel =
+    props.ledgerEntries.length === 0
+      ? "No ledger entries yet."
+      : "No ledger entries match current filters.";
+
   return html`
     <div class="card card--stretch">
       <div class="card-title">Ledger</div>
@@ -610,7 +620,7 @@ function renderLedgerCard(
           <span class="field__label">Search</span>
           <input
             type="search"
-            placeholder="Lease, resource, or run"
+            placeholder="Ledger, lease, resource, or run"
             .value=${props.filters.ledgerSearch}
             @input=${(event: Event) =>
               props.onFiltersChange({
@@ -652,30 +662,30 @@ function renderLedgerCard(
         </label>
         <div class="field field--summary">
           <span class="field__label">Visible</span>
-          <div class="field__value">${ledgerEntryCount}</div>
+          <div class="field__value">${entries.length}</div>
         </div>
       </div>
       <div class="list list--dense" style="margin-top: 16px;">
         ${
-          ledgerEntries.length === 0
+          entries.length === 0
             ? html`<div class="muted">${emptyLabel}</div>`
-            : ledgerEntries.map(
+            : entries.slice(0, 12).map(
                 (entry) => html`
-                <article class="list-item list-item--stacked">
-                  <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
-                    <div>
-                      <div class="list-item__title">${entry.entryId}</div>
-                      <div class="muted">${entry.leaseId ?? entry.resourceId ?? entry.runId ?? "n/a"}</div>
+                  <article class="list-item list-item--stacked">
+                    <div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start;">
+                      <div>
+                        <div class="list-item__title">${entry.ledgerId}</div>
+                        <div class="muted">${entry.leaseId ?? entry.resourceId ?? entry.runId ?? "n/a"}</div>
+                      </div>
+                      <span class="pill">${entry.unit}</span>
                     </div>
-                    <span class="pill">${entry.unit}</span>
-                  </div>
-                  <div class="list-item__meta">
-                    <span>${entry.amount}</span>
-                    <span>${entry.direction}</span>
-                    <span>${entry.timestamp}</span>
-                  </div>
-                </article>
-              `,
+                    <div class="list-item__meta">
+                      <span>${entry.quantity}</span>
+                      <span>${entry.cost} ${entry.currency}</span>
+                      <span>${formatIsoRelative(entry.timestamp)}</span>
+                    </div>
+                  </article>
+                `,
               )
         }
       </div>
@@ -685,64 +695,38 @@ function renderLedgerCard(
 
 function sortResources(resources: MarketResource[], mode: MarketFilters["resourceSort"]) {
   const copy = [...resources];
-  switch (mode) {
-    case "updated_asc":
-      return copy.toSorted((a, b) => compareValues(a.updatedAt, b.updatedAt));
-    case "price_desc":
-      return copy.toSorted((a, b) => compareValues(b.price?.value ?? 0, a.price?.value ?? 0));
-    case "price_asc":
-      return copy.toSorted((a, b) => compareValues(a.price?.value ?? 0, b.price?.value ?? 0));
-    case "updated_desc":
-    default:
-      return copy.toSorted((a, b) => compareValues(b.updatedAt, a.updatedAt));
-  }
+  return copy.toSorted((a, b) =>
+    mode === "updated_asc"
+      ? compareValues(a.updatedAt, b.updatedAt)
+      : compareValues(b.updatedAt, a.updatedAt),
+  );
 }
 
 function sortLeases(leases: MarketLease[], mode: MarketFilters["leaseSort"]) {
   const copy = [...leases];
-  switch (mode) {
-    case "issued_asc":
-      return copy.toSorted((a, b) => compareValues(a.issuedAt, b.issuedAt));
-    case "expires_desc":
-      return copy.toSorted((a, b) => compareValues(b.expiresAt, a.expiresAt));
-    case "expires_asc":
-      return copy.toSorted((a, b) => compareValues(a.expiresAt, b.expiresAt));
-    case "issued_desc":
-    default:
-      return copy.toSorted((a, b) => compareValues(b.issuedAt, a.issuedAt));
-  }
+  return copy.toSorted((a, b) =>
+    mode === "issued_asc"
+      ? compareValues(a.issuedAt, b.issuedAt)
+      : compareValues(b.issuedAt, a.issuedAt),
+  );
 }
 
 function sortDisputes(disputes: MarketDispute[], mode: MarketFilters["disputeSort"]) {
   const copy = [...disputes];
-  switch (mode) {
-    case "opened_asc":
-      return copy.toSorted((a, b) => compareValues(a.openedAt, b.openedAt));
-    case "updated_desc":
-      return copy.toSorted((a, b) =>
-        compareValues(b.updatedAt ?? b.openedAt, a.updatedAt ?? a.openedAt),
-      );
-    case "updated_asc":
-      return copy.toSorted((a, b) =>
-        compareValues(a.updatedAt ?? a.openedAt, b.updatedAt ?? b.openedAt),
-      );
-    case "opened_desc":
-    default:
-      return copy.toSorted((a, b) => compareValues(b.openedAt, a.openedAt));
-  }
+  return copy.toSorted((a, b) =>
+    mode === "opened_asc"
+      ? compareValues(a.openedAt, b.openedAt)
+      : compareValues(b.openedAt, a.openedAt),
+  );
 }
 
-function sortByTime<T>(
-  entries: T[],
-  pick: (entry: T) => string | number | null | undefined,
-  direction: "asc" | "desc",
-) {
+function sortLedgerEntries(entries: MarketLedgerEntry[], mode: MarketFilters["ledgerSort"]) {
   const copy = [...entries];
-  copy.sort((a, b) => {
-    const result = compareValues(pick(a), pick(b));
-    return direction === "asc" ? result : -result;
-  });
-  return copy;
+  return copy.toSorted((a, b) =>
+    mode === "time_asc"
+      ? compareValues(a.timestamp, b.timestamp)
+      : compareValues(b.timestamp, a.timestamp),
+  );
 }
 
 function compareValues(
@@ -767,28 +751,33 @@ function matchesText(search: string | undefined, values: Array<string | null | u
   );
 }
 
-function countByStatus(disputes: MarketDispute[]) {
-  return disputes.reduce(
-    (acc, dispute) => {
-      if (dispute.status === "dispute_opened") {
-        acc.open += 1;
-      }
-      if (dispute.status === "dispute_resolved") {
-        acc.resolved += 1;
-      }
-      return acc;
-    },
-    { open: 0, resolved: 0 },
-  );
-}
-
 function formatStatusLabel(label: string) {
   return clampText(label.replaceAll("_", " "), 24);
 }
 
 function formatPrice(price: MarketResource["price"]) {
-  if (!price) {
-    return "No price";
+  return `${price.amount} ${price.currency} / ${price.unit}`;
+}
+
+function formatIsoRelative(value?: string) {
+  if (!value) {
+    return "n/a";
   }
-  return `${price.value} ${price.currency} / ${price.unit}`;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? value : formatRelativeTimestamp(parsed);
+}
+
+function formatLedgerTotal(summary: MarketLedgerSummary | null) {
+  if (!summary) {
+    return "n/a";
+  }
+  return `${summary.totalCost} ${summary.currency}`;
+}
+
+function formatLedgerUnits(summary: MarketLedgerSummary | null) {
+  if (!summary) {
+    return "No ledger summary";
+  }
+  const units = Object.keys(summary.byUnit);
+  return units.length > 0 ? `Units: ${units.join(", ")}` : "No unit totals";
 }
