@@ -258,7 +258,9 @@ function normalizePayload<T>(input: unknown): T | null {
 export type MarketTaskState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
+  hello?: unknown;
   taskLoading: boolean;
+  taskError: string | null;
   taskSummary: MarketTaskSummary | null;
   taskOrders: TaskOrderView[];
   taskBids: TaskBidView[];
@@ -271,33 +273,67 @@ export async function loadMarketTasks(state: MarketTaskState) {
     return;
   }
   state.taskLoading = true;
+  state.taskError = null;
   try {
-    const [summaryRes, tasksRes, bidsRes, resultsRes, receiptsRes] = await Promise.allSettled([
-      state.client.request("web3.market.task.list", { limit: 1, summary: true }),
-      state.client.request("web3.market.task.list", { limit: 20 }),
-      state.client.request("web3.market.task.bid.list", { limit: 20 }),
-      state.client.request("web3.market.task.result.submit", { list: true, limit: 20 }),
-      state.client.request("web3.market.task.receipt.list", { limit: 20 }),
+    const missingMethods = findMissingMethods(state.hello, [
+      "web3.market.task.list",
+      "web3.market.task.bid.list",
+      "web3.market.task.result.list",
+      "web3.market.task.receipt.list",
     ]);
-    if (summaryRes.status === "fulfilled") {
-      state.taskSummary = normalizePayload<MarketTaskSummary>(summaryRes.value);
+    if (missingMethods.length > 0) {
+      resetTaskCollections(state);
+      state.taskSummary = buildTaskSummary([], [], [], []);
+      state.taskError =
+        `Task APIs 未就绪：缺少方法：${missingMethods.join(", ")}。` +
+        "请确认 web3-core / market-core 已更新并重启 Gateway。";
+      return;
     }
+
+    const [tasksRes, bidsRes, resultsRes, receiptsRes] = await Promise.allSettled([
+      state.client.request("web3.market.task.list", { limit: 50 }),
+      state.client.request("web3.market.task.bid.list", { limit: 50 }),
+      state.client.request("web3.market.task.result.list", { limit: 50 }),
+      state.client.request("web3.market.task.receipt.list", { limit: 50 }),
+    ]);
+    const errors: string[] = [];
+
     if (tasksRes.status === "fulfilled") {
       const payload = normalizePayload<{ tasks?: TaskOrderView[] }>(tasksRes.value);
       state.taskOrders = payload?.tasks ?? [];
+    } else {
+      state.taskOrders = [];
+      errors.push(formatTaskLoadError("web3.market.task.list", tasksRes.reason));
     }
     if (bidsRes.status === "fulfilled") {
       const payload = normalizePayload<{ bids?: TaskBidView[] }>(bidsRes.value);
       state.taskBids = payload?.bids ?? [];
+    } else {
+      state.taskBids = [];
+      errors.push(formatTaskLoadError("web3.market.task.bid.list", bidsRes.reason));
     }
     if (resultsRes.status === "fulfilled") {
       const payload = normalizePayload<{ results?: TaskResultView[] }>(resultsRes.value);
       state.taskResults = payload?.results ?? [];
+    } else {
+      state.taskResults = [];
+      errors.push(formatTaskLoadError("web3.market.task.result.list", resultsRes.reason));
     }
     if (receiptsRes.status === "fulfilled") {
       const payload = normalizePayload<{ receipts?: TaskReceiptView[] }>(receiptsRes.value);
       state.taskReceipts = payload?.receipts ?? [];
+    } else {
+      state.taskReceipts = [];
+      errors.push(formatTaskLoadError("web3.market.task.receipt.list", receiptsRes.reason));
     }
+
+    state.taskSummary = buildTaskSummary(
+      state.taskOrders,
+      state.taskBids,
+      state.taskResults,
+      state.taskReceipts,
+    );
+    state.taskError = errors.length > 0 ? formatTaskLoadErrors(errors) : null;
   } finally {
     state.taskLoading = false;
   }
@@ -366,31 +402,181 @@ export async function loadMarketOps(state: MarketOpsState) {
   }
   state.opsLoading = true;
   try {
-    const [monitorRes] = await Promise.allSettled([
-      state.client.request("web3.monitor.snapshot", {}),
+    const [alertsRes, healthRes] = await Promise.allSettled([
+      state.client.request("web3.monitor.alerts.list", { limit: 20 }),
+      state.client.request("web3.monitor.health", {}),
     ]);
-    if (monitorRes.status === "fulfilled") {
-      const payload = normalizePayload<Web3MonitorSnapshot>(monitorRes.value);
-      const activeAlerts = (payload as unknown as { alerts?: OpsAlertView[] })?.alerts ?? [];
-      state.opsAlerts = activeAlerts;
-      state.opsSummary = {
-        activeAlerts: activeAlerts.filter((a) => a.status === "active").length,
-        alertsByLevel: activeAlerts.reduce(
-          (acc, a) => {
-            acc[a.level] = (acc[a.level] ?? 0) + 1;
-            return acc;
-          },
-          {} as Record<string, number>,
-        ),
-        healthProbes: [],
-        discoveryHealthy: true,
-        paymentHealthy: true,
-        settlementHealthy: true,
-      };
-    }
+
+    const alertsPayload =
+      alertsRes.status === "fulfilled"
+        ? normalizePayload<{ alerts?: OpsAlertView[] }>(alertsRes.value)
+        : null;
+    state.opsAlerts = alertsPayload?.alerts ?? [];
+
+    const health =
+      healthRes.status === "fulfilled"
+        ? normalizePayload<MonitorHealthResponse>(healthRes.value)
+        : null;
+    state.opsSummary = buildOpsSummary(state.opsAlerts, health);
   } finally {
     state.opsLoading = false;
   }
+}
+
+function findMissingMethods(hello: unknown, requiredMethods: string[]): string[] {
+  const record = hello as { features?: { methods?: unknown } } | undefined;
+  const methods = Array.isArray(record?.features?.methods) ? record.features.methods : null;
+  if (!methods) {
+    return [];
+  }
+  return requiredMethods.filter((method) => !methods.includes(method));
+}
+
+function resetTaskCollections(
+  state: Pick<MarketTaskState, "taskOrders" | "taskBids" | "taskResults" | "taskReceipts">,
+): void {
+  state.taskOrders = [];
+  state.taskBids = [];
+  state.taskResults = [];
+  state.taskReceipts = [];
+}
+
+function formatTaskLoadError(method: string, error: unknown): string {
+  return `${method}: ${describeRequestError(error)}`;
+}
+
+function formatTaskLoadErrors(errors: string[]): string {
+  return `Task 数据加载不完整：${errors.slice(0, 3).join("；")}`;
+}
+
+function describeRequestError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error && typeof error === "object") {
+    const record = error as { message?: unknown; error?: unknown };
+    if (typeof record.message === "string") {
+      return record.message;
+    }
+    if (typeof record.error === "string") {
+      return record.error;
+    }
+  }
+  return String(error);
+}
+
+type MonitorHealthResponse = {
+  status?: "healthy" | "degraded" | "down";
+  healthy?: boolean;
+  criticalAlerts?: number;
+  lastActivity?: string | null;
+  timestamp?: string;
+};
+
+function buildTaskSummary(
+  tasks: TaskOrderView[],
+  bids: TaskBidView[],
+  results: TaskResultView[],
+  receipts: TaskReceiptView[],
+): MarketTaskSummary {
+  return {
+    openTasks: tasks.filter((task) => task.status === "task_open").length,
+    awardedTasks: tasks.filter((task) => task.status === "task_awarded").length,
+    closedTasks: tasks.filter((task) => task.status === "task_closed").length,
+    totalBids: bids.length,
+    pendingResults: results.filter((result) => result.status === "result_submitted").length,
+    settledReceipts: receipts.filter((receipt) => receipt.status === "receipt_settled").length,
+    disputedReceipts: receipts.filter((receipt) => receipt.status === "receipt_disputed").length,
+  };
+}
+
+function buildOpsSummary(
+  alerts: OpsAlertView[],
+  health: MonitorHealthResponse | null,
+): MarketOpsSummary {
+  const activeAlerts = alerts.filter((alert) => alert.status === "active");
+  const timestamp = health?.timestamp ?? new Date().toISOString();
+  const discoveryHealthy = !hasActiveCategory(activeAlerts, "discovery");
+  const paymentHealthy =
+    !hasActiveCategory(activeAlerts, "billing") && !hasActiveCategory(activeAlerts, "chain");
+  const settlementHealthy = !hasActiveCategory(activeAlerts, "settlement");
+  const monitorStatus = mapMonitorStatus(health?.status, health?.healthy, activeAlerts.length > 0);
+
+  return {
+    activeAlerts: activeAlerts.length,
+    alertsByLevel: activeAlerts.reduce(
+      (acc, alert) => {
+        acc[alert.level] = (acc[alert.level] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    ),
+    healthProbes: [
+      {
+        name: "monitor",
+        status: monitorStatus,
+        lastCheck: timestamp,
+        details: formatMonitorDetails(health),
+      },
+      {
+        name: "discovery",
+        status: discoveryHealthy ? "healthy" : "degraded",
+        lastCheck: timestamp,
+      },
+      {
+        name: "payment",
+        status: paymentHealthy ? "healthy" : "degraded",
+        lastCheck: timestamp,
+      },
+      {
+        name: "settlement",
+        status: settlementHealthy ? "healthy" : "degraded",
+        lastCheck: timestamp,
+      },
+    ],
+    discoveryHealthy,
+    paymentHealthy,
+    settlementHealthy,
+  };
+}
+
+function hasActiveCategory(alerts: OpsAlertView[], category: string): boolean {
+  return alerts.some(
+    (alert) => alert.category.toLowerCase() === category && alert.status === "active",
+  );
+}
+
+function mapMonitorStatus(
+  status: MonitorHealthResponse["status"],
+  healthy: boolean | undefined,
+  hasActiveAlerts: boolean,
+): "healthy" | "degraded" | "down" {
+  if (status === "healthy" || status === "degraded" || status === "down") {
+    return status;
+  }
+  if (healthy === true) {
+    return "healthy";
+  }
+  if (healthy === false || hasActiveAlerts) {
+    return "degraded";
+  }
+  return "healthy";
+}
+
+function formatMonitorDetails(health: MonitorHealthResponse | null): string | undefined {
+  if (!health) {
+    return undefined;
+  }
+  if (health.lastActivity) {
+    return `last activity ${health.lastActivity}`;
+  }
+  if (typeof health.criticalAlerts === "number") {
+    return `${health.criticalAlerts} critical alerts`;
+  }
+  return undefined;
 }
 
 function getPathValue(root: Record<string, unknown>, path: Array<string | number>): unknown {

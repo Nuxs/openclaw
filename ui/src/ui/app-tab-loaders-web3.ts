@@ -6,7 +6,12 @@
  */
 
 import type { OpenClawApp } from "./app.ts";
-import { loadMarketStatus } from "./controllers/market-status.ts";
+import {
+  loadMarketOps,
+  loadMarketPrivacy,
+  loadMarketStatus,
+  loadMarketTasks,
+} from "./controllers/market-status.ts";
 import { loadWeb3MarketSummary } from "./controllers/market-summary.ts";
 import { loadWeb3BillingSummary } from "./controllers/web3-billing.ts";
 import { loadWeb3Dashboard } from "./controllers/web3-dashboard.ts";
@@ -18,7 +23,12 @@ type LoadHost = {
 };
 
 export async function loadMarket(host: LoadHost) {
-  await loadMarketStatus(host as unknown as OpenClawApp);
+  const app = host as unknown as OpenClawApp;
+  await loadMarketStatus(app);
+  if (app.marketError?.includes("市场 API 未就绪")) {
+    return;
+  }
+  await Promise.allSettled([loadMarketTasks(app), loadMarketPrivacy(app), loadMarketOps(app)]);
 }
 
 export async function loadWeb3(host: LoadHost) {

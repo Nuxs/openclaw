@@ -8,16 +8,27 @@
 import type {
   BridgeRoutesSnapshot,
   BridgeTransfer,
+  ConsentView,
   MarketDispute,
   MarketFilters,
   MarketLedgerEntry,
   MarketLedgerSummary,
   MarketLease,
   MarketMetricsSnapshot,
+  MarketOpsSummary,
+  MarketPrivacySummary,
   MarketReputationSummary,
   MarketResource,
   MarketResourceKind,
   MarketStatusSummary,
+  MarketTaskSummary,
+  OpsAlertView,
+  PrivacyAssetView,
+  PrivacyReplayView,
+  TaskBidView,
+  TaskOrderView,
+  TaskReceiptView,
+  TaskResultView,
   TokenEconomyState,
   Web3BillingSummary,
   Web3IndexEntry,
@@ -54,6 +65,21 @@ export type Web3ViewState = {
   marketBridgeRoutes: BridgeRoutesSnapshot | null;
   marketBridgeTransfers: BridgeTransfer[];
   marketLastSuccess: number | null;
+  taskLoading: boolean;
+  taskError: string | null;
+  taskSummary: MarketTaskSummary | null;
+  taskOrders: TaskOrderView[];
+  taskBids: TaskBidView[];
+  taskResults: TaskResultView[];
+  taskReceipts: TaskReceiptView[];
+  privacyLoading: boolean;
+  privacySummary: MarketPrivacySummary | null;
+  privacyConsents: ConsentView[];
+  privacyAssets: PrivacyAssetView[];
+  privacyReplays: PrivacyReplayView[];
+  opsLoading: boolean;
+  opsSummary: MarketOpsSummary | null;
+  opsAlerts: OpsAlertView[];
   marketResourceKind: MarketResourceKind | "all";
   marketFilters: MarketFilters;
   marketEnableBusy: boolean;

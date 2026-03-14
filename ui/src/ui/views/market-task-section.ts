@@ -13,6 +13,7 @@ import type {
 
 export type TaskSectionProps = {
   loading: boolean;
+  error?: string | null;
   summary: MarketTaskSummary | null;
   tasks: TaskOrderView[];
   bids: TaskBidView[];
@@ -43,13 +44,42 @@ function statusBadge(status: string) {
   return html`<span class="badge" style="background:${color};color:#0B1220;padding:2px 8px;border-radius:4px;font-size:11px;">${status}</span>`;
 }
 
+function shortId(value: string): string {
+  return value.length <= 14 ? value : `${value.slice(0, 8)}…${value.slice(-4)}`;
+}
+
+function renderTimestamp(value?: string): string {
+  if (!value) {
+    return "—";
+  }
+  return formatRelativeTimestamp(Date.parse(value));
+}
+
+function renderArtifactSummary(result: TaskResultView): string {
+  const count = result.artifacts.length;
+  if (count === 0) {
+    return "No artifacts";
+  }
+  if (count === 1) {
+    return shortId(result.artifacts[0] ?? "artifact");
+  }
+  return `${count} artifacts`;
+}
+
 export function renderTaskSection(props: TaskSectionProps) {
-  const { summary, tasks, loading } = props;
+  const { summary, tasks, bids, results, receipts, loading, error } = props;
 
   return html`
     <div class="card">
       <div class="card-title">Task Market</div>
       <div class="card-sub">Task publishing, bidding, delivery and settlement.</div>
+      ${
+        error
+          ? html`
+              <div class="callout warn" style="margin-top: 12px;">${error}</div>
+            `
+          : nothing
+      }
       ${
         summary
           ? html`
@@ -78,6 +108,12 @@ export function renderTaskSection(props: TaskSectionProps) {
                 <div class="stat-label">Settled</div>
                 <div class="stat-value">${summary.settledReceipts}</div>
               </div>
+              <div class="stat">
+                <div class="stat-label">Disputed</div>
+                <div class="stat-value" style="color:${summary.disputedReceipts > 0 ? "#EF4444" : "#94A3B8"}">
+                  ${summary.disputedReceipts}
+                </div>
+              </div>
             </div>
           `
           : loading
@@ -105,12 +141,114 @@ export function renderTaskSection(props: TaskSectionProps) {
                 </thead>
                 <tbody>
                   ${tasks.slice(0, 8).map(
-                    (t) => html`
+                    (task) => html`
                       <tr>
-                        <td title="${t.taskId}">${t.title}</td>
-                        <td>${statusBadge(t.status)}</td>
-                        <td>${t.budget.amount} ${t.budget.currency}</td>
-                        <td>${formatRelativeTimestamp(Date.parse(t.expiryAt))}</td>
+                        <td title="${task.taskId}">${task.title}</td>
+                        <td>${statusBadge(task.status)}</td>
+                        <td>${task.budget.amount} ${task.budget.currency}</td>
+                        <td>${formatRelativeTimestamp(Date.parse(task.expiryAt))}</td>
+                      </tr>
+                    `,
+                  )}
+                </tbody>
+              </table>
+            </div>
+          `
+          : nothing
+      }
+
+      ${
+        bids.length > 0
+          ? html`
+            <div style="margin-top:16px;">
+              <div class="card-sub" style="font-weight:600;margin-bottom:8px;">Recent Bids</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Bidder</th>
+                    <th>Task</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${bids.slice(0, 6).map(
+                    (bid) => html`
+                      <tr>
+                        <td title="${bid.bidderActorId}">${shortId(bid.bidderActorId)}</td>
+                        <td title="${bid.taskId}">${shortId(bid.taskId)}</td>
+                        <td>${bid.price} ${bid.currency}</td>
+                        <td>${statusBadge(bid.status)}</td>
+                        <td>${renderTimestamp(bid.createdAt)}</td>
+                      </tr>
+                    `,
+                  )}
+                </tbody>
+              </table>
+            </div>
+          `
+          : nothing
+      }
+
+      ${
+        results.length > 0
+          ? html`
+            <div style="margin-top:16px;">
+              <div class="card-sub" style="font-weight:600;margin-bottom:8px;">Submitted Results</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Deliverer</th>
+                    <th>Task</th>
+                    <th>Status</th>
+                    <th>Artifacts</th>
+                    <th>Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${results.slice(0, 6).map(
+                    (result) => html`
+                      <tr>
+                        <td title="${result.delivererActorId}">${shortId(result.delivererActorId)}</td>
+                        <td title="${result.taskId}">${shortId(result.taskId)}</td>
+                        <td>${statusBadge(result.status)}</td>
+                        <td title="${result.artifacts.join(", ")}">${renderArtifactSummary(result)}</td>
+                        <td>${renderTimestamp(result.submittedAt)}</td>
+                      </tr>
+                    `,
+                  )}
+                </tbody>
+              </table>
+            </div>
+          `
+          : nothing
+      }
+
+      ${
+        receipts.length > 0
+          ? html`
+            <div style="margin-top:16px;">
+              <div class="card-sub" style="font-weight:600;margin-bottom:8px;">Settlement Receipts</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Task</th>
+                    <th>Status</th>
+                    <th>Amount</th>
+                    <th>Settled</th>
+                    <th>Dispute</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${receipts.slice(0, 6).map(
+                    (receipt) => html`
+                      <tr>
+                        <td title="${receipt.taskId}">${shortId(receipt.taskId)}</td>
+                        <td>${statusBadge(receipt.status)}</td>
+                        <td>${receipt.amount} ${receipt.currency}</td>
+                        <td>${renderTimestamp(receipt.settledAt)}</td>
+                        <td title="${receipt.disputeId ?? ""}">${receipt.disputeId ? shortId(receipt.disputeId) : "—"}</td>
                       </tr>
                     `,
                   )}

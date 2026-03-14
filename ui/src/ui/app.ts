@@ -759,6 +759,21 @@ export class OpenClawApp extends LitElement {
   @state() marketBridgeRoutes: import("./types.js").BridgeRoutesSnapshot | null = null;
   @state() marketBridgeTransfers: import("./types.js").BridgeTransfer[] = [];
   @state() marketLastSuccess: number | null = null;
+  @state() taskLoading = false;
+  @state() taskError: string | null = null;
+  @state() taskSummary: import("./types.js").MarketTaskSummary | null = null;
+  @state() taskOrders: import("./types.js").TaskOrderView[] = [];
+  @state() taskBids: import("./types.js").TaskBidView[] = [];
+  @state() taskResults: import("./types.js").TaskResultView[] = [];
+  @state() taskReceipts: import("./types.js").TaskReceiptView[] = [];
+  @state() privacyLoading = false;
+  @state() privacySummary: import("./types.js").MarketPrivacySummary | null = null;
+  @state() privacyConsents: import("./types.js").ConsentView[] = [];
+  @state() privacyAssets: import("./types.js").PrivacyAssetView[] = [];
+  @state() privacyReplays: import("./types.js").PrivacyReplayView[] = [];
+  @state() opsLoading = false;
+  @state() opsSummary: import("./types.js").MarketOpsSummary | null = null;
+  @state() opsAlerts: import("./types.js").OpsAlertView[] = [];
   @state() marketResourceKind: import("./types.js").MarketResourceKind | "all" = "all";
   @state() marketFilters: import("./types.js").MarketFilters = {
     resourceSearch: "",
