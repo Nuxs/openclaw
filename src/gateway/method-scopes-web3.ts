@@ -30,6 +30,13 @@ export const WEB3_READ_METHODS: readonly string[] = [
   "market.audit.query",
   "market.transparency.summary",
   "market.transparency.trace",
+  "market.task.list",
+  "market.bridge.routes",
+  "market.tokenEconomy.summary",
+  "market.reputation.summary",
+  "market.consent.list",
+  "market.privacy.assets",
+  "market.privacy.replay.list",
   "web3.market.status.summary",
   "web3.market.metrics.snapshot",
   "web3.market.resource.get",
@@ -50,6 +57,14 @@ export const WEB3_READ_METHODS: readonly string[] = [
   "web3.billing.paymentTrace.query",
   "web3.audit.query",
   "web3.market.reconciliation.summary",
+  "web3.market.consent.list",
+  "web3.market.task.list",
+  "web3.market.bridge.routes",
+  "web3.market.tokenEconomy.summary",
+  "web3.market.reputation.summary",
+  "web3.market.privacy.assets",
+  "web3.market.privacy.replay.list",
+  "web3.status.summary",
 ] as const;
 
 export const WEB3_WRITE_METHODS: readonly string[] = [
