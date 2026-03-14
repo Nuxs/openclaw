@@ -238,7 +238,11 @@ export function renderMessageGroup(
           <span class="chat-group-timestamp">${timestamp}</span>
           ${renderMessageMeta(meta)}
           ${normalizedRole === "assistant" && isTtsSupported() ? renderTtsButton(group) : nothing}
-          ${opts.onDelete ? renderDeleteButton(opts.onDelete) : nothing}
+          ${
+            opts.onDelete
+              ? renderDeleteButton(opts.onDelete, normalizedRole === "user" ? "left" : "right")
+              : nothing
+          }
         </div>
       </div>
     </div>
@@ -376,6 +380,8 @@ function extractGroupText(group: MessageGroup): string {
 
 const SKIP_DELETE_CONFIRM_KEY = "openclaw:skipDeleteConfirm";
 
+type DeleteConfirmSide = "left" | "right";
+
 function shouldSkipDeleteConfirm(): boolean {
   try {
     return localStorage.getItem(SKIP_DELETE_CONFIRM_KEY) === "1";
@@ -384,7 +390,7 @@ function shouldSkipDeleteConfirm(): boolean {
   }
 }
 
-function renderDeleteButton(onDelete: () => void) {
+function renderDeleteButton(onDelete: () => void, side: DeleteConfirmSide) {
   return html`
     <span class="chat-delete-wrap">
       <button
@@ -404,7 +410,7 @@ function renderDeleteButton(onDelete: () => void) {
             return;
           }
           const popover = document.createElement("div");
-          popover.className = "chat-delete-confirm";
+          popover.className = `chat-delete-confirm chat-delete-confirm--${side}`;
           popover.innerHTML = `
             <p class="chat-delete-confirm__text">Delete this message?</p>
             <label class="chat-delete-confirm__remember">
