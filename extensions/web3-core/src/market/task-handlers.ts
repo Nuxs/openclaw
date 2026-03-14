@@ -81,6 +81,10 @@ export function createMarketTaskResultSubmitHandler(
   return createTaskProxyHandler(config, "market.task.result.submit");
 }
 
+export function createMarketTaskResultListHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createTaskProxyHandler(config, "market.task.result.list");
+}
+
 export function createMarketTaskResultReviewHandler(
   config: Web3PluginConfig,
 ): GatewayRequestHandler {

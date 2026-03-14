@@ -50,6 +50,10 @@ export function createTaskResultSubmitHandler(
         throw new Error("E_NOT_FOUND: awarded bid not found");
       }
       assertActorMatch(config, actorId, bid.bidderActorId, "bidderActorId");
+      const activeResult = task.resultId ? store.getTaskResult(task.resultId) : undefined;
+      if (activeResult?.status === "result_submitted") {
+        throw new Error("E_CONFLICT: task already has a submitted result awaiting review");
+      }
       const submittedAt = nowIso();
       const result: TaskResult = {
         resultId: randomUUID(),
@@ -304,6 +308,39 @@ export function createTaskResultReviewHandler(
         status: result.status,
         receiptStatus: receipt.status,
       });
+    } catch (err) {
+      respond(false, formatGatewayErrorResponse(err));
+    }
+  };
+}
+
+export function createTaskResultListHandler(
+  store: MarketStateStore,
+  config: MarketPluginConfig,
+): GatewayRequestHandler {
+  return (opts: GatewayRequestHandlerOptions) => {
+    const { params, respond } = opts;
+    try {
+      assertAccess(opts, config, "read");
+      const input = (params ?? {}) as Record<string, unknown>;
+      const status = requireOptionalEnum(input, "status", [
+        "result_submitted",
+        "result_accepted",
+        "result_rejected",
+      ] as const);
+      const limit = requireLimit(input, "limit", 50, 200);
+      const results = store
+        .listTaskResults({
+          taskId: typeof input.taskId === "string" ? input.taskId : undefined,
+          bidId: typeof input.bidId === "string" ? input.bidId : undefined,
+          delivererActorId:
+            typeof input.delivererActorId === "string" ? input.delivererActorId : undefined,
+          status,
+          limit,
+        })
+        .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+        .slice(0, limit);
+      respond(true, { count: results.length, results });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }

@@ -115,6 +115,7 @@ export {
 } from "./task-bid.js";
 export {
   createTaskResultSubmitHandler,
+  createTaskResultListHandler,
   createTaskResultReviewHandler,
   createTaskReceiptGetHandler,
   createTaskReceiptListHandler,

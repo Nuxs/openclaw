@@ -12,6 +12,19 @@
  */
 
 import {
+  createMarketConsentGrantHandler,
+  createMarketConsentRevokeHandler,
+  createMarketDeliveryCompleteHandler,
+  createMarketDeliveryIssueHandler,
+  createMarketDeliveryRevokeHandler,
+  createMarketOfferCloseHandler,
+  createMarketOfferCreateHandler,
+  createMarketOfferPublishHandler,
+  createMarketOfferUpdateHandler,
+  createMarketOrderCancelHandler,
+  createMarketOrderCreateHandler,
+} from "./market/commerce-handlers.js";
+import {
   createMarketBridgeListHandler,
   createMarketBridgeRequestHandler,
   createMarketBridgeRoutesHandler,
@@ -59,6 +72,7 @@ import {
   createMarketTaskBidListHandler,
   createMarketTaskBidAwardHandler,
   createMarketTaskResultSubmitHandler,
+  createMarketTaskResultListHandler,
   createMarketTaskResultReviewHandler,
   createMarketTaskReceiptGetHandler,
   createMarketTaskReceiptListHandler,
@@ -90,6 +104,25 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
     acceptsArgs: true,
     handler: createWeb3MarketCommand(config),
   });
+
+  // ── Gateway: Market commerce ──
+  api.registerGatewayMethod("web3.market.offer.create", createMarketOfferCreateHandler(config));
+  api.registerGatewayMethod("web3.market.offer.publish", createMarketOfferPublishHandler(config));
+  api.registerGatewayMethod("web3.market.offer.update", createMarketOfferUpdateHandler(config));
+  api.registerGatewayMethod("web3.market.offer.close", createMarketOfferCloseHandler(config));
+  api.registerGatewayMethod("web3.market.order.create", createMarketOrderCreateHandler(config));
+  api.registerGatewayMethod("web3.market.order.cancel", createMarketOrderCancelHandler(config));
+  api.registerGatewayMethod("web3.market.consent.grant", createMarketConsentGrantHandler(config));
+  api.registerGatewayMethod("web3.market.consent.revoke", createMarketConsentRevokeHandler(config));
+  api.registerGatewayMethod("web3.market.delivery.issue", createMarketDeliveryIssueHandler(config));
+  api.registerGatewayMethod(
+    "web3.market.delivery.revoke",
+    createMarketDeliveryRevokeHandler(config),
+  );
+  api.registerGatewayMethod(
+    "web3.market.delivery.complete",
+    createMarketDeliveryCompleteHandler(config),
+  );
 
   // ── Gateway: Market resources ──
   api.registerGatewayMethod(
@@ -211,6 +244,10 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
   api.registerGatewayMethod(
     "web3.market.task.result.submit",
     createMarketTaskResultSubmitHandler(config),
+  );
+  api.registerGatewayMethod(
+    "web3.market.task.result.list",
+    createMarketTaskResultListHandler(config),
   );
   api.registerGatewayMethod(
     "web3.market.task.result.review",

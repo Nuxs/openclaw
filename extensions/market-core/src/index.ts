@@ -98,6 +98,7 @@ import {
   createTaskBidListHandler,
   createTaskBidAwardHandler,
   createTaskResultSubmitHandler,
+  createTaskResultListHandler,
   createTaskResultReviewHandler,
   createTaskReceiptGetHandler,
   createTaskReceiptListHandler,
@@ -318,6 +319,10 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod(
       "market.task.result.submit",
       createTaskResultSubmitHandler(store, config),
+    );
+    api.registerGatewayMethod(
+      "market.task.result.list",
+      createTaskResultListHandler(store, config),
     );
     api.registerGatewayMethod(
       "market.task.result.review",
