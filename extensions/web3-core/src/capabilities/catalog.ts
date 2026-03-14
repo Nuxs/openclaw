@@ -4,6 +4,7 @@
  */
 import type { Web3PluginConfig } from "../config.js";
 import { coreCapabilities } from "./catalog/core.js";
+import { marketCommerceCapabilities } from "./catalog/market-commerce.js";
 import { marketPrivacyCapabilities } from "./catalog/market-privacy.js";
 import { marketTaskCapabilities } from "./catalog/market-task.js";
 import { marketCapabilities } from "./catalog/market.js";
@@ -41,6 +42,7 @@ export function describeWeb3Capabilities(
     ...rewardCapabilities(config),
     ...monitorCapabilities(),
     ...marketCapabilities(config),
+    ...marketCommerceCapabilities(config),
     ...marketTaskCapabilities(config),
     ...marketPrivacyCapabilities(config),
     ...toolsCapabilities(config),

@@ -19,6 +19,7 @@ import {
 } from "./task-order.js";
 import {
   createTaskResultSubmitHandler,
+  createTaskResultListHandler,
   createTaskResultReviewHandler,
   createTaskReceiptGetHandler,
   createTaskReceiptListHandler,
@@ -545,6 +546,84 @@ describe("task market handlers", () => {
           client: createClient(),
         } as any);
         expect(result()?.ok).toBe(false);
+      });
+    });
+
+    it("rejects duplicate active submissions for the same awarded task", async () => {
+      await withStoreModes(tempDir, async ({ store, config }) => {
+        const ctx = await publishAndAward(store, config);
+        const handler = createTaskResultSubmitHandler(store, config);
+
+        const { respond: firstRespond, result: firstResult } = createResponder();
+        await handler({
+          params: {
+            actorId: "bidder-1",
+            taskId: ctx.taskId,
+            artifacts: ["https://example.com/artifact-1"],
+          },
+          respond: firstRespond,
+          client: createClient(),
+        } as any);
+        expect(firstResult()?.ok).toBe(true);
+
+        const { respond: secondRespond, result: secondResult } = createResponder();
+        await handler({
+          params: {
+            actorId: "bidder-1",
+            taskId: ctx.taskId,
+            artifacts: ["https://example.com/artifact-2"],
+          },
+          respond: secondRespond,
+          client: createClient(),
+        } as any);
+        expect(secondResult()?.ok).toBe(false);
+        expect(secondResult()?.payload.error).toBe("E_CONFLICT");
+        expect(store.listTaskResults({ taskId: ctx.taskId })).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("task.result.list", () => {
+    it("lists results for a task and supports status filters", async () => {
+      await withStoreModes(tempDir, async ({ store, config }) => {
+        const ctx = await publishAwardAndSubmit(store, config);
+
+        const listHandler = createTaskResultListHandler(store, config);
+        const { respond: listRespond, result: listResult } = createResponder();
+        listHandler({
+          params: { taskId: ctx.taskId },
+          respond: listRespond,
+          client: createClient(["operator.read"]),
+        } as any);
+        expect(listResult()?.ok).toBe(true);
+        expect(listResult()?.payload.count).toBe(1);
+        expect((listResult()?.payload.results as TaskResult[])[0]?.resultId).toBe(ctx.resultId);
+
+        const reviewHandler = createTaskResultReviewHandler(store, config);
+        const { respond: reviewRespond, result: reviewResult } = createResponder();
+        await reviewHandler({
+          params: {
+            actorId: "creator-1",
+            resultId: ctx.resultId,
+            decision: "reject",
+            note: "needs revision",
+          },
+          respond: reviewRespond,
+          client: createClient(),
+        } as any);
+        expect(reviewResult()?.ok).toBe(true);
+
+        const { respond: filterRespond, result: filterResult } = createResponder();
+        listHandler({
+          params: { taskId: ctx.taskId, status: "result_rejected" },
+          respond: filterRespond,
+          client: createClient(["operator.read"]),
+        } as any);
+        expect(filterResult()?.ok).toBe(true);
+        expect(filterResult()?.payload.count).toBe(1);
+        expect((filterResult()?.payload.results as TaskResult[])[0]?.status).toBe(
+          "result_rejected",
+        );
       });
     });
   });

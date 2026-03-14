@@ -111,6 +111,14 @@ export function marketTaskCapabilities(config: Web3PluginConfig): CapabilityDesc
       stability: "experimental",
     },
     {
+      name: "web3.market.task.result.list",
+      summary: "List submitted task results with optional task, bid, deliverer or status filters.",
+      kind: "gateway",
+      group: "market",
+      availability: available,
+      stability: "experimental",
+    },
+    {
       name: "web3.market.task.result.review",
       summary: "Accept or reject a submitted result. Accept triggers settlement release.",
       kind: "gateway",
