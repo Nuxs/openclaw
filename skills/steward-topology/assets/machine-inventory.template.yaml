@@ -1,0 +1,86 @@
+version: 1
+
+goal:
+  primaryWorkload: chat
+  optimizeFor: balanced
+  privacyMode: local-first
+  allowPublicExposure: false
+  notes: "Use this template to describe the user's current devices without storing secrets."
+
+constraints:
+  budgetPriority: balanced
+  requireTrustedCircleOnly: false
+  requireAlwaysOnAuthority: true
+  preferGpuForInference: true
+  avoidHardcodedRoles: true
+
+nodes:
+  - label: "mac-mini"
+    kind: workstation
+    os: macos
+    availability: daily
+    reachability: tailscale
+    trustTier: personal
+    installed: true
+    plugins:
+      web3Core: true
+      marketCore: false
+    hardware:
+      cpu: "Apple Silicon"
+      gpu: "integrated"
+      memoryGb: 16
+    runtimes:
+      - kind: none
+        label: "none"
+        healthy: false
+    currentRoleHints:
+      - control
+      - consumer-primary
+    notes: "User's main daily machine"
+
+  - label: "windows-gpu"
+    kind: workstation
+    os: windows
+    availability: daily
+    reachability: tailscale
+    trustTier: personal
+    installed: true
+    plugins:
+      web3Core: true
+      marketCore: false
+    hardware:
+      cpu: "7950X3D"
+      gpu: "3080Ti"
+      memoryGb: 64
+    runtimes:
+      - kind: ollama
+        label: "Ollama"
+        healthy: true
+        models:
+          - qwen2.5:14b
+    currentRoleHints:
+      - provider-primary
+    notes: "Primary inference candidate"
+
+  - label: "cloud-a"
+    kind: server
+    os: linux
+    availability: always-on
+    reachability: public
+    trustTier: hosted
+    installed: true
+    plugins:
+      web3Core: true
+      marketCore: true
+    hardware:
+      cpu: "2 vCPU"
+      gpu: "none"
+      memoryGb: 4
+    runtimes:
+      - kind: none
+        label: "none"
+        healthy: false
+    currentRoleHints:
+      - authority
+      - bootstrap
+    notes: "Durable authority and fallback discovery candidate"
