@@ -18,7 +18,24 @@ function jsonResult(payload: unknown): AgentToolResult {
   };
 }
 
-async function callGatewayMethod(config: Web3PluginConfig, method: string, params?: unknown) {
+type GatewayCallSuccess = {
+  ok: true;
+  result?: unknown;
+  error?: string;
+};
+
+type GatewayCallFailure = {
+  ok: false;
+  error: unknown;
+};
+
+type GatewayCallResult = GatewayCallSuccess | GatewayCallFailure;
+
+async function callGatewayMethod(
+  config: Web3PluginConfig,
+  method: string,
+  params?: unknown,
+): Promise<GatewayCallResult> {
   const callGateway = await loadCallGateway();
   const response = await callGateway({
     method,
@@ -29,7 +46,7 @@ async function callGatewayMethod(config: Web3PluginConfig, method: string, param
   if (!normalized.ok) {
     return { ok: false, error: formatWeb3GatewayErrorResponse(normalized.error) };
   }
-  return normalized;
+  return { ok: true, result: normalized.result, error: normalized.error };
 }
 
 function safeResult(payload: unknown): AgentToolResult {
@@ -263,6 +280,286 @@ export function createWeb3MarketUnpublishTool(config: Web3PluginConfig): AnyAgen
           resourceId,
         });
         return safeResult(result);
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  } as AnyAgentTool;
+}
+
+const QuoteSchema = Type.Object(
+  {
+    resourceId: Type.String({ description: "Published resource ID to quote." }),
+    quantity: Type.Optional(Type.Number({ minimum: 1, maximum: 1000 })),
+    ttlMs: Type.Optional(Type.Number({ minimum: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+type QuoteParams = { resourceId: string; quantity?: number; ttlMs?: number };
+
+export function createWeb3MarketQuoteTool(config: Web3PluginConfig): AnyAgentTool | null {
+  if (!config.resources.enabled) {
+    return null;
+  }
+  return {
+    name: "web3.market.offer.quote",
+    label: "Web3 Market Quote",
+    description: "Build a redacted quote for a published Web3 market resource.",
+    parameters: QuoteSchema,
+    execute: async (_toolCallId, params: QuoteParams) => {
+      try {
+        const resourceId = params.resourceId?.trim();
+        if (!resourceId) {
+          return errorResult("resourceId is required", { fields: ["resourceId"] });
+        }
+        const result = await callGatewayMethod(config, "web3.market.offer.quote", {
+          resourceId,
+          quantity:
+            typeof params.quantity === "number" && Number.isFinite(params.quantity)
+              ? Math.max(1, Math.floor(params.quantity))
+              : undefined,
+          ttlMs:
+            typeof params.ttlMs === "number" && Number.isFinite(params.ttlMs)
+              ? Math.max(1, Math.floor(params.ttlMs))
+              : undefined,
+        });
+        return safeResult(result);
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  } as AnyAgentTool;
+}
+
+const CompareSchema = Type.Object(
+  {
+    kind: Type.Optional(Type.String()),
+    tag: Type.Optional(Type.String()),
+    query: Type.Optional(Type.String()),
+    quantity: Type.Optional(Type.Number({ minimum: 1, maximum: 1000 })),
+    limit: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
+  },
+  { additionalProperties: false },
+);
+
+type CompareParams = {
+  kind?: string;
+  tag?: string;
+  query?: string;
+  quantity?: number;
+  limit?: number;
+};
+
+export function createWeb3MarketCompareTool(config: Web3PluginConfig): AnyAgentTool | null {
+  if (!config.resources.enabled) {
+    return null;
+  }
+  return {
+    name: "web3.market.offer.compare",
+    label: "Web3 Market Compare",
+    description: "Compare published Web3 market resources for the current buyer intent.",
+    parameters: CompareSchema,
+    execute: async (_toolCallId, params: CompareParams) => {
+      try {
+        const result = await callGatewayMethod(config, "web3.market.offer.compare", {
+          ...params,
+          quantity:
+            typeof params.quantity === "number" && Number.isFinite(params.quantity)
+              ? Math.max(1, Math.floor(params.quantity))
+              : undefined,
+          limit:
+            typeof params.limit === "number" && Number.isFinite(params.limit)
+              ? Math.max(1, Math.min(20, Math.floor(params.limit)))
+              : undefined,
+        });
+        return safeResult(result);
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  } as AnyAgentTool;
+}
+
+const OrderCreateSchema = Type.Object(
+  {
+    actorId: Type.String({ description: "Actor ID authorizing the order request." }),
+    buyerId: Type.String({ description: "Buyer actor ID." }),
+    offerId: Type.Optional(Type.String({ description: "Existing offer ID." })),
+    resourceId: Type.Optional(Type.String({ description: "Resource ID used to resolve offerId." })),
+    quantity: Type.Optional(Type.Number({ minimum: 1, maximum: 1000 })),
+  },
+  { additionalProperties: false },
+);
+
+type OrderCreateParams = {
+  actorId: string;
+  buyerId: string;
+  offerId?: string;
+  resourceId?: string;
+  quantity?: number;
+};
+
+export function createWeb3MarketOrderCreateTool(config: Web3PluginConfig): AnyAgentTool | null {
+  if (!config.resources.enabled || !config.resources.consumer.enabled) {
+    return null;
+  }
+  return {
+    name: "web3.market.order.create",
+    label: "Web3 Market Order Create",
+    description: "Create a market order from an offerId or published resource.",
+    parameters: OrderCreateSchema,
+    execute: async (_toolCallId, params: OrderCreateParams) => {
+      try {
+        const actorId = params.actorId?.trim();
+        const buyerId = params.buyerId?.trim();
+        let offerId = params.offerId?.trim();
+        const resourceId = params.resourceId?.trim();
+        if (!actorId || !buyerId) {
+          return errorResult("actorId and buyerId are required", {
+            fields: ["actorId", "buyerId"],
+          });
+        }
+        if (!offerId && resourceId) {
+          const resourceResult = await callGatewayMethod(config, "web3.market.resource.get", {
+            resourceId,
+          });
+          const resource =
+            resourceResult.ok && resourceResult.result && typeof resourceResult.result === "object"
+              ? ((resourceResult.result as Record<string, unknown>).resource as
+                  | Record<string, unknown>
+                  | undefined)
+              : undefined;
+          offerId = typeof resource?.offerId === "string" ? resource.offerId.trim() : undefined;
+        }
+        if (!offerId) {
+          return errorResult("offerId or resourceId is required", {
+            fields: ["offerId", "resourceId"],
+          });
+        }
+        const result = await callGatewayMethod(config, "web3.market.order.create", {
+          actorId,
+          buyerId,
+          offerId,
+          quantity:
+            typeof params.quantity === "number" && Number.isFinite(params.quantity)
+              ? Math.max(1, Math.floor(params.quantity))
+              : 1,
+        });
+        return safeResult(result);
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  } as AnyAgentTool;
+}
+
+const BuySchema = Type.Object(
+  {
+    resourceId: Type.String({ description: "Published resource ID to buy/use." }),
+    actorId: Type.String({ description: "Actor ID authorizing the purchase." }),
+    consumerActorId: Type.String({ description: "Consumer actor ID." }),
+    ttlMs: Type.Number({ minimum: 10_000, maximum: 604_800_000 }),
+    maxCost: Type.Optional(Type.String()),
+    sessionKey: Type.Optional(Type.String()),
+    autoPay: Type.Optional(Type.Boolean()),
+    paymentChain: Type.Optional(Type.String()),
+    paymentTo: Type.Optional(Type.String()),
+    paymentAmount: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+type BuyParams = {
+  resourceId: string;
+  actorId: string;
+  consumerActorId: string;
+  ttlMs: number;
+  maxCost?: string;
+  sessionKey?: string;
+  autoPay?: boolean;
+  paymentChain?: string;
+  paymentTo?: string;
+  paymentAmount?: string;
+};
+
+export function createWeb3MarketBuyTool(config: Web3PluginConfig): AnyAgentTool | null {
+  if (!config.resources.enabled || !config.resources.consumer.enabled) {
+    return null;
+  }
+  return {
+    name: "web3.market.buy",
+    label: "Web3 Market Buy",
+    description:
+      "Compare/quote-aware purchase helper that can autopay and then lease the resource for immediate agent use.",
+    parameters: BuySchema,
+    execute: async (_toolCallId, params: BuyParams) => {
+      try {
+        const actorId = params.actorId?.trim();
+        const consumerActorId = params.consumerActorId?.trim();
+        const resourceId = params.resourceId?.trim();
+        if (!actorId || !consumerActorId || !resourceId) {
+          return errorResult("resourceId, actorId, and consumerActorId are required", {
+            fields: ["resourceId", "actorId", "consumerActorId"],
+          });
+        }
+
+        const quoteResult = await callGatewayMethod(config, "web3.market.offer.quote", {
+          resourceId,
+          quantity: 1,
+          ttlMs: params.ttlMs,
+        });
+        const quotePayload =
+          quoteResult.ok && quoteResult.result && typeof quoteResult.result === "object"
+            ? (quoteResult.result as Record<string, unknown>)
+            : {};
+        const quote =
+          quotePayload.quote && typeof quotePayload.quote === "object"
+            ? (quotePayload.quote as Record<string, unknown>)
+            : undefined;
+
+        let payment: unknown = null;
+        if (params.autoPay) {
+          const chain = params.paymentChain?.trim() || "evm";
+          const to =
+            params.paymentTo?.trim() ||
+            (typeof quote?.providerActorId === "string" ? quote.providerActorId : "");
+          const amount =
+            params.paymentAmount?.trim() ||
+            (quote?.price &&
+            typeof quote.price === "object" &&
+            typeof (quote.price as Record<string, unknown>).amount === "string"
+              ? ((quote.price as Record<string, unknown>).amount as string)
+              : undefined);
+          if (!to || !amount) {
+            return errorResult("paymentTo/paymentAmount could not be resolved for autopay", {
+              fields: ["paymentTo", "paymentAmount"],
+            });
+          }
+          const paymentResult = await callGatewayMethod(config, "web3.wallet.autopay", {
+            chain,
+            to,
+            value: amount,
+            amount,
+            tool: "web3.market.buy",
+          });
+          payment = paymentResult;
+        }
+
+        const leaseResult = await callGatewayMethod(config, "web3.market.lease.issue", {
+          actorId,
+          resourceId,
+          consumerActorId,
+          ttlMs: params.ttlMs,
+          maxCost: params.maxCost,
+          sessionKey: params.sessionKey,
+        });
+        return safeResult({
+          quote: quote ?? null,
+          payment,
+          lease: leaseResult,
+          workflow: "quote -> optional autopay -> lease",
+        });
       } catch (err) {
         return errorResult(err);
       }

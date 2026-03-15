@@ -7,6 +7,7 @@ import type { PluginCommandHandler } from "openclaw/plugin-sdk/plugin-command";
 import type { Web3PluginConfig } from "../config.js";
 import { AlertLevel } from "../monitor/types.js";
 import type { Web3StateStore } from "../state/store.js";
+import { redactString } from "../utils/redact.js";
 import {
   alertLevelBadge,
   buildStatLine,
@@ -89,7 +90,8 @@ export function createWeb3DashboardCommand(
     } else {
       const { shown, more } = truncateList(alerts, 3);
       for (const a of shown) {
-        const label = a.message || a.ruleName;
+        // Alert text may include upstream error strings, so keep the dashboard share-safe.
+        const label = redactString(a.message || a.ruleName);
         alertLines.push(`  ${alertLevelBadge(a.level)} ${label}`);
       }
       if (more > 0) alertLines.push(`  …and ${more} more`);

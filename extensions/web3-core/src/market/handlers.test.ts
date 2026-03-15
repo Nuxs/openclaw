@@ -40,8 +40,12 @@ vi.mock("../identity/ens.js", async () => {
 });
 
 // Dynamically import after mocks are established
-const { createMarketReconciliationSummaryHandler, createMarketReputationSummaryHandler } =
-  await import("./handlers.js");
+const {
+  createMarketOfferCompareHandler,
+  createMarketOfferQuoteHandler,
+  createMarketReconciliationSummaryHandler,
+  createMarketReputationSummaryHandler,
+} = await import("./handlers.js");
 
 type HandlerResult = { ok: boolean; payload: Record<string, unknown> } | undefined;
 
@@ -72,6 +76,92 @@ beforeEach(() => {
 
 afterEach(() => {
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe("market.offer quote/compare", () => {
+  it("builds a redacted quote summary from a published resource", async () => {
+    mockCallGateway.mockImplementation(async (opts: { method: string }) => {
+      if (opts.method === "market.resource.get") {
+        return {
+          ok: true,
+          result: {
+            resource: {
+              resourceId: "resource-1",
+              offerId: "offer-1",
+              providerActorId: "0x00000000000000000000000000000000000000a1",
+              kind: "service",
+              label: "Advanced code review",
+              price: { unit: "call", amount: "2.5", currency: "USDC" },
+              serviceSchema: {
+                inputs: ["repo"],
+                outputs: ["report"],
+                proofRequirements: [{ type: "tlsnotary", required: true }],
+              },
+            },
+          },
+        };
+      }
+      return { ok: true, result: {} };
+    });
+
+    const handler = createMarketOfferQuoteHandler(config);
+    const r = createResponder();
+    await handler({
+      params: { resourceId: "resource-1", quantity: 2 },
+      respond: r.respond,
+    } as never);
+
+    expect(r.result()!.ok).toBe(true);
+    expect((r.result()!.payload as any).quote.estimatedTotal).toBe("5");
+    expect((r.result()!.payload as any).quote.proofRequired).toBe(true);
+  });
+
+  it("compares candidate resources and ranks stronger matches first", async () => {
+    mockCallGateway.mockImplementation(async (opts: { method: string }) => {
+      if (opts.method === "market.resource.list") {
+        return {
+          ok: true,
+          result: {
+            resources: [
+              {
+                resourceId: "resource-1",
+                offerId: "offer-1",
+                providerActorId: "0x00000000000000000000000000000000000000a1",
+                kind: "service",
+                label: "Advanced code review",
+                description: "Deep secure review",
+                tags: ["security", "review"],
+                price: { unit: "call", amount: "2", currency: "USDC" },
+                serviceSchema: { proofRequirements: [{ type: "tlsnotary" }] },
+              },
+              {
+                resourceId: "resource-2",
+                offerId: "offer-2",
+                providerActorId: "0x00000000000000000000000000000000000000a2",
+                kind: "service",
+                label: "Generic automation",
+                description: "Basic workflow automation",
+                tags: ["automation"],
+                price: { unit: "call", amount: "4", currency: "USDC" },
+              },
+            ],
+          },
+        };
+      }
+      return { ok: true, result: {} };
+    });
+
+    const handler = createMarketOfferCompareHandler(config);
+    const r = createResponder();
+    await handler({
+      params: { kind: "service", query: "review", limit: 2 },
+      respond: r.respond,
+    } as never);
+
+    expect(r.result()!.ok).toBe(true);
+    expect((r.result()!.payload as any).count).toBe(2);
+    expect((r.result()!.payload as any).candidates[0].quote.resourceId).toBe("resource-1");
+  });
 });
 
 describe("market.reconciliation.summary", () => {

@@ -140,4 +140,51 @@ describe("market-status", () => {
     expect(summary.runtime.errors).toContain("market.task.list: unknown method market.task.list");
     expect(formatWeb3MarketStatusMessage(summary)).toContain("⚠️ Some probes failed:");
   });
+
+  it("redacts endpoints, tokens, and local paths from share-safe market status", async () => {
+    installGatewayResponses({
+      "web3.status.summary": {
+        ok: true,
+        result: {
+          connected: true,
+          providerEndpoint: "https://provider.example.com",
+          accessToken: "tok_secret_123",
+          cwd: "/Users/test/private",
+        },
+      },
+      "web3.market.status.summary": {
+        ok: true,
+        result: {
+          enabled: true,
+          nested: {
+            endpoint: "https://operator.example.com",
+            storePath: "/Users/test/market-state",
+            token: "tok_inner_456",
+          },
+        },
+      },
+      "web3.market.ledger.summary": {
+        ok: true,
+        result: {
+          pending: 0,
+          rpcUrl: "https://rpc.example.com",
+        },
+      },
+      "market.task.list": { ok: true, result: { tasks: [] } },
+      "market.consent.list": { ok: true, result: { consents: [] } },
+    });
+
+    const summary = await buildWeb3MarketStatusSummary({
+      config: createConfig(),
+      profile: "fast",
+    });
+    const serialized = JSON.stringify(summary);
+
+    expect(serialized).not.toContain("provider.example.com");
+    expect(serialized).not.toContain("operator.example.com");
+    expect(serialized).not.toContain("rpc.example.com");
+    expect(serialized).not.toContain("tok_secret_123");
+    expect(serialized).not.toContain("tok_inner_456");
+    expect(serialized).not.toContain("/Users/test");
+  });
 });

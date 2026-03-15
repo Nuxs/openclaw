@@ -118,6 +118,33 @@ export function toolsCapabilities(config: Web3PluginConfig): CapabilityDescripto
       risk: { level: "low" },
     },
     {
+      name: "web3.market.steward.buy",
+      summary:
+        "Plan or execute a policy-gated market purchase with candidate selection, approval-aware budget checks, and optional autopay + lease.",
+      kind: "tool",
+      group: "tools",
+      availability: availability(consumerEnabled, "resources consumer disabled"),
+      paramsSchema: {
+        actorId: "string",
+        consumerActorId: "string",
+        resourceId: "string",
+        query: "string",
+        ttlMs: "number",
+        execute: "boolean",
+        autoPay: "boolean",
+        selectionPolicy: "object",
+        budgetPolicy: "object",
+        riskPolicy: "object",
+        approval: "object",
+      },
+      returns:
+        "A steward purchase plan with selected candidate, budget/risk decisions, and optional payment + lease execution results.",
+      risk: {
+        level: "high",
+        notes: ["Can trigger policy-gated autopay and lease when execute=true"],
+      },
+    },
+    {
       name: "web3.market.ledger.summary",
       summary: "Summarize market ledger totals.",
       kind: "tool",

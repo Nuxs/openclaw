@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveConfig } from "../config.js";
 import {
+  createWeb3MarketBuyTool,
+  createWeb3MarketCompareTool,
   createWeb3MarketLeaseTool,
+  createWeb3MarketOrderCreateTool,
   createWeb3MarketPublishTool,
+  createWeb3MarketQuoteTool,
   createWeb3MarketRevokeLeaseTool,
   createWeb3MarketUnpublishTool,
 } from "./market-tools.js";
@@ -74,6 +78,29 @@ describe("web3 market tools", () => {
     expect(callGatewayMock).not.toHaveBeenCalled();
   });
 
+  it("passes quote and compare through new buyer tools", async () => {
+    const quoteTool = createWeb3MarketQuoteTool(makeConfig())!;
+    const compareTool = createWeb3MarketCompareTool(makeConfig())!;
+
+    await quoteTool.execute("tc-1", { resourceId: "res_1", quantity: 2, ttlMs: 60_000 });
+    await compareTool.execute("tc-2", { kind: "service", query: "review", limit: 3 });
+
+    expect(callGatewayMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        method: "web3.market.offer.quote",
+        params: { resourceId: "res_1", quantity: 2, ttlMs: 60000 },
+      }),
+    );
+    expect(callGatewayMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        method: "web3.market.offer.compare",
+        params: expect.objectContaining({ kind: "service", query: "review", limit: 3 }),
+      }),
+    );
+  });
+
   it("passes required lease fields through lease tool", async () => {
     const tool = createWeb3MarketLeaseTool(makeConfig())!;
 
@@ -96,6 +123,93 @@ describe("web3 market tools", () => {
           ttlMs: 60_000,
           maxCost: "0.5",
           sessionKey: "sess_1",
+        }),
+      }),
+    );
+  });
+
+  it("creates an order from a resolved resource offer", async () => {
+    callGatewayMock
+      .mockResolvedValueOnce({ ok: true, result: { resource: { offerId: "offer_1" } } })
+      .mockResolvedValueOnce({ ok: true, result: { orderId: "order_1" } });
+
+    const tool = createWeb3MarketOrderCreateTool(makeConfig())!;
+    await tool.execute("tc-3", {
+      actorId: "0xbuyer",
+      buyerId: "0xbuyer",
+      resourceId: "res_1",
+      quantity: 2,
+    });
+
+    expect(callGatewayMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        method: "web3.market.resource.get",
+        params: { resourceId: "res_1" },
+      }),
+    );
+    expect(callGatewayMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        method: "web3.market.order.create",
+        params: { actorId: "0xbuyer", buyerId: "0xbuyer", offerId: "offer_1", quantity: 2 },
+      }),
+    );
+  });
+
+  it("runs autopay before leasing in buy tool", async () => {
+    callGatewayMock
+      .mockResolvedValueOnce({
+        ok: true,
+        result: {
+          quote: {
+            providerActorId: "0xprovider",
+            price: { amount: "2" },
+          },
+        },
+      })
+      .mockResolvedValueOnce({ ok: true, result: { txHash: "0xtx" } })
+      .mockResolvedValueOnce({ ok: true, result: { leaseId: "lease_1" } });
+
+    const tool = createWeb3MarketBuyTool(makeConfig())!;
+    await tool.execute("tc-4", {
+      resourceId: "res_1",
+      actorId: "0xbuyer",
+      consumerActorId: "0xbuyer",
+      ttlMs: 60000,
+      autoPay: true,
+      sessionKey: "sess_buy",
+    });
+
+    expect(callGatewayMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        method: "web3.market.offer.quote",
+        params: { resourceId: "res_1", quantity: 1, ttlMs: 60000 },
+      }),
+    );
+    expect(callGatewayMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        method: "web3.wallet.autopay",
+        params: expect.objectContaining({
+          chain: "evm",
+          to: "0xprovider",
+          amount: "2",
+          value: "2",
+        }),
+      }),
+    );
+    expect(callGatewayMock).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        method: "web3.market.lease.issue",
+        params: expect.objectContaining({
+          resourceId: "res_1",
+          actorId: "0xbuyer",
+          consumerActorId: "0xbuyer",
+          ttlMs: 60000,
+          sessionKey: "sess_buy",
         }),
       }),
     );

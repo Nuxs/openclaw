@@ -122,6 +122,29 @@ describe("createWeb3DashboardCommand", () => {
     expect(result.text).toContain("Critical issue");
   });
 
+  it("redacts sensitive alert text before rendering the dashboard", async () => {
+    const store = makeStore({
+      getAlerts: vi.fn().mockReturnValue([
+        {
+          level: AlertLevel.P1,
+          message:
+            "Leak detected at https://provider.example.com with token tok_secret_123 under /Users/test/private",
+          status: AlertStatus.ACTIVE,
+          category: AlertCategory.SECURITY,
+          ruleName: "rule-1",
+        },
+      ]),
+    });
+    const config = makeConfig();
+    const handler = createWeb3DashboardCommand(store, config);
+    const result = await handler({} as any);
+    expect(result.text).not.toContain("provider.example.com");
+    expect(result.text).not.toContain("tok_secret_123");
+    expect(result.text).not.toContain("/Users/test");
+    expect(result.text).toContain("[REDACTED_ENDPOINT]");
+    expect(result.text).toContain("tok_***");
+  });
+
   it("shows provider/consumer mode when market enabled", async () => {
     const store = makeStore();
     const config = makeConfig({

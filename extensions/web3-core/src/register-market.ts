@@ -48,12 +48,19 @@ import {
   createMarketResourceGetHandler,
   createMarketResourceListHandler,
   createMarketOrderListHandler,
+  createMarketOfferQuoteHandler,
+  createMarketOfferCompareHandler,
   createMarketSettlementQueryHandler,
   createMarketResourcePublishHandler,
   createMarketResourceUnpublishHandler,
   createMarketServiceProofSubmitHandler,
   createMarketServiceProofGetHandler,
   createMarketServiceProofListHandler,
+  createMarketProofSubmitHandler,
+  createMarketProofVerifyHandler,
+  createMarketAcceptanceSignHandler,
+  createMarketAcceptanceRejectHandler,
+  createMarketExecutionStatusHandler,
   createMarketStatusSummaryHandler,
   createMarketDisputeGetHandler,
   createMarketDisputeListHandler,
@@ -90,12 +97,17 @@ import {
 import { createWeb3MarketCommand } from "./market/web3-market-command.js";
 import { createWeb3MarketStatusTool } from "./market/web3-market-status-tool.js";
 import type { RegistrationContext } from "./register-types.js";
+import { createWeb3MarketStewardBuyTool } from "./resources/market-steward-tools.js";
 import {
+  createWeb3MarketBuyTool,
+  createWeb3MarketCompareTool,
   createWeb3MarketIndexListTool,
   createWeb3MarketLedgerListTool,
   createWeb3MarketLedgerSummaryTool,
   createWeb3MarketLeaseTool,
+  createWeb3MarketOrderCreateTool,
   createWeb3MarketPublishTool,
+  createWeb3MarketQuoteTool,
   createWeb3MarketRevokeLeaseTool,
   createWeb3MarketUnpublishTool,
 } from "./resources/market-tools.js";
@@ -140,6 +152,8 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
   api.registerGatewayMethod("web3.market.resource.get", createMarketResourceGetHandler(config));
   api.registerGatewayMethod("web3.market.resource.list", createMarketResourceListHandler(config));
   api.registerGatewayMethod("web3.market.order.list", createMarketOrderListHandler(config));
+  api.registerGatewayMethod("web3.market.offer.quote", createMarketOfferQuoteHandler(config));
+  api.registerGatewayMethod("web3.market.offer.compare", createMarketOfferCompareHandler(config));
   api.registerGatewayMethod(
     "web3.market.settlement.query",
     createMarketSettlementQueryHandler(config),
@@ -167,6 +181,20 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
   api.registerGatewayMethod(
     "web3.market.service.proof.list",
     createMarketServiceProofListHandler(config),
+  );
+  api.registerGatewayMethod("web3.market.proof.submit", createMarketProofSubmitHandler(config));
+  api.registerGatewayMethod("web3.market.proof.verify", createMarketProofVerifyHandler(config));
+  api.registerGatewayMethod(
+    "web3.market.acceptance.sign",
+    createMarketAcceptanceSignHandler(config),
+  );
+  api.registerGatewayMethod(
+    "web3.market.acceptance.reject",
+    createMarketAcceptanceRejectHandler(config),
+  );
+  api.registerGatewayMethod(
+    "web3.market.execution.status",
+    createMarketExecutionStatusHandler(config),
   );
 
   // ── Gateway: Ledger ──
@@ -286,7 +314,12 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
   api.registerTool(createWeb3MarketStatusTool(config));
   for (const tool of [
     createWeb3MarketIndexListTool(config),
+    createWeb3MarketQuoteTool(config),
+    createWeb3MarketCompareTool(config),
+    createWeb3MarketOrderCreateTool(config),
     createWeb3MarketLeaseTool(config),
+    createWeb3MarketBuyTool(config),
+    createWeb3MarketStewardBuyTool(config),
     createWeb3MarketRevokeLeaseTool(config),
     createWeb3MarketPublishTool(config),
     createWeb3MarketUnpublishTool(config),
