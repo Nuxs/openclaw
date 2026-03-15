@@ -16,6 +16,7 @@ const utilitySubpathLoaders = [
   { id: "plugin-command", load: () => import("openclaw/plugin-sdk/plugin-command") },
   { id: "plugin-definition", load: () => import("openclaw/plugin-sdk/plugin-definition") },
   { id: "plugin-hooks", load: () => import("openclaw/plugin-sdk/plugin-hooks") },
+  { id: "steward-policy", load: () => import("openclaw/plugin-sdk/steward-policy") },
 ] as const;
 
 const bundledExtensionSubpathLoaders = [
