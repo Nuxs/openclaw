@@ -467,7 +467,60 @@ function Get-ConfiguredOpenClawConfigPath {
     return (Join-Path (Get-ConfiguredStateDir) "openclaw.json")
 }
 
+function Get-FilteredBootstrapConfigRoot {
+    param($Root)
+
+    $plainRoot = ConvertTo-PlainData -Value $Root
+    if (-not (Test-DictionaryLike -Value $plainRoot) -or -not $plainRoot.ContainsKey("plugins")) {
+        return @{ Root = $plainRoot; SkippedPluginEntries = @() }
+    }
+
+    $plugins = $plainRoot["plugins"]
+    if (-not (Test-DictionaryLike -Value $plugins)) {
+        return @{ Root = $plainRoot; SkippedPluginEntries = @() }
+    }
+
+    $pluginMap = ConvertTo-PlainData -Value $plugins
+    if (-not $pluginMap.ContainsKey("entries")) {
+        return @{ Root = $plainRoot; SkippedPluginEntries = @() }
+    }
+
+    $entries = $pluginMap["entries"]
+    if (-not (Test-DictionaryLike -Value $entries)) {
+        return @{ Root = $plainRoot; SkippedPluginEntries = @() }
+    }
+
+    $entryMap = ConvertTo-PlainData -Value $entries
+    $skippedPluginEntries = @()
+    foreach ($pluginId in @("web3-core", "market-core", "agent-wallet")) {
+        if ($entryMap.ContainsKey($pluginId)) {
+            [void]$entryMap.Remove($pluginId)
+            $skippedPluginEntries += $pluginId
+        }
+    }
+
+    if ($skippedPluginEntries.Count -eq 0) {
+        return @{ Root = $plainRoot; SkippedPluginEntries = @() }
+    }
+
+    # Windows bootstrap 只写基础 upstream 配置；web3/market 相关插件留给用户在启动后用官方 CLI 自行启用。
+    if ($entryMap.Count -eq 0) {
+        [void]$pluginMap.Remove("entries")
+    } else {
+        $pluginMap["entries"] = $entryMap
+    }
+
+    if ($pluginMap.Count -eq 0) {
+        [void]$plainRoot.Remove("plugins")
+    } else {
+        $plainRoot["plugins"] = $pluginMap
+    }
+
+    return @{ Root = $plainRoot; SkippedPluginEntries = $skippedPluginEntries }
+}
+
 function Ensure-OpenClawSetup {
+
     $workspaceDir = Get-ConfiguredWorkspaceDir
     Write-Step " openclaw "
     Invoke-OpenClawCli -Arguments @("setup", "--workspace", $workspaceDir)
@@ -607,12 +660,17 @@ function Ensure-OpenClawConfigFromPreset {
     }
 
     Write-Step " openclaw.json "
-    $plainRoot = ConvertTo-PlainData -Value $root
-    foreach ($key in $plainRoot.Keys) {
-        Seed-OpenClawConfigPath -Path (Escape-OpenClawConfigPathSegment -Segment $key) -Value $plainRoot[$key]
+    $filteredRootState = Get-FilteredBootstrapConfigRoot -Root $root
+    if ($filteredRootState.SkippedPluginEntries.Count -gt 0) {
+        Write-Info ("Skip preset plugin bootstrap for: {0}" -f ($filteredRootState.SkippedPluginEntries -join ", "))
+    }
+
+    foreach ($key in $filteredRootState.Root.Keys) {
+        Seed-OpenClawConfigPath -Path (Escape-OpenClawConfigPathSegment -Segment $key) -Value $filteredRootState.Root[$key]
     }
 
     Invoke-OpenClawCli -Arguments @("config", "validate")
 
     Write-Ok " openclaw.json "
 }
+

@@ -81,69 +81,7 @@
                     workspace = "~/.openclaw/workspace"
                 }
             }
-            plugins = @{
-                entries = @{
-                    "web3-core" = @{
-                        enabled = $true
-                        config = @{
-                            chain = @{
-                                network = "base"
-                                rpcUrl = "https://mainnet.base.org"
-                                privateKey = '${WEB3_CHAIN_PRIVATE_KEY}'
-                            }
-                            storage = @{
-                                provider = "ipfs"
-                                gateway = "https://w3s.link"
-                                pinataJwt = '${PINATA_JWT}'
-                            }
-                            privacy = @{
-                                onChainData = "hash_only"
-                                archiveEncryption = $true
-                            }
-                            billing = @{
-                                enabled = $false
-                                quotaPerSession = 1000
-                                costPerLlmCall = 1
-                                costPerToolCall = 0.5
-                            }
-                            monitor = @{
-                                enabled = $true
-                            }
-                            resources = @{
-                                enabled = $true
-                                consumer = @{
-                                    enabled = $true
-                                    preferLocalFirst = $true
-                                }
-                            }
-                        }
-                    }
-                    "market-core" = @{
-                        enabled = $true
-                        config = @{
-                            chain = @{
-                                network = "base"
-                                rpcUrl = "https://mainnet.base.org"
-                                privateKey = '${WEB3_CHAIN_PRIVATE_KEY}'
-                            }
-                            settlement = @{
-                                mode = "anchor_only"
-                            }
-                            store = @{
-                                mode = "sqlite"
-                            }
-                            access = @{
-                                mode = "allowlist"
-                                requireActor = $true
-                                requireActorMatch = $true
-                            }
-                            rewards = @{
-                                enabled = $true
-                            }
-                        }
-                    }
-                }
-            }
+
         }
     }
 }
