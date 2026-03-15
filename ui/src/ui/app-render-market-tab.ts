@@ -53,6 +53,23 @@ export function renderMarketTab(state: AppViewState) {
       summary: state.opsSummary,
       alerts: state.opsAlerts,
     },
+    providerOnboardingSection: {
+      loading: state.marketPresetLoading,
+      error: state.marketPresetError,
+      mode: state.marketPresetMode,
+      intent: state.marketPresetIntent,
+      preview: state.marketPresetPreview,
+      verification: state.opsSummary?.preset ?? null,
+      onModeChange: (next) => {
+        state.marketPresetMode = next;
+        void state.loadMarket();
+      },
+      onIntentChange: (next) => {
+        state.marketPresetIntent = next;
+        void state.loadMarket();
+      },
+      onRefresh: () => state.loadMarket(),
+    },
     onResourceKindChange: (next) => (state.marketResourceKind = next),
     onFiltersChange: (next) => (state.marketFilters = next),
     onRefresh: () => state.loadMarket(),

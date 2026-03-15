@@ -17,6 +17,9 @@ import type {
   MarketLease,
   MarketMetricsSnapshot,
   MarketOpsSummary,
+  MarketPresetIntent,
+  MarketPresetMode,
+  MarketPresetPreview,
   MarketPrivacySummary,
   MarketReputationSummary,
   MarketResource,
@@ -84,6 +87,11 @@ export type Web3ViewState = {
   opsLoading: boolean;
   opsSummary: MarketOpsSummary | null;
   opsAlerts: OpsAlertView[];
+  marketPresetLoading: boolean;
+  marketPresetError: string | null;
+  marketPresetPreview: MarketPresetPreview | null;
+  marketPresetMode: MarketPresetMode;
+  marketPresetIntent: MarketPresetIntent;
   marketResourceKind: MarketResourceKind | "all";
   marketFilters: MarketFilters;
   debugWeb3Audit: unknown;

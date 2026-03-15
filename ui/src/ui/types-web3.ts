@@ -621,6 +621,8 @@ export type OpsHealthProbe = {
 };
 
 export type MarketPresetMode = "single-node" | "trusted-circle" | "hybrid-cloud-edge";
+export type MarketPresetIntent = "consumer" | "provider" | "hybrid";
+export type MarketRuntimeHintKind = "ollama" | "lmstudio" | "openai-compat" | "custom";
 
 export type MarketPresetOperation = {
   op: "set" | "setIfMissing" | "setIfEmpty" | "mergeStringSet";
@@ -635,9 +637,19 @@ export type MarketPresetRole = {
   responsibility: string;
 };
 
+export type MarketDetectedProvider = {
+  label: string;
+  source: "configured" | "hint";
+  runtime: MarketRuntimeHintKind;
+  offerBackend: "openai-compat" | "custom";
+  models: string[];
+  publishable: boolean;
+  note?: string;
+};
+
 export type MarketPresetPreview = {
   mode: MarketPresetMode;
-  intent: "consumer" | "provider" | "hybrid";
+  intent: MarketPresetIntent;
   summary: string;
   layout: {
     pattern: string;
@@ -645,15 +657,7 @@ export type MarketPresetPreview = {
     roles: MarketPresetRole[];
     validationScenarios: string[];
   };
-  detectedProviders: Array<{
-    label: string;
-    source: "configured" | "hint";
-    runtime: "ollama" | "lmstudio" | "openai-compat" | "custom";
-    offerBackend: "openai-compat" | "custom";
-    models: string[];
-    publishable: boolean;
-    note?: string;
-  }>;
+  detectedProviders: MarketDetectedProvider[];
   operations: MarketPresetOperation[];
   checks: GaReadinessCheck[];
   nextSteps: string[];
@@ -673,6 +677,10 @@ export type MarketPresetVerification = {
     advertiseToMarket: boolean;
     providerListenEnabled: boolean;
     providerBind?: string;
+    walletReady: boolean;
+    paymentReady: boolean;
+    billingEnabled: boolean;
+    autopayEnabled: boolean;
   };
   recommendedActions: string[];
 };
@@ -681,6 +689,7 @@ export type MarketOpsSummary = {
   activeAlerts: number;
   alertsByLevel: Record<string, number>;
   healthProbes: OpsHealthProbe[];
+  walletHealthy: boolean;
   discoveryHealthy: boolean;
   paymentHealthy: boolean;
   settlementHealthy: boolean;
@@ -693,6 +702,7 @@ export type GaReadinessCheck = {
   name: string;
   status: "pass" | "warn" | "fail";
   detail?: string;
+  action?: string;
 };
 
 export type GaReadiness = {

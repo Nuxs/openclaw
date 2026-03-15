@@ -778,6 +778,11 @@ export class OpenClawApp extends LitElement {
   @state() opsLoading = false;
   @state() opsSummary: import("./types.js").MarketOpsSummary | null = null;
   @state() opsAlerts: import("./types.js").OpsAlertView[] = [];
+  @state() marketPresetLoading = false;
+  @state() marketPresetError: string | null = null;
+  @state() marketPresetPreview: import("./types.js").MarketPresetPreview | null = null;
+  @state() marketPresetMode: import("./types.js").MarketPresetMode = "single-node";
+  @state() marketPresetIntent: import("./types.js").MarketPresetIntent = "provider";
   @state() marketResourceKind: import("./types.js").MarketResourceKind | "all" = "all";
   @state() marketFilters: import("./types.js").MarketFilters = {
     resourceSearch: "",

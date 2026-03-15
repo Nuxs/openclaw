@@ -9,6 +9,7 @@ import type { OpenClawApp } from "./app.ts";
 import { loadMarketExecutions } from "./controllers/market-execution.ts";
 import {
   loadMarketOps,
+  loadMarketPresetPreview,
   loadMarketPrivacy,
   loadMarketStatus,
   loadMarketTasks,
@@ -34,6 +35,7 @@ export async function loadMarket(host: LoadHost) {
     loadMarketTasks(app),
     loadMarketPrivacy(app),
     loadMarketOps(app),
+    loadMarketPresetPreview(app),
   ]);
 }
 
