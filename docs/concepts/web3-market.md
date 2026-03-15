@@ -98,6 +98,7 @@ AI 管家会替你完成：
 - **A2A 任务协作**：跨 Agent 任务标识贯通（taskId/orderId/proofId/settlementId）
 - **链策略分层**：当前支付与回执继续遵循 `TON + EVM` 双栈；面向 `AI-to-AI` 对象化交易的下一阶段账本方向，优先考虑 `Sui-first` 的能力/租约/回执/托管/奖励建模
 - **GA 发布门禁与运维 Runbook**：覆盖降级、回滚、值班处置与验收清单
+- **Go-live evidence**：沉淀 baseline verify、钱包/支付 readiness、Discovery、Provider 发布前检查和 Control 面 operator 留痕
 
 > 也就是说：**现状不改写，方向要写清。** 当前运行时仍以 `EVM + TON` 为事实基础；如果进入 `Agentic Commerce` 的对象化权利层设计，建议阅读 [/reference/web3-sui-first-architecture](/reference/web3-sui-first-architecture)。
 

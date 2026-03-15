@@ -286,3 +286,4 @@ graph TD
 - EaaS 协议规范：[/reference/web3-eaas-protocol-spec](/reference/web3-eaas-protocol-spec)
 - EaaS 开发指南：[/reference/web3-eaas-developer-guide](/reference/web3-eaas-developer-guide)
 - GA 运维 Runbook：[/reference/web3-ga-runbook](/reference/web3-ga-runbook)
+- Go-live evidence：[/reference/web3-market-go-live-evidence](/reference/web3-market-go-live-evidence)

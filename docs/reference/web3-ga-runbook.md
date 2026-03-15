@@ -201,10 +201,18 @@ git commit -m "revert: rollback Web3 GA changes"
 
 ---
 
-## 相关文档
+## 6. Evidence 留痕与可分享结果
+
+- **统一口径**：CLI 侧使用 `/web3-market verify <mode>`，Control 面使用 `Operations & Health` 与 `Preset Baseline Gates`；两边必须引用同一组 readiness 事实。
+- **最小证据集**：至少留存一次 baseline verify、一次钱包探针成功结果、一次支付 readiness 结果、一次 discovery/index 成功结果，以及一次 Provider 发布前检查结果。
+- **paste-safe 原则**：证据只能包含状态、计数、模式、检查项与建议动作；不得包含 token、endpoint、真实路径或可复用凭证。
+- **模板与样例**：使用 [/reference/web3-market-go-live-evidence](/reference/web3-market-go-live-evidence) 中的 checklist、记录模板和样例片段沉淀 go-live 证据。
+
+## 7. 相关文档
 
 - Web3 Market 概览：[/concepts/web3-market](/concepts/web3-market)
 - Web3 Market 开发文档：[/reference/web3-market-dev](/reference/web3-market-dev)
+- Web3 Market go-live evidence：[/reference/web3-market-go-live-evidence](/reference/web3-market-go-live-evidence)
 - EaaS 协议规范：[/reference/web3-eaas-protocol-spec](/reference/web3-eaas-protocol-spec)
 - EaaS 开发指南：[/reference/web3-eaas-developer-guide](/reference/web3-eaas-developer-guide)
 - 输出脱敏验收：[/reference/web3-market-output-redaction](/reference/web3-market-output-redaction)
