@@ -31,6 +31,10 @@ import {
 } from "./market-execution-section.ts";
 import { renderOpsSection, type OpsSectionProps } from "./market-ops-section.ts";
 import { renderPrivacySection, type PrivacySectionProps } from "./market-privacy-section.ts";
+import {
+  renderMarketProviderOnboardingSection,
+  type MarketProviderOnboardingSectionProps,
+} from "./market-provider-onboarding-section.ts";
 import { renderIndexOverview, renderMonitorOverview } from "./market-sections.ts";
 import { renderTaskSection, type TaskSectionProps } from "./market-task-section.ts";
 
@@ -58,6 +62,7 @@ type MarketProps = {
   taskSection?: TaskSectionProps;
   privacySection?: PrivacySectionProps;
   opsSection?: OpsSectionProps;
+  providerOnboardingSection?: MarketProviderOnboardingSectionProps;
   onResourceKindChange: (next: MarketResourceKind | "all") => void;
   onFiltersChange: (next: MarketFilters) => void;
   onRefresh: () => void;
@@ -257,6 +262,12 @@ export function renderMarket(props: MarketProps) {
         </div>
       </div>
     </section>
+
+    ${
+      props.providerOnboardingSection
+        ? renderMarketProviderOnboardingSection(props.providerOnboardingSection)
+        : nothing
+    }
 
     ${props.executionSection ? renderMarketExecutionSection(props.executionSection) : nothing}
 

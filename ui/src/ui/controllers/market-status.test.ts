@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import {
   loadMarketOps,
+  loadMarketPresetPreview,
   loadMarketPrivacy,
   loadMarketTasks,
   type MarketOpsState,
+  type MarketPresetState,
 } from "./market-status.ts";
 
 function createClient(
@@ -377,7 +379,8 @@ describe("market-status controller", () => {
   });
 
   it("loadMarketOps builds health probes from alerts and health endpoints", async () => {
-    const client = createClient(async (method) => {
+    let verifyParams: Record<string, unknown> | null = null;
+    const client = createClient(async (method, params) => {
       switch (method) {
         case "web3.monitor.alerts.list":
           return {
@@ -421,19 +424,23 @@ describe("market-status controller", () => {
             },
           };
         case "web3.market.preset.verify":
+          verifyParams = params;
           return {
             result: {
               mode: "trusted-circle",
               healthy: false,
-              summary: "可信圈：3 项通过 / 1 项告警 / 0 项失败。",
+              summary: "可信圈：3 项通过 / 1 项告警 / 1 项失败。",
               readiness: {
-                ready: true,
+                ready: false,
                 passCount: 3,
                 warnCount: 1,
-                failCount: 0,
+                failCount: 1,
                 checks: [
-                  { name: "resources.enabled", status: "pass", detail: "ok" },
-                  { name: "resource.publish", status: "warn", detail: "missing offer" },
+                  { name: "wallet.readiness", status: "pass", detail: "wallet connected" },
+                  { name: "payment.readiness", status: "warn", detail: "autopay disabled" },
+                  { name: "discovery.enabled", status: "pass", detail: "discovery active" },
+                  { name: "market.status.summary", status: "fail", detail: "settlement stalled" },
+                  { name: "lease.flow", status: "pass", detail: "lease checks ok" },
                 ],
               },
               metrics: {
@@ -445,8 +452,12 @@ describe("market-status controller", () => {
                 advertiseToMarket: true,
                 providerListenEnabled: true,
                 providerBind: "lan",
+                walletReady: true,
+                paymentReady: false,
+                billingEnabled: true,
+                autopayEnabled: false,
               },
-              recommendedActions: ["补齐 provider offers 后执行发布资源。"],
+              recommendedActions: ["启用 autopay 后重新执行验证。"],
             },
           };
         default:
@@ -460,10 +471,12 @@ describe("market-status controller", () => {
       opsLoading: false,
       opsSummary: null,
       opsAlerts: [],
+      marketPresetMode: "trusted-circle",
     };
 
     await loadMarketOps(state);
 
+    expect(verifyParams).toEqual({ mode: "trusted-circle" });
     expect(state.opsAlerts).toHaveLength(3);
     expect(state.opsSummary).not.toBeNull();
     const opsSummary = state.opsSummary;
@@ -472,17 +485,64 @@ describe("market-status controller", () => {
     }
     expect(opsSummary.activeAlerts).toBe(2);
     expect(opsSummary.alertsByLevel).toEqual({ P0: 1, P1: 1 });
+    expect(opsSummary.walletHealthy).toBe(true);
     expect(opsSummary.discoveryHealthy).toBe(true);
     expect(opsSummary.paymentHealthy).toBe(false);
     expect(opsSummary.settlementHealthy).toBe(false);
     expect(opsSummary.healthProbes.map((probe) => probe.name)).toEqual([
       "monitor",
-      "discovery",
+      "wallet",
       "payment",
+      "discovery",
       "settlement",
     ]);
     expect(opsSummary.healthProbes[0]?.status).toBe("degraded");
     expect(opsSummary.preset?.mode).toBe("trusted-circle");
     expect(opsSummary.preset?.readiness.warnCount).toBe(1);
+  });
+
+  it("loadMarketPresetPreview uses the selected mode and intent", async () => {
+    let previewParams: Record<string, unknown> | null = null;
+    const client = createClient(async (method, params) => {
+      expect(method).toBe("web3.market.preset.preview");
+      previewParams = params;
+      return {
+        result: {
+          mode: "hybrid-cloud-edge",
+          intent: "provider",
+          summary: "Hybrid provider preview",
+          detectedProviders: [
+            {
+              label: "Local Ollama",
+              kind: "ollama",
+              healthy: true,
+            },
+          ],
+          operations: [],
+          checks: [],
+          nextSteps: ["Review missing secrets before publish."],
+        },
+      };
+    });
+
+    const state: MarketPresetState = {
+      client,
+      connected: true,
+      marketPresetLoading: false,
+      marketPresetError: null,
+      marketPresetPreview: null,
+      marketPresetMode: "hybrid-cloud-edge",
+      marketPresetIntent: "provider",
+    };
+
+    await loadMarketPresetPreview(state);
+
+    expect(previewParams).toEqual({
+      mode: "hybrid-cloud-edge",
+      intent: "provider",
+    });
+    expect(state.marketPresetError).toBeNull();
+    expect(state.marketPresetPreview?.summary).toBe("Hybrid provider preview");
+    expect(state.marketPresetPreview?.detectedProviders[0]?.label).toBe("Local Ollama");
   });
 });

@@ -98,12 +98,47 @@ describe("market view", () => {
           activeAlerts: 0,
           alertsByLevel: {},
           healthProbes: [],
+          walletHealthy: true,
           discoveryHealthy: true,
           paymentHealthy: true,
           settlementHealthy: true,
           preset: null,
         },
         alerts: [],
+      },
+      providerOnboardingSection: {
+        loading: false,
+        error: null,
+        mode: "trusted-circle" as const,
+        intent: "provider" as const,
+        preview: {
+          mode: "trusted-circle",
+          intent: "provider",
+          summary: "可信圈 provider 预检查",
+          layout: {
+            pattern: "trusted-circle",
+            trustDomain: "lan",
+            roles: [],
+            validationScenarios: [],
+          },
+          detectedProviders: [
+            {
+              label: "Local Ollama",
+              source: "hint",
+              runtime: "ollama",
+              offerBackend: "openai-compat",
+              models: ["llama3"],
+              publishable: true,
+            },
+          ],
+          operations: [],
+          checks: [],
+          nextSteps: [],
+        },
+        verification: null,
+        onModeChange: () => {},
+        onIntentChange: () => {},
+        onRefresh: () => {},
       },
       onResourceKindChange: () => {},
       onFiltersChange: () => {},
@@ -118,7 +153,12 @@ describe("market view", () => {
     expect(props.privacySection).toBeTruthy();
     expect(props.privacySection?.summary?.activeConsents).toBe(5);
     expect(props.opsSection).toBeTruthy();
+    expect(props.opsSection?.summary?.walletHealthy).toBe(true);
     expect(props.opsSection?.summary?.discoveryHealthy).toBe(true);
+    expect(props.providerOnboardingSection).toBeTruthy();
+    expect(props.providerOnboardingSection?.preview?.detectedProviders[0]?.label).toBe(
+      "Local Ollama",
+    );
   });
 
   it("task section renders status badges for all task states", () => {

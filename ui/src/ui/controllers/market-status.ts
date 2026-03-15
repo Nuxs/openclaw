@@ -3,12 +3,16 @@ import type {
   BridgeRoutesSnapshot,
   BridgeTransfer,
   ConsentView,
+  GaReadinessCheck,
   MarketDispute,
   MarketLedgerEntry,
   MarketLedgerSummary,
   MarketLease,
   MarketMetricsSnapshot,
   MarketOpsSummary,
+  MarketPresetIntent,
+  MarketPresetMode,
+  MarketPresetPreview,
   MarketPresetVerification,
   MarketPrivacySummary,
   MarketReputationSummary,
@@ -140,6 +144,7 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
 type TaskState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
+  hello?: unknown;
   taskLoading: boolean;
   taskError: string | null;
   taskSummary: MarketTaskSummary | null;
@@ -149,28 +154,60 @@ type TaskState = {
   taskReceipts: TaskReceiptView[];
 };
 
+const REQUIRED_TASK_METHODS = [
+  "web3.market.task.list",
+  "web3.market.task.bid.list",
+  "web3.market.task.result.list",
+  "web3.market.task.receipt.list",
+] as const;
+
 export async function loadMarketTasks(state: TaskState) {
   if (!state.client || !state.connected || state.taskLoading) {
     return;
   }
   state.taskLoading = true;
   state.taskError = null;
+
+  const missingMethods = findMissingMethods(state.hello, REQUIRED_TASK_METHODS);
+  if (missingMethods.length > 0) {
+    state.taskSummary = createEmptyTaskSummary();
+    state.taskOrders = [];
+    state.taskBids = [];
+    state.taskResults = [];
+    state.taskReceipts = [];
+    state.taskError = `Task Market API 未就绪：缺少 ${missingMethods.join(", ")}。请启用/升级 web3-core 后重试。`;
+    state.taskLoading = false;
+    return;
+  }
+
   try {
-    const [summary, orders, bids, results, receipts] = await Promise.all([
-      state.client.request<MarketTaskSummary>("web3.market.task.summary", {}),
+    const [orders, bids, results, receipts] = await Promise.allSettled([
       state.client.request<{ tasks?: unknown[] }>("web3.market.task.list", { limit: 100 }),
-      state.client.request<{ bids?: unknown[] }>("web3.market.bid.list", { limit: 100 }),
-      state.client.request<{ results?: unknown[] }>("web3.market.result.list", { limit: 100 }),
-      state.client.request<{ receipts?: unknown[] }>("web3.market.receipt.list", { limit: 100 }),
+      state.client.request<{ bids?: unknown[] }>("web3.market.task.bid.list", { limit: 100 }),
+      state.client.request<{ results?: unknown[] }>("web3.market.task.result.list", { limit: 100 }),
+      state.client.request<{ receipts?: unknown[] }>("web3.market.task.receipt.list", {
+        limit: 100,
+      }),
     ]);
 
-    state.taskSummary = normalizePayload<MarketTaskSummary>(summary);
-    state.taskOrders = normalizeListPayload<TaskOrderView>(orders, "tasks");
-    state.taskBids = normalizeListPayload<TaskBidView>(bids, "bids");
-    state.taskResults = normalizeListPayload<TaskResultView>(results, "results");
-    state.taskReceipts = normalizeListPayload<TaskReceiptView>(receipts, "receipts");
-  } catch (error) {
-    state.taskError = String(error);
+    // Keep partial data visible so operators can see which endpoint failed instead of a blank panel.
+    state.taskOrders = normalizeSettledListPayload<TaskOrderView>(orders, "tasks");
+    state.taskBids = normalizeSettledListPayload<TaskBidView>(bids, "bids");
+    state.taskResults = normalizeSettledListPayload<TaskResultView>(results, "results");
+    state.taskReceipts = normalizeSettledListPayload<TaskReceiptView>(receipts, "receipts");
+    state.taskSummary = buildTaskSummary(
+      state.taskOrders,
+      state.taskBids,
+      state.taskResults,
+      state.taskReceipts,
+    );
+    const requestErrors = collectRequestErrors([
+      ["web3.market.task.list", orders],
+      ["web3.market.task.bid.list", bids],
+      ["web3.market.task.result.list", results],
+      ["web3.market.task.receipt.list", receipts],
+    ]);
+    state.taskError = requestErrors.length > 0 ? requestErrors.join("; ") : null;
   } finally {
     state.taskLoading = false;
   }
@@ -192,17 +229,22 @@ export async function loadMarketPrivacy(state: PrivacyState) {
   }
   state.privacyLoading = true;
   try {
-    const [summary, consents, assets, replays] = await Promise.all([
-      state.client.request<MarketPrivacySummary>("web3.market.privacy.summary", {}),
+    const [consents, assets, replays] = await Promise.all([
       state.client.request<{ consents?: unknown[] }>("web3.market.consent.list", { limit: 100 }),
-      state.client.request<{ assets?: unknown[] }>("web3.market.asset.list", { limit: 100 }),
-      state.client.request<{ replays?: unknown[] }>("web3.market.replay.list", { limit: 100 }),
+      state.client.request<{ assets?: unknown[] }>("web3.market.privacy.assets", { limit: 100 }),
+      state.client.request<{ replays?: unknown[] }>("web3.market.privacy.replay.list", {
+        limit: 100,
+      }),
     ]);
 
-    state.privacySummary = normalizePayload<MarketPrivacySummary>(summary);
     state.privacyConsents = normalizeListPayload<ConsentView>(consents, "consents");
     state.privacyAssets = normalizeListPayload<PrivacyAssetView>(assets, "assets");
     state.privacyReplays = normalizeListPayload<PrivacyReplayView>(replays, "replays");
+    state.privacySummary = buildPrivacySummary(
+      state.privacyConsents,
+      state.privacyAssets,
+      state.privacyReplays,
+    );
   } finally {
     state.privacyLoading = false;
   }
@@ -214,7 +256,37 @@ export type MarketOpsState = {
   opsLoading: boolean;
   opsSummary: MarketOpsSummary | null;
   opsAlerts: OpsAlertView[];
+  marketPresetMode?: MarketPresetMode;
 };
+
+export type MarketPresetState = {
+  client: GatewayBrowserClient | null;
+  connected: boolean;
+  marketPresetLoading: boolean;
+  marketPresetError: string | null;
+  marketPresetPreview: MarketPresetPreview | null;
+  marketPresetMode: MarketPresetMode;
+  marketPresetIntent: MarketPresetIntent;
+};
+
+export async function loadMarketPresetPreview(state: MarketPresetState) {
+  if (!state.client || !state.connected || state.marketPresetLoading) {
+    return;
+  }
+  state.marketPresetLoading = true;
+  state.marketPresetError = null;
+  try {
+    const preview = await state.client.request<MarketPresetPreview>("web3.market.preset.preview", {
+      mode: state.marketPresetMode,
+      intent: state.marketPresetIntent,
+    });
+    state.marketPresetPreview = normalizePayload<MarketPresetPreview>(preview);
+  } catch (error) {
+    state.marketPresetError = String(error);
+  } finally {
+    state.marketPresetLoading = false;
+  }
+}
 
 export async function loadMarketOps(state: MarketOpsState) {
   if (!state.client || !state.connected || state.opsLoading) {
@@ -228,7 +300,9 @@ export async function loadMarketOps(state: MarketOpsState) {
         activeOnly: false,
         limit: 100,
       }),
-      state.client.request<MarketPresetVerification>("web3.market.preset.verify", {}),
+      state.client.request<MarketPresetVerification>("web3.market.preset.verify", {
+        mode: state.marketPresetMode ?? "single-node",
+      }),
     ]);
 
     const normalizedAlerts = normalizeListPayload<OpsAlertView>(alerts, "alerts");
@@ -241,6 +315,17 @@ export async function loadMarketOps(state: MarketOpsState) {
       normalizedHealth?.healthy,
       hasActiveAlerts,
     );
+    const walletProbe = summarizePresetProbe(normalizedPreset, ["wallet.readiness"]);
+    const paymentProbe = summarizePresetProbe(normalizedPreset, ["payment.readiness"]);
+    const discoveryProbe = summarizePresetProbe(normalizedPreset, [
+      "discovery.mode",
+      "discovery.enabled",
+      "index.providers",
+    ]);
+    const settlementProbe = summarizePresetProbe(normalizedPreset, [
+      "market.status.summary",
+      "lease.flow",
+    ]);
     const observedAt = new Date().toISOString();
     const healthProbes: OpsHealthProbe[] = [
       {
@@ -250,37 +335,39 @@ export async function loadMarketOps(state: MarketOpsState) {
         details: formatMonitorDetails(normalizedHealth),
       },
       {
-        name: "discovery",
-        status:
-          normalizedPreset?.metrics.discoveryEnabled === false
-            ? "degraded"
-            : normalizedPreset?.healthy
-              ? "healthy"
-              : "degraded",
+        name: "wallet",
+        status: walletProbe.status,
         lastCheck: observedAt,
-        details: normalizedPreset?.summary,
+        details: walletProbe.details,
       },
       {
         name: "payment",
-        status: normalizedHealth?.healthy === false ? "degraded" : "healthy",
-        lastCheck: normalizedHealth?.lastActivity ?? observedAt,
-        details: hasActiveAlerts ? `${activeAlerts.length} active alerts` : undefined,
+        status: paymentProbe.status,
+        lastCheck: observedAt,
+        details: paymentProbe.details,
+      },
+      {
+        name: "discovery",
+        status: discoveryProbe.status,
+        lastCheck: observedAt,
+        details: discoveryProbe.details,
       },
       {
         name: "settlement",
-        status: normalizedPreset?.healthy ? "healthy" : "degraded",
+        status: settlementProbe.status,
         lastCheck: observedAt,
-        details: formatPresetDetails(normalizedPreset),
+        details: settlementProbe.details,
       },
     ];
 
     state.opsSummary = {
       activeAlerts: activeAlerts.length,
-      alertsByLevel: countAlertsByLevel(normalizedAlerts),
+      alertsByLevel: countAlertsByLevel(activeAlerts),
       healthProbes,
-      discoveryHealthy: normalizedPreset?.metrics.discoveryEnabled ?? false,
-      paymentHealthy: normalizedHealth?.healthy ?? false,
-      settlementHealthy: normalizedPreset?.healthy ?? false,
+      walletHealthy: walletProbe.status === "healthy",
+      discoveryHealthy: discoveryProbe.status === "healthy",
+      paymentHealthy: paymentProbe.status === "healthy",
+      settlementHealthy: settlementProbe.status === "healthy",
       preset: normalizedPreset,
     };
     state.opsAlerts = normalizedAlerts;
@@ -310,6 +397,10 @@ function normalizeListPayload<T>(payload: unknown, key: string): T[] {
   return Array.isArray(list) ? (list as T[]) : [];
 }
 
+function normalizeSettledListPayload<T>(result: PromiseSettledResult<unknown>, key: string): T[] {
+  return result.status === "fulfilled" ? normalizeListPayload<T>(result.value, key) : [];
+}
+
 function unwrapResult(payload: unknown): unknown {
   if (payload && typeof payload === "object" && "result" in payload) {
     return (payload as { result?: unknown }).result ?? null;
@@ -323,6 +414,78 @@ function countAlertsByLevel(alerts: OpsAlertView[]): Record<string, number> {
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
+}
+
+function createEmptyTaskSummary(): MarketTaskSummary {
+  return {
+    openTasks: 0,
+    awardedTasks: 0,
+    closedTasks: 0,
+    totalBids: 0,
+    pendingResults: 0,
+    settledReceipts: 0,
+    disputedReceipts: 0,
+  };
+}
+
+function buildTaskSummary(
+  orders: TaskOrderView[],
+  bids: TaskBidView[],
+  results: TaskResultView[],
+  receipts: TaskReceiptView[],
+): MarketTaskSummary {
+  return {
+    openTasks: orders.filter((task) => task.status === "task_open").length,
+    awardedTasks: orders.filter((task) => task.status === "task_awarded").length,
+    closedTasks: orders.filter((task) => task.status === "task_closed").length,
+    totalBids: bids.length,
+    pendingResults: results.filter((result) => result.status === "result_submitted").length,
+    settledReceipts: receipts.filter((receipt) => receipt.status === "receipt_settled").length,
+    disputedReceipts: receipts.filter((receipt) => receipt.status === "receipt_disputed").length,
+  };
+}
+
+function buildPrivacySummary(
+  consents: ConsentView[],
+  assets: PrivacyAssetView[],
+  replays: PrivacyReplayView[],
+): MarketPrivacySummary {
+  return {
+    activeConsents: consents.filter((consent) => consent.status === "consent_granted").length,
+    revokedConsents: consents.filter((consent) => consent.status === "consent_revoked").length,
+    pendingErasure: replays.filter((replay) => replay.retentionAction === "delete_on_revoke")
+      .length,
+    totalReplays: replays.length,
+    assetCount: assets.length,
+  };
+}
+
+function findMissingMethods(hello: unknown, requiredMethods: readonly string[]): string[] {
+  const methods = extractAvailableMethods(hello);
+  if (!methods) {
+    return [];
+  }
+  return requiredMethods.filter((method) => !methods.has(method));
+}
+
+function extractAvailableMethods(hello: unknown): Set<string> | null {
+  const features =
+    hello && typeof hello === "object" && "features" in hello
+      ? (hello as { features?: { methods?: unknown } }).features
+      : undefined;
+  if (!Array.isArray(features?.methods)) {
+    return null;
+  }
+  return new Set(features.methods.filter((method): method is string => typeof method === "string"));
+}
+
+function collectRequestErrors(entries: Array<[string, PromiseSettledResult<unknown>]>): string[] {
+  return entries.flatMap(([method, result]) => {
+    if (result.status === "fulfilled") {
+      return [];
+    }
+    return [`${method}: ${String(result.reason)}`];
+  });
 }
 
 function mapMonitorStatus(
@@ -361,4 +524,31 @@ function formatPresetDetails(preset: MarketPresetVerification | null): string | 
   }
   const { passCount, warnCount, failCount } = preset.readiness;
   return `pass ${passCount} · warn ${warnCount} · fail ${failCount}`;
+}
+
+function summarizePresetProbe(
+  preset: MarketPresetVerification | null,
+  names: string[],
+): { status: OpsHealthProbe["status"]; details?: string } {
+  if (!preset) {
+    return { status: "down", details: "preset verification unavailable" };
+  }
+  const matches = preset.readiness.checks.filter((check) => names.includes(check.name));
+  if (matches.length === 0) {
+    return { status: "degraded", details: formatPresetDetails(preset) };
+  }
+  if (matches.some((check) => check.status === "fail")) {
+    return { status: "down", details: summarizePresetCheckDetails(matches) };
+  }
+  if (matches.some((check) => check.status === "warn")) {
+    return { status: "degraded", details: summarizePresetCheckDetails(matches) };
+  }
+  return { status: "healthy", details: summarizePresetCheckDetails(matches) };
+}
+
+function summarizePresetCheckDetails(checks: GaReadinessCheck[]): string | undefined {
+  const entries = checks
+    .map((check) => check.detail ?? check.action ?? check.name)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+  return entries.length > 0 ? entries.join(" · ") : undefined;
 }

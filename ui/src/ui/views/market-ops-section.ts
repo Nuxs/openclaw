@@ -49,6 +49,10 @@ export function renderOpsSection(props: OpsSectionProps) {
                 <div class="stat-value" style="color:${summary.activeAlerts > 0 ? "#EF4444" : "#10B981"}">${summary.activeAlerts}</div>
               </div>
               <div class="stat">
+                <div class="stat-label">Wallet</div>
+                <div class="stat-value" style="color:${summary.walletHealthy ? "#10B981" : "#EF4444"}">${summary.walletHealthy ? "OK" : "DOWN"}</div>
+              </div>
+              <div class="stat">
                 <div class="stat-label">Discovery</div>
                 <div class="stat-value" style="color:${summary.discoveryHealthy ? "#10B981" : "#EF4444"}">${summary.discoveryHealthy ? "OK" : "DOWN"}</div>
               </div>
@@ -110,6 +114,7 @@ export function renderOpsSection(props: OpsSectionProps) {
                             <th>Check</th>
                             <th>Status</th>
                             <th>Detail</th>
+                            <th>Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -119,11 +124,26 @@ export function renderOpsSection(props: OpsSectionProps) {
                                 <td>${check.name}</td>
                                 <td>${check.status.toUpperCase()}</td>
                                 <td>${check.detail ?? "—"}</td>
+                                <td>${check.action ?? "—"}</td>
                               </tr>
                             `,
                           )}
                         </tbody>
                       </table>
+                      ${
+                        summary.preset.recommendedActions.length > 0
+                          ? html`
+                              <div style="margin-top:12px;">
+                                <div class="card-sub" style="font-weight:600;margin-bottom:6px;">Recommended Actions</div>
+                                <ul class="clean-list muted">
+                                  ${summary.preset.recommendedActions.map(
+                                    (action) => html`<li>${action}</li>`,
+                                  )}
+                                </ul>
+                              </div>
+                            `
+                          : nothing
+                      }
                     </div>
                   `
                 : nothing
