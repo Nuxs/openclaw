@@ -120,6 +120,7 @@ graph TD
 - **Audit / Billing / Status**：`web3.audit.query` `web3.billing.status` `web3.billing.summary` `web3.billing.paymentTrace.query` `web3.billing.handlePaymentRequired` `web3.billing.consumePaymentRequired` `web3.status.summary`
 - **Reward**：`web3.reward.get` `web3.reward.list` `web3.reward.claim` `web3.reward.updateStatus`
 - **Market public surface**：`web3.market.resource.*` `web3.market.order.list` `web3.market.settlement.query` `web3.market.lease.*` `web3.market.service.proof.*` `web3.market.ledger.*` `web3.market.reputation.summary` `web3.market.tokenEconomy.*` `web3.market.bridge.*` `web3.market.metrics.snapshot` `web3.market.reconciliation.summary` `web3.market.status.summary` `web3.market.dispute.*`
+- **Steward / commerce orchestration**：`web3.market.offer.quote` `web3.market.offer.compare` `web3.market.proof.submit|verify` `web3.market.acceptance.sign|reject` `web3.market.execution.status` `web3.market.steward.buy`
 - **Task Market**：`web3.market.task.publish|get|list|cancel|expireSweep` `web3.market.task.bid.place|list|award` `web3.market.task.result.submit|review` `web3.market.task.receipt.get|list`
 - **Privacy / Consent**：`web3.market.consent.list|get` `web3.market.privacy.assets` `web3.market.privacy.replay.generate|list` `web3.market.privacy.erase`
 - **Compatibility aliases**：`web3.resources.publish` `web3.resources.unpublish` `web3.resources.list` `web3.resources.lease` `web3.resources.revokeLease` `web3.resources.status`
@@ -254,6 +255,8 @@ graph TD
 
 - 必须展示：钱包绑定状态、审计/锚定状态、归档 CID、credits/配额、订单/结算状态。
 - 必须提供一页式入口：`/web3` 命令 + UI Web3 Tab（身份/计费/审计/市场健康度 + 下一步动作）。
+- 聊天主路径应优先显示 policy-gated 购买结果：`web3.market.steward.buy` 默认输出审批态/计划态，只有显式 `execute=true` 且策略通过时才进入 autopay + lease；UI 需要把这类 tool output 呈现成可读审批卡，而不是原始 JSON。
+- `Market Control` 需要提供 recent executions 读面，把 `proof`、`acceptance`、`settlement`、`dispute` 和最近 trace 聚到同一块 operator 摘要中，便于值班和排障。
 - 遇到链/存储不可用：必须继续允许 OpenClaw 正常工作，只在 UI 上提示“未锚定/未归档/未结算”。
 
 ## 兼容预设与零配置边界

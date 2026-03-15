@@ -43,6 +43,9 @@ OpenClaw 已具备 Web3 Market 的资源共享与结算底座，但当前最成�
 - `resource.kind = "service"`：服务资源已可表达
 - `serviceSchema`：可描述输入/输出/SLA/proof requirements 的最小服务契约
 - `web3.market.service.proof.*`：服务类证明提交/查询/列表接口已存在
+- `web3.market.offer.quote|compare`：买方发现、比较、报价解释的 façade 已落地
+- `web3.market.proof.submit|verify`、`web3.market.acceptance.sign|reject`、`web3.market.execution.status`：proof、验收、执行摘要闭环已补齐
+- `web3.market.steward.buy`：预算/选供/风控门禁后的计划式购买工具已落地，默认先输出审批态或计划态
 - `web3.market.reconciliation.summary`：双栈支付 + 账本 + 争议 + proof 的聚合摘要已存在
 - `web3.market.dispute.*`：服务争议已有兜底流程
 - TON + EVM：支付与对账已统一到双栈口径
@@ -79,7 +82,7 @@ OpenClaw 已具备 Web3 Market 的资源共享与结算底座，但当前最成�
 
 ### 4. Discovery 与 MCP 还需要工程化整合
 
-Agent 需要发现的不是“节点”，而是 **可交易的 Offer / Resource / ServiceSchema**。这意味着后续还要补齐：
+Agent 需要发现的不是“节点”，而是 **可交易的 Offer / Resource / ServiceSchema**。当前 runtime 已有 `quote` / `compare` / `steward.buy` 这组面向买方的比较与计划接口，但聊天主路径、MCP 暴露面、跨 agent 协同上下文仍需要继续工程化统一。这意味着后续还要补齐：
 
 - 可比较摘要（价格、SLA、信誉、proof 类型）
 - 与 MCP 的双向接入方式

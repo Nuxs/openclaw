@@ -593,6 +593,72 @@
       },
       {
         "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.acceptance.reject",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId", "reason"],
+          "type": "object"
+        },
+        "returns": "Acceptance rejection result with dispute linkage.",
+        "risk": {
+          "level": "medium"
+        },
+        "summary": "Buyer rejects delivery/proof and opens a dispute-ready acceptance record."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.acceptance.sign",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId"],
+          "type": "object"
+        },
+        "returns": "Acceptance result with settlement release snapshot.",
+        "risk": {
+          "level": "medium"
+        },
+        "summary": "Buyer signs acceptance for a completed delivery and releases remaining settlement."
+      },
+      {
+        "availability": {
           "enabled": true
         },
         "group": "market",
@@ -1173,6 +1239,39 @@
           "enabled": false,
           "reason": "resources disabled"
         },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.execution.status",
+        "paramsSchema": {
+          "properties": {
+            "leaseId": {
+              "type": "string"
+            },
+            "limit": {
+              "maximum": 50,
+              "minimum": 1,
+              "type": "number"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Execution summary with trace entries and redacted linked object snapshots.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Aggregate order, lease, proof, acceptance, settlement, dispute, and trace into one execution summary."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
         "group": "tools",
         "kind": "tool",
         "name": "web3.market.index.list",
@@ -1594,6 +1693,45 @@
         },
         "group": "market",
         "kind": "gateway",
+        "name": "web3.market.offer.compare",
+        "paramsSchema": {
+          "properties": {
+            "kind": {
+              "enum": ["model", "search", "storage", "service"],
+              "type": "string"
+            },
+            "limit": {
+              "maximum": 20,
+              "minimum": 1,
+              "type": "number"
+            },
+            "quantity": {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "number"
+            },
+            "query": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Ranked candidate list with quote previews and comparable scores.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Compare candidate published resources for the same buyer intent."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
         "name": "web3.market.offer.create",
         "paramsSchema": {
           "properties": {
@@ -1689,6 +1827,38 @@
         },
         "stability": "experimental",
         "summary": "Publish a draft seller offer so buyers can order it."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.quote",
+        "paramsSchema": {
+          "properties": {
+            "quantity": {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "number"
+            },
+            "resourceId": {
+              "type": "string"
+            },
+            "ttlMs": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          "required": ["resourceId"],
+          "type": "object"
+        },
+        "returns": "Redacted quote payload with price, estimated total, proof requirements, and service metadata summary.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Build a redacted quote summary for a published market resource."
       },
       {
         "availability": {
@@ -1993,6 +2163,95 @@
         "name": "web3.market.privacy.replay.list",
         "stability": "experimental",
         "summary": "List previously generated privacy replay records."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.proof.submit",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "deliveryId": {
+              "type": "string"
+            },
+            "leaseId": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proof": {
+              "properties": {
+                "artifactHash": {
+                  "pattern": "^sha256:[a-fA-F0-9]{64}$",
+                  "type": "string"
+                },
+                "issuedAt": {
+                  "type": "string"
+                },
+                "redactedFields": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                "type": {
+                  "enum": ["tlsnotary"],
+                  "type": "string"
+                },
+                "verifier": {
+                  "type": "string"
+                }
+              },
+              "required": ["type", "artifactHash", "issuedAt", "verifier"],
+              "type": "object"
+            }
+          },
+          "required": ["actorId", "orderId", "proof"],
+          "type": "object"
+        },
+        "returns": "Generic proof submission result with proofId and linked settlement snapshot.",
+        "risk": {
+          "level": "medium"
+        },
+        "summary": "Submit proof through the generic proof façade while preserving service proof compatibility."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.proof.verify",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Verification status plus redacted proof summary and linked order/dispute state.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Verify and summarize proof state for an order or proofId."
       },
       {
         "availability": {
@@ -2647,6 +2906,34 @@
           "level": "low"
         },
         "summary": "Summarize market-core status totals and counts."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources consumer disabled"
+        },
+        "group": "tools",
+        "kind": "tool",
+        "name": "web3.market.steward.buy",
+        "paramsSchema": {
+          "actorId": "string",
+          "approval": "object",
+          "autoPay": "boolean",
+          "budgetPolicy": "object",
+          "consumerActorId": "string",
+          "execute": "boolean",
+          "query": "string",
+          "resourceId": "string",
+          "riskPolicy": "object",
+          "selectionPolicy": "object",
+          "ttlMs": "number"
+        },
+        "returns": "A steward purchase plan with selected candidate, budget/risk decisions, and optional payment + lease execution results.",
+        "risk": {
+          "level": "high",
+          "notes": ["Can trigger policy-gated autopay and lease when execute=true"]
+        },
+        "summary": "Plan or execute a policy-gated market purchase with candidate selection, approval-aware budget checks, and optional autopay + lease."
       },
       {
         "availability": {
@@ -4639,6 +4926,70 @@
         },
         "group": "market",
         "kind": "gateway",
+        "name": "web3.market.acceptance.reject",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId", "reason"],
+          "type": "object"
+        },
+        "returns": "Acceptance rejection result with dispute linkage.",
+        "risk": {
+          "level": "medium"
+        },
+        "summary": "Buyer rejects delivery/proof and opens a dispute-ready acceptance record."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.acceptance.sign",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            }
+          },
+          "required": ["actorId", "orderId"],
+          "type": "object"
+        },
+        "returns": "Acceptance result with settlement release snapshot.",
+        "risk": {
+          "level": "medium"
+        },
+        "summary": "Buyer signs acceptance for a completed delivery and releases remaining settlement."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
         "name": "web3.market.bridge.list",
         "paramsSchema": {
           "properties": {
@@ -5201,6 +5552,38 @@
         "availability": {
           "enabled": true
         },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.execution.status",
+        "paramsSchema": {
+          "properties": {
+            "leaseId": {
+              "type": "string"
+            },
+            "limit": {
+              "maximum": 50,
+              "minimum": 1,
+              "type": "number"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Execution summary with trace entries and redacted linked object snapshots.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Aggregate order, lease, proof, acceptance, settlement, dispute, and trace into one execution summary."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
         "group": "tools",
         "kind": "tool",
         "name": "web3.market.index.list",
@@ -5609,6 +5992,44 @@
         },
         "group": "market",
         "kind": "gateway",
+        "name": "web3.market.offer.compare",
+        "paramsSchema": {
+          "properties": {
+            "kind": {
+              "enum": ["model", "search", "storage", "service"],
+              "type": "string"
+            },
+            "limit": {
+              "maximum": 20,
+              "minimum": 1,
+              "type": "number"
+            },
+            "quantity": {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "number"
+            },
+            "query": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Ranked candidate list with quote previews and comparable scores.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Compare candidate published resources for the same buyer intent."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
         "name": "web3.market.offer.create",
         "paramsSchema": {
           "properties": {
@@ -5703,6 +6124,37 @@
         },
         "stability": "experimental",
         "summary": "Publish a draft seller offer so buyers can order it."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.offer.quote",
+        "paramsSchema": {
+          "properties": {
+            "quantity": {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "number"
+            },
+            "resourceId": {
+              "type": "string"
+            },
+            "ttlMs": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          "required": ["resourceId"],
+          "type": "object"
+        },
+        "returns": "Redacted quote payload with price, estimated total, proof requirements, and service metadata summary.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Build a redacted quote summary for a published market resource."
       },
       {
         "availability": {
@@ -5999,6 +6451,93 @@
         "name": "web3.market.privacy.replay.list",
         "stability": "experimental",
         "summary": "List previously generated privacy replay records."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.proof.submit",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "deliveryId": {
+              "type": "string"
+            },
+            "leaseId": {
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proof": {
+              "properties": {
+                "artifactHash": {
+                  "pattern": "^sha256:[a-fA-F0-9]{64}$",
+                  "type": "string"
+                },
+                "issuedAt": {
+                  "type": "string"
+                },
+                "redactedFields": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                "type": {
+                  "enum": ["tlsnotary"],
+                  "type": "string"
+                },
+                "verifier": {
+                  "type": "string"
+                }
+              },
+              "required": ["type", "artifactHash", "issuedAt", "verifier"],
+              "type": "object"
+            }
+          },
+          "required": ["actorId", "orderId", "proof"],
+          "type": "object"
+        },
+        "returns": "Generic proof submission result with proofId and linked settlement snapshot.",
+        "risk": {
+          "level": "medium"
+        },
+        "summary": "Submit proof through the generic proof façade while preserving service proof compatibility."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.proof.verify",
+        "paramsSchema": {
+          "properties": {
+            "actorId": {
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "type": "string"
+            },
+            "orderId": {
+              "type": "string"
+            },
+            "proofId": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "returns": "Verification status plus redacted proof summary and linked order/dispute state.",
+        "risk": {
+          "level": "low"
+        },
+        "summary": "Verify and summarize proof state for an order or proofId."
       },
       {
         "availability": {
@@ -6643,6 +7182,33 @@
           "level": "low"
         },
         "summary": "Summarize market-core status totals and counts."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "tools",
+        "kind": "tool",
+        "name": "web3.market.steward.buy",
+        "paramsSchema": {
+          "actorId": "string",
+          "approval": "object",
+          "autoPay": "boolean",
+          "budgetPolicy": "object",
+          "consumerActorId": "string",
+          "execute": "boolean",
+          "query": "string",
+          "resourceId": "string",
+          "riskPolicy": "object",
+          "selectionPolicy": "object",
+          "ttlMs": "number"
+        },
+        "returns": "A steward purchase plan with selected candidate, budget/risk decisions, and optional payment + lease execution results.",
+        "risk": {
+          "level": "high",
+          "notes": ["Can trigger policy-gated autopay and lease when execute=true"]
+        },
+        "summary": "Plan or execute a policy-gated market purchase with candidate selection, approval-aware budget checks, and optional autopay + lease."
       },
       {
         "availability": {
@@ -8417,9 +8983,12 @@
         "web3.index.stats",
         "web3.market.bridge.*",
         "web3.market.dispute.*",
+        "web3.market.execution.status",
         "web3.market.lease.*",
         "web3.market.ledger.*",
         "web3.market.metrics.snapshot",
+        "web3.market.offer.compare",
+        "web3.market.offer.quote",
         "web3.market.order.list",
         "web3.market.preset.preview",
         "web3.market.preset.verify",
@@ -8431,6 +9000,7 @@
         "web3.market.service.proof.*",
         "web3.market.settlement.query",
         "web3.market.status.summary",
+        "web3.market.steward.buy",
         "web3.market.tokenEconomy.*",
         "web3.metrics.*",
         "web3.monitor.*",
@@ -9197,6 +9767,8 @@
       "runtime": {
         "commands": ["market-assistant"],
         "gatewayMethods": [
+          "market.acceptance.reject",
+          "market.acceptance.sign",
           "market.audit.query",
           "market.bridge.list",
           "market.bridge.request",
@@ -9216,6 +9788,7 @@
           "market.dispute.reject",
           "market.dispute.resolve",
           "market.dispute.submitEvidence",
+          "market.execution.get",
           "market.lease.expireSweep",
           "market.lease.get",
           "market.lease.issue",
@@ -9236,6 +9809,8 @@
           "market.privacy.erase",
           "market.privacy.replay.generate",
           "market.privacy.replay.list",
+          "market.proof.submit",
+          "market.proof.verify",
           "market.repair.retry",
           "market.reputation.summary",
           "market.resource.get",
@@ -10122,6 +10697,8 @@
           "web3.index.peers.list",
           "web3.index.report",
           "web3.index.stats",
+          "web3.market.acceptance.reject",
+          "web3.market.acceptance.sign",
           "web3.market.bridge.list",
           "web3.market.bridge.request",
           "web3.market.bridge.routes",
@@ -10140,6 +10717,7 @@
           "web3.market.dispute.reject",
           "web3.market.dispute.resolve",
           "web3.market.dispute.submitEvidence",
+          "web3.market.execution.status",
           "web3.market.lease.expireSweep",
           "web3.market.lease.get",
           "web3.market.lease.issue",
@@ -10149,8 +10727,10 @@
           "web3.market.ledger.summary",
           "web3.market.metrics.snapshot",
           "web3.market.offer.close",
+          "web3.market.offer.compare",
           "web3.market.offer.create",
           "web3.market.offer.publish",
+          "web3.market.offer.quote",
           "web3.market.offer.update",
           "web3.market.order.cancel",
           "web3.market.order.create",
@@ -10161,6 +10741,8 @@
           "web3.market.privacy.erase",
           "web3.market.privacy.replay.generate",
           "web3.market.privacy.replay.list",
+          "web3.market.proof.submit",
+          "web3.market.proof.verify",
           "web3.market.reconciliation.summary",
           "web3.market.reputation.summary",
           "web3.market.resource.get",
