@@ -8,6 +8,13 @@ metadata: { "openclaw": { "emoji": "🕸️" } }
 
 Design and extend OpenClaw as a `Private Steward OS` with a `Market-backed A2A` stack. Treat Web3 as the trust and settlement substrate, not the product façade. Evolve the current resource-sharing runtime into a broader EaaS stack without breaking the existing `web3.*` public contract.
 
+Default March 2026 strategy baseline:
+
+- **Mainline**: productize the **digital-service closure** first; ship verifiable search, data, model, automation, and code/security-review flows before broader market stories.
+- **Production rails**: keep **`EVM + TON`** on the production path for treasury, stablecoin settlement, receipts, and distribution.
+- **Future ledger**: advance **`Sui-first`** only as a parallel prototype line for objectized rights, lease, receipt, escrow, and reward semantics; do not let it block current delivery.
+- **Commercial narrative**: sell **`accountable execution`**, not “the chain”, not token speculation, and not abstract autonomy.
+
 ## Trigger
 
 Use this skill when working on:
@@ -56,6 +63,43 @@ Treat the stack as:
   - `A2A` / `ACP` = delegation, coordination, and cross-agent communication
   - `OpenClaw Market` = offer, lease, ledger, settlement, proof, dispute, reconciliation
   - chain/wallet/identity = trust anchor, signature, payment, and audit substrate
+
+## Default strategy and delivery doctrine
+
+Use these defaults unless current repo truth proves otherwise:
+
+1. **Digital services first**
+   - Prioritize verifiable digital services as the first proving ground.
+   - Default v1 scope: search, data enrichment, model inference, automation workflows, code review, and security review.
+   - Keep human-service and `RWA` flows explicitly out of the mainline unless the task is marked experimental or later-phase.
+
+2. **Production path = `EVM + TON`**
+   - Use `EVM` for stablecoin liquidity, treasury, bridge compatibility, and settlement-grade auditability.
+   - Use `TON` for lightweight payment entry and Telegram-facing distribution.
+   - Do not pause or destabilize current production work in order to chase a cleaner theoretical chain model.
+
+3. **Future ledger = `Sui-first` parallel prototype**
+   - Use `Sui-first` for objectized capability/lease/receipt/escrow/reward design research and prototype work.
+   - Keep `Sui-first` work additive, isolated, and explicitly labeled as prototype, roadmap, or target-state unless code proves otherwise.
+   - Do not frame `Sui-first` as a justification for rewriting already-working `EVM + TON` runtime paths.
+
+4. **Sell accountable execution**
+   - Present `Private Steward` as the product surface.
+   - Present `OpenClaw Market` as the accountability and economic substrate.
+   - Explain that the differentiator is the ability to discover, buy, verify, settle, reconcile, and dispute outside services safely.
+   - Avoid chain-first, wallet-first, or token-first storytelling in mainstream product language.
+
+5. **Industrial delivery discipline**
+   - Separate every proposal into: current fact, next additive step, and target-state roadmap.
+   - Prefer thin-entry, overlay-first, leaf-module changes over central rewrites.
+   - Tie proof, acceptance, settlement, dispute, reconciliation, and governance together as one delivery loop.
+   - Gate shipping on security, redaction, stable contracts, operability, and test evidence.
+   - Prefer boring, auditable closure over clever architecture churn.
+
+6. **信达雅 communication standard**
+   - **信**: verify claims in code or authoritative docs before stating them.
+   - **达**: explain layer boundaries, tradeoffs, and rollout order in plain language.
+   - **雅**: keep product narrative crisp, non-hyped, and consistent with current runtime truth.
 
 ## Architectural invariants
 
@@ -113,7 +157,11 @@ First reference for this topic:
 
 Read these first for architecture or protocol work:
 
+- `skills/web3-market/references/openclaw-accountable-execution-delivery-doctrine.md`
 - `skills/web3-market/references/openclaw-private-steward-architecture-2026-2028.md`
+- `skills/web3-market/references/openclaw-observable-a2a-market-lessons.md`
+- `skills/web3-market/references/openclaw-web3-market-product-principles-one-page.md`
+- `skills/web3-market/references/openclaw-web3-market-external-narrative-one-page.md`
 - `skills/web3-market/references/openclaw-sui-first-agentic-commerce.md`
 - `skills/web3-market/references/openclaw-eaas-a2a-mcp-productization.md`
 - `skills/web3-market/references/web3-brain-architecture.md`
@@ -142,6 +190,7 @@ Read when drafting plans, leadership updates, or implementation breakdowns:
 
 - `skills/web3-market/internal/BOARD_STRATEGY_MEMO_2026_PRIVATE_STEWARD.md`
 - `skills/web3-market/internal/RFC_2026_PRIVATE_STEWARD_MARKET_STACK.md`
+- `skills/web3-market/internal/WEB3_DIGITAL_SERVICE_MARKET_V1_EXECUTION_PLAN.md`
 - `skills/web3-market/internal/WEB3_OVERALL_PROGRESS.md`
 - `skills/web3-market/internal/WEB3_MARKET_GO_LIVE_REVIEW_2026-03.md`
 - `skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
@@ -176,25 +225,38 @@ When adding new market capabilities to already-large files, prefer creating leaf
 
 ### For runtime / protocol implementation
 
-1. Read `openclaw-private-steward-architecture-2026-2028.md` to confirm the target layer and protocol boundary.
-2. Read `RFC_2026_PRIVATE_STEWARD_MARKET_STACK.md` for proposed modules, interfaces, and phase order.
-3. Confirm current repo truth in runtime files before editing.
-4. Implement additive changes first:
+1. Read `openclaw-accountable-execution-delivery-doctrine.md` first to lock scope, chain roles, and narrative discipline.
+2. Read `openclaw-private-steward-architecture-2026-2028.md` to confirm the target layer and protocol boundary.
+3. Read `RFC_2026_PRIVATE_STEWARD_MARKET_STACK.md` for proposed modules, interfaces, and phase order.
+4. Confirm current repo truth in runtime files before editing.
+5. Implement additive changes in this default order:
+   - capability/contract truth
    - type/model additions
    - validator additions
    - authority handler additions
    - façade additions
-   - capability descriptor additions
-5. Reuse existing `offer` / `order` / `lease` / `service-proof` / `dispute` flows when possible instead of inventing parallel state machines.
-6. Add tests in the touched leaf modules and keep file + SQLite store behavior aligned.
+   - proof/settlement/dispute linkage
+   - governance/ops visibility
+6. Reuse existing `offer` / `order` / `lease` / `service-proof` / `dispute` flows when possible instead of inventing parallel state machines.
+7. Keep `EVM + TON` production paths stable unless the task explicitly targets a prototype lane.
+8. Put `Sui-first` work behind prototype wording, isolated modules, or dedicated reference/design artifacts unless runtime code is actually being added.
+9. Add tests in the touched leaf modules and keep file + SQLite store behavior aligned.
 
 ### For product / strategy work
 
-1. Read `openclaw-eaas-a2a-mcp-productization.md`.
-2. Anchor every claim to a current runtime fact or clearly label it as roadmap.
-3. Read `WEB3_DIGITAL_SERVICE_MARKET_V1_EXECUTION_PLAN.md` first when the task is about productization, go-live scope, backlog, or launch gating.
-4. Present `Private Steward` as the product and `Web3 Market` as the accountable economic substrate.
-5. Explain `MCP`, `A2A`, and `Market` as complementary layers, not mutually exclusive bets.
+1. Read `openclaw-accountable-execution-delivery-doctrine.md` first.
+2. Read `openclaw-eaas-a2a-mcp-productization.md`.
+3. Anchor every claim to a current runtime fact or clearly label it as roadmap.
+4. Read `WEB3_DIGITAL_SERVICE_MARKET_V1_EXECUTION_PLAN.md` first when the task is about productization, go-live scope, backlog, or launch gating.
+5. For product-language, visibility, or growth-shape questions, also read `openclaw-observable-a2a-market-lessons.md`, `openclaw-web3-market-product-principles-one-page.md`, and `openclaw-web3-market-external-narrative-one-page.md`.
+6. Present `Private Steward` as the product and `Web3 Market` as the accountable economic substrate.
+7. Explain `MCP`, `A2A`, and `Market` as complementary layers, not mutually exclusive bets.
+8. Keep the strategy defaults explicit:
+   - mainline = digital-service closure productization
+   - production = `EVM + TON`
+   - future ledger = `Sui-first` parallel prototype
+   - narrative = accountable execution
+9. Write in a 信达雅 style: factual, layered, concise, and non-hyped.
 
 ### For A2A / MCP integration design
 

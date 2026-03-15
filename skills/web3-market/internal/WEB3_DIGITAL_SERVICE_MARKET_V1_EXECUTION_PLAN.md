@@ -36,6 +36,16 @@
 - 开放 A2A 市场化
 - 泛化 Service Wrapper 重构
 - “万物皆可交易” 对外叙事
+- 全面迁移到 `Sui` 生产主线
+- 链优先 / 代币优先的对外叙事
+
+### 0.3 战略默认值（2026-03 冻结口径）
+
+- **主线**：数字服务闭环产品化
+- **生产链**：`EVM + TON`
+- **未来账本**：`Sui-first` 并行原型
+- **商业叙事**：卖 `accountable execution`，不卖“链”
+- **表达标准**：所有方案、评估、PRD、RFC、实现说明默认遵循“信达雅”——可核验、讲清边界、不过度宣称
 
 ---
 
@@ -61,6 +71,34 @@
 - token / provider endpoint / 真实路径不得出现在普通输出面
 - proof、settlement、dispute 必须绑定，不能拆成互不关联的孤立流程
 - `file` / `sqlite` 两种 store 行为必须一致
+- `EVM + TON` 是当前生产闭环，不得因未来账本研究而被无计划扰动
+- `Sui-first` 研究默认走并行原型线，不得伪装成已迁移完成的现网事实
+
+### 1.4 链角色分工
+
+- **`EVM`**：稳定币流动性、Treasury、跨链桥与外部 DeFi 兼容
+- **`TON`**：分发、轻量支付入口、Telegram 生态触达
+- **`Sui`**：能力 / 租约 / 回执 / 托管 / 奖励等对象化账本的未来方向
+
+> 约束：默认采用 **链下 discovery / quote + 链上 lease / settlement / audit**。Prompt、数据、模型权重、推理结果保持链下，只把哈希承诺、回执与策略锚点上链。
+
+### 1.5 从可观察 A2A 到 accountable execution
+
+近期公开 A2A 案例说明，真正产生网络效应的，不是协议名词本身，而是以下四个产品要素同时成立：
+
+- **公共可观察性**：agent 行为一旦可围观，就会形成传播、模仿、角色分层与 reputation 聚集。
+- **周期性 agent 行为**：`heartbeat` 让 agent 网络不是一次性 demo，而是具有持续存在感的活动系统。
+- **社交表面**：论坛、线程、社区、回复等交互表面，比抽象 protocol 更容易被用户理解和传播。
+- **低门槛接入**：`skill` 驱动的加入方式，本质上既是扩展机制，也是网络增长机制。
+
+但 `OpenClaw` 的主线响应不是复制“公开 agent 社交网络”，而是将这四点翻译为 **可观察的 accountable execution**：
+
+- 让重要执行过程可见，但默认分级可见、默认脱敏
+- 让 `heartbeat` 服务于 quote、delivery、SLA、risk、acceptance 等治理场景，而不是无边界远端指令拉取
+- 让产品表面优先呈现任务线程、执行时间线、proof 摘要、settlement / dispute 状态，而不是抽象协议术语
+- 让 `skill` / preset / template 成为 provider、buyer 与 operator 进入市场闭环的低摩擦入口
+
+一句话：**我们要的不是 agent 社交网络，而是带网络效应的可问责执行网络。**
 
 ---
 
