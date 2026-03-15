@@ -1,4 +1,4 @@
-﻿function ConvertTo-PlainData {
+function ConvertTo-PlainData {
     param([Parameter(Mandatory = $true)]$Value)
 
     if ($null -eq $Value) {
@@ -105,7 +105,7 @@ function Set-ScriptValueFromPresetDefault {
     }
 
     Set-Variable -Scope Script -Name $Name -Value $Value
-    Write-Info "预设默认：$Name"
+    Write-Info ":$Name"
 }
 
 function Apply-WindowsDevPresetDefaults {
@@ -134,18 +134,18 @@ function Initialize-WindowsDevPreset {
     }
 
     if (-not (Test-Path $presetPath)) {
-        Throw-UserError "预设文件不存在：$presetPath"
+        Throw-UserError "Preset file does not exist: $presetPath"
     }
 
     try {
         $loaded = Import-PowerShellDataFile -Path $presetPath
     } catch {
-        Throw-UserError "加载预设文件失败：$($_.Exception.Message)"
+        Throw-UserError "Failed to load preset file: $($_.Exception.Message)"
     }
 
     $script:LoadedPresetPath = $presetPath
     $script:WindowsDevPreset = ConvertTo-PlainData -Value $loaded
-    Write-Ok "已加载预设模板：$(Format-RepoRelativePath -Path $presetPath)"
+    Write-Ok "Loaded preset template: $(Format-RepoRelativePath -Path $presetPath)"
     Apply-WindowsDevPresetDefaults
 }
 
@@ -154,17 +154,17 @@ function Initialize-WindowsDevTemplate {
     $localPresetPath = Get-WindowsDevLocalPresetPath
 
     if (-not (Test-Path $templatePath)) {
-        Throw-UserError "缺少预设模板：$templatePath"
+        Throw-UserError "Missing preset template: $templatePath"
     }
 
     if (Test-Path $localPresetPath) {
-        Write-Ok "已存在本地预设文件：$(Format-RepoRelativePath -Path $localPresetPath)"
+        Write-Ok "Local preset file already exists: $(Format-RepoRelativePath -Path $localPresetPath)"
         return
     }
 
     Copy-Item -Path $templatePath -Destination $localPresetPath
-    Write-Ok "已生成本地预设文件：$(Format-RepoRelativePath -Path $localPresetPath)"
-    Write-Info "这是仓库内 bootstrap 预设，不负责 clone 仓库。请先确保同事已经 clone 到本地，再编辑仓库地址、镜像名、Branding 和 OpenClawConfig 默认值后运行 bootstrap。"
+    Write-Ok "Generated local preset file: $(Format-RepoRelativePath -Path $localPresetPath)"
+    Write-Info "This is an in-repo bootstrap preset. Clone the repository first, then edit the repo URL, image name, Branding, and OpenClawConfig defaults before running bootstrap."
 }
 
 function Convert-EnvValue {
@@ -198,7 +198,7 @@ function Import-EnvFile {
         $name = $match.Groups[1].Value
         $value = Convert-EnvValue -RawValue $match.Groups[2].Value
 
-        # 进程里显式传入的变量优先级最高；否则允许 .env.local 覆盖 .env。
+        # ; .env.local  .env
         if ($script:InitialEnvNames.Contains($name)) {
             continue
         }
@@ -294,7 +294,7 @@ function Add-MissingEnvDefaultsToFile {
 
     Add-Content -Path $FilePath -Value @("", "# Defaults from private/windows-dev.local.psd1")
     Add-Content -Path $FilePath -Value $appendLines
-    Write-Ok "已把预设 env 默认值补充到：private/env/$EnvName.env.local"
+    Write-Ok " env :private/env/$EnvName.env.local"
 }
 
 function Ensure-LocalEnvFile {
@@ -306,12 +306,12 @@ function Ensure-LocalEnvFile {
 
     $tracked = Join-Path $script:RepoRoot "private\env\$EnvName.env"
     if (-not (Test-Path $tracked)) {
-        Throw-UserError "缺少环境模板：$tracked"
+        Throw-UserError ":$tracked"
     }
 
     $local = Join-Path $script:RepoRoot "private\env\$EnvName.env.local"
     if ((Test-Path $local) -and -not $Force) {
-        Write-Ok "已存在本地覆盖文件：private/env/$EnvName.env.local"
+        Write-Ok ":private/env/$EnvName.env.local"
         Add-MissingEnvDefaultsToFile -FilePath $local -EnvName $EnvName
         return $local
     }
@@ -339,7 +339,7 @@ function Ensure-LocalEnvFile {
 
     Set-Content -Path $local -Value $lines -Encoding UTF8
     Add-MissingEnvDefaultsToFile -FilePath $local -EnvName $EnvName
-    Write-Ok "已生成本地覆盖文件：private/env/$EnvName.env.local"
+    Write-Ok ":private/env/$EnvName.env.local"
     return $local
 }
 
@@ -385,13 +385,13 @@ function Apply-PresetBranding {
 
     $overlay = $branding["Json"]
     if (-not (Test-DictionaryLike -Value $overlay)) {
-        Write-Warn "Branding.ApplyOnBootstrap=true，但未提供 Branding.Json；已跳过。"
+        Write-Warn "Branding.ApplyOnBootstrap=true, Branding.Json;"
         return
     }
 
     $brandPath = Join-Path $script:RepoRoot "private\brand.json"
     if (-not (Test-Path $brandPath)) {
-        Throw-UserError "缺少品牌配置文件：$brandPath"
+        Throw-UserError ":$brandPath"
     }
 
     $currentRaw = Get-Content -Path $brandPath -Raw
@@ -401,12 +401,12 @@ function Apply-PresetBranding {
     $currentJson = ($current | ConvertTo-Json -Depth 50)
     $nextJson = ($next | ConvertTo-Json -Depth 50)
     if ($currentJson -eq $nextJson) {
-        Write-Info "品牌配置已与预设一致。"
+        Write-Info ""
         return
     }
 
     Set-Content -Path $brandPath -Value $nextJson -Encoding UTF8
-    Write-Ok "已按预设更新：private/brand.json"
+    Write-Ok ":private/brand.json"
 }
 
 function Ensure-ExpectedOriginRemote {
@@ -427,17 +427,17 @@ function Ensure-ExpectedOriginRemote {
 
     $origin = & $git -C $script:RepoRoot remote get-url origin 2>$null
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "当前仓库没有 origin remote，预设期望：$expectedOrigin"
+        Write-Warn " origin remote,:$expectedOrigin"
         return
     }
 
     $actual = ([string]$origin).Trim()
     if ($actual -ne $expectedOrigin) {
-        Write-Warn "origin remote 与预设不一致：当前=$actual；预设=$expectedOrigin"
+        Write-Warn "origin remote :=$actual;=$expectedOrigin"
         return
     }
 
-    Write-Ok "origin remote 已匹配预设仓库"
+    Write-Ok "origin remote "
 }
 
 function Get-ConfiguredStateDir {
@@ -469,7 +469,7 @@ function Get-ConfiguredOpenClawConfigPath {
 
 function Ensure-OpenClawSetup {
     $workspaceDir = Get-ConfiguredWorkspaceDir
-    Write-Step "初始化官方 openclaw 配置与工作区"
+    Write-Step " openclaw "
     Invoke-Pnpm -Arguments @("openclaw", "setup", "--workspace", $workspaceDir)
 }
 
@@ -498,7 +498,7 @@ function Get-OpenClawConfigValue {
 
     $pnpm = Resolve-PnpmCommand
     if (-not $pnpm) {
-        Throw-UserError "pnpm 不可用，无法读取 OpenClaw 配置。"
+        Throw-UserError "pnpm , OpenClaw "
     }
 
     $output = & $pnpm openclaw config get $Path --json 2>$null
@@ -539,7 +539,7 @@ function Seed-OpenClawConfigPath {
     $current = Get-OpenClawConfigValue -Path $Path
     if (-not $current.Found) {
         Set-OpenClawConfigValue -Path $Path -Value $Value
-        Write-Ok "已写入缺省配置：$Path"
+        Write-Ok ":$Path"
         return
     }
 
@@ -571,16 +571,16 @@ function Ensure-OpenClawConfigFromPreset {
 
     $root = $configPreset["Root"]
     if (-not (Test-DictionaryLike -Value $root)) {
-        Write-Warn "OpenClawConfig.ApplyOnBootstrap=true，但未提供 OpenClawConfig.Root；已跳过。"
+        Write-Warn "OpenClawConfig.ApplyOnBootstrap=true, OpenClawConfig.Root;"
         return
     }
 
-    Write-Step "按预设补齐官方 openclaw.json 缺省值"
+    Write-Step " openclaw.json "
     $plainRoot = ConvertTo-PlainData -Value $root
     foreach ($key in $plainRoot.Keys) {
         Seed-OpenClawConfigPath -Path (Escape-OpenClawConfigPathSegment -Segment $key) -Value $plainRoot[$key]
     }
 
     Invoke-Pnpm -Arguments @("openclaw", "config", "validate")
-    Write-Ok "官方 openclaw.json 缺省值已同步"
+    Write-Ok " openclaw.json "
 }

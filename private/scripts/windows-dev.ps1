@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet("bootstrap", "doctor", "gateway-install", "gateway-run", "gateway-status", "docker-up", "docker-down", "status", "init-template")]
     [string]$Action = "bootstrap",
 
@@ -42,22 +42,22 @@ $script:LoadedPresetPath = $null
 
 function Write-Step {
     param([string]$Message)
-    Microsoft.PowerShell.Host\Write-Host "`n==> $Message" -ForegroundColor Cyan
+    Write-Host "`n==> $Message" -ForegroundColor Cyan
 }
 
 function Write-Info {
     param([string]$Message)
-    Microsoft.PowerShell.Host\Write-Host "  - $Message" -ForegroundColor DarkGray
+    Write-Host "  - $Message" -ForegroundColor DarkGray
 }
 
 function Write-Ok {
     param([string]$Message)
-    Microsoft.PowerShell.Host\Write-Host "  ✓ $Message" -ForegroundColor Green
+    Write-Host "   $Message" -ForegroundColor Green
 }
 
 function Write-Warn {
     param([string]$Message)
-    Microsoft.PowerShell.Host\Write-Host "  ! $Message" -ForegroundColor Yellow
+    Write-Host "  ! $Message" -ForegroundColor Yellow
 }
 
 function Throw-UserError {
@@ -67,7 +67,7 @@ function Throw-UserError {
 
 $windowsConfigHelper = Join-Path $PSScriptRoot "windows\windows-dev.config.ps1"
 if (-not (Test-Path $windowsConfigHelper)) {
-    Throw-UserError "缺少 helper：$windowsConfigHelper"
+    Throw-UserError " helper:$windowsConfigHelper"
 }
 . $windowsConfigHelper
 Initialize-WindowsDevPreset -ExplicitPath $PresetFile
@@ -84,9 +84,9 @@ function Refresh-Path {
 function Ensure-ExecutionPolicy {
     $policy = Get-ExecutionPolicy
     if ($policy -in @("Restricted", "AllSigned")) {
-        Write-Step "调整当前 PowerShell 进程执行策略"
+        Write-Step " PowerShell "
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
-        Write-Ok "已为当前进程启用 RemoteSigned"
+        Write-Ok " RemoteSigned"
     }
 }
 
@@ -114,7 +114,7 @@ function Invoke-Native {
     & $FilePath @Arguments
     $exitCode = $LASTEXITCODE
     if (-not $IgnoreExitCode -and $exitCode -ne 0) {
-        Throw-UserError "命令失败（exit=$exitCode）：$FilePath $($Arguments -join ' ')"
+        Throw-UserError "(exit=$exitCode):$FilePath $($Arguments -join ' ')"
     }
 
     return $exitCode
@@ -161,7 +161,7 @@ function Test-SupportedNodeVersion {
 function Install-Node {
     param([string]$Method)
 
-    Write-Step "安装 Node.js（推荐 Node 24；兼容 Node 22.16+）"
+    Write-Step " Node.js( Node 24; Node 22.16+)"
 
     $attempts = switch ($Method) {
         "auto" { @("winget", "choco", "scoop") }
@@ -173,7 +173,7 @@ function Install-Node {
             "winget" {
                 $winget = Get-CommandPath @("winget.exe", "winget")
                 if ($winget) {
-                    Write-Info "使用 winget 安装 OpenJS.NodeJS.LTS"
+                    Write-Info " winget  OpenJS.NodeJS.LTS"
                     Invoke-Native -FilePath $winget -Arguments @("install", "OpenJS.NodeJS.LTS", "--accept-package-agreements", "--accept-source-agreements")
                     Refresh-Path
                     return
@@ -182,7 +182,7 @@ function Install-Node {
             "choco" {
                 $choco = Get-CommandPath @("choco.exe", "choco")
                 if ($choco) {
-                    Write-Info "使用 Chocolatey 安装 nodejs-lts"
+                    Write-Info " Chocolatey  nodejs-lts"
                     Invoke-Native -FilePath $choco -Arguments @("install", "nodejs-lts", "-y")
                     Refresh-Path
                     return
@@ -191,60 +191,60 @@ function Install-Node {
             "scoop" {
                 $scoop = Get-CommandPath @("scoop.cmd", "scoop")
                 if ($scoop) {
-                    Write-Info "使用 Scoop 安装 nodejs-lts"
+                    Write-Info " Scoop  nodejs-lts"
                     Invoke-Native -FilePath $scoop -Arguments @("install", "nodejs-lts")
                     Refresh-Path
                     return
                 }
             }
             "manual" {
-                Throw-UserError "未检测到受支持的 Node 版本，请先手动安装 Node 24（推荐）或 Node 22.16+。"
+                Throw-UserError " Node , Node 24() Node 22.16+"
             }
         }
     }
 
-    Throw-UserError "无法自动安装 Node.js。请先安装 Node 24（推荐）或 Node 22.16+。"
+    Throw-UserError " Node.js Node 24() Node 22.16+"
 }
 
 function Ensure-Node {
     $version = Get-NodeVersionString
     if ($version -and (Test-SupportedNodeVersion -VersionString $version)) {
-        Write-Ok "检测到 Node $version"
+        Write-Ok " Node $version"
         return
     }
 
     if ($version) {
-        Write-Warn "检测到 Node $version，但仓库要求 Node 22.16+（推荐 Node 24）"
+        Write-Warn " Node $version, Node 22.16+( Node 24)"
     }
 
     Install-Node -Method $NodeInstallMethod
 
     $installedVersion = Get-NodeVersionString
     if (-not (Test-SupportedNodeVersion -VersionString $installedVersion)) {
-        Throw-UserError "Node 安装后版本仍不满足要求：${installedVersion}"
+        Throw-UserError "Node :${installedVersion}"
     }
 
-    Write-Ok "Node 已就绪：$installedVersion"
+    Write-Ok "Node :$installedVersion"
 }
 
 function Ensure-Git {
     $git = Get-CommandPath @("git.exe", "git")
     if ($git) {
         $version = & $git --version 2>$null
-        Write-Ok "检测到 $version"
+        Write-Ok " $version"
         return
     }
 
-    Write-Step "安装 Git"
+    Write-Step " Git"
     $winget = Get-CommandPath @("winget.exe", "winget")
     if ($winget) {
         Invoke-Native -FilePath $winget -Arguments @("install", "Git.Git", "--accept-package-agreements", "--accept-source-agreements")
         Refresh-Path
-        Write-Ok "Git 已安装"
+        Write-Ok "Git "
         return
     }
 
-    Throw-UserError "未检测到 Git，且当前机器没有可用的 winget。请先安装 Git for Windows。"
+    Throw-UserError " Git, winget Git for Windows"
 }
 
 function Resolve-PnpmCommand {
@@ -258,7 +258,7 @@ function Get-NpmCommand {
 function Install-Pnpm {
     param([string]$Method)
 
-    Write-Step "安装 pnpm"
+    Write-Step " pnpm"
     Ensure-ExecutionPolicy
 
     $attempts = switch ($Method) {
@@ -269,7 +269,7 @@ function Install-Pnpm {
     foreach ($attempt in $attempts) {
         switch ($attempt) {
             "standalone" {
-                Write-Info "使用 pnpm 官方独立安装脚本（不依赖 npm 全局安装）"
+                Write-Info " pnpm ( npm )"
                 try {
                     Invoke-Expression ((Invoke-WebRequest "https://get.pnpm.io/install.ps1" -UseBasicParsing).Content)
                     Refresh-Path
@@ -280,18 +280,18 @@ function Install-Pnpm {
                     if ($Method -ne "auto") {
                         throw
                     }
-                    Write-Warn "pnpm 官方独立安装失败：$($_.Exception.Message)"
+                    Write-Warn "pnpm :$($_.Exception.Message)"
                 }
             }
             "manual" {
-                Throw-UserError "未检测到 pnpm，请先手动安装（推荐使用 https://get.pnpm.io/install.ps1）。"
+                Throw-UserError " pnpm,( https://get.pnpm.io/install.ps1)"
             }
         }
     }
 
     $npm = Get-NpmCommand
     if ($Method -eq "auto" -and $npm) {
-        Write-Warn "退回到 npm 全局安装 pnpm（如果你不想这么做，请预先安装 pnpm）"
+        Write-Warn " npm  pnpm(, pnpm)"
         Invoke-Native -FilePath $npm -Arguments @("install", "-g", "pnpm")
         Refresh-Path
         if (Resolve-PnpmCommand) {
@@ -299,41 +299,41 @@ function Install-Pnpm {
         }
     }
 
-    Throw-UserError "无法自动安装 pnpm。"
+    Throw-UserError " pnpm"
 }
 
 function Ensure-Pnpm {
     $pnpm = Resolve-PnpmCommand
     if ($pnpm) {
         $version = & $pnpm --version 2>$null
-        Write-Ok "检测到 pnpm $version"
+        Write-Ok " pnpm $version"
         return
     }
 
     Install-Pnpm -Method $PnpmInstallMethod
     $resolved = Resolve-PnpmCommand
     if (-not $resolved) {
-        Throw-UserError "pnpm 安装后仍不可用。"
+        Throw-UserError "pnpm "
     }
 
     $version = & $resolved --version 2>$null
-    Write-Ok "pnpm 已就绪：$version"
+    Write-Ok "pnpm :$version"
 }
 
 function Ensure-Bun {
     if ($SkipBun) {
-        Write-Info "按参数要求跳过 Bun 安装"
+        Write-Info " Bun "
         return
     }
 
     $bun = Get-CommandPath @("bun.exe", "bun")
     if ($bun) {
         $version = & $bun --version 2>$null
-        Write-Ok "检测到 Bun $version"
+        Write-Ok " Bun $version"
         return
     }
 
-    Write-Step "安装 Bun（可选，但建议保留 Node + Bun 双路径）"
+    Write-Step " Bun(, Node + Bun )"
     Ensure-ExecutionPolicy
 
     try {
@@ -342,12 +342,12 @@ function Ensure-Bun {
         $bun = Get-CommandPath @("bun.exe", "bun")
         if ($bun) {
             $version = & $bun --version 2>$null
-            Write-Ok "Bun 已安装：$version"
+            Write-Ok "Bun :$version"
             return
         }
-        Write-Warn "Bun 安装后仍未出现在 PATH，后续可手动补装。"
+        Write-Warn "Bun  PATH,"
     } catch {
-        Write-Warn "Bun 安装失败，不阻塞当前流程：$($_.Exception.Message)"
+        Write-Warn "Bun ,:$($_.Exception.Message)"
     }
 }
 
@@ -356,7 +356,7 @@ function Invoke-Pnpm {
 
     $pnpm = Resolve-PnpmCommand
     if (-not $pnpm) {
-        Throw-UserError "pnpm 不可用，请先执行 bootstrap。"
+        Throw-UserError "pnpm , bootstrap"
     }
 
     Invoke-Native -FilePath $pnpm -Arguments $Arguments
@@ -364,7 +364,7 @@ function Invoke-Pnpm {
 
 function Ensure-RepoRoot {
     if (-not (Test-Path (Join-Path $script:RepoRoot "package.json"))) {
-        Throw-UserError "脚本必须在 OpenClaw 仓库中运行。"
+        Throw-UserError " OpenClaw "
     }
 
     Set-Location $script:RepoRoot
@@ -383,7 +383,7 @@ function Get-StateDirDisplay {
 
 function Get-LoadedPresetDisplay {
     if (-not $script:LoadedPresetPath) {
-        return "未加载"
+        return ""
     }
 
     return (Format-RepoRelativePath -Path $script:LoadedPresetPath)
@@ -404,36 +404,36 @@ function Bootstrap-WindowsDev {
     Ensure-Bun
     Ensure-ExpectedOriginRemote
 
-    Write-Step "确认 workspace 扩展策略"
-    Write-Info "当前脚本不会运行 filter-extensions，也不会修改 pnpm-workspace.yaml。"
-    Write-Info "这会保留官方全部 workspace 包，同时保留私有 Web3 扩展（如 web3-core / market-core）。"
+    Write-Step " workspace "
+    Write-Info " filter-extensions, pnpm-workspace.yaml"
+    Write-Info " workspace , Web3 ( web3-core / market-core)"
 
     if (-not $NoLocalEnv) {
         Ensure-LocalEnvFile -EnvName $Environment -Force:$ForceLocalEnv -UseLanBinding:$AllowLan | Out-Null
     }
 
-    Write-Step "安装依赖"
+    Write-Step ""
     Invoke-Pnpm -Arguments @("install")
 
     if (-not $SkipUiBuild) {
-        Write-Step "构建 UI"
+        Write-Step " UI"
         Invoke-Pnpm -Arguments @("ui:build")
     } else {
-        Write-Info "按参数要求跳过 ui:build"
+        Write-Info " ui:build"
     }
 
     if (-not $SkipBuild) {
-        Write-Step "构建仓库"
+        Write-Step ""
         Invoke-Pnpm -Arguments @("build")
     } else {
-        Write-Info "按参数要求跳过 build"
+        Write-Info "Skip build because of input flags"
     }
 
     Import-PrivateEnv -EnvName $Environment
     Ensure-OfficialConfigAndPreset
 
     if (-not $SkipDoctor) {
-        Write-Step "运行官方诊断"
+        Write-Step "Run upstream diagnostics"
         Invoke-Pnpm -Arguments @("openclaw", "doctor")
     }
 
@@ -442,15 +442,15 @@ function Bootstrap-WindowsDev {
         Show-GatewayStatus
     }
 
-    Write-Step "Bootstrap 完成"
+    Write-Step "Bootstrap complete"
     Write-Info "Repo Root: $script:RepoRoot"
     Write-Info "State Dir: $(Get-StateDirDisplay)"
     Write-Info "Config Path: $(Get-ConfiguredOpenClawConfigPath)"
     Write-Info "Preset: $(Get-LoadedPresetDisplay)"
-    Write-Info "默认不会改官方路径；除非你在进程环境或 private/env 覆盖它们。"
-    Write-Info "本地运行：powershell -File private/scripts/windows-dev.ps1 -Action gateway-run -Environment $Environment"
-    Write-Info "托管启动：powershell -File private/scripts/windows-dev.ps1 -Action gateway-install -Environment $Environment"
-    Write-Info "Docker：powershell -File private/scripts/windows-dev.ps1 -Action docker-up -Environment $Environment"
+    Write-Info "Upstream default paths stay unchanged unless you override them via process env or private/env files."
+    Write-Info "Run locally: powershell -File private/scripts/windows-dev.ps1 -Action gateway-run -Environment $Environment"
+    Write-Info "Install service: powershell -File private/scripts/windows-dev.ps1 -Action gateway-install -Environment $Environment"
+    Write-Info "Docker: powershell -File private/scripts/windows-dev.ps1 -Action docker-up -Environment $Environment"
 }
 
 function Install-GatewayService {
@@ -458,10 +458,10 @@ function Install-GatewayService {
     Import-PrivateEnv -EnvName $Environment
     Ensure-OfficialConfigAndPreset
 
-    Write-Step "安装/更新 Windows 原生 Gateway 托管启动"
-    Write-Info "这里直接调用官方 CLI：openclaw gateway install"
+    Write-Step "/ Windows  Gateway "
+    Write-Info " CLI:openclaw gateway install"
     Invoke-Pnpm -Arguments @("openclaw", "gateway", "install")
-    Write-Ok "Gateway 托管启动已配置"
+    Write-Ok "Gateway "
 }
 
 function Run-Gateway {
@@ -469,8 +469,8 @@ function Run-Gateway {
     Import-PrivateEnv -EnvName $Environment
     Ensure-OfficialConfigAndPreset
 
-    Write-Step "在当前 PowerShell 会话启动 Gateway"
-    Write-Info "这里直接调用官方 CLI：openclaw gateway run"
+    Write-Step " PowerShell  Gateway"
+    Write-Info " CLI:openclaw gateway run"
     Invoke-Pnpm -Arguments @("openclaw", "gateway", "run")
 }
 
@@ -478,7 +478,7 @@ function Show-GatewayStatus {
     Ensure-LocalCliPrereqs
     Import-PrivateEnv -EnvName $Environment
 
-    Write-Step "查询 Gateway 状态"
+    Write-Step " Gateway "
     Invoke-Pnpm -Arguments @("openclaw", "gateway", "status", "--json")
 }
 
@@ -487,20 +487,20 @@ function Run-Doctor {
     Import-PrivateEnv -EnvName $Environment
     Ensure-OfficialConfigAndPreset
 
-    Write-Step "运行官方诊断"
+    Write-Step ""
     Invoke-Pnpm -Arguments @("openclaw", "doctor")
 }
 
 function Ensure-Docker {
     $docker = Get-CommandPath @("docker.exe", "docker")
     if (-not $docker) {
-        Throw-UserError "未检测到 Docker。请先安装 Docker Desktop。"
+        Throw-UserError " Docker Docker Desktop"
     }
 
     try {
         Invoke-Native -FilePath $docker -Arguments @("compose", "version") | Out-Null
     } catch {
-        Throw-UserError "检测到了 docker，但 docker compose 不可用。请确认 Docker Desktop 已正确安装。"
+        Throw-UserError " docker, docker compose  Docker Desktop "
     }
 }
 
@@ -509,7 +509,7 @@ function Invoke-DockerCompose {
 
     $docker = Get-CommandPath @("docker.exe", "docker")
     if (-not $docker) {
-        Throw-UserError "未检测到 Docker。"
+        Throw-UserError " Docker"
     }
 
     $allArguments = @("compose") + $Arguments
@@ -522,7 +522,7 @@ function Ensure-ComposeLocalEnvFile {
     $local = Join-Path $script:RepoRoot "private\env\$EnvName.env.local"
     if (-not (Test-Path $local)) {
         Set-Content -Path $local -Value @("# Machine-local overrides for Docker Compose") -Encoding UTF8
-        Write-Ok "已补充空的本地 env 文件：private/env/$EnvName.env.local"
+        Write-Ok " env :private/env/$EnvName.env.local"
     }
 }
 
@@ -555,18 +555,18 @@ function Docker-Up {
 
     $pnpmForce = if ($env:OPENCLAW_PNPM_FORCE) { $env:OPENCLAW_PNPM_FORCE } else { "0" }
 
-    Write-Step "Docker Compose 部署（Windows 原生）"
+    Write-Step "Docker Compose (Windows )"
     if ($image -eq "openclaw:dev" -or $image.EndsWith(":local")) {
-        Write-Info "检测到本地镜像模式，先构建镜像：$image"
+        Write-Info ",:$image"
         $docker = Get-CommandPath @("docker.exe", "docker")
         Invoke-Native -FilePath $docker -Arguments @("build", "--build-arg", "OPENCLAW_PNPM_FORCE=$pnpmForce", "-t", $image, ".")
     } else {
-        Write-Info "检测到远端镜像模式，先拉取镜像：$image"
+        Write-Info ",:$image"
         Invoke-DockerCompose -Arguments ($composeArgs + @("pull"))
     }
 
     Invoke-DockerCompose -Arguments ($composeArgs + @("up", "-d"))
-    Write-Ok "Docker Compose 已启动"
+    Write-Ok "Docker Compose "
 }
 
 function Docker-Down {
@@ -582,16 +582,16 @@ function Docker-Down {
         "-f", "private/docker-compose.override.yml"
     )
 
-    Write-Step "停止 Docker Compose"
+    Write-Step " Docker Compose"
     Invoke-DockerCompose -Arguments ($composeArgs + @("down"))
-    Write-Ok "Docker Compose 已停止"
+    Write-Ok "Docker Compose "
 }
 
 function Show-Status {
     Ensure-LocalCliPrereqs
     Import-PrivateEnv -EnvName $Environment
 
-    Write-Step "OpenClaw Windows 私有化状态"
+    Write-Step "OpenClaw Windows "
     Write-Info "Repo Root: $script:RepoRoot"
     Write-Info "State Dir: $(Get-StateDirDisplay)"
     Write-Info "Config Path: $(Get-ConfiguredOpenClawConfigPath)"
@@ -600,7 +600,7 @@ function Show-Status {
     try {
         Show-GatewayStatus
     } catch {
-        Write-Warn "Gateway 状态查询失败：$($_.Exception.Message)"
+        Write-Warn "Gateway :$($_.Exception.Message)"
     }
 
     $docker = Get-CommandPath @("docker.exe", "docker")
@@ -615,13 +615,13 @@ function Show-Status {
                 "-f", "private/docker-compose.override.yml",
                 "ps"
             )
-            Write-Step "Docker Compose 状态"
+            Write-Step "Docker Compose "
             Invoke-DockerCompose -Arguments $composeArgs
         } catch {
-            Write-Warn "Docker Compose 状态查询失败：$($_.Exception.Message)"
+            Write-Warn "Docker Compose :$($_.Exception.Message)"
         }
     } else {
-        Write-Info "未检测到 Docker，跳过 compose 状态查询。"
+        Write-Info " Docker, compose "
     }
 }
 
@@ -635,5 +635,5 @@ switch ($Action) {
     "docker-down" { Docker-Down }
     "status" { Show-Status }
     "init-template" { Initialize-WindowsDevTemplate }
-    default { Throw-UserError "未知 Action: $Action" }
+    default { Throw-UserError " Action: $Action" }
 }

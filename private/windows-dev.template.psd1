@@ -1,8 +1,8 @@
-﻿@{
+@{
     Repository = @{
-        # 期望的私有化仓库 origin remote。bootstrap 时若不一致会给出提醒。
+        #  origin remotebootstrap 
         OriginUrl = "git@github.com:your-org/openclaw-private.git"
-        # 可选：给同事看的 clone 地址，脚本本身不会自动 clone。
+        # : clone , clone
         CloneUrl = "https://github.com/your-org/openclaw-private.git"
     }
 
@@ -18,7 +18,7 @@
     }
 
     Branding = @{
-        # true 时，bootstrap / gateway-run / gateway-install / docker-up 会把下面的 Json overlay 写入 private/brand.json。
+        # true ,bootstrap / gateway-run / gateway-install / docker-up  Json overlay  private/brand.json
         ApplyOnBootstrap = $false
         Json = @{
             name = "OpenClaw Private"
@@ -70,7 +70,7 @@
     }
 
     OpenClawConfig = @{
-        # true 时，脚本会在官方 ~/.openclaw/openclaw.json（或 OPENCLAW_CONFIG_PATH）里补齐缺失项，不覆盖已存在值。
+        # true , ~/.openclaw/openclaw.json( OPENCLAW_CONFIG_PATH),
         ApplyOnBootstrap = $true
         Root = @{
             gateway = @{
