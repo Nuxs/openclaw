@@ -120,6 +120,40 @@ function Invoke-Native {
     return $exitCode
 }
 
+function Get-CurrentPowerShellPath {
+    $currentProcess = Get-Process -Id $PID -ErrorAction SilentlyContinue
+    if ($currentProcess -and $currentProcess.Path -and (Test-Path $currentProcess.Path)) {
+        return $currentProcess.Path
+    }
+
+    return Get-CommandPath @("pwsh.exe", "pwsh", "powershell.exe", "powershell")
+}
+
+function Invoke-RemotePowerShellScript {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url,
+        [string[]]$Arguments = @(),
+        [switch]$IgnoreExitCode
+    )
+
+    $powerShell = Get-CurrentPowerShellPath
+    if (-not $powerShell) {
+        Throw-UserError " PowerShell "
+    }
+
+    $tempScript = Join-Path ([System.IO.Path]::GetTempPath()) ("openclaw-" + [guid]::NewGuid().ToString("N") + ".ps1")
+    try {
+        # 远端脚本在不同 PowerShell 版本下有时会返回 byte[] 或与当前作用域变量冲突，
+        # 统一落盘后用独立进程执行更稳妥。
+        Invoke-WebRequest $Url -OutFile $tempScript -UseBasicParsing
+        Invoke-Native -FilePath $powerShell -Arguments (@("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $tempScript) + $Arguments) -IgnoreExitCode:$IgnoreExitCode
+    } finally {
+        Remove-Item -Path $tempScript -Force -ErrorAction SilentlyContinue
+    }
+}
+
+
 function Get-NodeVersionString {
     $node = Get-CommandPath @("node.exe", "node")
     if (-not $node) {
@@ -271,12 +305,13 @@ function Install-Pnpm {
             "standalone" {
                 Write-Info " pnpm ( npm )"
                 try {
-                    Invoke-Expression ((Invoke-WebRequest "https://get.pnpm.io/install.ps1" -UseBasicParsing).Content)
+                    Invoke-RemotePowerShellScript -Url "https://get.pnpm.io/install.ps1"
                     Refresh-Path
                     if (Resolve-PnpmCommand) {
                         return
                     }
                 } catch {
+
                     if ($Method -ne "auto") {
                         throw
                     }
@@ -337,7 +372,7 @@ function Ensure-Bun {
     Ensure-ExecutionPolicy
 
     try {
-        Invoke-Expression ((Invoke-WebRequest "https://bun.sh/install.ps1" -UseBasicParsing).Content)
+        Invoke-RemotePowerShellScript -Url "https://bun.sh/install.ps1"
         Refresh-Path
         $bun = Get-CommandPath @("bun.exe", "bun")
         if ($bun) {

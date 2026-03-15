@@ -501,8 +501,32 @@ function Get-OpenClawConfigValue {
         Throw-UserError "pnpm , OpenClaw "
     }
 
-    $output = & $pnpm openclaw config get $Path --json 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    # `openclaw config get` 在 key 不存在时会退出 1 并向 stderr 写提示。
+    # Windows PowerShell 下如果全局 ErrorActionPreference=Stop，
+    # 这类原生命令 stderr 可能被升级成 NativeCommandError，导致脚本提前中断。
+    # 这里临时关闭该行为，并按退出码判断是否只是“路径不存在”。
+    $previousErrorActionPreference = $ErrorActionPreference
+    $hasNativeCommandPreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    if ($hasNativeCommandPreference) {
+        $previousNativeCommandPreference = $PSNativeCommandUseErrorActionPreference
+    }
+
+    try {
+        $ErrorActionPreference = "Continue"
+        if ($hasNativeCommandPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        $output = & $pnpm openclaw config get $Path --json 2>$null
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        if ($hasNativeCommandPreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativeCommandPreference
+        }
+    }
+
+    if ($exitCode -ne 0) {
         return @{ Found = $false; Value = $null }
     }
 
@@ -519,6 +543,8 @@ function Get-OpenClawConfigValue {
 
     return @{ Found = $true; Value = (ConvertTo-PlainData -Value $value) }
 }
+
+
 
 function Set-OpenClawConfigValue {
     param(
