@@ -6,6 +6,7 @@
  */
 
 import type { OpenClawApp } from "./app.ts";
+import { loadMarketExecutions } from "./controllers/market-execution.ts";
 import {
   loadMarketOps,
   loadMarketPrivacy,
@@ -28,7 +29,12 @@ export async function loadMarket(host: LoadHost) {
   if (app.marketError?.includes("市场 API 未就绪")) {
     return;
   }
-  await Promise.allSettled([loadMarketTasks(app), loadMarketPrivacy(app), loadMarketOps(app)]);
+  await Promise.allSettled([
+    loadMarketExecutions(app),
+    loadMarketTasks(app),
+    loadMarketPrivacy(app),
+    loadMarketOps(app),
+  ]);
 }
 
 export async function loadWeb3(host: LoadHost) {

@@ -92,6 +92,36 @@ const TOOL_MAP: Record<string, ToolDisplaySpec> = Object.fromEntries(
   ]),
 );
 TOOL_MAP.slack = SLACK_SPEC;
+TOOL_MAP["web3.market.steward.buy"] = {
+  icon: "shield",
+  title: "Market Steward Buy",
+  label: "Market steward",
+  detailKeys: ["resourceId", "query", "kind"],
+};
+TOOL_MAP["web3.market.execution.status"] = {
+  icon: "fileText",
+  title: "Market Execution Status",
+  label: "Execution summary",
+  detailKeys: ["leaseId", "orderId", "proofId"],
+};
+TOOL_MAP["web3.market.proof.verify"] = {
+  icon: "fileText",
+  title: "Market Proof Verify",
+  label: "Proof verify",
+  detailKeys: ["proofId", "orderId"],
+};
+TOOL_MAP["web3.market.acceptance.sign"] = {
+  icon: "check",
+  title: "Market Acceptance Sign",
+  label: "Accept delivery",
+  detailKeys: ["orderId"],
+};
+TOOL_MAP["web3.market.acceptance.reject"] = {
+  icon: "x",
+  title: "Market Acceptance Reject",
+  label: "Reject delivery",
+  detailKeys: ["orderId"],
+};
 
 function shortenHomeInString(input: string): string {
   if (!input) {

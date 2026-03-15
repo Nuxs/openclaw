@@ -27,6 +27,11 @@ export function renderMarketTab(state: AppViewState) {
     bridgeTransfers: state.marketBridgeTransfers,
     resourceKind: state.marketResourceKind,
     filters: state.marketFilters,
+    executionSection: {
+      loading: state.marketExecutionLoading,
+      error: state.marketExecutionError,
+      executions: state.marketExecutions,
+    },
     taskSection: {
       loading: state.taskLoading,
       error: state.taskError,

@@ -759,6 +759,9 @@ export class OpenClawApp extends LitElement {
   @state() marketTokenEconomy: import("./types.js").TokenEconomyState | null = null;
   @state() marketBridgeRoutes: import("./types.js").BridgeRoutesSnapshot | null = null;
   @state() marketBridgeTransfers: import("./types.js").BridgeTransfer[] = [];
+  @state() marketExecutionLoading = false;
+  @state() marketExecutionError: string | null = null;
+  @state() marketExecutions: import("./types.js").MarketExecutionSummaryView[] = [];
   @state() marketLastSuccess: number | null = null;
   @state() taskLoading = false;
   @state() taskError: string | null = null;

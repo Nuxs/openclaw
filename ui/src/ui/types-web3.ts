@@ -702,3 +702,8 @@ export type GaReadiness = {
   warnCount: number;
   failCount: number;
 };
+
+export type {
+  MarketExecutionSummaryView,
+  MarketExecutionTraceView,
+} from "./types-web3-market-execution.ts";

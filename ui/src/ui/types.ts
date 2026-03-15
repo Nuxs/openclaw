@@ -620,6 +620,8 @@ export type {
   MarketPresetRole,
   MarketPresetVerification,
   MarketDisputeStatusFilter,
+  MarketExecutionSummaryView,
+  MarketExecutionTraceView,
   MarketFilters,
   MarketLeaseMetrics,
   MarketLeaseSort,

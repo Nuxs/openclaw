@@ -24,10 +24,44 @@ describe("market view", () => {
       bridgeTransfers: [],
       resourceKind: "all" as const,
       filters: {
+        resourceSearch: "",
         resourceStatus: "all" as const,
+        resourceSort: "updated_desc" as const,
+        leaseSearch: "",
         leaseStatus: "all" as const,
+        leaseSort: "issued_desc" as const,
+        disputeSearch: "",
         disputeStatus: "all" as const,
+        disputeSort: "opened_desc" as const,
+        ledgerSearch: "",
         ledgerUnit: "all" as const,
+        ledgerSort: "time_desc" as const,
+      },
+      executionSection: {
+        loading: false,
+        executions: [
+          {
+            orderId: "order-1",
+            leaseId: "lease-1",
+            resourceId: "res-1",
+            resourceLabel: "Secure review",
+            providerActorId: "seller-1",
+            buyerId: "buyer-1",
+            executionStatus: "awaiting_acceptance",
+            acceptanceStatus: "acceptance_pending",
+            deliveryStatus: "delivery_ready",
+            proofId: "proof-1",
+            proofStatus: "proof_submitted",
+            proofType: "tlsnotary",
+            settlementStatus: "settlement_locked",
+            settlementAmount: "4",
+            releasedAmount: null,
+            disputeStatus: null,
+            currency: "USDC",
+            lastUpdatedAt: "2026-03-15T00:00:00.000Z",
+            trace: [],
+          },
+        ],
       },
       taskSection: {
         loading: false,
@@ -77,6 +111,8 @@ describe("market view", () => {
     };
 
     // Verify the props structure includes task/privacy/ops section data
+    expect(props.executionSection).toBeTruthy();
+    expect(props.executionSection?.executions[0]?.executionStatus).toBe("awaiting_acceptance");
     expect(props.taskSection).toBeTruthy();
     expect(props.taskSection?.summary?.openTasks).toBe(3);
     expect(props.privacySection).toBeTruthy();

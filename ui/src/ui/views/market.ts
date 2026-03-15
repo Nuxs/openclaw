@@ -25,6 +25,10 @@ import {
   renderReputationCard,
   renderTokenEconomyCard,
 } from "./market-cards.ts";
+import {
+  renderMarketExecutionSection,
+  type MarketExecutionSectionProps,
+} from "./market-execution-section.ts";
 import { renderOpsSection, type OpsSectionProps } from "./market-ops-section.ts";
 import { renderPrivacySection, type PrivacySectionProps } from "./market-privacy-section.ts";
 import { renderIndexOverview, renderMonitorOverview } from "./market-sections.ts";
@@ -50,6 +54,7 @@ type MarketProps = {
   bridgeTransfers: BridgeTransfer[];
   resourceKind: MarketResourceKind | "all";
   filters: MarketFilters;
+  executionSection?: MarketExecutionSectionProps;
   taskSection?: TaskSectionProps;
   privacySection?: PrivacySectionProps;
   opsSection?: OpsSectionProps;
@@ -252,6 +257,8 @@ export function renderMarket(props: MarketProps) {
         </div>
       </div>
     </section>
+
+    ${props.executionSection ? renderMarketExecutionSection(props.executionSection) : nothing}
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
       ${renderIndexOverview({

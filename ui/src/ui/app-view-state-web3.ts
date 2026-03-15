@@ -10,6 +10,7 @@ import type {
   BridgeTransfer,
   ConsentView,
   MarketDispute,
+  MarketExecutionSummaryView,
   MarketFilters,
   MarketLedgerEntry,
   MarketLedgerSummary,
@@ -64,6 +65,9 @@ export type Web3ViewState = {
   marketTokenEconomy: TokenEconomyState | null;
   marketBridgeRoutes: BridgeRoutesSnapshot | null;
   marketBridgeTransfers: BridgeTransfer[];
+  marketExecutionLoading: boolean;
+  marketExecutionError: string | null;
+  marketExecutions: MarketExecutionSummaryView[];
   marketLastSuccess: number | null;
   taskLoading: boolean;
   taskError: string | null;

@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import { icons } from "../icons.ts";
 import { formatToolDetail, resolveToolDisplay } from "../tool-display.ts";
 import type { ToolCard } from "../types/chat-types.ts";
+import { renderMarketToolCardBody } from "../views/market-consent-card.ts";
 import { TOOL_INLINE_THRESHOLD } from "./constants.ts";
 import { extractTextCached } from "./message-extract.ts";
 import { isToolResultMessage } from "./message-normalizer.ts";
@@ -67,6 +68,8 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
       }
     : undefined;
 
+  const customBody = card.kind === "result" ? renderMarketToolCardBody(card) : null;
+  const hasCustomBody = customBody !== null;
   const isShort = hasText && (card.text?.length ?? 0) <= TOOL_INLINE_THRESHOLD;
   const showCollapsed = hasText && !isShort;
   const showInline = hasText && isShort;
@@ -110,6 +113,7 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
             `
           : nothing
       }
+      ${hasCustomBody ? customBody : nothing}
       ${
         showCollapsed
           ? html`<div class="chat-tool-card__preview mono">${getTruncatedPreview(card.text!)}</div>`
