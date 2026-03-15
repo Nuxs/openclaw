@@ -33,6 +33,7 @@
     "src/plugin-sdk/http-body.ts",
     "src/plugin-sdk/http-route.ts",
     "src/plugin-sdk/config-types.ts",
+    "src/plugin-sdk/steward-policy.ts",
     "src/plugin-sdk/acpx.ts",
     "src/plugin-sdk/bluebubbles.ts",
     "src/plugin-sdk/copilot-proxy.ts",

@@ -94,6 +94,7 @@ const pluginSdkEntrypoints = [
   "http-body",
   "http-route",
   "config-types",
+  "steward-policy",
 ] as const;
 
 export default defineConfig([

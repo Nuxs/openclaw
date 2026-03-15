@@ -61,6 +61,7 @@ const pluginSdkSubpaths = [
   "http-body",
   "http-route",
   "config-types",
+  "steward-policy",
 ] as const;
 
 const workspacePackageAliases = [
@@ -119,9 +120,12 @@ export default defineConfig({
       "ui/src/ui/app-chat.test.ts",
       "ui/src/ui/views/agents-utils.test.ts",
       "ui/src/ui/views/chat.test.ts",
+      "ui/src/ui/views/market-consent-card.test.ts",
+      "ui/src/ui/views/market.test.ts",
       "ui/src/ui/views/usage-render-details.test.ts",
       "ui/src/ui/controllers/agents.test.ts",
       "ui/src/ui/controllers/chat.test.ts",
+      "ui/src/ui/controllers/market-execution.test.ts",
     ],
     setupFiles: ["test/setup.ts"],
     exclude: [
