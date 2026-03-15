@@ -76,6 +76,10 @@ export async function verifyMarketPresetBaseline(params: {
     advertiseToMarket: runtimeConfig.resources.advertiseToMarket,
     providerListenEnabled: runtimeConfig.resources.provider.listen.enabled,
     providerBind: runtimeConfig.resources.provider.listen.bind,
+    walletReady: false,
+    paymentReady: false,
+    billingEnabled: runtimeConfig.billing.enabled,
+    autopayEnabled: runtimeConfig.x402.autopay.enabled,
   };
 
   checks.push(
@@ -123,13 +127,56 @@ export async function verifyMarketPresetBaseline(params: {
     );
   }
 
-  const [statusSummary, monitorHealth, indexStats, resources, leases] = await Promise.all([
+  const [
+    statusSummary,
+    monitorHealth,
+    indexStats,
+    resources,
+    leases,
+    walletBalanceCapability,
+    walletAutopayCapability,
+    paymentRequiredCapability,
+  ] = await Promise.all([
     safeGatewayCall("market.status.summary", {}),
     safeGatewayCall("web3.monitor.health", {}),
     safeGatewayCall("web3.index.stats", {}),
     safeGatewayCall("market.resource.list", { limit: 200 }),
     safeGatewayCall("market.lease.list", { limit: 200 }),
+    safeGatewayCall("web3.capabilities.describe", { name: "web3.wallet.balance" }),
+    safeGatewayCall("web3.capabilities.describe", { name: "web3.wallet.autopay" }),
+    safeGatewayCall("web3.capabilities.describe", { name: "web3.billing.handlePaymentRequired" }),
   ]);
+
+  metrics.walletReady = walletBalanceCapability.ok;
+  metrics.paymentReady =
+    runtimeConfig.billing.enabled &&
+    runtimeConfig.x402.autopay.enabled &&
+    walletAutopayCapability.ok &&
+    paymentRequiredCapability.ok;
+
+  checks.push({
+    name: "wallet.readiness",
+    status: metrics.walletReady ? "pass" : mode === "single-node" ? "warn" : "fail",
+    detail: metrics.walletReady
+      ? "`web3.wallet.balance` 能力已注册，可进入钱包实测。"
+      : walletBalanceCapability.error,
+    action: metrics.walletReady
+      ? undefined
+      : "确认 agent-wallet 已启用，并让 `web3.wallet.balance` 保持可用。",
+  });
+
+  checks.push(
+    buildPaymentReadinessCheck({
+      mode,
+      billingEnabled: runtimeConfig.billing.enabled,
+      autopayEnabled: runtimeConfig.x402.autopay.enabled,
+      walletAutopayCapabilityOk: walletAutopayCapability.ok,
+      paymentRequiredCapabilityOk: paymentRequiredCapability.ok,
+      capabilityErrors: [walletAutopayCapability, paymentRequiredCapability]
+        .filter((entry) => !entry.ok)
+        .map((entry) => entry.error),
+    }),
+  );
 
   if (statusSummary.ok) {
     checks.push({
@@ -263,9 +310,13 @@ export async function verifyMarketPresetBaseline(params: {
     summary: `${modeLabel(mode)}：${readiness.passCount} 项通过 / ${readiness.warnCount} 项告警 / ${readiness.failCount} 项失败。`,
     readiness,
     metrics,
-    recommendedActions: checks
-      .filter((check) => check.status !== "pass" && check.action)
-      .map((check) => check.action as string),
+    recommendedActions: [
+      ...new Set(
+        checks
+          .filter((check) => check.status !== "pass" && check.action)
+          .map((check) => check.action as string),
+      ),
+    ],
   };
 }
 
@@ -308,6 +359,9 @@ export function formatMarketPresetVerification(verification: MarketPresetVerific
   lines.push(verification.summary);
   lines.push(
     `资源=${verification.metrics.publishedResources} · 活跃租约=${verification.metrics.activeLeases} · 活跃告警=${verification.metrics.activeAlerts}`,
+  );
+  lines.push(
+    `钱包=${formatReadinessLabel(verification.metrics.walletReady)} · 支付=${formatReadinessLabel(verification.metrics.paymentReady)} · billing=${verification.metrics.billingEnabled ? "on" : "off"} · autopay=${verification.metrics.autopayEnabled ? "on" : "off"}`,
   );
   lines.push("");
   for (const check of verification.readiness.checks) {
@@ -493,4 +547,52 @@ function normalizeHealthStatus(status: unknown, healthy: unknown): "healthy" | "
     return "degraded";
   }
   return "healthy";
+}
+
+function buildPaymentReadinessCheck(params: {
+  mode: MarketPresetMode;
+  billingEnabled: boolean;
+  autopayEnabled: boolean;
+  walletAutopayCapabilityOk: boolean;
+  paymentRequiredCapabilityOk: boolean;
+  capabilityErrors: string[];
+}): MarketPresetCheck {
+  const ready =
+    params.billingEnabled &&
+    params.autopayEnabled &&
+    params.walletAutopayCapabilityOk &&
+    params.paymentRequiredCapabilityOk;
+
+  return {
+    name: "payment.readiness",
+    status: ready ? "pass" : params.mode === "single-node" ? "warn" : "fail",
+    detail: ready
+      ? "billing 与 autopay 门禁已就绪，可进入支付链路演练。"
+      : buildPaymentReadinessDetail(params),
+    action: ready
+      ? undefined
+      : "启用 billing 与 x402.autopay，并确认 `web3.wallet.autopay`、`web3.billing.handlePaymentRequired` 已注册。",
+  };
+}
+
+function buildPaymentReadinessDetail(params: {
+  billingEnabled: boolean;
+  autopayEnabled: boolean;
+  capabilityErrors: string[];
+}): string {
+  const reasons: string[] = [];
+  if (!params.billingEnabled) {
+    reasons.push("billing disabled");
+  }
+  if (!params.autopayEnabled) {
+    reasons.push("x402.autopay disabled");
+  }
+  if (params.capabilityErrors.length > 0) {
+    reasons.push(params.capabilityErrors.join("; "));
+  }
+  return reasons.length > 0 ? reasons.join(" · ") : "支付链路 readiness 未通过。";
+}
+
+function formatReadinessLabel(value: boolean): string {
+  return value ? "就绪" : "待补";
 }

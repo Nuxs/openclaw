@@ -91,6 +91,10 @@ export type MarketPresetVerification = {
     advertiseToMarket: boolean;
     providerListenEnabled: boolean;
     providerBind?: string;
+    walletReady: boolean;
+    paymentReady: boolean;
+    billingEnabled: boolean;
+    autopayEnabled: boolean;
   };
   recommendedActions: string[];
 };
