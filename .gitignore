@@ -115,6 +115,7 @@ apps/ios/LocalSigning.xcconfig
 # private/env/*.env 中包含真实 token/key 时不要提交
 # 如果只是模板（无真实密钥），可以提交
 private/env/*.env.local
+private/windows-dev.local.psd1
 private/assets/*.ico
 private/assets/*.svg
 private/assets/*.png

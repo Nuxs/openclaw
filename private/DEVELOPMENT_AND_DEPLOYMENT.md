@@ -79,6 +79,59 @@
 
 ## 4) 部署
 
+### Windows 原生（PowerShell）
+
+新增入口：`private/scripts/windows-dev.ps1`
+
+适用目标：**Windows 原生开发/调试**，同时保持官方默认 CLI / Gateway / workspace 架构，不改默认路径布局。
+
+前提：**这是一份仓库内脚本**。使用它之前，你需要先把私有仓库 clone 到本地并进入仓库目录；它负责的是 clone 之后的 bootstrap / build / gateway / docker 流程，不负责自动 clone 仓库。
+
+推荐分两阶段使用：
+
+0. **阶段 0：先 clone 仓库**
+   - `git clone <your-private-repo-url>`
+   - `cd openclaw`
+1. **阶段 1：在仓库内执行脚本**
+   - 先 `init-template`（可选但推荐）
+   - 再 `bootstrap`
+
+典型用法：
+
+- 初始化开发环境：
+  - `powershell -File private/scripts/windows-dev.ps1 -Action bootstrap -Environment dev`
+- 安装 Windows 托管启动（官方 `openclaw gateway install`）：
+  - `powershell -File private/scripts/windows-dev.ps1 -Action gateway-install -Environment dev`
+- 在当前终端直接启动 Gateway：
+  - `powershell -File private/scripts/windows-dev.ps1 -Action gateway-run -Environment dev`
+- Docker Compose 部署：
+  - `powershell -File private/scripts/windows-dev.ps1 -Action docker-up -Environment dev`
+- 查看状态：
+  - `powershell -File private/scripts/windows-dev.ps1 -Action status -Environment dev`
+
+模板工作流（推荐给公司内部同事）：
+
+1. 运行 `init-template` 生成 `private/windows-dev.local.psd1`：
+   - `powershell -File private/scripts/windows-dev.ps1 -Action init-template`
+2. 编辑其中的：
+   - `Repository.OriginUrl`：你们私有仓库地址（用于 bootstrap 时校验 origin）。
+   - `Branding.Json`：品牌名、镜像仓库、域名、端口等。
+   - `EnvironmentDefaults.<env>`：本地 `.env.local` 默认值（模型 Key / 镜像 / Web3 常用变量等）。
+   - `OpenClawConfig.Root`：要种入官方 `~/.openclaw/openclaw.json` 的缺省配置。
+3. 再执行 `bootstrap`。脚本会：
+   - 继续复用官方 `pnpm install` / `pnpm build` / `openclaw setup` / `openclaw doctor`；
+   - 只在缺失时补齐 `openclaw.json` 配置，不覆盖开发者已经存在的值；
+   - 默认把 `web3-core` / `market-core` 的启用与基础配置写到官方 `plugins.entries.*` 路径下；
+   - 按需把 `Branding.Json` overlay 到 `private/brand.json`（当 `Branding.ApplyOnBootstrap=true`）。
+
+说明：
+
+- 脚本会优先复用**官方默认命令**：`pnpm install`、`pnpm ui:build`、`pnpm build`、`openclaw setup`、`openclaw doctor`、`openclaw gateway install`。
+- 脚本会按私有化约定创建/加载 `private/env/<env>.env.local`，但**不会**改动官方默认目录布局；若不显式覆盖，state 仍走官方默认 `USERPROFILE/.openclaw` 逻辑。
+- 若存在 `private/windows-dev.local.psd1`（或显式传 `-PresetFile`），脚本会读取公司内模板，把缺失的 env 默认值补进 `.env.local`，并把缺失的 Web3 / Market 缺省配置种到官方 `~/.openclaw/openclaw.json` 的 `plugins.entries.*` 路径下。
+- 脚本**不会**执行 `filter-extensions.sh`，因此会保留官方全部 workspace 包，同时保留私有 Web3 扩展（如 `web3-core` / `market-core`）。
+- Windows 原生入口主要覆盖 `bootstrap` / 本地 Gateway / Docker Compose；`AnyDev`、`bare`、`k8s` 仍继续使用现有 `private/scripts/deploy.sh`。
+
 ### A) AnyDev / 开发机（推荐本地跑通用）
 
 - `bash private/scripts/deploy.sh anydev dev`
