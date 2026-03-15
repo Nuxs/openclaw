@@ -22,7 +22,7 @@ OpenClaw is strongest when positioned as the system that closes the loop between
 
 ### External definition
 
-> OpenClaw is a private AI steward that not only answers and automates, but also discovers, buys, verifies, settles, and audits outside services on the user’s behalf.
+> OpenClaw is a private AI steward that not only answers and automates, but also autonomously discovers, buys, verifies, settles, and audits outside services on your behalf, governed only by your explicit consent.
 
 ### Internal operating definition
 
@@ -102,8 +102,8 @@ Target providers:
 
 Value:
 
-- become discoverable to agents
-- become purchasable by agents
+- become discoverable to agents (not humans)
+- become purchasable by agents via API (not Web dashboards)
 - ship proof-backed delivery
 - get reconciliation, audit, and dispute rails
 

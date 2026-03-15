@@ -105,6 +105,8 @@ Use these defaults unless current repo truth proves otherwise:
 
 Do not violate these rules:
 
+- **Agent as Buyer, Human as Approver (最高智能架构)**: Do not build traditional Web2 "shopping cart" or "marketplace catalog" UIs for humans to manually browse and buy services. The Private Steward (AI) is the buyer. It discovers resources via tool calls (`market.resource.list`), proposes a purchase, and the UI merely renders a **Consent Card** (budget/approval) in the chat stream.
+- **Invisible Delivery (无缝挂载)**: Once a lease is issued and authorized, the system auto-mounts the `accessToken` and capability directly into the Agent's runtime context. Do not force the user to handle tokens or endpoints. The UI is for audit and governance, not manual configuration.
 - Keep `web3.*` as the user/agent/UI public contract
 - Keep `market.*` as the internal authority / authoritative execution layer
 - Keep **Extension = Mechanism, AI = Policy**

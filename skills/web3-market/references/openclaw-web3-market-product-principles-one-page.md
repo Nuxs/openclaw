@@ -8,7 +8,7 @@ We do not sell “the chain.” We do not sell abstract autonomy. We sell **acco
 
 ## One-sentence promise
 
-> **OpenClaw helps users discover, buy, verify, settle, and audit outside digital services through a private steward that keeps execution visible, governed, and accountable.**
+> **OpenClaw is a private steward that discovers, buys, verifies, settles, and audits outside digital services _on your behalf_, keeping execution invisible yet governed and accountable through human-in-the-loop consent.**
 
 ## The one-page rulebook
 
@@ -22,7 +22,12 @@ Lead with the user outcome:
 
 Web3 stays underneath as the trust, settlement, and audit substrate.
 
-### 2. Build observable execution, not invisible orchestration
+### 2. Build Consent UIs, not Shopping Malls
+
+The UI is for **audit and consent**, not discovery and manual checkout.
+
+- **Bad (Web2.5 approach)**: A traditional dashboard where a human browses a catalog, selects a model/service, configures a TTL, and clicks "Buy".
+- **Good (Agent-Driven approach)**: The Agent realizes it needs external capability, discovers it via API, and surfaces an elegant **Consent Card** in the chat stream ("Your steward requests $2.50 to lease advanced code analysis for 24 hours. [Approve] [Reject]").
 
 Important work should be visible as:
 
@@ -82,8 +87,8 @@ A network grows when joining feels lightweight.
 Default packaging should be:
 
 - provider publishing preset
-- buyer consumption preset
-- review-and-approve preset
+- agent execution preset
+- human-in-the-loop consent preset
 - service-specific skill packs
 
 Skills are not only extensions. They are the distribution channel for market-backed execution.
