@@ -201,6 +201,8 @@ export type AuditEventKind =
   | "delivery_revoked"
   | "delivery_completed"
   | "service_proof_submitted"
+  | "acceptance_signed"
+  | "acceptance_rejected"
   | "lease_issued"
   | "lease_revoked"
   | "lease_expired"

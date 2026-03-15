@@ -82,6 +82,11 @@ import {
   createServiceProofSubmitHandler,
   createServiceProofGetHandler,
   createServiceProofListHandler,
+  createProofSubmitHandler,
+  createProofVerifyHandler,
+  createAcceptanceSignHandler,
+  createAcceptanceRejectHandler,
+  createExecutionGetHandler,
   createSettlementLockHandler,
   createSettlementQueryHandler,
   createSettlementRefundHandler,
@@ -270,6 +275,14 @@ const plugin: OpenClawPluginDefinition = {
       "market.service.proof.list",
       createServiceProofListHandler(store, config),
     );
+    api.registerGatewayMethod("market.proof.submit", createProofSubmitHandler(store, config));
+    api.registerGatewayMethod("market.proof.verify", createProofVerifyHandler(store, config));
+    api.registerGatewayMethod("market.acceptance.sign", createAcceptanceSignHandler(store, config));
+    api.registerGatewayMethod(
+      "market.acceptance.reject",
+      createAcceptanceRejectHandler(store, config),
+    );
+    api.registerGatewayMethod("market.execution.get", createExecutionGetHandler(store, config));
 
     api.registerGatewayMethod("market.dispute.open", createDisputeOpenHandler(store, config));
     api.registerGatewayMethod(

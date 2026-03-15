@@ -41,6 +41,9 @@ export {
   createServiceProofGetHandler,
   createServiceProofListHandler,
 } from "./service-proof.js";
+export { createProofSubmitHandler, createProofVerifyHandler } from "./proof.js";
+export { createAcceptanceSignHandler, createAcceptanceRejectHandler } from "./acceptance.js";
+export { createExecutionGetHandler } from "./execution.js";
 export {
   createResourcePublishHandler,
   createResourceUnpublishHandler,
