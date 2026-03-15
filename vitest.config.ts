@@ -126,6 +126,7 @@ export default defineConfig({
       "ui/src/ui/controllers/agents.test.ts",
       "ui/src/ui/controllers/chat.test.ts",
       "ui/src/ui/controllers/market-execution.test.ts",
+      "ui/src/ui/controllers/market-status.test.ts",
     ],
     setupFiles: ["test/setup.ts"],
     exclude: [
