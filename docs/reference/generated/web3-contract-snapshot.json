@@ -8930,6 +8930,7 @@
     },
     {
       "declaredContracts": [
+        "/web3-market",
         "market.settlement.lock",
         "market.settlement.release",
         "market.task.*",
@@ -9028,6 +9029,20 @@
       "normative": true,
       "path": "docs/reference/web3-market-dev.md",
       "title": "Web3 Market Dev (web3-core + market-core)"
+    },
+    {
+      "declaredContracts": [
+        "/web3-market",
+        "web3.index.list",
+        "web3.index.stats",
+        "web3.market.preset.preview",
+        "web3.market.preset.verify",
+        "web3.wallet.balance"
+      ],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/reference/web3-market-go-live-evidence.md",
+      "title": "Web3 Market Go Live Evidence"
     },
     {
       "declaredContracts": [
