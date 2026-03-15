@@ -7,7 +7,7 @@ import type { MarketStateStore } from "../../state/store.js";
 import type { Offer, Order, ServiceProof, Settlement } from "../types.js";
 import { normalizeBuyerId, requireString } from "../validators.js";
 import { assertAccess, formatGatewayErrorResponse, requireActorId } from "./_shared.js";
-import { createServiceProofSubmitHandler } from "./service-proof.js";
+export { createServiceProofSubmitHandler as createProofSubmitHandler } from "./service-proof.js";
 
 function assertReadableByActor(actorId: string | undefined, order: Order, offer: Offer): void {
   if (!actorId) return;
@@ -47,13 +47,6 @@ function resolveProofContext(params: {
   }
   const settlement = store.getSettlementByOrder(order.orderId);
   return { proof, order, offer, settlement: settlement ?? undefined };
-}
-
-export function createProofSubmitHandler(
-  store: MarketStateStore,
-  config: MarketPluginConfig,
-): GatewayRequestHandler {
-  return createServiceProofSubmitHandler(store, config);
 }
 
 export function createProofVerifyHandler(
