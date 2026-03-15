@@ -1,4 +1,4 @@
-@{
+﻿@{
     Repository = @{
         # 期望的私有化仓库 origin remote。bootstrap 时若不一致会给出提醒。
         OriginUrl = "git@github.com:your-org/openclaw-private.git"

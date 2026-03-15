@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("bootstrap", "doctor", "gateway-install", "gateway-run", "gateway-status", "docker-up", "docker-down", "status", "init-template")]
     [string]$Action = "bootstrap",
 

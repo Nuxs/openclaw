@@ -1,4 +1,4 @@
-function ConvertTo-PlainData {
+﻿function ConvertTo-PlainData {
     param([Parameter(Mandatory = $true)]$Value)
 
     if ($null -eq $Value) {
