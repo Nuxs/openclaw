@@ -470,8 +470,9 @@ function Get-ConfiguredOpenClawConfigPath {
 function Ensure-OpenClawSetup {
     $workspaceDir = Get-ConfiguredWorkspaceDir
     Write-Step " openclaw "
-    Invoke-Pnpm -Arguments @("openclaw", "setup", "--workspace", $workspaceDir)
+    Invoke-OpenClawCli -Arguments @("setup", "--workspace", $workspaceDir)
 }
+
 
 function Escape-OpenClawConfigPathSegment {
     param([string]$Segment)
@@ -496,10 +497,12 @@ function Join-OpenClawConfigPath {
 function Get-OpenClawConfigValue {
     param([string]$Path)
 
-    $pnpm = Resolve-PnpmCommand
-    if (-not $pnpm) {
-        Throw-UserError "pnpm , OpenClaw "
+    $node = Get-NodeCommand
+    if (-not $node) {
+        Throw-UserError "Node.js , OpenClaw "
     }
+
+    $runner = Join-Path $script:RepoRoot "scripts\run-node.mjs"
 
     # `openclaw config get` 在 key 不存在时会退出 1 并向 stderr 写提示。
     # Windows PowerShell 下如果全局 ErrorActionPreference=Stop，
@@ -517,9 +520,10 @@ function Get-OpenClawConfigValue {
             $PSNativeCommandUseErrorActionPreference = $false
         }
 
-        $output = & $pnpm openclaw config get $Path --json 2>$null
+        $output = & $node $runner config get $Path --json 2>$null
         $exitCode = $LASTEXITCODE
     } finally {
+
         $ErrorActionPreference = $previousErrorActionPreference
         if ($hasNativeCommandPreference) {
             $PSNativeCommandUseErrorActionPreference = $previousNativeCommandPreference
@@ -553,8 +557,9 @@ function Set-OpenClawConfigValue {
     )
 
     $json = ConvertTo-PlainData -Value $Value | ConvertTo-Json -Depth 100 -Compress
-    Invoke-Pnpm -Arguments @("openclaw", "config", "set", $Path, $json, "--strict-json")
+    Invoke-OpenClawCli -Arguments @("config", "set", $Path, $json, "--strict-json")
 }
+
 
 function Seed-OpenClawConfigPath {
     param(
@@ -607,6 +612,7 @@ function Ensure-OpenClawConfigFromPreset {
         Seed-OpenClawConfigPath -Path (Escape-OpenClawConfigPathSegment -Segment $key) -Value $plainRoot[$key]
     }
 
-    Invoke-Pnpm -Arguments @("openclaw", "config", "validate")
+    Invoke-OpenClawCli -Arguments @("config", "validate")
+
     Write-Ok " openclaw.json "
 }

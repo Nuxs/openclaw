@@ -397,7 +397,30 @@ function Invoke-Pnpm {
     Invoke-Native -FilePath $pnpm -Arguments $Arguments
 }
 
+function Get-NodeCommand {
+    return Get-CommandPath @("node.exe", "node")
+}
+
+function Invoke-OpenClawCli {
+    param([string[]]$Arguments)
+
+    $node = Get-NodeCommand
+    if (-not $node) {
+        Throw-UserError "Node.js , bootstrap"
+    }
+
+    $runner = Join-Path $script:RepoRoot "scripts\run-node.mjs"
+    if (-not (Test-Path $runner)) {
+        Throw-UserError " OpenClaw CLI :$runner"
+    }
+
+    # Windows 下经由 pnpm.cmd 传递 JSON 参数容易被 cmd/PowerShell 重写引号，
+    # 这里直接调用 Node runner，保留参数原样传递给官方 CLI。
+    Invoke-Native -FilePath $node -Arguments (@($runner) + $Arguments)
+}
+
 function Ensure-RepoRoot {
+
     if (-not (Test-Path (Join-Path $script:RepoRoot "package.json"))) {
         Throw-UserError " OpenClaw "
     }
@@ -469,8 +492,9 @@ function Bootstrap-WindowsDev {
 
     if (-not $SkipDoctor) {
         Write-Step "Run upstream diagnostics"
-        Invoke-Pnpm -Arguments @("openclaw", "doctor")
+        Invoke-OpenClawCli -Arguments @("doctor")
     }
+
 
     if ($GatewayService) {
         Install-GatewayService
@@ -495,8 +519,9 @@ function Install-GatewayService {
 
     Write-Step "/ Windows  Gateway "
     Write-Info " CLI:openclaw gateway install"
-    Invoke-Pnpm -Arguments @("openclaw", "gateway", "install")
+    Invoke-OpenClawCli -Arguments @("gateway", "install")
     Write-Ok "Gateway "
+
 }
 
 function Run-Gateway {
@@ -506,7 +531,7 @@ function Run-Gateway {
 
     Write-Step " PowerShell  Gateway"
     Write-Info " CLI:openclaw gateway run"
-    Invoke-Pnpm -Arguments @("openclaw", "gateway", "run")
+    Invoke-OpenClawCli -Arguments @("gateway", "run")
 }
 
 function Show-GatewayStatus {
@@ -514,7 +539,8 @@ function Show-GatewayStatus {
     Import-PrivateEnv -EnvName $Environment
 
     Write-Step " Gateway "
-    Invoke-Pnpm -Arguments @("openclaw", "gateway", "status", "--json")
+    Invoke-OpenClawCli -Arguments @("gateway", "status", "--json")
+
 }
 
 function Run-Doctor {
@@ -523,7 +549,8 @@ function Run-Doctor {
     Ensure-OfficialConfigAndPreset
 
     Write-Step ""
-    Invoke-Pnpm -Arguments @("openclaw", "doctor")
+    Invoke-OpenClawCli -Arguments @("doctor")
+
 }
 
 function Ensure-Docker {
