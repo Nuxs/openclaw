@@ -77,10 +77,20 @@ export type BillingConfig = {
 
 export type X402AutopayConfig = {
   enabled: boolean;
+  enforceCooldown: boolean;
+};
+
+export type X402FxQuoteConfig = {
+  enabled: boolean;
+  source: string;
+  settlementAsset: string;
+  defaultTtlMs: number;
+  manualRates?: Record<string, string>;
 };
 
 export type X402Config = {
   autopay: X402AutopayConfig;
+  fxQuote: X402FxQuoteConfig;
 };
 
 // ---------------------------------------------------------------------------
@@ -293,6 +303,14 @@ export const DEFAULT_CONFIG: Web3PluginConfig = {
   x402: {
     autopay: {
       enabled: true,
+      enforceCooldown: true,
+    },
+    fxQuote: {
+      enabled: true,
+      source: "manual",
+      settlementAsset: "USD",
+      defaultTtlMs: 5 * 60_000,
+      manualRates: {},
     },
   },
   brain: {
@@ -364,7 +382,20 @@ export function resolveConfig(raw?: Record<string, unknown>): Web3PluginConfig {
     privacy: merge(DEFAULT_CONFIG.privacy, raw.privacy),
     identity: merge(DEFAULT_CONFIG.identity, raw.identity),
     billing: merge(DEFAULT_CONFIG.billing, raw.billing),
-    x402: merge(DEFAULT_CONFIG.x402, raw.x402),
+    x402: {
+      autopay: merge(
+        DEFAULT_CONFIG.x402.autopay,
+        raw.x402 && typeof raw.x402 === "object"
+          ? (raw.x402 as Record<string, unknown>).autopay
+          : undefined,
+      ),
+      fxQuote: merge(
+        DEFAULT_CONFIG.x402.fxQuote,
+        raw.x402 && typeof raw.x402 === "object"
+          ? (raw.x402 as Record<string, unknown>).fxQuote
+          : undefined,
+      ),
+    },
     brain: merge(DEFAULT_CONFIG.brain, raw.brain),
     resources: merge(DEFAULT_CONFIG.resources, raw.resources),
     browserIngest: merge(DEFAULT_CONFIG.browserIngest, raw.browserIngest),

@@ -47,6 +47,12 @@ type HeadlessWallet = {
   provider: ContractProvider;
 };
 
+type TonTransaction = {
+  hash(): Buffer;
+  lt: bigint;
+  inMessage?: { hash(): Buffer };
+};
+
 export class TONProvider implements IProviderTON {
   readonly chainType: "ton" = "ton";
   readonly chainId: ChainId;
@@ -75,6 +81,7 @@ export class TONProvider implements IProviderTON {
   private connectedWallet?: Wallet;
   private config: TONProviderConfig;
   private eventListeners = new Map<string, Set<EventCallback>>();
+  private lastSeenTransactionLt = new Map<string, bigint>();
   private pollingInterval?: NodeJS.Timeout;
 
   constructor(options: TONProviderOptions = {}) {
@@ -124,6 +131,56 @@ export class TONProvider implements IProviderTON {
         this.client = new TonClient({ endpoint, apiKey: config.apiKey });
         this.config = { ...this.config, rpcUrl: endpoint };
       }
+    }
+  }
+
+  private async listRecentTransactions(address: Address, limit = 20): Promise<TonTransaction[]> {
+    return (
+      (
+        this.client as unknown as {
+          getTransactions(addr: typeof address, opts: { limit: number }): Promise<TonTransaction[]>;
+        }
+      ).getTransactions(address, { limit }) ?? []
+    );
+  }
+
+  private deriveTransactionCandidates(txHash: string): Set<string> {
+    const candidates = new Set<string>();
+    const trimmed = txHash.trim();
+    if (trimmed.length > 0) {
+      candidates.add(trimmed);
+    }
+    try {
+      const cell = decodeBocBase64ToCell(trimmed);
+      candidates.add(cell.hash().toString("hex"));
+      candidates.add(cell.hash().toString("base64"));
+    } catch {
+      // Not a base64 BOC identifier; keep exact-match candidates only.
+    }
+    return candidates;
+  }
+
+  private buildReceiptFromTransaction(tx: TonTransaction, from: string): TxReceipt {
+    return {
+      status: "success",
+      blockNumber: Number(tx.lt),
+      txHash: tx.hash().toString("hex"),
+      from,
+      logs: [],
+    };
+  }
+
+  private async primeEventCursor(contract: string): Promise<void> {
+    if (this.lastSeenTransactionLt.has(contract)) {
+      return;
+    }
+    try {
+      const latest = (await this.listRecentTransactions(Address.parse(contract), 1))[0];
+      if (latest) {
+        this.lastSeenTransactionLt.set(contract, latest.lt);
+      }
+    } catch (err) {
+      console.error(`TON event cursor prime failed for ${contract}:`, err);
     }
   }
 
@@ -192,6 +249,7 @@ export class TONProvider implements IProviderTON {
       this.pollingInterval = undefined;
     }
     this.eventListeners.clear();
+    this.lastSeenTransactionLt.clear();
 
     if (this.tonConnect) {
       await this.tonConnect.disconnect();
@@ -289,6 +347,7 @@ export class TONProvider implements IProviderTON {
     }
 
     this.eventListeners.get(key)!.add(callback);
+    await this.primeEventCursor(contract);
 
     if (!this.pollingInterval) {
       this.startEventPolling();
@@ -298,6 +357,9 @@ export class TONProvider implements IProviderTON {
       this.eventListeners.get(key)?.delete(callback);
       if (this.eventListeners.get(key)?.size === 0) {
         this.eventListeners.delete(key);
+      }
+      if (![...this.eventListeners.keys()].some((entry) => entry.startsWith(`${contract}:`))) {
+        this.lastSeenTransactionLt.delete(contract);
       }
 
       if (this.eventListeners.size === 0 && this.pollingInterval) {
@@ -325,17 +387,69 @@ export class TONProvider implements IProviderTON {
   }
 
   private async checkNewTransactions(): Promise<void> {
-    // TODO: implement if/when required.
+    const watchedContracts = new Set(
+      [...this.eventListeners.keys()].map((key) => key.slice(0, key.indexOf(":"))),
+    );
+
+    for (const contract of watchedContracts) {
+      if (!contract) {
+        continue;
+      }
+      const address = Address.parse(contract);
+      const previousLt = this.lastSeenTransactionLt.get(contract) ?? 0n;
+      const transactions = await this.listRecentTransactions(address, 20);
+      const fresh = transactions
+        .filter((tx) => tx.lt > previousLt)
+        .sort((left, right) => (left.lt < right.lt ? -1 : left.lt > right.lt ? 1 : 0));
+      if (fresh.length === 0) {
+        continue;
+      }
+
+      let maxLt = previousLt;
+      for (const tx of fresh) {
+        if (tx.lt > maxLt) {
+          maxLt = tx.lt;
+        }
+        const receipt = this.buildReceiptFromTransaction(tx, contract);
+        const messageHash = tx.inMessage?.hash().toString("hex");
+        for (const [key, listeners] of this.eventListeners.entries()) {
+          if (!key.startsWith(`${contract}:`)) {
+            continue;
+          }
+          const eventName = key.slice(contract.length + 1);
+          for (const listener of listeners) {
+            listener({
+              contract,
+              eventName,
+              txHash: receipt.txHash,
+              lt: tx.lt.toString(),
+              messageHash,
+              receipt,
+            });
+          }
+        }
+      }
+
+      this.lastSeenTransactionLt.set(contract, maxLt);
+    }
   }
 
   async waitForTransaction(txHash: TxHash, confirmations = 1): Promise<TxReceipt> {
     let attempts = 0;
+    let firstSeenBlock: number | undefined;
     const maxAttempts = 60;
 
     while (attempts < maxAttempts) {
       const receipt = await this.getTransactionReceipt(txHash);
       if (receipt) {
-        return receipt;
+        if (confirmations <= 1) {
+          return receipt;
+        }
+        const currentBlock = await this.getBlockNumber();
+        firstSeenBlock ??= currentBlock;
+        if (currentBlock >= firstSeenBlock + confirmations - 1) {
+          return receipt;
+        }
       }
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -353,49 +467,18 @@ export class TONProvider implements IProviderTON {
   async getTransactionReceipt(txHash: string): Promise<TxReceipt | undefined> {
     if (!this.connectedWallet) return undefined;
     const address = Address.parse(this.connectedWallet.address);
+    const candidates = this.deriveTransactionCandidates(txHash);
 
     try {
-      // Searching for transaction with specific hash or message hash.
-      // NOTE: For external BOCs returned by transfer(), we might need to search by message hash.
-      // SAFETY: TonClient exposes getTransactions at runtime but @ton/ton typings
-      // do not declare it on the public interface; targeted cast avoids full `as any`.
-      const txs = await (
-        this.client as unknown as {
-          getTransactions(
-            addr: typeof address,
-            opts: { limit: number },
-          ): Promise<
-            Array<{
-              hash(): Buffer;
-              lt: bigint;
-              inMessage?: { hash(): Buffer };
-            }>
-          >;
-        }
-      ).getTransactions(address, { limit: 20 });
+      const txs = await this.listRecentTransactions(address, 20);
       for (const tx of txs) {
-        // Match by tx hash
-        if (tx.hash().toString("base64") === txHash || tx.hash().toString("hex") === txHash) {
-          return {
-            status: "success",
-            blockNumber: Number(tx.lt),
-            txHash: tx.hash().toString("hex"),
-            from: this.connectedWallet.address,
-            logs: [],
-          };
-        }
-        // Match by message hash (if txHash is actually a msg hash or BOC hash)
         if (
-          tx.inMessage?.hash().toString("base64") === txHash ||
-          tx.inMessage?.hash().toString("hex") === txHash
+          candidates.has(tx.hash().toString("base64")) ||
+          candidates.has(tx.hash().toString("hex")) ||
+          candidates.has(tx.inMessage?.hash().toString("base64") ?? "") ||
+          candidates.has(tx.inMessage?.hash().toString("hex") ?? "")
         ) {
-          return {
-            status: "success",
-            blockNumber: Number(tx.lt),
-            txHash: tx.hash().toString("hex"),
-            from: this.connectedWallet.address,
-            logs: [],
-          };
+          return this.buildReceiptFromTransaction(tx, this.connectedWallet.address);
         }
       }
     } catch (err) {

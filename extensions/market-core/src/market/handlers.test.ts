@@ -342,6 +342,15 @@ describe("market-core handlers", () => {
       status: "settlement_locked",
       amount: "10",
       lockTxHash: "0xlock",
+      paymentChain: "ton",
+      paymentNetwork: "ton-mainnet",
+      paymentIntentId: "intent-1",
+      paymentReceiptId: "receipt-1",
+      paymentTxHash: "0xpayment",
+      paymentConfirmedAt: "2026-03-16T00:00:00.000Z",
+      confirmationStatus: "confirmed",
+      fxQuoteId: "quote-1",
+      treasuryRouteId: "route-1",
     });
 
     const handler = createSettlementStatusHandler(store, config);
@@ -357,6 +366,15 @@ describe("market-core handlers", () => {
     expect(result()?.payload.settlementId).toBe("settlement-1");
     expect(result()?.payload.status).toBe("settlement_locked");
     expect(result()?.payload.lockTxHash).toBe("0xlock");
+    expect(result()?.payload.paymentChain).toBe("ton");
+    expect(result()?.payload.paymentNetwork).toBe("ton-mainnet");
+    expect(result()?.payload.paymentIntentId).toBe("intent-1");
+    expect(result()?.payload.paymentReceiptId).toBe("receipt-1");
+    expect(result()?.payload.paymentTxHash).toBe("0xpayment");
+    expect(result()?.payload.paymentConfirmedAt).toBe("2026-03-16T00:00:00.000Z");
+    expect(result()?.payload.confirmationStatus).toBe("confirmed");
+    expect(result()?.payload.fxQuoteId).toBe("quote-1");
+    expect(result()?.payload.treasuryRouteId).toBe("route-1");
   });
 
   it("lists active orders and queries settlement aggregates", async () => {

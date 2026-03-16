@@ -123,7 +123,19 @@ export class BillingStore {
         paymentReceiptId: record.resumeToken.paymentReceiptId,
         txHash: record.resumeToken.txHash,
         toolName: record.toolName,
+        chain: record.resumeToken.chain,
+        network: record.network ?? record.resumeToken.network,
+        amount: record.amount,
+        status: record.status,
+        reused: record.reused,
+        orderId: record.settlement?.orderId,
+        settlementId: record.settlement?.settlementId,
+        confirmationStatus: record.confirmationStatus,
+        intentId: record.resumeToken.intentId,
+        fxQuoteId: record.fxQuote?.quoteId,
+        treasuryRouteId: record.treasuryRoute?.routeId,
         createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
       }));
   }
 

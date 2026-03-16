@@ -414,13 +414,18 @@ const plugin: OpenClawPluginDefinition = {
 
 export default plugin;
 
+export { resolveTreasuryRoute } from "./market/treasury-router.js";
+
 // Re-export dual-stack payment types for cross-plugin consumption (e.g. web3-core)
 export type {
   PaymentChain,
-  PaymentMode,
+  PaymentConfirmationStatus,
   PaymentIntent,
+  PaymentMode,
+  PaymentRail,
   PaymentReceipt,
   FXQuote,
   PayoutPreference,
   ReconciliationSummary,
+  TreasuryRoute,
 } from "./market/types.js";

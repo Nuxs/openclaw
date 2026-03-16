@@ -3,6 +3,13 @@
  * gate tool calls when quota is exhausted.
  */
 
+import type {
+  FXQuote,
+  PaymentConfirmationStatus,
+  PaymentIntent,
+  TreasuryRoute,
+} from "@openclaw/market-core";
+
 export type UsageRecord = {
   /** Hashed session id */
   sessionIdHash: string;
@@ -37,6 +44,20 @@ export type BillingCheckResult = {
   reason?: string;
 };
 
+export type PaymentOrchestrationStatus =
+  | "authorized"
+  | "settlement_pending"
+  | "settlement_submitted"
+  | "consumed"
+  | "failed";
+
+export type PaymentSettlementContext = {
+  orderId?: string;
+  settlementId?: string;
+  payer?: string;
+  actorId?: string;
+};
+
 export type PaymentRequiredInvoice = {
   invoiceId: string;
   provider: string;
@@ -47,6 +68,12 @@ export type PaymentRequiredInvoice = {
   nonce: string;
   expiresAt: string;
   idempotencyKey?: string;
+  network?: string;
+  requestId?: string;
+  tool?: string;
+  settlement?: PaymentSettlementContext;
+  quote?: FXQuote;
+  metadata?: Record<string, unknown>;
 };
 
 export type PaymentResumeToken = {
@@ -59,6 +86,15 @@ export type PaymentResumeToken = {
   tokenVersion?: 1 | 2;
   nonce?: string;
   signature?: string;
+  network?: string;
+  asset?: string;
+  amount?: string;
+  payTo?: string;
+  payer?: string;
+  orderId?: string;
+  settlementId?: string;
+  quoteId?: string;
+  intentId?: string;
 };
 
 export type BillingPaymentReceipt = {
@@ -70,6 +106,13 @@ export type BillingPaymentReceipt = {
   tokenAddress?: string;
   confirmedAt: string;
   mode: "live" | "simulated";
+  confirmationStatus?: PaymentConfirmationStatus;
+  payer?: string;
+  payTo?: string;
+  orderId?: string;
+  settlementId?: string;
+  intentId?: string;
+  treasuryRouteId?: string;
 };
 
 export type PaymentTraceRef = {
@@ -79,5 +122,26 @@ export type PaymentTraceRef = {
   paymentReceiptId: string;
   txHash?: string;
   toolName?: string;
+  chain?: "evm" | "ton";
+  network?: string;
+  amount?: string;
+  status?: PaymentOrchestrationStatus;
+  reused?: boolean;
+  orderId?: string;
+  settlementId?: string;
+  confirmationStatus?: PaymentConfirmationStatus;
+  intentId?: string;
+  fxQuoteId?: string;
+  treasuryRouteId?: string;
   createdAt: string;
+  updatedAt?: string;
+};
+
+export type PaymentOrchestrationRecord = {
+  status: PaymentOrchestrationStatus;
+  reused: boolean;
+  paymentIntent?: PaymentIntent;
+  fxQuote?: FXQuote;
+  treasuryRoute?: TreasuryRoute;
+  settlement?: PaymentSettlementContext;
 };

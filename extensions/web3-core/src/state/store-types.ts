@@ -6,8 +6,18 @@
  * from the main `store.ts` barrel to preserve backward compatibility.
  */
 
+import type {
+  FXQuote,
+  PaymentConfirmationStatus,
+  PaymentIntent,
+  TreasuryRoute,
+} from "@openclaw/market-core";
 import type { AuditEvent } from "../audit/types.js";
-import type { PaymentResumeToken } from "../billing/types.js";
+import type {
+  PaymentOrchestrationStatus,
+  PaymentResumeToken,
+  PaymentSettlementContext,
+} from "../billing/types.js";
 
 export type PendingAnchor = {
   anchorId: string;
@@ -31,6 +41,14 @@ export type PendingSettlement = {
   payer?: string;
   amount?: string;
   actorId?: string;
+  paymentIntent?: PaymentIntent;
+  paymentReceiptId?: string;
+  paymentChain?: "evm" | "ton";
+  paymentNetwork?: string;
+  paymentTxHash?: string;
+  confirmationStatus?: PaymentConfirmationStatus;
+  fxQuote?: FXQuote;
+  treasuryRoute?: TreasuryRoute;
   attempts?: number;
   lastError?: string;
 };
@@ -42,10 +60,23 @@ export type PaymentRequiredRecord = {
   invoiceHash: string;
   resumeToken: PaymentResumeToken;
   createdAt: string;
+  updatedAt?: string;
   maxRetries?: number;
   consumedAt?: string;
   /** Network identifier from the wallet response (e.g. "base", "ton-testnet"). */
   network?: string;
+  amount?: string;
+  asset?: string;
+  provider?: string;
+  payTo?: string;
+  status?: PaymentOrchestrationStatus;
+  reused?: boolean;
+  confirmationStatus?: PaymentConfirmationStatus;
+  paymentIntent?: PaymentIntent;
+  settlement?: PaymentSettlementContext;
+  fxQuote?: FXQuote;
+  treasuryRoute?: TreasuryRoute;
+  lastError?: string;
 };
 
 export type X402AutopayStats = {
