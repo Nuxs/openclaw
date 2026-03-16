@@ -116,7 +116,40 @@ describe("flushPendingSettlements", () => {
   it("clears entry from queue on successful settlement lock", async () => {
     const store = makeStore();
     const config = resolveConfig({ billing: { enabled: true } });
-    store.savePendingSettlements([readyEntry()]);
+    store.savePendingSettlements([
+      readyEntry({
+        paymentReceiptId: "receipt-1",
+        paymentChain: "ton",
+        paymentNetwork: "ton-mainnet",
+        paymentTxHash: "0xpayment-1",
+        confirmationStatus: "confirmed",
+        paymentIntent: {
+          intentId: "intent-1",
+          chain: "ton",
+          asset: "USDT",
+          amount: "100",
+          currency: "USD",
+          requestId: "request-1",
+          createdAt: "2026-03-16T00:00:00.000Z",
+        },
+        fxQuote: {
+          quoteId: "quote-1",
+          fromAsset: "USDT",
+          toAsset: "USD",
+          rate: "1",
+          source: "manual",
+          expiresAt: "2026-03-16T01:00:00.000Z",
+        },
+        treasuryRoute: {
+          routeId: "route-1",
+          sourceChain: "ton",
+          settlementChain: "evm",
+          sourceAsset: "USDT",
+          settlementAsset: "USDC",
+          strategy: "bridge",
+        },
+      }),
+    ]);
     callGatewayMock.mockResolvedValue({ ok: true });
 
     await flushPendingSettlements(store, config);
@@ -129,6 +162,15 @@ describe("flushPendingSettlements", () => {
           orderId: "order-1",
           amount: "100",
           payer: "0xpayer",
+          paymentReceiptId: "receipt-1",
+          paymentChain: "ton",
+          paymentNetwork: "ton-mainnet",
+          paymentTxHash: "0xpayment-1",
+          confirmationStatus: "confirmed",
+          requestId: "request-1",
+          paymentIntent: expect.objectContaining({ intentId: "intent-1", chain: "ton" }),
+          fxQuote: expect.objectContaining({ quoteId: "quote-1" }),
+          treasuryRoute: expect.objectContaining({ routeId: "route-1" }),
         }),
       }),
     );
