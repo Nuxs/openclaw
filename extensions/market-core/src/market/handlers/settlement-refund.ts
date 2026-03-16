@@ -33,7 +33,7 @@ import {
   recordAuditWithAnchor,
   requireActorId,
 } from "./_shared.js";
-import { getSettlementRevision } from "./settlement-shared.js";
+import { copySettlementPaymentContext, getSettlementRevision } from "./settlement-shared.js";
 
 export function createSettlementRefundHandler(
   store: MarketStateStore,
@@ -106,6 +106,7 @@ export function createSettlementRefundHandler(
           if (config.settlement.mode === "contract") {
             const escrow = createEscrowAdapter(config.chain, config.settlement);
             txHash = await escrow.refund(order.orderHash, payerAddress, { idempotencyKey });
+            operation = txHash ? { ...operation, txHash } : operation;
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -135,6 +136,7 @@ export function createSettlementRefundHandler(
             const settlementPayload: Record<string, unknown> = { orderId, payer, txHash };
             if (reason) settlementPayload.reason = reason;
             const settlementHash = hashCanonical(settlementPayload);
+            const paymentContext = copySettlementPaymentContext(existingSettlement);
             const settlement: Settlement = {
               settlementId,
               orderId,
@@ -148,6 +150,7 @@ export function createSettlementRefundHandler(
               refundedAt: nowIso(),
               refundReason: reason,
               refundTxHash: txHash,
+              ...paymentContext,
               settlementHash,
               revision: getSettlementRevision(existingSettlement) + 1,
               updatedAt: nowIso(),

@@ -22,7 +22,7 @@ import {
   markOperationSucceeded,
 } from "../settlement/operation-repository.js";
 import { assertOrderTransition } from "../state-machine.js";
-import type { Settlement } from "../types.js";
+import type { Settlement, SettlementOperation } from "../types.js";
 import { normalizeBuyerId, requireString } from "../validators.js";
 import {
   assertAccess,
@@ -33,7 +33,12 @@ import {
   recordAudit,
   requireActorId,
 } from "./_shared.js";
-import { getSettlementRevision, normalizeSettlementStrategy } from "./settlement-shared.js";
+import {
+  getSettlementRevision,
+  isFinalPaymentConfirmationStatus,
+  normalizeSettlementStrategy,
+  readSettlementPaymentContext,
+} from "./settlement-shared.js";
 
 export function createSettlementLockHandler(
   store: MarketStateStore,
@@ -53,6 +58,11 @@ export function createSettlementLockHandler(
         typeof input.idempotencyKey === "string" && input.idempotencyKey.trim().length > 0
           ? input.idempotencyKey.trim()
           : `lock:${orderId}:${payer}:${amount}`;
+      const requestId =
+        typeof input.requestId === "string" && input.requestId.trim().length > 0
+          ? input.requestId.trim()
+          : undefined;
+      const paymentContext = readSettlementPaymentContext(input);
 
       // Per-orderId mutex prevents duplicate lock attempts.
       await withSettlementLock(orderId, async () => {
@@ -91,14 +101,27 @@ export function createSettlementLockHandler(
           throw new Error("E_CONFLICT: SETTLEMENT_OPERATION_IN_PROGRESS");
         }
 
-        let operation = buildSettlementOperation({
-          orderId,
-          settlementId: existingSettlement?.settlementId,
-          kind: "lock",
-          idempotencyKey,
-          payload: { payer, amount, sellerId: offer.sellerId, strategy },
-          maxAttempts: Math.max(1, (config.settlement.maxRetries ?? 2) + 1),
-        });
+        let operation: SettlementOperation = {
+          ...buildSettlementOperation({
+            orderId,
+            settlementId: existingSettlement?.settlementId,
+            kind: "lock",
+            idempotencyKey,
+            payload: {
+              payer,
+              amount,
+              sellerId: offer.sellerId,
+              strategy,
+              paymentIntentId: paymentContext.paymentIntentId,
+              paymentReceiptId: paymentContext.paymentReceiptId,
+              paymentChain: paymentContext.paymentChain,
+              paymentNetwork: paymentContext.paymentNetwork,
+            },
+            maxAttempts: Math.max(1, (config.settlement.maxRetries ?? 2) + 1),
+          }),
+          requestId,
+          confirmationStatus: paymentContext.confirmationStatus,
+        };
         store.saveSettlementOperation(operation);
 
         let txHash: string | undefined;
@@ -109,6 +132,7 @@ export function createSettlementLockHandler(
             txHash = await escrow.lock(order.orderHash, payer, amount, offer.sellerId, {
               idempotencyKey,
             });
+            operation = txHash ? { ...operation, txHash } : operation;
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -117,6 +141,15 @@ export function createSettlementLockHandler(
         }
 
         const settlementId = existingSettlement?.settlementId ?? randomUUID();
+        const nextPaymentContext = {
+          ...paymentContext,
+        };
+        if (
+          !nextPaymentContext.paymentConfirmedAt &&
+          isFinalPaymentConfirmationStatus(nextPaymentContext.confirmationStatus)
+        ) {
+          nextPaymentContext.paymentConfirmedAt = nowIso();
+        }
 
         // Optimistic re-validation + atomic write inside transaction.
         try {
@@ -144,6 +177,7 @@ export function createSettlementLockHandler(
               tokenAddress: config.settlement.tokenAddress,
               lockedAt: nowIso(),
               lockTxHash: txHash,
+              ...nextPaymentContext,
               revision: getSettlementRevision(existingSettlement) + 1,
               updatedAt: nowIso(),
             };
@@ -161,6 +195,11 @@ export function createSettlementLockHandler(
           amount,
           strategy,
           txHash,
+          requestId,
+          paymentIntentId: committedSettlement.paymentIntentId,
+          paymentReceiptId: committedSettlement.paymentReceiptId,
+          paymentChain: committedSettlement.paymentChain,
+          confirmationStatus: committedSettlement.confirmationStatus,
         });
 
         const responsePayload = {
@@ -170,6 +209,15 @@ export function createSettlementLockHandler(
           settlementId: committedSettlement.settlementId,
           strategy,
           releasedAmount: committedSettlement.releasedAmount,
+          paymentChain: committedSettlement.paymentChain,
+          paymentNetwork: committedSettlement.paymentNetwork,
+          paymentIntentId: committedSettlement.paymentIntentId,
+          paymentReceiptId: committedSettlement.paymentReceiptId,
+          paymentTxHash: committedSettlement.paymentTxHash,
+          paymentConfirmedAt: committedSettlement.paymentConfirmedAt,
+          confirmationStatus: committedSettlement.confirmationStatus,
+          fxQuoteId: committedSettlement.fxQuoteId,
+          treasuryRouteId: committedSettlement.treasuryRouteId,
         };
         markOperationSucceeded(store, operation, responsePayload, txHash);
 

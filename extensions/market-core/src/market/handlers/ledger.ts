@@ -179,6 +179,7 @@ export function createLedgerAppendHandler(
               orderId: lease.orderId,
               actorId,
               releaseAmount: amountToRelease.toString(),
+              idempotencyKey: `ledger:${entry.ledgerId}`,
               payees: [{ address: lease.providerActorId, amount: amountToRelease.toString() }],
             });
             settlementRelease = {

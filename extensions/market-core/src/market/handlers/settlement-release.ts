@@ -37,6 +37,7 @@ import {
 import {
   buildReleaseOperationKey,
   buildReleaseResultFromOperation,
+  copySettlementPaymentContext,
   getReleasedAmount,
   getSettlementRevision,
   normalizeSettlementStrategy,
@@ -152,6 +153,7 @@ export async function releaseSettlementIncremental(params: {
       payload: {
         payees,
         releaseAmount: targetReleaseAmount.toString(),
+        expectedReleased: updatedReleased.toString(),
         actorId,
         priorReleased: priorReleased.toString(),
       },
@@ -204,6 +206,7 @@ export async function releaseSettlementIncremental(params: {
           releasedAmount: updatedReleased.toString(),
           txHash,
         });
+        const paymentContext = copySettlementPaymentContext(existingSettlement);
         const settlement: Settlement = {
           settlementId: existingSettlement.settlementId,
           orderId,
@@ -216,6 +219,7 @@ export async function releaseSettlementIncremental(params: {
           lockTxHash: existingSettlement.lockTxHash,
           releasedAt: completed ? nowIso() : existingSettlement.releasedAt,
           releaseTxHash: txHash,
+          ...paymentContext,
           settlementHash,
           revision: priorRevision + 1,
           updatedAt: nowIso(),
