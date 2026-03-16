@@ -34,8 +34,8 @@ export function renderPrivacySection(props: PrivacySectionProps) {
 
   return html`
     <div class="card">
-      <div class="card-title">Privacy & Consent</div>
-      <div class="card-sub">Authorization governance, knowledge assets, replays and erasure.</div>
+      <div class="card-title">Knowledge Asset & Privacy Control</div>
+      <div class="card-sub">Steward authorization governance, knowledge assets, replays, and erasure.</div>
       ${
         summary
           ? html`

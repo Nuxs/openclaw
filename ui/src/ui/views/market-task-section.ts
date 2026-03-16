@@ -71,8 +71,8 @@ export function renderTaskSection(props: TaskSectionProps) {
 
   return html`
     <div class="card">
-      <div class="card-title">Task Market</div>
-      <div class="card-sub">Task publishing, bidding, delivery and settlement.</div>
+      <div class="card-title">Delegated Tasks</div>
+      <div class="card-sub">Steward-managed task publishing, bidding, delivery, and settlement.</div>
       ${
         error
           ? html`

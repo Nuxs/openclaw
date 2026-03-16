@@ -38,7 +38,7 @@ export function renderOpsSection(props: OpsSectionProps) {
 
   return html`
     <div class="card">
-      <div class="card-title">Operations & Health</div>
+      <div class="card-title">Steward Operations & Health</div>
       <div class="card-sub">Alerts, health probes, degradation status and release gates.</div>
       ${
         summary

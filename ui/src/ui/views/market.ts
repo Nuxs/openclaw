@@ -194,8 +194,8 @@ export function renderMarket(props: MarketProps) {
       <div class="card">
         <div class="row" style="justify-content: space-between;">
           <div>
-            <div class="card-title">Market Overview</div>
-            <div class="card-sub">Key totals and live status distributions for market activity.</div>
+            <div class="card-title">Steward Execution (Market)</div>
+            <div class="card-sub">Key totals and live status distributions for steward-delegated market activity.</div>
           </div>
           <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onRefresh}>
             ${props.loading ? "Refreshing…" : "Refresh"}
@@ -232,7 +232,7 @@ export function renderMarket(props: MarketProps) {
       </div>
 
       <div class="card">
-        <div class="card-title">Activity Health</div>
+        <div class="card-title">Execution Health</div>
         <div class="card-sub">Alerts, lease posture, dispute queue, and billing totals.</div>
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
@@ -350,8 +350,8 @@ function renderResourceCard(props: MarketProps, resources: MarketResource[]) {
     <div class="card card--stretch">
       <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 16px;">
         <div>
-          <div class="card-title">Resources</div>
-          <div class="card-sub">Published capacity, pricing, and provider metadata.</div>
+          <div class="card-title">Discovered Resources</div>
+          <div class="card-sub">Steward-discovered capacity, pricing, and provider metadata.</div>
         </div>
         <label class="field" style="min-width: 120px;">
           <span class="field__label">Kind</span>
@@ -457,8 +457,8 @@ function renderLeaseCard(props: MarketProps, leases: MarketLease[]) {
 
   return html`
     <div class="card card--stretch">
-      <div class="card-title">Leases</div>
-      <div class="card-sub">Consumer/provider bindings with status and window metadata.</div>
+      <div class="card-title">Active Leases</div>
+      <div class="card-sub">Steward-managed consumer/provider bindings with status and window metadata.</div>
       <div class="filters filters--four" style="margin-top: 16px;">
         <label class="field">
           <span class="field__label">Search</span>
@@ -631,8 +631,8 @@ function renderLedgerCard(props: MarketProps, entries: MarketLedgerEntry[]) {
 
   return html`
     <div class="card card--stretch">
-      <div class="card-title">Ledger</div>
-      <div class="card-sub">Recent billing and settlement events.</div>
+      <div class="card-title">Execution Ledger</div>
+      <div class="card-sub">Recent steward billing and settlement events.</div>
       <div class="filters filters--four" style="margin-top: 16px;">
         <label class="field">
           <span class="field__label">Search</span>
