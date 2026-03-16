@@ -92,12 +92,17 @@ export function markOperationSucceeded(
   response?: Record<string, unknown>,
   txHash?: string,
 ): SettlementOperation {
+  const completedAt = nowIso();
   return saveOperation(store, {
     ...op,
     status: "succeeded",
     response: response ?? op.response,
     txHash: txHash ?? op.txHash,
     lastError: undefined,
+    lastAttemptAt: completedAt,
+    completedAt,
+    manualInterventionRequired: false,
+    nextAction: undefined,
   });
 }
 

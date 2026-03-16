@@ -36,7 +36,7 @@ describe("settlement poller", () => {
     }
   }
 
-  it("marks retry_wait operation as succeeded when state already reconciled", async () => {
+  it("marks retry_wait release as succeeded when expectedReleased is already reconciled", async () => {
     await withStoreModes(async (_mode, store) => {
       const now = new Date().toISOString();
       const config = resolveConfig({
@@ -48,9 +48,9 @@ describe("settlement poller", () => {
       store.saveSettlement({
         settlementId: "s1",
         orderId: "o1",
-        status: "settlement_released",
+        status: "settlement_locked",
         amount: "100",
-        releasedAmount: "100",
+        releasedAmount: "60",
         strategy: "metered",
         revision: 2,
         updatedAt: now,
@@ -61,7 +61,7 @@ describe("settlement poller", () => {
         settlementId: "s1",
         kind: "release",
         idempotencyKey: "idem:o1:release",
-        payload: { releasedAmount: "100" },
+        payload: { expectedReleased: "60", releaseAmount: "10", priorReleased: "50" },
         status: "retry_wait",
       });
       store.saveSettlementOperation(op);
@@ -70,6 +70,49 @@ describe("settlement poller", () => {
 
       const updated = store.getSettlementOperation(op.operationId);
       expect(updated?.status).toBe("succeeded");
+      expect(updated?.completedAt).toBeDefined();
+      expect(updated?.lastAttemptAt).toBeDefined();
+      expect(updated?.manualInterventionRequired).toBe(false);
+      expect(updated?.nextAction).toBeUndefined();
+    });
+  });
+
+  it("reconciles stale pending operations instead of leaving them stuck forever", async () => {
+    await withStoreModes(async (_mode, store) => {
+      const now = new Date().toISOString();
+      const config = resolveConfig({
+        store: { mode: "file" },
+        access: { mode: "open", requireActor: true, requireActorMatch: true },
+        settlement: { mode: "anchor_only" },
+      });
+
+      store.saveSettlement({
+        settlementId: "s2",
+        orderId: "o2",
+        status: "settlement_locked",
+        amount: "50",
+        releasedAmount: "0",
+        strategy: "one-shot",
+        revision: 1,
+        updatedAt: now,
+      });
+
+      const op = buildSettlementOperation({
+        orderId: "o2",
+        settlementId: "s2",
+        kind: "lock",
+        idempotencyKey: "idem:o2:lock",
+        payload: {},
+        status: "pending",
+      });
+      store.saveSettlementOperation(op);
+
+      await flushPendingSettlementOperations(store, config);
+
+      const updated = store.getSettlementOperation(op.operationId);
+      expect(updated?.status).toBe("succeeded");
+      expect(updated?.completedAt).toBeDefined();
+      expect(updated?.lastAttemptAt).toBeDefined();
     });
   });
 });

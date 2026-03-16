@@ -26,9 +26,11 @@ function isOperationAlreadyApplied(
 
   if (operation.kind === "release") {
     const expectedReleased =
-      typeof operation.payload.releasedAmount === "string"
-        ? operation.payload.releasedAmount
-        : undefined;
+      typeof operation.payload.expectedReleased === "string"
+        ? operation.payload.expectedReleased
+        : typeof operation.payload.releasedAmount === "string"
+          ? operation.payload.releasedAmount
+          : undefined;
     if (!expectedReleased) {
       return settlement.status === "settlement_released";
     }
@@ -48,7 +50,10 @@ export async function flushPendingSettlementOperations(
   store: MarketStateStore,
   config: MarketPluginConfig,
 ): Promise<void> {
-  const due = listDueOperations(store, { status: "retry_wait", limit: 200 });
+  const due = [
+    ...listDueOperations(store, { status: "pending", limit: 200 }),
+    ...listDueOperations(store, { status: "retry_wait", limit: 200 }),
+  ].sort((left, right) => left.nextAttemptAt.localeCompare(right.nextAttemptAt));
   if (due.length === 0) {
     return;
   }
