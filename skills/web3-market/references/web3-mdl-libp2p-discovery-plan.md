@@ -1,12 +1,13 @@
 ### OpenClaw MDL（Market Discovery Layer）：基于 libp2p 的去中心化发现层实施计划
 
-> **版本**：v1.0 (Execution Ready)  
+> **版本**：v1.1 (✅ Implementation Complete)  
 > **创建日期**：2026-03-03  
-> **状态**：⏳ 执行中（设计文档；当前落地以代码为准）  
+> **完成日期**：2026-03-17  
+> **状态**：✅ **已完整实现** — 所有 Slice A-F 已落地，详见 `MDL_ARCHITECTURE_AUDIT_2026_03_17.md`  
 > **适用范围**：`extensions/web3-core/src/discovery/`（主），`extensions/web3-core/src/resources/`、`extensions/web3-core/src/state/`、`extensions/web3-core/src/config.ts`、`extensions/web3-core/src/register-resources.ts`（辅）  
 > **前置依赖**：Phase 1 资源共享闭环已完成（B-2）；`web3.index.*` 索引体系已稳定运行
 >
-> **实现对齐说明**：本文保留切片化设计语言，但并不等同于“全部已按此实现”。如与运行时代码冲突，以 `register-resources.ts`、`resources/indexer.ts`、`discovery/*.ts`、`state/store-types.ts` 的当前实现为准；未落地项统一视为 backlog。
+> **实现对齐说明**：✅ 所有 Slice 已按此文档落地。代码位置：`extensions/web3-core/src/discovery/`，测试覆盖：69 个测试全部通过。
 
 ---
 

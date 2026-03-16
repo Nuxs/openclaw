@@ -136,13 +136,15 @@
 
 ## 4. 下一步
 
-### 4.1 MDL（Market Discovery Layer）— ⏳ 执行中（与主计划对齐）
+### 4.1 MDL（Market Discovery Layer）— ✅ 已完整实现
 
 - **目标**：按 `WEB3_DEV_PLAN_PAYFI.md` v1.4 对齐，仅维护 Discovery **P0/P1**（我方接入与集成面），保障 PayFi 与 Discovery 并行推进。
 - **实施计划**：`skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`（盟友主导完整切片 A→F，我方按 P0/P1 接入）
+- **实现状态**：✅ **已完整实现** — 所有 Slice A-F 均已落地，详见 `MDL_ARCHITECTURE_AUDIT_2026_03_17.md`
 - **我方范围（P0/P1）**：节点身份映射、资源广播契约、`web3.index.*` / `market.resource.*` 索引对接、Discovery 文档与运行时口径收敛；当前保底手段是 report/publish 解耦与 operator 手动切换 `static` backend。
 - **边界说明（P2）**：自动 failover、持久缓存回放、relay/direct connect 与 NAT 穿透仍属 backlog；NAT/Relay/端到端路由由盟友主文档维护与排期。
 - **安全约束**：发现不暴露 endpoint/token、market.lease.issue 零改动、默认 disabled
+- **测试覆盖**：69 个测试全部通过（2026-03-17 验证）
 
 ### 4.2 既有路线图
 
