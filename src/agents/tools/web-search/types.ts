@@ -4,6 +4,7 @@ export const WEB_SEARCH_PROVIDER_IDS = [
   "grok",
   "gemini",
   "kimi",
+  "firecrawl",
   "searxng",
 ] as const;
 
@@ -35,7 +36,7 @@ export type WebSearchCitations =
 
 export type WebSearchListPayload = {
   query: string;
-  provider: "brave" | "searxng";
+  provider: "brave" | "firecrawl" | "searxng";
   count: number;
   tookMs: number;
   externalContent: WebSearchExternalContent;

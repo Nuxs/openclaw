@@ -23,6 +23,7 @@ import type {
   HealthSummary,
   LogEntry,
   LogLevel,
+  ChatModelOverride,
   ModelCatalogEntry,
   NostrProfile,
   PresenceEntry,
@@ -80,7 +81,7 @@ type AppViewStateCore = {
   fallbackStatus: FallbackStatus | null;
   chatAvatarUrl: string | null;
   chatThinkingLevel: string | null;
-  chatModelOverrides: Record<string, string | null>;
+  chatModelOverrides: Record<string, ChatModelOverride | null>;
   chatModelsLoading: boolean;
   chatModelCatalog: ModelCatalogEntry[];
   chatQueue: ChatQueueItem[];

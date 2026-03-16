@@ -15,12 +15,18 @@ vi.mock("../../../agents/agent-scope.js", () => ({
   listAgentIds,
   resolveAgentWorkspaceDir,
 }));
-vi.mock("../../../logging/subsystem.js", () => ({
-  createSubsystemLogger: () => ({
+vi.mock("../../../logging/subsystem.js", () => {
+  const logger = {
     warn: logWarn,
     debug: logDebug,
-  }),
-}));
+    info: vi.fn(),
+    error: vi.fn(),
+    child: vi.fn(() => logger),
+  };
+  return {
+    createSubsystemLogger: () => logger,
+  };
+});
 
 const { default: runBootChecklist } = await import("./handler.js");
 

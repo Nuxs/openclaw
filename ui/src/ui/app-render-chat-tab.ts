@@ -35,6 +35,7 @@ export function renderChatTab(state: AppViewState) {
 
   const chatDisabledReason = state.connected ? null : t("chat.disconnected");
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
+  const showToolCalls = state.onboarding ? true : state.settings.chatShowToolCalls;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const resolvedAgentId =
@@ -67,6 +68,7 @@ export function renderChatTab(state: AppViewState) {
     },
     thinkingLevel: state.chatThinkingLevel,
     showThinking,
+    showToolCalls,
     loading: state.chatLoading,
     sending: state.chatSending,
     compactionStatus: state.compactionStatus,

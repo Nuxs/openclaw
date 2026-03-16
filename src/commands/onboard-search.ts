@@ -6,11 +6,35 @@ import {
   hasConfiguredSecretInput,
   normalizeSecretInputString,
 } from "../config/types.secrets.js";
+import { enablePluginInConfig } from "../plugins/enable.js";
+import { resolvePluginWebSearchProviders } from "../plugins/web-search-providers.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import type { SecretInputMode } from "./onboard-types.js";
 
-export type SearchProvider = "brave" | "gemini" | "grok" | "kimi" | "perplexity" | "searxng";
+export type SearchProvider = NonNullable<
+  NonNullable<NonNullable<NonNullable<OpenClawConfig["tools"]>["web"]>["search"]>["provider"]
+>;
+
+const SEARCH_PROVIDER_IDS = [
+  "brave",
+  "firecrawl",
+  "gemini",
+  "grok",
+  "kimi",
+  "perplexity",
+  "searxng",
+] as const;
+
+function isSearchProvider(value: string): value is SearchProvider {
+  return (SEARCH_PROVIDER_IDS as readonly string[]).includes(value);
+}
+
+function hasSearchProviderId<T extends { id: string }>(
+  provider: T,
+): provider is T & { id: SearchProvider } {
+  return isSearchProvider(provider.id);
+}
 
 type SearchProviderEntry = {
   value: SearchProvider;
@@ -21,67 +45,43 @@ type SearchProviderEntry = {
   signupUrl: string;
 };
 
-export const SEARCH_PROVIDER_OPTIONS: readonly SearchProviderEntry[] = [
-  {
-    value: "brave",
-    label: "Brave Search",
-    hint: "Structured results · country/language/time filters",
-    envKeys: ["BRAVE_API_KEY"],
-    placeholder: "BSA...",
-    signupUrl: "https://brave.com/search/api/",
-  },
-  {
-    value: "gemini",
-    label: "Gemini (Google Search)",
-    hint: "Google Search grounding · AI-synthesized",
-    envKeys: ["GEMINI_API_KEY"],
-    placeholder: "AIza...",
-    signupUrl: "https://aistudio.google.com/apikey",
-  },
-  {
-    value: "grok",
-    label: "Grok (xAI)",
-    hint: "xAI web-grounded responses",
-    envKeys: ["XAI_API_KEY"],
-    placeholder: "xai-...",
-    signupUrl: "https://console.x.ai/",
-  },
-  {
-    value: "kimi",
-    label: "Kimi (Moonshot)",
-    hint: "Moonshot web search",
-    envKeys: ["KIMI_API_KEY", "MOONSHOT_API_KEY"],
-    placeholder: "sk-...",
-    signupUrl: "https://platform.moonshot.cn/",
-  },
-  {
-    value: "perplexity",
-    label: "Perplexity Search",
-    hint: "Structured results · domain/country/language/time filters",
-    envKeys: ["PERPLEXITY_API_KEY"],
-    placeholder: "pplx-...",
-    signupUrl: "https://www.perplexity.ai/settings/api",
-  },
-] as const;
+export const SEARCH_PROVIDER_OPTIONS: readonly SearchProviderEntry[] =
+  resolvePluginWebSearchProviders({
+    bundledAllowlistCompat: true,
+  })
+    .filter(hasSearchProviderId)
+    .map((provider) => ({
+      value: provider.id,
+      label: provider.label,
+      hint: provider.hint,
+      envKeys: provider.envVars,
+      placeholder: provider.placeholder,
+      signupUrl: provider.signupUrl,
+    }));
 
 export function hasKeyInEnv(entry: SearchProviderEntry): boolean {
   return entry.envKeys.some((k) => Boolean(process.env[k]?.trim()));
 }
 
+function hasSearxngBaseUrl(config: OpenClawConfig): boolean {
+  return Boolean(config.tools?.web?.search?.searxng?.baseUrl?.trim());
+}
+
+function hasProviderSetup(config: OpenClawConfig, entry: SearchProviderEntry): boolean {
+  return (
+    hasExistingKey(config, entry.value) ||
+    hasKeyInEnv(entry) ||
+    (entry.value === "searxng" && hasSearxngBaseUrl(config))
+  );
+}
+
 function rawKeyValue(config: OpenClawConfig, provider: SearchProvider): unknown {
   const search = config.tools?.web?.search;
-  switch (provider) {
-    case "brave":
-      return search?.apiKey;
-    case "gemini":
-      return search?.gemini?.apiKey;
-    case "grok":
-      return search?.grok?.apiKey;
-    case "kimi":
-      return search?.kimi?.apiKey;
-    case "perplexity":
-      return search?.perplexity?.apiKey;
-  }
+  const entry = resolvePluginWebSearchProviders({
+    config,
+    bundledAllowlistCompat: true,
+  }).find((candidate) => candidate.id === provider);
+  return entry?.getCredentialValue(search as Record<string, unknown> | undefined);
 }
 
 /** Returns the plaintext key string, or undefined for SecretRefs/missing. */
@@ -130,40 +130,28 @@ export function applySearchKey(
   key: SecretInput,
 ): OpenClawConfig {
   const search = { ...config.tools?.web?.search, provider, enabled: true };
-  switch (provider) {
-    case "brave":
-      search.apiKey = key;
-      break;
-    case "gemini":
-      search.gemini = { ...search.gemini, apiKey: key };
-      break;
-    case "grok":
-      search.grok = { ...search.grok, apiKey: key };
-      break;
-    case "kimi":
-      search.kimi = { ...search.kimi, apiKey: key };
-      break;
-    case "searxng":
-      search.searxng = {
-        ...search.searxng,
-        ...(typeof key === "string" ? { apiKey: key } : {}),
-      };
-      break;
-    case "perplexity":
-      search.perplexity = { ...search.perplexity, apiKey: key };
-      break;
+  const entry = resolvePluginWebSearchProviders({
+    config,
+    bundledAllowlistCompat: true,
+  }).find((candidate) => candidate.id === provider);
+  if (entry) {
+    entry.setCredentialValue(search as Record<string, unknown>, key);
   }
-  return {
+  const next = {
     ...config,
     tools: {
       ...config.tools,
       web: { ...config.tools?.web, search },
     },
   };
+  if (provider !== "firecrawl") {
+    return next;
+  }
+  return enablePluginInConfig(next, "firecrawl").config;
 }
 
 function applyProviderOnly(config: OpenClawConfig, provider: SearchProvider): OpenClawConfig {
-  return {
+  const next = {
     ...config,
     tools: {
       ...config.tools,
@@ -177,6 +165,10 @@ function applyProviderOnly(config: OpenClawConfig, provider: SearchProvider): Op
       },
     },
   };
+  if (provider !== "firecrawl") {
+    return next;
+  }
+  return enablePluginInConfig(next, "firecrawl").config;
 }
 
 function preserveDisabledState(original: OpenClawConfig, result: OpenClawConfig): OpenClawConfig {
@@ -215,7 +207,7 @@ export async function setupSearch(
   const existingProvider = config.tools?.web?.search?.provider;
 
   const options = SEARCH_PROVIDER_OPTIONS.map((entry) => {
-    const configured = hasExistingKey(config, entry.value) || hasKeyInEnv(entry);
+    const configured = hasProviderSetup(config, entry);
     const hint = configured ? `${entry.hint} · configured` : entry.hint;
     return { value: entry.value, label: entry.label, hint };
   });
@@ -224,9 +216,7 @@ export async function setupSearch(
     if (existingProvider && SEARCH_PROVIDER_OPTIONS.some((e) => e.value === existingProvider)) {
       return existingProvider;
     }
-    const detected = SEARCH_PROVIDER_OPTIONS.find(
-      (e) => hasExistingKey(config, e.value) || hasKeyInEnv(e),
-    );
+    const detected = SEARCH_PROVIDER_OPTIONS.find((entry) => hasProviderSetup(config, entry));
     if (detected) {
       return detected.value;
     }
@@ -244,7 +234,7 @@ export async function setupSearch(
         hint: "Configure later with openclaw configure --section web",
       },
     ],
-    initialValue: defaultProvider as PickerValue,
+    initialValue: defaultProvider,
   });
 
   if (choice === "__skip__") {
@@ -255,8 +245,9 @@ export async function setupSearch(
   const existingKey = resolveExistingKey(config, choice);
   const keyConfigured = hasExistingKey(config, choice);
   const envAvailable = hasKeyInEnv(entry);
+  const providerConfigured = hasProviderSetup(config, entry);
 
-  if (opts?.quickstartDefaults && (keyConfigured || envAvailable)) {
+  if (opts?.quickstartDefaults && providerConfigured) {
     const result = existingKey
       ? applySearchKey(config, choice, existingKey)
       : applyProviderOnly(config, choice);
@@ -264,7 +255,7 @@ export async function setupSearch(
   }
 
   const useSecretRefMode = opts?.secretInputMode === "ref"; // pragma: allowlist secret
-  if (useSecretRefMode) {
+  if (useSecretRefMode && choice !== "searxng") {
     if (keyConfigured) {
       return preserveDisabledState(config, applyProviderOnly(config, choice));
     }
@@ -279,6 +270,16 @@ export async function setupSearch(
       "Web search",
     );
     return applySearchKey(config, choice, ref);
+  }
+  if (useSecretRefMode && choice === "searxng") {
+    await prompter.note(
+      [
+        "SearxNG API keys are stored as plain strings today, so secret-reference mode falls back to an explicit value.",
+        "You can also leave the key blank and rely on SEARXNG_API_KEY in the Gateway environment.",
+        "Docs: https://docs.openclaw.ai/tools/web",
+      ].join("\n"),
+      "Web search",
+    );
   }
 
   const keyInput = await prompter.text({
@@ -300,7 +301,7 @@ export async function setupSearch(
     return preserveDisabledState(config, applySearchKey(config, choice, existingKey));
   }
 
-  if (keyConfigured || envAvailable) {
+  if (providerConfigured) {
     return preserveDisabledState(config, applyProviderOnly(config, choice));
   }
 

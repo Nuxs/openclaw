@@ -165,11 +165,12 @@ export const en: TranslationMap = {
     disconnected: "Disconnected from gateway.",
     refreshTitle: "Refresh chat data",
     thinkingToggle: "Toggle assistant thinking/working output",
+    toolCallsToggle: "Toggle tool calls and tool results",
     focusToggle: "Toggle focus mode (hide sidebar + page header)",
     hideCronSessions: "Hide cron sessions",
     showCronSessions: "Show cron sessions",
     showCronSessionsHidden: "Show cron sessions ({count} hidden)",
-    onboardingDisabled: "Disabled during onboarding",
+    onboardingDisabled: "Disabled during setup",
     progress: {
       step: "Step {step}",
       trail: "Previous: {steps}",

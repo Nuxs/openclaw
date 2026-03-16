@@ -9,22 +9,32 @@ type CallGatewayFn = (opts: {
   timeoutMs?: number;
 }) => Promise<unknown>;
 
+const HOST_SRC_ROOT = new URL("../../../../src/", import.meta.url);
+const HOST_DIST_ROOT = new URL("../../../../dist/", import.meta.url);
+
+function hostSrcUrl(path: string): string {
+  return new URL(path, HOST_SRC_ROOT).href;
+}
+
+function hostDistUrl(path: string): string {
+  return new URL(path, HOST_DIST_ROOT).href;
+}
+
 async function loadCallGateway(): Promise<CallGatewayFn> {
   try {
-    const mod = await import("../../../../src/gateway/call.ts");
+    const mod = await import(hostSrcUrl("gateway/call.ts"));
     if (typeof mod.callGateway === "function") {
       return mod.callGateway as CallGatewayFn;
     }
   } catch (err) {
-    // ignore source import failure and fallback to dist
-    // we only warn if both fail, but debug log here could be useful
+    // Ignore source import failure and fallback to dist. Keep the debug note so
+    // local troubleshooting can still explain why the fallback path was needed.
     if (process.env.DEBUG_MARKET) {
       console.warn("market-assistant: source import failed, trying dist...", err);
     }
   }
 
-  // @ts-expect-error dist fallback only exists after build
-  const mod = await import("../../../../dist/gateway/call.js");
+  const mod = await import(hostDistUrl("gateway/call.js"));
   if (typeof mod.callGateway !== "function") {
     throw new Error("callGateway is not available");
   }
