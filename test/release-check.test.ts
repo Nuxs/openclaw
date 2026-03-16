@@ -5,6 +5,7 @@ import {
   collectBundledExtensionRootDependencyGapErrors,
   collectForbiddenPackPaths,
   collectPackUnpackedSizeErrors,
+  collectRequiredReleaseArtifactErrors,
 } from "../scripts/release-check.ts";
 
 function makeItem(shortVersion: string, sparkleVersion: string): string {
@@ -192,6 +193,45 @@ describe("collectPackUnpackedSizeErrors", () => {
       ]),
     ).toEqual([
       "npm pack --dry-run produced no unpackedSize data; pack size budget was not verified.",
+    ]);
+  });
+});
+
+describe("collectRequiredReleaseArtifactErrors", () => {
+  it("accepts a complete set of web3 release artifacts", () => {
+    expect(
+      collectRequiredReleaseArtifactErrors({
+        "docs/reference/web3-ga-runbook.md": [
+          "## 1. 发布门禁分层",
+          "Preset baseline verify（运行时基线）",
+          "Operator release gate（运行时放行）",
+          "/reference/web3-market-release-notes",
+        ].join("\n"),
+        "docs/reference/web3-market-go-live-evidence.md": [
+          "## 2. 必备证据矩阵",
+          "Release notes",
+          "## 8. 建议产物结构",
+          "/reference/web3-market-release-notes",
+        ].join("\n"),
+        "docs/reference/web3-market-release-notes.md": [
+          "# Web3 Market Release Notes",
+          "## 2. 发布摘要模板",
+          "## 6. 回滚与降级",
+          "## 7. Operator sign off",
+        ].join("\n"),
+      }),
+    ).toEqual([]);
+  });
+
+  it("flags missing or stale release artifacts", () => {
+    expect(
+      collectRequiredReleaseArtifactErrors({
+        "docs/reference/web3-ga-runbook.md": "## 1. 发布门禁分层",
+      }),
+    ).toEqual([
+      "required release artifact drift in docs/reference/web3-ga-runbook.md | missing markers: Preset baseline verify（运行时基线）, Operator release gate（运行时放行）, /reference/web3-market-release-notes",
+      "required release artifact missing: docs/reference/web3-market-go-live-evidence.md",
+      "required release artifact missing: docs/reference/web3-market-release-notes.md",
     ]);
   });
 });

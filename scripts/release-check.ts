@@ -405,6 +405,54 @@ const sourceGateChecks: SourceGateCheck[] = [
   },
 ];
 
+const requiredReleaseArtifacts = [
+  {
+    filePath: "docs/reference/web3-ga-runbook.md",
+    markers: [
+      "## 1. 发布门禁分层",
+      "Preset baseline verify（运行时基线）",
+      "Operator release gate（运行时放行）",
+      "/reference/web3-market-release-notes",
+    ],
+  },
+  {
+    filePath: "docs/reference/web3-market-go-live-evidence.md",
+    markers: [
+      "## 2. 必备证据矩阵",
+      "Release notes",
+      "## 8. 建议产物结构",
+      "/reference/web3-market-release-notes",
+    ],
+  },
+  {
+    filePath: "docs/reference/web3-market-release-notes.md",
+    markers: [
+      "# Web3 Market Release Notes",
+      "## 2. 发布摘要模板",
+      "## 6. 回滚与降级",
+      "## 7. Operator sign off",
+    ],
+  },
+] as const;
+
+export function collectRequiredReleaseArtifactErrors(files: Record<string, string>): string[] {
+  const errors: string[] = [];
+  for (const artifact of requiredReleaseArtifacts) {
+    const content = files[artifact.filePath];
+    if (typeof content !== "string") {
+      errors.push(`required release artifact missing: ${artifact.filePath}`);
+      continue;
+    }
+    const missingMarkers = artifact.markers.filter((marker) => !content.includes(marker));
+    if (missingMarkers.length > 0) {
+      errors.push(
+        `required release artifact drift in ${artifact.filePath} | missing markers: ${missingMarkers.join(", ")}`,
+      );
+    }
+  }
+  return errors;
+}
+
 function checkWeb3GaSourceGates() {
   for (const check of sourceGateChecks) {
     let content: string;
@@ -428,12 +476,34 @@ function checkWeb3GaSourceGates() {
   }
 }
 
+function checkRequiredReleaseArtifacts() {
+  const files: Record<string, string> = {};
+  for (const artifact of requiredReleaseArtifacts) {
+    const absolutePath = resolve(artifact.filePath);
+    try {
+      files[artifact.filePath] = readFileSync(absolutePath, "utf8");
+    } catch {
+      // Keep missing files out of the map so the collector can produce a stable error message.
+    }
+  }
+
+  const errors = collectRequiredReleaseArtifactErrors(files);
+  if (errors.length > 0) {
+    console.error("release-check: required release artifacts are incomplete:");
+    for (const error of errors) {
+      console.error(`  - ${error}`);
+    }
+    process.exit(1);
+  }
+}
+
 function main() {
   checkPluginVersions();
   checkAppcastSparkleVersions();
   checkPluginSdkExports();
   checkBundledExtensionRootDependencyMirrors();
   checkWeb3GaSourceGates();
+  checkRequiredReleaseArtifacts();
 
   const results = runPackDry();
   const files = results.flatMap((entry) => entry.files ?? []);
