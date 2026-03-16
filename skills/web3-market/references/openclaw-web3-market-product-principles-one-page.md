@@ -8,7 +8,7 @@ We do not sell “the chain.” We do not sell abstract autonomy. We sell **acco
 
 ## One-sentence promise
 
-> **OpenClaw is a private steward that discovers, buys, verifies, settles, and audits outside digital services _on your behalf_, keeping execution invisible yet governed and accountable through human-in-the-loop consent.**
+> **OpenClaw is a private steward that discovers, buys, verifies, settles, and audits outside digital services _on your behalf_, acting autonomously within policy boundaries and only requesting human intervention when crossing thresholds.**
 
 ## The one-page rulebook
 
@@ -22,12 +22,24 @@ Lead with the user outcome:
 
 Web3 stays underneath as the trust, settlement, and audit substrate.
 
-### 2. Build Consent UIs, not Shopping Malls
+### 2. Build Governance UIs, not Shopping Malls
 
-The UI is for **audit and consent**, not discovery and manual checkout.
+The UI is for **governance, audit, and exception handling**, not routine discovery and checkout.
 
 - **Bad (Web2.5 approach)**: A traditional dashboard where a human browses a catalog, selects a model/service, configures a TTL, and clicks "Buy".
-- **Good (Agent-Driven approach)**: The Agent realizes it needs external capability, discovers it via API, and surfaces an elegant **Consent Card** in the chat stream ("Your steward requests $2.50 to lease advanced code analysis for 24 hours. [Approve] [Reject]").
+- **Good (Agent-Driven approach)**: The Agent autonomously realizes it needs external capability, discovers and compares options via API, and **completes the purchase within budget boundaries**. A Consent Card surfaces ONLY when crossing thresholds ("Your steward requests $150 for premium analysis — exceeds your $100 threshold. [Approve] [Reject]").
+
+**Routine operations (within boundaries)**:
+
+- AI autonomously discovers, compares, and purchases services
+- No human intervention required
+- User sees results in audit trail
+
+**Exception handling (crossing boundaries)**:
+
+- Budget exceeded → Consent Card for approval
+- New provider → Risk confirmation
+- High-value transaction → Explicit approval
 
 Important work should be visible as:
 

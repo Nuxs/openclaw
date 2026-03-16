@@ -6,7 +6,7 @@
 
 ## 2. Subheadline
 
-**OpenClaw helps you discover, buy, verify, settle, and audit outside digital services without losing control of budget, access, or trust.**
+**OpenClaw helps you discover, buy, verify, settle, and audit outside digital services — your AI steward acts autonomously within your policy boundaries, and only asks for your input when crossing thresholds.**
 
 ## 3. One-line version
 
@@ -14,21 +14,22 @@
 
 ## 4. 30-second version
 
-Most AI products can answer questions or call tools. OpenClaw goes one layer deeper: it helps a user’s private steward discover outside services, compare options, execute work, verify delivery, settle payment, and keep an audit trail. The point is not more automation for its own sake. The point is **accountable execution**.
+Most AI products can answer questions or call tools. OpenClaw goes one layer deeper: it helps a user's private steward autonomously discover outside services, compare options, execute work, verify delivery, settle payment, and keep an audit trail. The steward acts within your policy boundaries — you set the budget and risk tolerance, and it only asks for your input when crossing thresholds. The point is not more automation for its own sake. The point is **accountable autonomy**.
 
 ## 5. 90-second version
 
 We believe personal AI is moving from answering to acting. But once an AI starts using outside tools, providers, and services, the real problem is no longer just intelligence. The real problem becomes trust.
 
-Can the system choose the right provider?
-Can it control spend?
+Can the system choose the right provider autonomously?
+Can it control spend within your boundaries?
 Can it verify what was delivered?
 Can it settle safely?
 Can it explain what happened afterward?
+Can it know when to ask for human input?
 
-OpenClaw is designed for that next layer. It is a **private AI steward** that can coordinate tools and outside services on a user’s behalf while keeping the important parts visible, governed, and auditable. `MCP` helps connect tools. `A2A` helps coordinate agents. `OpenClaw Market` closes the loop with proof, settlement, dispute handling, and reconciliation.
+OpenClaw is designed for that next layer. It is a **private AI steward** that autonomously coordinates tools and outside services on a user's behalf within policy boundaries, requesting human intervention only when crossing thresholds. `MCP` helps connect tools. `A2A` helps coordinate agents. `OpenClaw Market` closes the loop with proof, settlement, dispute handling, and reconciliation.
 
-That is why we describe OpenClaw as **accountable execution for personal AI**.
+That is why we describe OpenClaw as **accountable autonomy for personal AI** — autonomous action with responsibility built in.
 
 ## 6. What makes us different
 
@@ -67,11 +68,11 @@ This is the fastest path to a product users can understand and operators can gov
 
 Avoid these frames in mainstream external messaging:
 
-- “the decentralized AI marketplace”
-- “a token economy for agents”
-- “an autonomous agent social network”
-- “replace people with agents”
-- “everything marketplace”
+- "the decentralized AI marketplace"
+- "a token economy for agents"
+- "an autonomous agent social network"
+- "replace people with agents"
+- "everything marketplace"
 
 These phrases create noise, invite the wrong expectations, and blur the product truth.
 
@@ -88,4 +89,4 @@ Use these instead:
 
 ## 10. Suggested external closing line
 
-> **OpenClaw is building the accountability layer for personal AI — so your AI can do more than act; it can act responsibly.**
+> **OpenClaw is building the accountability layer for personal AI — so your AI can act autonomously within boundaries, with responsibility built in.**

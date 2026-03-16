@@ -1,8 +1,9 @@
 # OpenClaw Web3 Market：整体进度口径（可验证）
 
 > **状态**：Draft（以严格评审为准：受控内测 Conditional Go，GA 待复评）  
-> **更新日期**：2026-03-04  
-> **适用范围**：Web3 Market（资源/能力市场 + AI 管家编排）
+> **更新日期**：2026-03-17  
+> **适用范围**：Web3 Market（资源/能力市场 + AI 管家编排）  
+> **架构审计**：`WEB3_ARCHITECTURE_AUDIT_2026_03.md`
 
 本文档用于解决一个问题：当我们说"Web3 Market 已做到哪里"，**到底哪些是已实现、可演示、可验收的事实**，哪些仍是规划。
 
@@ -135,6 +136,20 @@
 ---
 
 ## 4. 下一步
+
+### 4.0 前沿调研与状态追踪
+
+> **前沿调研报告**：`skills/web3-market/internal/WEB3_FRONTIER_RESEARCH_REPORT.md`
+>
+> 包含：Agentic Commerce 趋势、A2A/MCP/x402 协议调研、竞品分析、架构评估。
+
+> **实现状态追踪**：`skills/web3-market/internal/WEB3_IMPLEMENTATION_STATUS.md`
+>
+> 包含：详细的功能完成状态矩阵、阻断项清单、下一步行动。
+
+> **完整产品规格**：`skills/web3-market/internal/WEB3_FINAL_PRODUCT_SPEC.md`
+>
+> 包含：2026-2028 完整功能需求，标注已完成/未完成状态。
 
 ### 4.1 MDL（Market Discovery Layer）— ✅ 已完整实现
 

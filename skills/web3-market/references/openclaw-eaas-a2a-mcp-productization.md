@@ -22,7 +22,7 @@ OpenClaw is strongest when positioned as the system that closes the loop between
 
 ### External definition
 
-> OpenClaw is a private AI steward that not only answers and automates, but also autonomously discovers, buys, verifies, settles, and audits outside services on your behalf, governed only by your explicit consent.
+> OpenClaw is a private AI steward that not only answers and automates, but also autonomously discovers, buys, verifies, settles, and audits outside services on your behalf — acting within your policy boundaries and only requesting intervention when crossing thresholds.
 
 ### Internal operating definition
 

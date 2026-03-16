@@ -101,11 +101,27 @@ Use these defaults unless current repo truth proves otherwise:
    - **达**: explain layer boundaries, tradeoffs, and rollout order in plain language.
    - **雅**: keep product narrative crisp, non-hyped, and consistent with current runtime truth.
 
+## AI 自主权阈值模型
+
+AI Private Steward 在策略边界内拥有完全自主决策权，只在跨越边界时才触发人类介入：
+
+| 场景                     | 自主权     | 介入点       |
+| ------------------------ | ---------- | ------------ |
+| **日常搜索**             | 完全自主   | 无           |
+| **小额购买（< $10）**    | 完全自主   | 事后审计     |
+| **中额购买（$10-$100）** | 边界内自主 | 超预算才审批 |
+| **大额交易（> $100）**   | 需确认     | 执行前审批   |
+| **首次 Provider**        | 需确认     | 执行前审批   |
+| **签约/承诺**            | 需确认     | 执行前审批   |
+| **争议处理**             | 需介入     | 人类裁决     |
+
+**核心原则**：AI 在策略边界内完全自主，只有跨越边界才触发人类介入。UI 面板用于策略设置、异常处理、审计追溯，而非实时监控每个操作。
+
 ## Architectural invariants
 
 Do not violate these rules:
 
-- **Agent as Buyer, Human as Approver (最高智能架构)**: Do not build traditional Web2 "shopping cart" or "marketplace catalog" UIs for humans to manually browse and buy services. The Private Steward (AI) is the buyer. It discovers resources via tool calls (`market.resource.list`), proposes a purchase, and the UI merely renders a **Consent Card** (budget/approval) in the chat stream.
+- **Agent as Buyer, Human as Governor (最高智能架构)**: Do not build traditional Web2 "shopping cart" or "marketplace catalog" UIs for humans to manually browse and buy services. The Private Steward (AI) is the **autonomous buyer** within policy boundaries. It discovers resources via tool calls (`market.resource.list`), compares options, and **autonomously completes purchases** within budget/risk thresholds. The UI surfaces a **Consent Card** ONLY when crossing thresholds (e.g., exceeds budget, new provider, high-risk operation). For routine operations within boundaries, the steward acts autonomously.
 - **Invisible Delivery (无缝挂载)**: Once a lease is issued and authorized, the system auto-mounts the `accessToken` and capability directly into the Agent's runtime context. Do not force the user to handle tokens or endpoints. The UI is for audit and governance, not manual configuration.
 - Keep `web3.*` as the user/agent/UI public contract
 - Keep `market.*` as the internal authority / authoritative execution layer
@@ -196,6 +212,10 @@ Read when drafting plans, leadership updates, or implementation breakdowns:
 - `skills/web3-market/internal/WEB3_OVERALL_PROGRESS.md`
 - `skills/web3-market/internal/WEB3_MARKET_GO_LIVE_REVIEW_2026-03.md`
 - `skills/web3-market/internal/WEB3_GAP_AUDIT_REPORT.md`
+- `skills/web3-market/internal/WEB3_FINAL_PRODUCT_SPEC.md` — **完整产品功能需求（2026-2028）**
+- `skills/web3-market/internal/WEB3_IMPLEMENTATION_STATUS.md` — **实现状态追踪（已完成/进行中/未开始）**
+- `skills/web3-market/internal/WEB3_FRONTIER_RESEARCH_REPORT.md` — **前沿调研与竞品分析**
+- `skills/web3-market/internal/WEB3_ARCHITECTURE_AUDIT_2026_03.md` — **架构审计报告（愿景一致性/信达雅/工业级）**
 
 ### External docs to align with
 
