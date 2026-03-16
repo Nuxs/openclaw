@@ -4,6 +4,10 @@ import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.j
 import { redactString } from "../utils/redact.js";
 import { applyPresetOperations, buildPresetOperations } from "./config-patch.js";
 import {
+  buildPresetBaselineScopeLines,
+  MARKET_RELEASE_GATE_ACTIONS,
+} from "./preset-gate-guidance.js";
+import {
   buildPresetLayout,
   modeLabel,
   resolvePresetIntent,
@@ -158,10 +162,10 @@ export async function verifyMarketPresetBaseline(params: {
     name: "wallet.readiness",
     status: metrics.walletReady ? "pass" : mode === "single-node" ? "warn" : "fail",
     detail: metrics.walletReady
-      ? "`web3.wallet.balance` 能力已注册，可进入钱包实测。"
+      ? "`web3.wallet.balance` 能力已注册；GA 放行前仍需执行真钱包探针。"
       : walletBalanceCapability.error,
     action: metrics.walletReady
-      ? undefined
+      ? "执行一次 `web3.wallet.balance` 真探针，并留存 paste-safe 摘要。"
       : "确认 agent-wallet 已启用，并让 `web3.wallet.balance` 保持可用。",
   });
 
@@ -231,12 +235,14 @@ export async function verifyMarketPresetBaseline(params: {
               : "warn",
       detail:
         mode === "single-node"
-          ? `index providers=${providers}。`
+          ? `index providers=${providers}；如需放行，还应确认本机消费路径可解释。`
           : providers > 0
-            ? `已发现 ${providers} 个 provider。`
+            ? `已发现 ${providers} 个 provider；GA 放行前仍需确认 \`web3.index.list\` 非空。`
             : "尚未发现 provider，需检查 bootstrap / 心跳 / 可信圈白名单。",
       action:
-        providers > 0 ? undefined : "确认 discovery 节点可达并至少有一个 Provider 已发布资源。",
+        providers > 0
+          ? "执行一次 `web3.index.list`，确认发现结果可被分享复核。"
+          : "确认 discovery 节点可达并至少有一个 Provider 已发布资源。",
     });
   } else {
     checks.push({
@@ -357,6 +363,7 @@ export function formatMarketPresetVerification(verification: MarketPresetVerific
   const lines: string[] = [];
   lines.push(`🩺 预设基线验证：${modeLabel(verification.mode)}`);
   lines.push(verification.summary);
+  lines.push(...buildPresetBaselineScopeLines(verification.mode));
   lines.push(
     `资源=${verification.metrics.publishedResources} · 活跃租约=${verification.metrics.activeLeases} · 活跃告警=${verification.metrics.activeAlerts}`,
   );
@@ -368,9 +375,14 @@ export function formatMarketPresetVerification(verification: MarketPresetVerific
     const status = check.status.toUpperCase();
     lines.push(`- [${status}] ${check.name}${check.detail ? ` · ${check.detail}` : ""}`);
   }
+  lines.push("");
+  lines.push("Release gate 补充动作：");
+  for (const action of MARKET_RELEASE_GATE_ACTIONS) {
+    lines.push(`- ${action}`);
+  }
   if (verification.recommendedActions.length > 0) {
     lines.push("");
-    lines.push("建议动作：");
+    lines.push("当前建议动作：");
     for (const action of verification.recommendedActions.slice(0, 5)) {
       lines.push(`- ${action}`);
     }
@@ -567,10 +579,10 @@ function buildPaymentReadinessCheck(params: {
     name: "payment.readiness",
     status: ready ? "pass" : params.mode === "single-node" ? "warn" : "fail",
     detail: ready
-      ? "billing 与 autopay 门禁已就绪，可进入支付链路演练。"
+      ? "billing 与 autopay baseline 已就绪；GA 放行前仍需完成一次支付链路演练。"
       : buildPaymentReadinessDetail(params),
     action: ready
-      ? undefined
+      ? "完成一次 autopay / settlement 演练，并记录 evidence 编号。"
       : "启用 billing 与 x402.autopay，并确认 `web3.wallet.autopay`、`web3.billing.handlePaymentRequired` 已注册。",
   };
 }

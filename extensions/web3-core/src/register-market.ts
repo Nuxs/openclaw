@@ -97,6 +97,24 @@ import {
 import { createWeb3MarketCommand } from "./market/web3-market-command.js";
 import { createWeb3MarketStatusTool } from "./market/web3-market-status-tool.js";
 import type { RegistrationContext } from "./register-types.js";
+import {
+  createWeb3MarketAcceptanceRejectTool,
+  createWeb3MarketAcceptanceSignTool,
+  createWeb3MarketDisputeOpenTool,
+  createWeb3MarketDisputeRejectTool,
+  createWeb3MarketDisputeResolveTool,
+  createWeb3MarketDisputeSubmitEvidenceTool,
+  createWeb3MarketExecutionStatusTool,
+  createWeb3MarketProofSubmitTool,
+  createWeb3MarketProofVerifyTool,
+  createWeb3MarketSettlementQueryTool,
+} from "./resources/market-execution-tools.js";
+import {
+  createWeb3MarketOfferCloseTool,
+  createWeb3MarketOfferCreateTool,
+  createWeb3MarketOfferPublishTool,
+  createWeb3MarketOfferUpdateTool,
+} from "./resources/market-provider-tools.js";
 import { createWeb3MarketStewardBuyTool } from "./resources/market-steward-tools.js";
 import {
   createWeb3MarketBuyTool,
@@ -320,6 +338,20 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
     createWeb3MarketLeaseTool(config),
     createWeb3MarketBuyTool(config),
     createWeb3MarketStewardBuyTool(config),
+    createWeb3MarketOfferCreateTool(config),
+    createWeb3MarketOfferUpdateTool(config),
+    createWeb3MarketOfferPublishTool(config),
+    createWeb3MarketOfferCloseTool(config),
+    createWeb3MarketExecutionStatusTool(config),
+    createWeb3MarketProofSubmitTool(config),
+    createWeb3MarketProofVerifyTool(config),
+    createWeb3MarketAcceptanceSignTool(config),
+    createWeb3MarketAcceptanceRejectTool(config),
+    createWeb3MarketSettlementQueryTool(config),
+    createWeb3MarketDisputeOpenTool(config),
+    createWeb3MarketDisputeSubmitEvidenceTool(config),
+    createWeb3MarketDisputeResolveTool(config),
+    createWeb3MarketDisputeRejectTool(config),
     createWeb3MarketRevokeLeaseTool(config),
     createWeb3MarketPublishTool(config),
     createWeb3MarketUnpublishTool(config),

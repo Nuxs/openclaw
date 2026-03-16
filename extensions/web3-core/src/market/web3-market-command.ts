@@ -10,6 +10,7 @@ import {
   formatMarketPresetVerification,
   verifyMarketPresetBaseline,
 } from "../setup/orchestrator.js";
+import { buildPresetBaselineScopeLines } from "../setup/preset-gate-guidance.js";
 import { modeLabel, resolvePresetMode } from "../setup/preset-layout.js";
 import type { MarketPresetMode } from "../setup/preset-types.js";
 import {
@@ -109,6 +110,7 @@ function formatPresetInstructions(
   lines.push("");
   lines.push(`若仍需直接应用该兼容预设：/web3-market enable ${mode} ok`);
   lines.push(`若要验证该预设基线：/web3-market verify ${mode}`);
+  lines.push(...buildPresetBaselineScopeLines(mode));
   lines.push("完成后请重启 Gateway（macOS 请通过 OpenClaw Mac app 重启）。");
   return lines.join("\n");
 }
@@ -193,6 +195,7 @@ async function enableWeb3MarketConfig(ctx: {
       preset.summary,
       "已补齐 agent-wallet policy 与资源共享基线。",
       "下一步：重启 Gateway，然后执行 /web3-market verify 查看预设基线状态。",
+      "注意：baseline verify 通过后，仍需按 runbook 补齐 release gate、回滚演练与发布说明。",
     ].join("\n"),
   };
 }
@@ -209,7 +212,7 @@ export function createWeb3MarketCommand(config: Web3PluginConfig): PluginCommand
           "- /web3-market plan [single-node|trusted-circle|hybrid-cloud-edge]",
           "- /web3-market start [mode]   (alias of plan; prints compatibility preset preview)",
           "- /web3-market enable [mode] ok   (apply compatibility preset patch)",
-          "- /web3-market verify [mode]      (verify preset baseline)",
+          "- /web3-market verify [mode]      (verify preset baseline; not the full release gate)",
         ].join("\n"),
       };
     }

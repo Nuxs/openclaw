@@ -24,4 +24,19 @@ describe("/web3-market command", () => {
     expect(result.text).toContain("Web3 Market status failed");
     expect(result.text).toMatch(/E_[A-Z_]+/);
   });
+
+  it("describes verify as a baseline check rather than a full release gate", async () => {
+    const handler = createWeb3MarketCommand(resolveConfig({}));
+
+    const result = await handler({
+      channel: "test",
+      commandBody: "/web3-market help",
+      args: "help",
+      isAuthorizedSender: true,
+      config: { plugins: { entries: {} } },
+    } as any);
+
+    expect(result.text).toContain("verify preset baseline");
+    expect(result.text).toContain("not the full release gate");
+  });
 });

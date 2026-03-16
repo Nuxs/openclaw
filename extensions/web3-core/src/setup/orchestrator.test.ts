@@ -62,8 +62,11 @@ describe("orchestrator verifyMarketPresetBaseline", () => {
     expect(
       verification.readiness.checks.find((check) => check.name === "payment.readiness")?.status,
     ).toBe("pass");
-    expect(formatMarketPresetVerification(verification)).toContain("钱包=就绪");
-    expect(formatMarketPresetVerification(verification)).toContain("支付=就绪");
+    const formatted = formatMarketPresetVerification(verification);
+    expect(formatted).toContain("钱包=就绪");
+    expect(formatted).toContain("支付=就绪");
+    expect(formatted).toContain("不等同于 GA release gate");
+    expect(formatted).toContain("Release gate 补充动作");
   });
 
   it("surfaces wallet and payment actions when capabilities or config are missing", async () => {
