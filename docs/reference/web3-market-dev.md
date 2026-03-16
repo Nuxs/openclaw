@@ -298,14 +298,17 @@ flowchart LR
 
 ## 兼容预设与零配置边界
 
-当前仓库新增了两条只读预设入口，用于把“单机 / 可信圈 / 混合云边”三类场景固化成可分享、可校验的兼容预设：
+当前仓库新增了两条预设入口，用于把“单机 / 可信圈 / 混合云边”三类场景固化成可分享、可校验的兼容预设：
 
 - `web3.market.preset.preview`：生成布局摘要、配置补丁操作、运行时探测摘要与下一步动作。
-- `web3.market.preset.verify`：基于 `market.status.summary`、`web3.monitor.health`、`web3.index.stats` 等现有能力生成 release gates。
+- `web3.market.preset.verify`：基于 `market.status.summary`、`web3.monitor.health`、`web3.index.stats` 等现有能力生成 **preset baseline verify**。
 
-它们的定位是 **preset preview / verify**，不是新的权威状态机：
+它们的定位是 **preset preview / baseline verify**，不是新的权威状态机，也不是完整 release gate：
 
-- 配置写入仍通过 `config.apply` 完成；
+- `/web3-market enable <mode> ok` 会通过当前插件的配置写 helpers 校验并写回配置；`config.apply` 仍可作为通用配置入口，但不是唯一写路径；
+- `web3.market.preset.verify` 与 `/web3-market verify` 只覆盖 runtime baseline，不替代真钱包探针、`web3.index.list` 非空确认、支付/结算演练、回滚演练与发布说明；
+- `web3.market.preset.verify` 当前依赖 `web3.index.stats` 这类聚合统计能力，不等价于消费者视角下 `web3.index.list` 验签后非空；
+- `web3.monitor.health` 当前反映告警与最近活动摘要，不直接代表 discovery backend 的 libp2p 连通性；
 - 权威交易状态仍由 `market-core` 管理；
 - 对外输出仍必须保持 paste-safe，不泄露 token、endpoint 或真实路径。
 
@@ -324,3 +327,4 @@ flowchart LR
 - EaaS 开发指南：[/reference/web3-eaas-developer-guide](/reference/web3-eaas-developer-guide)
 - GA 运维 Runbook：[/reference/web3-ga-runbook](/reference/web3-ga-runbook)
 - Go-live evidence：[/reference/web3-market-go-live-evidence](/reference/web3-market-go-live-evidence)
+- Release notes：[/reference/web3-market-release-notes](/reference/web3-market-release-notes)

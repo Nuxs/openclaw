@@ -12,20 +12,43 @@ normative: true
 
 ---
 
-## 1. 发布门禁（Release Gate）
+## 1. 发布门禁分层
 
-发布前必须通过 `scripts/release-check.ts` 中的 Web3/PayFi 门禁项：
+发布前必须同时通过 **3 层门禁**；任何一层通过都**不等于**整体放行：
 
-### 1.1 必过项
+### 1.1 Source/package gate（静态门禁）
+
+由 `scripts/release-check.ts` 执行，负责校验：
+
+- [ ] 发布包内容、版本、Sparkle build floor、plugin-sdk 导出、bundled extension manifest
+- [ ] Web3/PayFi source marker 仍在预期注册面内
+- [ ] `Web3 GA Runbook`、`Web3 Market Go Live Evidence`、`Web3 Market Release Notes` 三类发布产物存在且未漂移
+
+> 这层门禁只证明“仓库内容与发布资产齐全”，**不证明运行时已经健康**。
+
+### 1.2 Preset baseline verify（运行时基线）
+
+由 `/web3-market verify <mode>` 或 `web3.market.preset.verify` 执行，负责校验：
+
+- [ ] resources / consumer / provider listen / discovery 配置基线
+- [ ] `market.status.summary`、`web3.monitor.health`、`web3.index.stats`、`market.resource.list`、`market.lease.list` 的聚合可用性
+- [ ] wallet / billing / autopay capability readiness 与 paste-safe 下一步动作
+- [ ] CLI 与 Control 面引用同一组 readiness 事实
+
+> 这层门禁的定位是 **baseline verify**。它会提示下一步动作，但**不会替代**真钱包探针、`web3.index.list` 非空确认、支付/结算演练、回滚演练或发布说明留痕。
+
+### 1.3 Operator release gate（运行时放行）
 
 - [ ] **钱包连接**：至少一个 EVM 钱包可用（`web3.wallet.balance` 返回成功）
-- [ ] **结算链路**：`market.settlement.lock` + `market.settlement.release` 端到端可执行（anchor_only 模式即可）
-- [ ] **Discovery 健康**：至少一个 backend（libp2p 或 static）可达，`web3.index.list` 返回非空
+- [ ] **结算链路**：`market.settlement.lock` + `market.settlement.release` 端到端可执行（`anchor_only` 模式即可）
+- [ ] **Discovery 发现面**：至少完成一次真实 Provider 发布后由 `web3.index.list` 返回非空；若启用 P2P，再结合日志或探针确认当前 bootstrap / discover 行为
 - [ ] **支付链路**：`web3.billing.handlePaymentRequired` 的 autopay 路径完成至少一次成功流转
-- [ ] **监控引擎**：`web3.market.status.summary` 返回运行摘要且无 critical 告警
+- [ ] **监控引擎**：`web3.market.status.summary` 返回运行摘要，且 `web3.monitor.health` 为 `healthy`、`criticalAlerts = 0`
 - [ ] **双存储一致性**：file-store 与 sqlite-store 对同一数据集返回一致结果
+- [ ] **回滚演练**：至少完成一次降级或回滚演练，并留存 operator 记录
+- [ ] **发布说明**：发布摘要、风险、观察项、回滚入口和 evidence 链接已填写到 [/reference/web3-market-release-notes](/reference/web3-market-release-notes)
 
-### 1.2 任务市场门禁
+### 1.4 任务市场门禁
 
 - [ ] **任务全状态机**：`publish → bid → award → submit → review(accept) → receipt` 端到端通过
 - [ ] **争议路径**：`review(reject)` 创建 dispute，dispute 可被 resolve/reject
@@ -34,7 +57,7 @@ normative: true
 - [ ] **状态机守卫**：`task-state-machine.ts` 四个 `assertTask*Transition` 函数拒绝非法迁移
 - [ ] **审计锚定**：所有状态变更通过 `recordAuditWithAnchor()` 记录
 
-### 1.3 隐私合规门禁
+### 1.5 隐私合规门禁
 
 - [ ] **Consent 查询**：`web3.market.consent.list` 返回正确状态
 - [ ] **回放生成**：撤销后 `web3.market.privacy.replay.generate` 输出脱敏摘要与保留策略
@@ -43,13 +66,13 @@ normative: true
 - [ ] **删除事务**：consent 保存 + replay 擦除使用 `store.runInTransaction()` 原子执行
 - [ ] **保留策略推导**：`deriveRetentionAction()` 返回 `erase | retain_anonymized | retain_with_consent`
 
-### 1.4 UI 门禁
+### 1.6 UI 门禁
 
 - [ ] **Web3 总览页**：身份、支付、发现、市场、GA readiness 五组卡片正常渲染
 - [ ] **任务工作台**：任务列表、竞标、交付、回执区块可切换
 - [ ] **隐私工作台**：授权、资产、回放、删除区块可见
 
-### 1.5 状态聚合门禁
+### 1.7 状态聚合门禁
 
 - [ ] **市场状态摘要**：`web3.market.status.summary` 返回 `tasks`（open/awarded/closed）和 `privacy`（active/revoked/pendingErasure）字段
 - [ ] **AI 助手四主线**：MarketAssistant 覆盖基础市场、任务市场、隐私合规、运营诊断，所有输出 paste-safe
@@ -69,11 +92,11 @@ normative: true
 
 ### 2.2 Discovery 降级
 
-| 触发条件                | 降级行为                        | 恢复条件          |
-| ----------------------- | ------------------------------- | ----------------- |
-| libp2p bootstrap 不可达 | 回退 static/HTTP 索引           | bootstrap 恢复    |
-| 签名验证失败            | 拒绝入库，记录 `rejectedReason` | 发布方修复签名    |
-| 全部 backend 不可达     | 使用最后一次成功缓存 + 告警     | 任一 backend 恢复 |
+| 触发条件                | 降级行为                                                                                                       | 恢复条件                                  |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| libp2p bootstrap 不可达 | 保持当前索引主路径可用，记录 warn 日志；如需止血，由 operator 切换 `discovery.backend: "static"` 停止 P2P 发现 | bootstrap 恢复或 operator 重新启用 libp2p |
+| 签名验证失败            | 拒绝入库并输出 `[mdl:ingest]` warn 日志                                                                        | 发布方修复签名后重新发布                  |
+| discovery 需保底        | 切换 `static` backend，停止新的 P2P discover/publish，仅保留现有本地 index / gossip 查询面                     | operator 恢复 `libp2p` backend            |
 
 ### 2.3 结算降级
 
@@ -141,7 +164,7 @@ git commit -m "revert: rollback Web3 GA changes"
 
 - 检查 `ingest.ts` 去重逻辑
 - 检查 provider 是否在短间隔内重复发布
-- 查看 `rejectedReason` 统计
+- 查看 `[mdl:ingest]` warn 日志，确认 providerId 与拒绝原因
 
 **Q: 任务验收后未生成回执**
 
@@ -178,11 +201,11 @@ git commit -m "revert: rollback Web3 GA changes"
 - [ ] 任务发布 → 竞标 → 授标 → 交付 → 验收 → 回执（事务安全、状态机守卫、审计锚定）
 - [ ] 授权 → 撤销 → 回放（SHA-256 哈希验证）→ 删除（事务原子性）
 - [ ] 争议创建 → 提交证据 → 解决/拒绝
-- [ ] Discovery 发布 → 入库 → 搜索 → 失败回退
+- [ ] Discovery 发布 → 入库 → 搜索 → operator 降级切换
 - [ ] AI 助手：任务市场意图（发布/查询/投标/提交/验收）→ 正确路由 → 脱敏输出
 - [ ] AI 助手：隐私意图（授权查询/回放/删除）→ scope-aware 展示 → 脱敏输出
 - [ ] AI 助手：运营意图（状态总览/告警）→ 并行数据抓取 → 全景摘要
-- [ ] AI 助手：预设意图（预览 / 应用 / 验证）→ 走 `web3.market.preset.*` + `config.apply` 闭环
+- [ ] AI 助手：预设意图（预览 / 应用 / 验证）→ 走 `web3.market.preset.*` + `/web3-market enable` / 配置写 helpers 闭环
 
 ### 5.2 安全验收
 

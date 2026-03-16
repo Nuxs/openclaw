@@ -8931,16 +8931,22 @@
     {
       "declaredContracts": [
         "/web3-market",
+        "market.lease.list",
+        "market.resource.list",
         "market.settlement.lock",
         "market.settlement.release",
+        "market.status.summary",
         "market.task.*",
         "web3.billing.handlePaymentRequired",
         "web3.index.list",
+        "web3.index.stats",
         "web3.market.consent.list",
         "web3.market.preset.*",
+        "web3.market.preset.verify",
         "web3.market.privacy.erase",
         "web3.market.privacy.replay.generate",
         "web3.market.status.summary",
+        "web3.monitor.health",
         "web3.wallet.balance"
       ],
       "docLayer": "reference",
@@ -8951,6 +8957,7 @@
     {
       "declaredContracts": [
         "/web3",
+        "/web3-market",
         "agent-wallet.sign",
         "market.*",
         "market.audit.query",
@@ -8981,6 +8988,7 @@
         "web3.identity.resolveEns",
         "web3.identity.reverseEns",
         "web3.index.*",
+        "web3.index.list",
         "web3.index.stats",
         "web3.market.bridge.*",
         "web3.market.dispute.*",
@@ -9064,6 +9072,18 @@
       "normative": true,
       "path": "docs/reference/web3-market-output-redaction.md",
       "title": "Web3 Market Output Redaction Checklist"
+    },
+    {
+      "declaredContracts": [
+        "/web3-market",
+        "web3.index.*",
+        "web3.index.list",
+        "web3.wallet.balance"
+      ],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/reference/web3-market-release-notes.md",
+      "title": "Web3 Market Release Notes"
     },
     {
       "declaredContracts": [
