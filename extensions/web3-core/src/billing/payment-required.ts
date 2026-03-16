@@ -9,12 +9,17 @@ import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode } from "../errors/codes.js";
 import { loadCallGateway, normalizeGatewayResult } from "../market/proxy-utils.js";
 import type { Web3StateStore } from "../state/store.js";
-import type {
-  BillingPaymentReceipt,
-  PaymentRequiredInvoice,
-  PaymentResumeToken,
-  PaymentTraceRef,
-} from "./types.js";
+import { resolveBillingFxQuote } from "./fx-quote.js";
+import {
+  buildBillingPaymentReceipt,
+  buildPaymentIntent,
+  buildPaymentRequiredRecord,
+  buildPaymentTraceRef,
+  isAutopayCircuitOpen,
+  queueSettlementForPaymentRecord,
+} from "./payment-orchestrator.js";
+import { resolveTreasuryRoute } from "./treasury-router.runtime.js";
+import type { PaymentRequiredInvoice, PaymentResumeToken } from "./types.js";
 
 export class PaymentRequiredError extends Error {
   readonly status = 402;
@@ -84,6 +89,10 @@ function parseInvoice(encoded: string): PaymentRequiredInvoice {
     throw new Error("E_INVALID_ARGUMENT: invoice payload must be object");
   }
   const record = payload as Record<string, unknown>;
+  const settlement =
+    record.settlement && typeof record.settlement === "object" && !Array.isArray(record.settlement)
+      ? (record.settlement as Record<string, unknown>)
+      : undefined;
   return {
     invoiceId: requireString(record.invoiceId, "invoice.invoiceId"),
     provider: requireString(record.provider, "invoice.provider"),
@@ -95,6 +104,25 @@ function parseInvoice(encoded: string): PaymentRequiredInvoice {
     expiresAt: requireIsoDate(record.expiresAt, "invoice.expiresAt"),
     idempotencyKey:
       typeof record.idempotencyKey === "string" ? record.idempotencyKey.trim() : undefined,
+    network: optionalString(record.network),
+    requestId: optionalString(record.requestId),
+    tool: optionalString(record.tool),
+    settlement: settlement
+      ? {
+          orderId: optionalString(settlement.orderId),
+          settlementId: optionalString(settlement.settlementId),
+          payer: optionalString(settlement.payer),
+          actorId: optionalString(settlement.actorId),
+        }
+      : undefined,
+    quote:
+      record.quote && typeof record.quote === "object" && !Array.isArray(record.quote)
+        ? (record.quote as PaymentRequiredInvoice["quote"])
+        : undefined,
+    metadata:
+      record.metadata && typeof record.metadata === "object" && !Array.isArray(record.metadata)
+        ? (record.metadata as Record<string, unknown>)
+        : undefined,
   };
 }
 
@@ -206,46 +234,11 @@ function normalizeRetryBudget(value: unknown): number | undefined {
   return Math.max(0, Math.floor(value));
 }
 
-function buildPaymentTraceRef(params: {
-  requestId?: string;
-  idempotencyKey: string;
-  resumeToken: PaymentResumeToken;
-  toolName?: string;
-  createdAt: string;
-}): PaymentTraceRef {
-  return {
-    requestId: params.requestId,
-    idempotencyKey: params.idempotencyKey,
-    invoiceId: params.resumeToken.invoiceId,
-    paymentReceiptId: params.resumeToken.paymentReceiptId,
-    txHash: params.resumeToken.txHash,
-    toolName: params.toolName,
-    createdAt: params.createdAt,
-  };
-}
-
 function resolveInvoiceChain(value: unknown, fallback: "evm" | "ton"): "evm" | "ton" {
   if (value === "evm" || value === "ton") {
     return value;
   }
   return fallback;
-}
-
-function buildBillingPaymentReceipt(params: {
-  resumeToken: PaymentResumeToken;
-  amount: string;
-  confirmedAt: string;
-  network?: string;
-}): BillingPaymentReceipt {
-  return {
-    receiptId: params.resumeToken.paymentReceiptId,
-    chain: params.resumeToken.chain,
-    network: params.network,
-    txHash: params.resumeToken.txHash,
-    amount: params.amount,
-    confirmedAt: params.confirmedAt,
-    mode: "live",
-  };
 }
 
 function isSameResumeTokenIdentity(left: PaymentResumeToken, right: PaymentResumeToken): boolean {
@@ -264,13 +257,13 @@ export function createBillingHandlePaymentRequiredHandler(
     try {
       const input = (params ?? {}) as PaymentRequiredInput;
       const invoiceRaw = requireString(input.invoice, "invoice");
-      const invoice = parseInvoice(invoiceRaw);
-      const requestId = optionalString(input.requestId);
-      const toolName = optionalString(input.tool);
+      const parsedInvoice = parseInvoice(invoiceRaw);
+      const requestId = optionalString(input.requestId) ?? parsedInvoice.requestId;
+      const toolName = optionalString(input.tool) ?? parsedInvoice.tool;
       const idempotencyKey =
         typeof input.idempotencyKey === "string" && input.idempotencyKey.trim().length > 0
           ? input.idempotencyKey.trim()
-          : invoice.idempotencyKey;
+          : parsedInvoice.idempotencyKey;
 
       if (!idempotencyKey) {
         respond(
@@ -280,7 +273,7 @@ export function createBillingHandlePaymentRequiredHandler(
         return;
       }
 
-      if (config.x402?.autopay?.enabled === false) {
+      if (config.x402.autopay.enabled === false) {
         respond(
           false,
           formatWeb3GatewayErrorResponse(
@@ -291,7 +284,18 @@ export function createBillingHandlePaymentRequiredHandler(
         return;
       }
 
-      if (Date.parse(invoice.expiresAt) <= Date.now()) {
+      if (config.x402.autopay.enforceCooldown !== false && isAutopayCircuitOpen(store)) {
+        respond(
+          false,
+          formatWeb3GatewayErrorResponse(
+            "E_UNAVAILABLE: x402 autopay cooling down",
+            ErrorCode.E_UNAVAILABLE,
+          ),
+        );
+        return;
+      }
+
+      if (Date.parse(parsedInvoice.expiresAt) <= Date.now()) {
         store.removePaymentRequired(idempotencyKey);
         respond(
           false,
@@ -300,8 +304,14 @@ export function createBillingHandlePaymentRequiredHandler(
         return;
       }
 
+      const invoiceHash = hashPayload(parsedInvoice);
+      const invoice: PaymentRequiredInvoice = {
+        ...parsedInvoice,
+        requestId,
+        tool: toolName,
+        quote: resolveBillingFxQuote(parsedInvoice, config),
+      };
       const signingSecret = resolveResumeTokenSigningSecret(store);
-      const invoiceHash = hashPayload(invoice);
       const existing = store.getPaymentRequired(idempotencyKey);
       if (existing) {
         if (existing.invoiceHash !== invoiceHash) {
@@ -344,29 +354,47 @@ export function createBillingHandlePaymentRequiredHandler(
           return;
         }
 
+        const reusedRecord = {
+          ...existing,
+          reused: true,
+          updatedAt: nowIso(),
+        };
+        store.savePaymentRequired(reusedRecord);
         respond(true, {
           idempotencyKey,
           invoiceId: invoice.invoiceId,
-          resumeToken: existing.resumeToken,
-          authorization: buildPaymentAuthorization(existing.resumeToken),
-          paymentReceipt: buildBillingPaymentReceipt({
-            resumeToken: existing.resumeToken,
-            amount: invoice.amount,
-            confirmedAt: existing.createdAt,
-            network: existing.network,
-          }),
-          maxRetries: normalizeRetryBudget(existing.maxRetries),
-          trace: buildPaymentTraceRef({
-            requestId: existing.requestId ?? requestId,
-            idempotencyKey,
-            resumeToken: existing.resumeToken,
-            toolName: existing.toolName,
-            createdAt: existing.createdAt,
-          }),
+          resumeToken: reusedRecord.resumeToken,
+          authorization: buildPaymentAuthorization(reusedRecord.resumeToken),
+          paymentReceipt: buildBillingPaymentReceipt(reusedRecord),
+          maxRetries: normalizeRetryBudget(reusedRecord.maxRetries),
+          trace: buildPaymentTraceRef(reusedRecord),
+          paymentIntent: reusedRecord.paymentIntent,
+          fxQuote: reusedRecord.fxQuote,
+          treasuryRoute: reusedRecord.treasuryRoute,
+          settlement: reusedRecord.settlement,
+          policy: reusedRecord.paymentIntent?.metadata,
           reused: true,
         });
         return;
       }
+
+      const issuedAt = nowIso();
+      store.updateX402AutopayStats({ attempts: 1, attemptEventAt: issuedAt });
+      const treasuryRoute = resolveTreasuryRoute({
+        paymentChain: invoice.chain,
+        paymentAsset: invoice.asset,
+        settlementAsset: config.x402.fxQuote.settlementAsset,
+        fxQuote: invoice.quote,
+      });
+      const paymentIntent = buildPaymentIntent({
+        invoice,
+        idempotencyKey,
+        requestId,
+        toolName,
+        network: invoice.network,
+        createdAt: issuedAt,
+        quoteId: invoice.quote?.quoteId,
+      });
 
       const callGateway = await loadCallGateway();
       const paymentResponse = await callGateway({
@@ -374,26 +402,27 @@ export function createBillingHandlePaymentRequiredHandler(
         params: {
           chain: invoice.chain,
           to: invoice.payTo,
-          // Compat layer: send both `value` (EVM convention) and `amount` (TON
-          // convention) so either handler resolves via `input.value ?? input.amount`.
-          // Target: unify to `amount` once all handlers are migrated.
           value: invoice.amount,
           amount: invoice.amount,
           tool: toolName,
+          requestId,
+          idempotencyKey,
         },
         timeoutMs: config.brain.timeoutMs,
       });
       const normalized = normalizeGatewayResult(paymentResponse);
       if (!normalized.ok) {
+        store.updateX402AutopayStats({ failures: 1, failureEventAt: nowIso() });
         throw new Error(normalized.error ?? "autopay failed");
       }
+      store.updateX402AutopayStats({ successes: 1 });
 
       const payload = (normalized.result ?? {}) as Record<string, unknown>;
       const txHash = typeof payload.txHash === "string" ? payload.txHash : undefined;
-      const network = typeof payload.network === "string" ? payload.network : undefined;
+      const network = typeof payload.network === "string" ? payload.network : invoice.network;
       const resolvedChain = resolveInvoiceChain(payload.chain, invoice.chain);
       const maxRetries = normalizeRetryBudget(payload.policyAutoPayMaxRetries);
-      const issuedAt = nowIso();
+      const confirmationStatus = txHash ? "submitted" : "simulated";
       const resumeToken: PaymentResumeToken = {
         invoiceId: invoice.invoiceId,
         paymentReceiptId: randomUUID(),
@@ -403,39 +432,67 @@ export function createBillingHandlePaymentRequiredHandler(
         expiresAt: invoice.expiresAt,
         tokenVersion: 2,
         nonce: randomUUID(),
+        network,
+        asset: invoice.asset,
+        amount: invoice.amount,
+        payTo: invoice.payTo,
+        payer: invoice.settlement?.payer,
+        orderId: invoice.settlement?.orderId,
+        settlementId: invoice.settlement?.settlementId,
+        quoteId: invoice.quote?.quoteId,
+        intentId: paymentIntent.intentId,
       };
       resumeToken.signature = signResumeToken(resumeToken, signingSecret);
 
-      store.savePaymentRequired({
+      let record = buildPaymentRequiredRecord({
         idempotencyKey,
         requestId,
         toolName,
         invoiceHash,
+        invoice,
         resumeToken,
         createdAt: issuedAt,
         maxRetries,
         network,
+        status: "authorized",
+        reused: false,
+        confirmationStatus,
+        paymentIntent: {
+          ...paymentIntent,
+          treasuryRouteId: treasuryRoute?.routeId,
+          metadata: {
+            ...(paymentIntent.metadata ?? {}),
+            policyDecisionId:
+              typeof payload.policyDecisionId === "string" ? payload.policyDecisionId : undefined,
+            policyDecisionResult:
+              typeof payload.policyDecisionResult === "string"
+                ? payload.policyDecisionResult
+                : undefined,
+            policyDecisionReason:
+              typeof payload.policyDecisionReason === "string"
+                ? payload.policyDecisionReason
+                : undefined,
+            policyTool: typeof payload.policyTool === "string" ? payload.policyTool : toolName,
+          },
+        },
+        treasuryRoute,
       });
+      record = queueSettlementForPaymentRecord(store, record);
+      store.savePaymentRequired(record);
 
       respond(true, {
         idempotencyKey,
         invoiceId: invoice.invoiceId,
         resumeToken,
         authorization: buildPaymentAuthorization(resumeToken),
-        paymentReceipt: buildBillingPaymentReceipt({
-          resumeToken,
-          amount: invoice.amount,
-          confirmedAt: issuedAt,
-          network,
-        }),
+        paymentReceipt: buildBillingPaymentReceipt(record),
         maxRetries,
-        trace: buildPaymentTraceRef({
-          requestId,
-          idempotencyKey,
-          resumeToken,
-          toolName,
-          createdAt: issuedAt,
-        }),
+        trace: buildPaymentTraceRef(record),
+        paymentIntent: record.paymentIntent,
+        fxQuote: record.fxQuote,
+        treasuryRoute: record.treasuryRoute,
+        settlement: record.settlement,
+        policy: record.paymentIntent?.metadata,
         reused: false,
       });
     } catch (err) {
@@ -520,16 +577,20 @@ export function createBillingConsumePaymentRequiredHandler(
         return;
       }
 
-      store.savePaymentRequired({
+      const consumedRecord = {
         ...record,
         consumedAt: nowIso(),
-      });
+        status: "consumed" as const,
+        updatedAt: nowIso(),
+      };
+      store.savePaymentRequired(consumedRecord);
 
       respond(true, {
         idempotencyKey,
         consumed: true,
-        resumeToken: record.resumeToken,
-        authorization: buildPaymentAuthorization(record.resumeToken),
+        resumeToken: consumedRecord.resumeToken,
+        authorization: buildPaymentAuthorization(consumedRecord.resumeToken),
+        trace: buildPaymentTraceRef(consumedRecord),
       });
     } catch (err) {
       respond(false, formatWeb3GatewayErrorResponse(err));

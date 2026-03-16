@@ -206,6 +206,66 @@ describe("web3.billing.handlePaymentRequired", () => {
     });
   });
 
+  it("derives fx quote and treasury route for TON payment settlement", async () => {
+    mockCallGateway.mockResolvedValueOnce({
+      ok: true,
+      result: { txHash: "0xtonhash", chain: "ton", network: "ton-testnet" },
+    });
+
+    const store = new Web3StateStore(tempDir);
+    const config = resolveConfig({
+      x402: {
+        fxQuote: {
+          enabled: true,
+          source: "manual",
+          settlementAsset: "USDC",
+          defaultTtlMs: 60_000,
+          manualRates: {
+            "TON:USDC": "5",
+          },
+        },
+      },
+    });
+    const handler = createBillingHandlePaymentRequiredHandler(store, config);
+    const invoice: Invoice = {
+      invoiceId: "inv-route",
+      provider: "provider-route",
+      chain: "ton",
+      asset: "TON",
+      amount: "2",
+      payTo: "EQC_ROUTE_ADDRESS",
+      nonce: "nonce-route",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: "idem-route",
+    };
+
+    const responder = createResponder();
+    await handler({
+      params: { invoice: encodeInvoice(invoice) },
+      respond: responder.respond,
+    } as any);
+
+    expect(responder.result()?.ok).toBe(true);
+    const payload = responder.result()?.payload ?? {};
+    expect(payload.fxQuote).toMatchObject({
+      fromAsset: "TON",
+      toAsset: "USDC",
+      rate: "5",
+      source: "manual",
+    });
+    expect(payload.treasuryRoute).toMatchObject({
+      sourceChain: "ton",
+      settlementChain: "evm",
+      sourceAsset: "TON",
+      settlementAsset: "USDC",
+      strategy: "bridge",
+    });
+    expect(payload.paymentIntent).toMatchObject({
+      treasuryRouteId: (payload.treasuryRoute as { routeId: string }).routeId,
+      quoteId: (payload.fxQuote as { quoteId: string }).quoteId,
+    });
+  });
+
   it("blocks autopay when x402 kill switch is disabled", async () => {
     const store = new Web3StateStore(tempDir);
     const config = resolveConfig({ x402: { autopay: { enabled: false } } });
