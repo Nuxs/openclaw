@@ -154,12 +154,14 @@ describe("settlement handler concurrency safety", () => {
       const { seller } = seedOrderAndSettlement(store, { amount: "1000" });
 
       // Fire two concurrent partial releases of 600 each (total 1200 > 1000).
+      // Use distinct idempotency keys so this exercises concurrency safety rather than replay reuse.
       const results = await Promise.allSettled([
         releaseSettlementIncremental({
           store,
           config,
           orderId: "order-1",
           actorId: seller,
+          idempotencyKey: "release:concurrency:a",
           payees: [{ address: seller, amount: "600" }],
         }),
         releaseSettlementIncremental({
@@ -167,6 +169,7 @@ describe("settlement handler concurrency safety", () => {
           config,
           orderId: "order-1",
           actorId: seller,
+          idempotencyKey: "release:concurrency:b",
           payees: [{ address: seller, amount: "600" }],
         }),
       ]);

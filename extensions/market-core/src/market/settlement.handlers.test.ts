@@ -106,6 +106,15 @@ describe("market-core settlement handlers", () => {
         amount: "150",
         lockedAt,
         lockTxHash: "lock-tx",
+        paymentChain: "evm",
+        paymentNetwork: "base-sepolia",
+        paymentIntentId: "intent-release",
+        paymentReceiptId: "receipt-release",
+        paymentTxHash: "0xpayment-release",
+        paymentConfirmedAt: lockedAt,
+        confirmationStatus: "confirmed",
+        fxQuoteId: "quote-release",
+        treasuryRouteId: "route-release",
       };
 
       store.saveOffer(offer);
@@ -137,6 +146,15 @@ describe("market-core settlement handlers", () => {
       expect(savedSettlement?.strategy).toBe("one-shot");
       expect(savedSettlement?.lockedAt).toBe(lockedAt);
       expect(savedSettlement?.lockTxHash).toBe("lock-tx");
+      expect(savedSettlement?.paymentChain).toBe("evm");
+      expect(savedSettlement?.paymentNetwork).toBe("base-sepolia");
+      expect(savedSettlement?.paymentIntentId).toBe("intent-release");
+      expect(savedSettlement?.paymentReceiptId).toBe("receipt-release");
+      expect(savedSettlement?.paymentTxHash).toBe("0xpayment-release");
+      expect(savedSettlement?.paymentConfirmedAt).toBe(lockedAt);
+      expect(savedSettlement?.confirmationStatus).toBe("confirmed");
+      expect(savedSettlement?.fxQuoteId).toBe("quote-release");
+      expect(savedSettlement?.treasuryRouteId).toBe("route-release");
     });
   });
 
@@ -260,6 +278,15 @@ describe("market-core settlement handlers", () => {
         amount: "200",
         lockedAt: new Date().toISOString(),
         lockTxHash: "lock-tx",
+        paymentChain: "ton",
+        paymentNetwork: "ton-mainnet",
+        paymentIntentId: "intent-refund",
+        paymentReceiptId: "receipt-refund",
+        paymentTxHash: "0xpayment-refund",
+        paymentConfirmedAt: "2026-03-16T00:00:00.000Z",
+        confirmationStatus: "confirmed",
+        fxQuoteId: "quote-refund",
+        treasuryRouteId: "route-refund",
       };
 
       store.saveOffer(offer);
@@ -286,6 +313,15 @@ describe("market-core settlement handlers", () => {
       expect(savedSettlement?.status).toBe("settlement_refunded");
       expect(savedSettlement?.amount).toBe("200");
       expect(savedSettlement?.refundReason).toBe("delivery timeout");
+      expect(savedSettlement?.paymentChain).toBe("ton");
+      expect(savedSettlement?.paymentNetwork).toBe("ton-mainnet");
+      expect(savedSettlement?.paymentIntentId).toBe("intent-refund");
+      expect(savedSettlement?.paymentReceiptId).toBe("receipt-refund");
+      expect(savedSettlement?.paymentTxHash).toBe("0xpayment-refund");
+      expect(savedSettlement?.paymentConfirmedAt).toBe("2026-03-16T00:00:00.000Z");
+      expect(savedSettlement?.confirmationStatus).toBe("confirmed");
+      expect(savedSettlement?.fxQuoteId).toBe("quote-refund");
+      expect(savedSettlement?.treasuryRouteId).toBe("route-refund");
     });
   });
 });
