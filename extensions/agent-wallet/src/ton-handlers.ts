@@ -11,6 +11,7 @@ import {
   type IProvider,
   type IProviderTON,
 } from "@openclaw/blockchain-adapter";
+import type { TxReceipt } from "@openclaw/blockchain-adapter";
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlerOptions,
@@ -51,6 +52,27 @@ async function ensureTonConnected(
   }
 
   return { provider, address: wallet.address };
+}
+
+async function confirmTonTransfer(
+  provider: IProviderTON,
+  to: string,
+  amount: bigint,
+): Promise<{
+  submissionId: string;
+  receipt: TxReceipt;
+  confirmedAt: string;
+  explorerUrl: string;
+}> {
+  const submissionId = await provider.transfer(to, amount);
+  const receipt = await provider.waitForTransaction(submissionId, 1);
+  const confirmedAt = new Date().toISOString();
+  return {
+    submissionId,
+    receipt,
+    confirmedAt,
+    explorerUrl: provider.getExplorerUrl(receipt.txHash),
+  };
 }
 
 export function createTonWalletCreateHandler(config: AgentWalletConfig): GatewayRequestHandler {
@@ -109,9 +131,17 @@ export function createTonWalletSendHandler(config: AgentWalletConfig): GatewayRe
 
       try {
         const { provider } = await ensureTonConnected(config);
-        const txHash = await provider.transfer(to, amount);
+        const confirmation = await confirmTonTransfer(provider, to, amount);
         await enforcement.commitUsage();
-        respond(true, { txHash, chain: "ton" });
+        respond(true, {
+          txHash: confirmation.receipt.txHash,
+          submissionId: confirmation.submissionId,
+          chain: "ton",
+          network: config.chain.network,
+          confirmationStatus: "confirmed",
+          confirmedAt: confirmation.confirmedAt,
+          explorerUrl: confirmation.explorerUrl,
+        });
       } catch (txErr) {
         await enforcement.rollbackUsage();
         throw txErr;
@@ -130,10 +160,14 @@ export function createTonWalletAutopayHandler(config: AgentWalletConfig): Gatewa
       const to = requireString(input.to, "to");
       const amountRaw = input.amount ?? input.value;
       const amount = parseAmount(amountRaw, "amount");
+      const callerTool =
+        typeof input.tool === "string" && input.tool.trim().length > 0
+          ? input.tool.trim()
+          : "agent-wallet.autopay";
       const enforcement = await enforcePolicy(config, {
         action: "autopay",
         chain: "ton",
-        tool: "agent-wallet.autopay",
+        tool: callerTool,
         to,
         amount,
         method: "ton_transfer",
@@ -141,13 +175,21 @@ export function createTonWalletAutopayHandler(config: AgentWalletConfig): Gatewa
 
       try {
         const { provider } = await ensureTonConnected(config);
-        const txHash = await provider.transfer(to, amount);
+        const confirmation = await confirmTonTransfer(provider, to, amount);
         await enforcement.commitUsage();
         respond(true, {
-          txHash,
+          txHash: confirmation.receipt.txHash,
+          submissionId: confirmation.submissionId,
           chain: "ton",
           network: config.chain.network,
+          confirmationStatus: "confirmed",
+          confirmedAt: confirmation.confirmedAt,
+          explorerUrl: confirmation.explorerUrl,
           policyAutoPayMaxRetries: enforcement.autoPayMaxRetries,
+          policyDecisionId: enforcement.decision.decisionId,
+          policyDecisionResult: enforcement.decision.result,
+          policyDecisionReason: enforcement.decision.reasonCode,
+          policyTool: callerTool,
         });
       } catch (txErr) {
         await enforcement.rollbackUsage();

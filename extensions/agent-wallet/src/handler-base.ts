@@ -5,11 +5,18 @@
  * and `ton-handlers.ts` (TON). Each chain-specific file now imports from here.
  */
 
+import { randomUUID } from "node:crypto";
 import { initBlockchainFactory } from "@openclaw/blockchain-adapter";
 import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk/gateway-types";
 import type { AgentWalletConfig } from "./config.js";
 import { formatAgentWalletGatewayErrorResponse } from "./errors.js";
-import { appendPolicyDecisionLog, checkPolicy, loadPolicy, type PolicyIntent } from "./policy.js";
+import {
+  appendPolicyDecisionLog,
+  checkPolicy,
+  loadPolicy,
+  type PolicyDecision,
+  type PolicyIntent,
+} from "./policy.js";
 import { readDailySpent, reserveDailyBudget } from "./state.js";
 
 // ── Singleton init ───────────────────────────────────────────────────────────
@@ -58,6 +65,7 @@ export type EnforcementResult = {
   commitUsage: () => Promise<void>;
   rollbackUsage: () => Promise<void>;
   autoPayMaxRetries?: number;
+  decision: PolicyDecision;
 };
 
 /**
@@ -70,9 +78,18 @@ export async function enforcePolicy(
   intent: PolicyIntent,
 ): Promise<EnforcementResult> {
   if (!config.policy.enabled) {
+    const decision: PolicyDecision = {
+      decisionId: randomUUID(),
+      timestamp: new Date().toISOString(),
+      action: intent.action,
+      result: "approved",
+      reasonCode: "approved",
+      metadata: { policyEnabled: false },
+    };
     return {
       commitUsage: async () => undefined,
       rollbackUsage: async () => undefined,
+      decision,
     };
   }
 
@@ -141,5 +158,6 @@ export async function enforcePolicy(
     },
     rollbackUsage: rollback ?? (async () => undefined),
     autoPayMaxRetries,
+    decision,
   };
 }

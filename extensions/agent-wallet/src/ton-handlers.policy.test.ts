@@ -9,7 +9,15 @@ const mockTonProvider = {
   chainType: "ton",
   isConnected: true,
   connect: vi.fn(async () => undefined),
-  transfer: vi.fn(async () => "0xtonhash"),
+  transfer: vi.fn(async () => "ton-boc-submission"),
+  waitForTransaction: vi.fn(async () => ({
+    txHash: "0xtonhash",
+    blockNumber: 123,
+    status: "success",
+    from: mockTonWallet.address,
+    logs: [],
+  })),
+  getExplorerUrl: vi.fn((txHash: string) => `https://tonscan.org/tx/${txHash}`),
   getBalance: vi.fn(async () => 0n),
 };
 
@@ -135,8 +143,16 @@ describe("ton handlers policy guard", () => {
     );
 
     expect(ok).toBe(true);
-    expect(payload).toMatchObject({ txHash: "0xtonhash", chain: "ton" });
+    expect(payload).toMatchObject({
+      txHash: "0xtonhash",
+      submissionId: "ton-boc-submission",
+      chain: "ton",
+      network: "ton-testnet",
+      confirmationStatus: "confirmed",
+      explorerUrl: "https://tonscan.org/tx/0xtonhash",
+    });
     expect(mockTonProvider.transfer).toHaveBeenCalledWith(mockTonWallet.address, 100n);
+    expect(mockTonProvider.waitForTransaction).toHaveBeenCalledWith("ton-boc-submission", 1);
   });
 
   it("rejects second send when daily cap is exceeded", async () => {
@@ -254,8 +270,13 @@ describe("ton handlers policy guard", () => {
     expect(firstOk).toBe(true);
     expect(firstPayload).toMatchObject({
       txHash: "0xtonhash",
+      submissionId: "ton-boc-submission",
       chain: "ton",
+      network: "ton-testnet",
+      confirmationStatus: "confirmed",
+      explorerUrl: "https://tonscan.org/tx/0xtonhash",
       policyAutoPayMaxRetries: 2,
+      policyTool: "agent-wallet.autopay",
     });
     expect(secondOk).toBe(false);
     expect(secondPayload).toMatchObject({ error: "E_FORBIDDEN" });
@@ -274,7 +295,7 @@ describe("ton handlers policy guard", () => {
             ...basePolicy,
             scope: {
               ...basePolicy.scope,
-              allowedTools: ["agent-wallet.autopay"],
+              allowedTools: ["agent-wallet.autopay", "web3.billing.handlePaymentRequired"],
             },
             autoPay: {
               enabled: true,
@@ -292,6 +313,7 @@ describe("ton handlers policy guard", () => {
         {
           to: mockTonWallet.address,
           value: "50",
+          tool: "web3.billing.handlePaymentRequired",
         },
         (resultOk, resultPayload) => {
           ok = resultOk;
@@ -303,8 +325,11 @@ describe("ton handlers policy guard", () => {
     expect(ok).toBe(true);
     expect(payload).toMatchObject({
       txHash: "0xtonhash",
+      submissionId: "ton-boc-submission",
       chain: "ton",
+      confirmationStatus: "confirmed",
       policyAutoPayMaxRetries: 1,
+      policyTool: "web3.billing.handlePaymentRequired",
     });
   });
 });

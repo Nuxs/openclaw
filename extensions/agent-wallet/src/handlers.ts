@@ -147,10 +147,14 @@ export function createAgentWalletAutopayHandler(config: AgentWalletConfig): Gate
       const valueRaw = input.value ?? input.amount;
       const value = parseAmount(valueRaw, "value");
       const data = typeof input.data === "string" ? input.data : undefined;
+      const callerTool =
+        typeof input.tool === "string" && input.tool.trim().length > 0
+          ? input.tool.trim()
+          : "agent-wallet.autopay";
       const enforcement = await enforcePolicy(config, {
         action: "autopay",
         chain: "evm",
-        tool: "agent-wallet.autopay",
+        tool: callerTool,
         to,
         amount: value,
         method: parseMethodSelector(data),
