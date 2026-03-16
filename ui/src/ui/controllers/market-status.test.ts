@@ -4,6 +4,7 @@ import {
   loadMarketOps,
   loadMarketPresetPreview,
   loadMarketPrivacy,
+  loadMarketStatus,
   loadMarketTasks,
   type MarketOpsState,
   type MarketPresetState,
@@ -20,6 +21,99 @@ function createClient(
 }
 
 describe("market-status controller", () => {
+  it("loadMarketStatus reads bridge transfers from the registered bridge.list method", async () => {
+    const methods: string[] = [];
+    const client = createClient(async (method) => {
+      methods.push(method);
+      switch (method) {
+        case "web3.market.status.summary":
+          return { result: { totals: { offers: 1, orders: 1, resources: 1, leases: 1 } } };
+        case "web3.market.metrics.snapshot":
+          return { result: { alerts: [] } };
+        case "web3.index.list":
+          return { result: { entries: [] } };
+        case "web3.index.stats":
+          return { result: { providers: 1 } };
+        case "web3.monitor.snapshot":
+          return { result: { healthy: true } };
+        case "web3.market.resource.list":
+          return { result: { resources: [] } };
+        case "web3.market.lease.list":
+          return { result: { leases: [] } };
+        case "web3.market.ledger.summary":
+          return { result: { totalEntries: 0 } };
+        case "web3.market.ledger.list":
+          return { result: { entries: [] } };
+        case "web3.market.dispute.list":
+          return { result: { disputes: [] } };
+        case "web3.market.reputation.summary":
+          return { result: { topProviders: [] } };
+        case "web3.market.tokenEconomy.summary":
+          return { result: { totalSupply: "0" } };
+        case "web3.market.bridge.routes":
+          return { result: { assets: [], routes: [] } };
+        case "web3.market.bridge.list":
+          return {
+            result: [
+              {
+                bridgeId: "bridge-1",
+                routeId: "route-1",
+                fromChain: "ton",
+                toChain: "evm",
+                assetSymbol: "USDC",
+                amount: "5",
+                status: "bridge_requested",
+                requestedAt: "2026-03-16T00:00:00.000Z",
+                updatedAt: "2026-03-16T00:00:00.000Z",
+              },
+            ],
+          };
+        default:
+          throw new Error(`Unexpected method: ${method}`);
+      }
+    });
+
+    const state: Parameters<typeof loadMarketStatus>[0] = {
+      client,
+      connected: true,
+      hello: {
+        features: {
+          methods: [
+            "web3.market.status.summary",
+            "web3.market.metrics.snapshot",
+            "web3.index.list",
+            "web3.index.stats",
+            "web3.monitor.snapshot",
+          ],
+        },
+      },
+      marketLoading: false,
+      marketError: null,
+      marketStatus: null,
+      marketMetrics: null,
+      marketIndexEntries: [],
+      marketIndexStats: null,
+      marketMonitor: null,
+      marketResources: [],
+      marketLeases: [],
+      marketLedgerSummary: null,
+      marketLedgerEntries: [],
+      marketDisputes: [],
+      marketReputation: null,
+      marketTokenEconomy: null,
+      marketBridgeRoutes: null,
+      marketBridgeTransfers: [],
+      marketLastSuccess: null,
+    };
+
+    await loadMarketStatus(state);
+
+    expect(methods).toContain("web3.market.bridge.list");
+    expect(methods).not.toContain("web3.market.bridge.transfers");
+    expect(state.marketBridgeTransfers).toHaveLength(1);
+    expect(state.marketBridgeTransfers[0]?.bridgeId).toBe("bridge-1");
+  });
+
   it("loadMarketTasks uses the formal result list method and derives summary fields", async () => {
     const methods: string[] = [];
     const client = createClient(async (method) => {

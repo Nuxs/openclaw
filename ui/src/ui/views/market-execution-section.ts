@@ -12,6 +12,8 @@ export function renderMarketExecutionSection(props: MarketExecutionSectionProps)
   const { executions, loading, error } = props;
   const statusCounts = countBy(executions, (entry) => entry.executionStatus);
   const acceptanceCounts = countBy(executions, (entry) => entry.acceptanceStatus ?? "unknown");
+  const pendingApprovals = acceptanceCounts.acceptance_pending ?? 0;
+  const activeDisputes = statusCounts.disputed ?? 0;
 
   return html`
     <div class="card">
@@ -37,6 +39,19 @@ export function renderMarketExecutionSection(props: MarketExecutionSectionProps)
       </div>
 
       ${error ? html`<div class="callout warn" style="margin-top: 12px;">${error}</div>` : nothing}
+
+      <div class="card" style="margin-top: 16px; background: rgba(15, 23, 42, 0.18); border: 1px dashed rgba(148, 163, 184, 0.25);">
+        <div class="card-sub" style="font-weight:600;margin-bottom:6px;">Buyer Lifecycle Path</div>
+        <ul class="clean-list muted">
+          <li><code>web3.market.offer.compare</code> / <code>web3.market.offer.quote</code>：先生成购买计划。</li>
+          <li><code>web3.market.steward.buy</code>：默认输出审批态，只有显式执行才进入支付与租约。</li>
+          <li><code>web3.market.proof.verify</code> + <code>web3.market.acceptance.sign/reject</code>：完成 proof 审核与买方决定。</li>
+          <li><code>web3.market.settlement.query</code> + <code>web3.market.dispute.*</code>：跟进结算与争议闭环。</li>
+        </ul>
+        <div class="muted" style="margin-top: 8px;">
+          Pending approvals ${pendingApprovals} · Active disputes ${activeDisputes}
+        </div>
+      </div>
 
       ${
         executions.length > 0

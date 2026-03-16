@@ -22,6 +22,12 @@ const MODE_OPTIONS: MarketPresetMode[] = ["single-node", "trusted-circle", "hybr
 const INTENT_OPTIONS: MarketPresetIntent[] = ["provider", "hybrid", "consumer"];
 
 export function renderMarketProviderOnboardingSection(props: MarketProviderOnboardingSectionProps) {
+  const previewBlockers = props.preview?.checks.filter((check) => check.status !== "pass") ?? [];
+  const verifyIssues =
+    props.verification?.readiness.checks.filter((check) => check.status !== "pass") ?? [];
+  const publishableProviders =
+    props.preview?.detectedProviders.filter((provider) => provider.publishable) ?? [];
+
   return html`
     <div class="card" style="margin-top: 16px;">
       <div class="row" style="justify-content: space-between; gap: 12px; align-items:flex-start;">
@@ -60,21 +66,48 @@ export function renderMarketProviderOnboardingSection(props: MarketProviderOnboa
             <div class="stat-value">${props.preview.detectedProviders.length}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">Checks</div>
-            <div class="stat-value">${props.preview.checks.length}</div>
+            <div class="stat-label">Publishable</div>
+            <div class="stat-value">${publishableProviders.length}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">Next Steps</div>
-            <div class="stat-value">${props.preview.nextSteps.length}</div>
+            <div class="stat-label">Preview Blockers</div>
+            <div class="stat-value">${previewBlockers.length}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">Verify Mode</div>
-            <div class="stat-value">${props.verification?.mode ?? props.mode}</div>
+            <div class="stat-label">Verify Issues</div>
+            <div class="stat-value">${verifyIssues.length}</div>
           </div>
         </div>
 
         <div class="muted" style="margin-top: 12px;">${props.preview.summary}</div>
         <div class="muted" style="margin-top: 6px;">${props.preview.layout.pattern} · ${props.preview.layout.trustDomain}</div>
+
+        <div class="card" style="margin-top: 16px; background: rgba(15, 23, 42, 0.18); border: 1px dashed rgba(148, 163, 184, 0.25);">
+          <div class="card-sub" style="font-weight:600;margin-bottom:6px;">Provider Lifecycle Path</div>
+          <ul class="clean-list muted">
+            <li><code>web3.market.offer.create</code>：先建立 seller offer 草稿。</li>
+            <li><code>web3.market.offer.update</code>：修正价格、交付方式或 usage scope。</li>
+            <li><code>web3.market.offer.publish</code>：在 preview / verify 足够稳定后发布 offer。</li>
+            <li><code>web3.market.resource.publish</code>：把可发现资源挂到已发布 offer 上。</li>
+            <li><code>web3.market.resource.unpublish</code> / <code>web3.market.offer.close</code>：下架资源或关闭旧 offer。</li>
+          </ul>
+        </div>
+
+        ${
+          previewBlockers.length > 0 || verifyIssues.length > 0
+            ? html`
+          <div class="callout warn" style="margin-top: 16px;">
+            Publish is still gated by ${previewBlockers.length} preview blockers and ${verifyIssues.length} verify issues.
+            Clear them before exposing this provider to buyers.
+          </div>
+        `
+            : html`
+                <div class="callout" style="margin-top: 16px">
+                  Provider onboarding is green enough to draft/publish an offer. Finish resource publish and
+                  operator review before go-live.
+                </div>
+              `
+        }
 
         ${
           props.preview.detectedProviders.length > 0

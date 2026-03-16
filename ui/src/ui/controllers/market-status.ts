@@ -111,7 +111,7 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       state.client.request<MarketReputationSummary>("web3.market.reputation.summary", {}),
       state.client.request<TokenEconomyState>("web3.market.tokenEconomy.summary", {}),
       state.client.request<BridgeRoutesSnapshot>("web3.market.bridge.routes", {}),
-      state.client.request<{ transfers?: unknown[] }>("web3.market.bridge.transfers", {
+      state.client.request("web3.market.bridge.list", {
         limit: 100,
       }),
     ]);
@@ -129,7 +129,7 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
     state.marketReputation = normalizePayload<MarketReputationSummary>(reputation);
     state.marketTokenEconomy = normalizePayload<TokenEconomyState>(tokenEconomy);
     state.marketBridgeRoutes = normalizePayload<BridgeRoutesSnapshot>(bridgeRoutes);
-    state.marketBridgeTransfers = normalizeListPayload<BridgeTransfer>(
+    state.marketBridgeTransfers = normalizeArrayOrListPayload<BridgeTransfer>(
       bridgeTransfers,
       "transfers",
     );
@@ -390,6 +390,18 @@ function normalizePayload<T>(payload: unknown): T | null {
 
 function normalizeListPayload<T>(payload: unknown, key: string): T[] {
   const value = unwrapResult(payload);
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  const list = (value as Record<string, unknown>)[key];
+  return Array.isArray(list) ? (list as T[]) : [];
+}
+
+function normalizeArrayOrListPayload<T>(payload: unknown, key: string): T[] {
+  const value = unwrapResult(payload);
+  if (Array.isArray(value)) {
+    return value as T[];
+  }
   if (!value || typeof value !== "object") {
     return [];
   }
