@@ -134,15 +134,15 @@
 
 - [ ] **选型对齐**：按盟友主文档结论落地 libp2p 传输层（`references/web3-mdl-libp2p-discovery-plan.md`），本计划只记录我方接入约束。
 - [ ] **节点身份映射**：定义 DID/Key 到 PeerID 的映射输入输出，保证 `web3.wallet.*` 与发现层身份一致。
-- [ ] **Bootstrap 接入门禁**：明确首批种子节点配置来源、健康探测与失败降级策略（不阻塞 PayFi 主链路）。
+- [ ] **Bootstrap 接入门禁**：明确首批种子节点配置来源、健康探测与 operator 降级策略（不阻塞 PayFi 主链路）。
 - [ ] **验收**：完成“单节点启动 -> 入网 -> 可见邻居”最小链路验证，并保留日志证据。
 
 ### 4.2 P1：资源广播与索引（我方集成面）
 
 - [ ] **接口契约**：定义 Discovery -> Market 的最小契约（资源广播消息结构、签名字段、去重键、TTL）。
-- [ ] **索引对接**：把发现结果接入现有 `web3.index.*` / `market.resource.*` 查询面，保持兼容旧 HTTP 索引路径。
-- [ ] **回退策略**：当 P2P 不稳定时自动回退到静态/HTTP 索引，保证 `web3.market.*` 可用性。
-- [ ] **验收**：完成“P2P 广播可用 + 回退可用”双路径演练，输出对账结果（资源数、一致性、时延）。
+- [ ] **索引对接**：把发现结果接入现有 `web3.index.*` / `market.resource.*` 查询面，保持与本地 index / gossip 路径兼容。
+- [ ] **回退策略**：P0/P1 先以“`web3.index.report` 与 discovery publish 解耦 + operator 可切 `static` backend 停止 P2P + 保留本地 index/gossip 查询面”为保底；自动回退 `static` / HTTP 索引 / 最近一次成功缓存属于后续 backlog。
+- [ ] **验收**：完成“P2P 广播可用 + `static` 手动切换后查询面仍可用”双路径演练，输出对账结果（资源数、一致性、时延）。
 
 ### 4.3 边界说明（P2 不在本计划展开）
 
@@ -203,6 +203,7 @@
 ### Week A：发布门禁补齐
 
 - [ ] 补齐“回滚演练记录”与“发布说明草案”。
+- [x] `runbook` / `go-live evidence` / `release notes` 三类公开文档已收敛到同一套 baseline vs release gate 口径，并已接入 `scripts/release-check.ts` 静态门禁。
 - [ ] 固化 kill switch 与降级操作脚本（负责人 + 值班人）。
 
 ### Week B：可观测收敛

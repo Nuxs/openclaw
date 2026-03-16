@@ -13,7 +13,7 @@
 - **对外单入口**：用户/看板/Agent 只依赖 `web3.*`；`market.*` 作为内部权威状态面。
 - **默认可分享输出**：任何可外发面（文档示例/日志/状态输出/工具返回）默认脱敏，不包含明文 token、Provider endpoint、真实路径。
 - **以代码为准**：本页只写"已能在代码里验证"的能力；规划内容必须标注为"计划"。
-- **上线口径**：P0 阻断项已清零，当前以严格评审结论为准（受控内测 Conditional Go，GA 待复评）；后续转绿需满足 `WEB3_DEV_PLAN_PAYFI.md` 的门禁清零。
+- **上线口径**：P0 代码与文档门禁正在收口，当前仍以严格评审结论为准（受控内测 Conditional Go，GA 待复评）；后续转绿需满足 `WEB3_DEV_PLAN_PAYFI.md` 的门禁清零与 operator 演练完成。
 - **核实依据**：`WEB3_LAUNCH_READINESS_EVALUATION_2026_03_03.md`（v2.2 安全修复完成版）与 `WEB3_LAUNCH_READINESS_EVIDENCE_MATRIX_2026_03_03.md`（v2.2）。
 
 ---
@@ -44,6 +44,7 @@
 - **资源发布与租用**：存在 `market.resource.*`、`market.lease.*` 权威方法，且 `web3-core` 提供 `web3.resources.*` 及 `web3.market.*` 编排/代理入口。
 - **一次性 token 约束**：租约签发响应允许返回明文 token（仅一次）；调用面鉴权执行强一致拒绝（含 lease 状态、过期、resource published 校验）。
 - **发现索引脱敏**：`web3.index.list` 输出会对 endpoint 等敏感字段做脱敏，并对索引条目执行消费侧验签。
+- **Discovery/MDL 当前真相**：已存在 `static` / `libp2p` 两种后端；`web3.index.report` 成功后会尝试发布 `DiscoveryRecord`，后台 service 会定时执行 discover + ingest；当前尚未实现运行时自动回退 `static` 或“最近一次成功缓存”回放。
 
 ### 2.3 争议（Dispute）
 
@@ -105,8 +106,8 @@
 #### 3.1.1 治理就绪状态（2026-03-03）
 
 - **技术评审**：✅ 已完成（`references/WEB3_TECH_STACK_REVIEW.md`）。
-- **文档治理**：🟡 进行中（已形成架构/计划/进度三层文档，术语与状态正在统一到主计划口径）。
-- **代码实现**：🟡 进行中（核心路径已具备，发布门禁项尚未全部闭合）。
+- **文档治理**：🟡 进行中（runbook / evidence / release notes 口径已开始收敛到同一套 baseline vs release gate 边界，仍待继续同步 MDL 与产品面文档）。
+- **代码实现**：🟡 进行中（核心路径已具备，`preset.verify` 与 `release-check` 已开始区分 baseline / source gate / operator gate，真实演练与产品化闭环仍在推进）。
 - **执行口径**：`WEB3_DEV_PLAN_PAYFI.md` 为单一执行真相源；其余文档同步对齐。
 
 #### 3.1.2 阻断分级结论（严格审计）
@@ -139,8 +140,8 @@
 
 - **目标**：按 `WEB3_DEV_PLAN_PAYFI.md` v1.4 对齐，仅维护 Discovery **P0/P1**（我方接入与集成面），保障 PayFi 与 Discovery 并行推进。
 - **实施计划**：`skills/web3-market/references/web3-mdl-libp2p-discovery-plan.md`（盟友主导完整切片 A→F，我方按 P0/P1 接入）
-- **我方范围（P0/P1）**：节点身份映射、资源广播契约、`web3.index.*` / `market.resource.*` 索引对接、P2P 异常回退静态/HTTP 索引。
-- **边界说明（P2）**：NAT/Relay/端到端路由由盟友主文档维护与排期，本页不重复承诺实现细节。
+- **我方范围（P0/P1）**：节点身份映射、资源广播契约、`web3.index.*` / `market.resource.*` 索引对接、Discovery 文档与运行时口径收敛；当前保底手段是 report/publish 解耦与 operator 手动切换 `static` backend。
+- **边界说明（P2）**：自动 failover、持久缓存回放、relay/direct connect 与 NAT 穿透仍属 backlog；NAT/Relay/端到端路由由盟友主文档维护与排期。
 - **安全约束**：发现不暴露 endpoint/token、market.lease.issue 零改动、默认 disabled
 
 ### 4.2 既有路线图

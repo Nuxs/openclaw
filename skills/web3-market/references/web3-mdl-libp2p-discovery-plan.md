@@ -2,9 +2,11 @@
 
 > **版本**：v1.0 (Execution Ready)  
 > **创建日期**：2026-03-03  
-> **状态**：⏳ 执行中  
-> **适用范围**：`extensions/web3-core/src/discovery/`（主），`extensions/web3-core/src/resources/`、`extensions/web3-core/src/state/`、`extensions/web3-core/src/config.ts`、`extensions/web3-core/src/index.ts`（辅）  
+> **状态**：⏳ 执行中（设计文档；当前落地以代码为准）  
+> **适用范围**：`extensions/web3-core/src/discovery/`（主），`extensions/web3-core/src/resources/`、`extensions/web3-core/src/state/`、`extensions/web3-core/src/config.ts`、`extensions/web3-core/src/register-resources.ts`（辅）  
 > **前置依赖**：Phase 1 资源共享闭环已完成（B-2）；`web3.index.*` 索引体系已稳定运行
+>
+> **实现对齐说明**：本文保留切片化设计语言，但并不等同于“全部已按此实现”。如与运行时代码冲突，以 `register-resources.ts`、`resources/indexer.ts`、`discovery/*.ts`、`state/store-types.ts` 的当前实现为准；未落地项统一视为 backlog。
 
 ---
 
@@ -33,12 +35,12 @@
 
 ### 0.3 爆炸半径控制
 
-| 约束             | 说明                                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 新增代码集中在   | `extensions/web3-core/src/discovery/` 目录（全部新建文件）                                                                                                          |
-| 现有文件修改控制 | `signature-verification.ts` 仅增加 v2 分支（v1 路径零改）；`store.ts` 仅增加可选字段；`config.ts` 仅增加 discovery 配置节；`index.ts` 仅增加 discovery 生命周期注入 |
-| market-core      | 零修改                                                                                                                                                              |
-| 对外 API 面      | `web3.index.*` 返回结构不变（新增字段为可选，默认不出现）                                                                                                           |
+| 约束             | 说明                                                                                                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 新增代码集中在   | `extensions/web3-core/src/discovery/` 目录（全部新建文件）                                                                                                                                   |
+| 现有文件修改控制 | `signature-verification.ts` 仅增加 v2 分支（v1 路径零改）；`state/store-types.ts` 仅增加可选字段；`config.ts` 仅增加 discovery 配置节；`register-resources.ts` 仅增加 discovery 生命周期注入 |
+| market-core      | 零修改                                                                                                                                                                                       |
+| 对外 API 面      | `web3.index.*` 返回结构不变（新增字段为可选，默认不出现）                                                                                                                                    |
 
 ---
 
@@ -52,21 +54,21 @@ extensions/web3-core/
 │   │   ├── namespace.ts                    # Slice A
 │   │   ├── signature-v2.ts                 # Slice B
 │   │   ├── ingest.ts                       # Slice C
-│   │   ├── backend-static.ts              # Slice C
-│   │   ├── backend-libp2p.ts              # Slice D
+│   │   ├── backend-static.ts               # Slice C
+│   │   ├── backend-libp2p.ts               # Slice D
 │   │   ├── factory.ts                      # Slice D
 │   │   ├── types.test.ts                   # Slice A
-│   │   ├── namespace.test.ts              # Slice A
-│   │   ├── signature-v2.test.ts           # Slice B
-│   │   ├── ingest.test.ts                 # Slice C
-│   │   └── backend-static.test.ts         # Slice C
+│   │   ├── namespace.test.ts               # Slice A
+│   │   ├── signature-v2.test.ts            # Slice B
+│   │   ├── ingest.test.ts                  # Slice C
+│   │   └── backend-static.test.ts          # Slice C
 │   │
 │   ├── resources/
-│   │   └── signature-verification.ts      # [MODIFY] Slice B
+│   │   └── signature-verification.ts       # [MODIFY] Slice B
 │   ├── state/
-│   │   └── store.ts                        # [MODIFY] Slice B
+│   │   └── store-types.ts                  # [MODIFY] Slice B
 │   ├── config.ts                           # [MODIFY] Slice E
-│   └── index.ts                            # [MODIFY] Slice E
+│   └── register-resources.ts               # [MODIFY] Slice E
 │
 ├── package.json                            # [MODIFY] Slice D
 └── ARCHITECTURE.md                         # [MODIFY] Slice F
@@ -76,12 +78,14 @@ extensions/web3-core/
 
 ```
 Publish 流:
-  Provider → web3.index.report → indexer 签名(v2) → store
+  Provider → web3.index.report → indexer 签名(v1) → store
+           → onReportAccepted 构造 DiscoveryRecord(v2)
            → DiscoveryBackend.publish()
-           → DHT putProvider + Rendezvous register
+           → DHT provide + DHT put(record) + Rendezvous register
 
 Discover 流:
   Background Service → DiscoveryBackend.discover()
+           → DHT findProviders / DHT get(record) / Rendezvous discover(peer hints)
            → DiscoveryRecord[] → ingest pipeline (验签+过期过滤)
            → store.upsertResourceIndex() + store.upsertP2pPeer()
            → web3.index.list 可见 (经 redact)
@@ -89,8 +93,8 @@ Discover 流:
 Connect 流:
   Consumer → web3.index.list (peerId + reachability)
            → web3.resources.lease → market.lease.issue
-           → ConsumerLeaseAccess (+ connectionRef)
-           → relay/direct connect (Slice B 阶段)
+           → ConsumerLeaseAccess (+ connectionRef, 仍属后续闭环预留)
+           → relay/direct connect (backlog)
 ```
 
 ---
@@ -185,7 +189,7 @@ type DiscoveryConfig = {
 | ---- | ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | B-1  | `discovery/signature-v2.ts`           | NEW    | `buildSignaturePayloadV2(entry)` — 在 v1 字段集上追加 `peerId`/`reachability`/`payloadVersion: 2`；`signEntryV2(entry, privateKey)` — 使用 Ed25519 签名         |
 | B-2  | `resources/signature-verification.ts` | MODIFY | 在 `verifyIndexSignature()` 入口增加分支：`entry.signature?.payloadVersion === 2` → 调用 `buildSignaturePayloadV2()`，否则走现有 v1 路径。**v1 路径代码零修改** |
-| B-3  | `state/store.ts`                      | MODIFY | `ResourceIndexEntry` 增加可选字段 `peerId?: string`、`reachability?: Reachability`；`IndexSignature` 增加可选字段 `payloadVersion?: number`                     |
+| B-3  | `state/store-types.ts`                | MODIFY | `ResourceIndexEntry` 增加可选字段 `peerId?: string`、`reachability?: Reachability`；`IndexSignature` 增加可选字段 `payloadVersion?: number`                     |
 | B-4  | `discovery/signature-v2.test.ts`      | NEW    | v2 payload 构建测试（字段完整性、stableStringify 确定性）、签名+验签往返测试、v1 签名不受影响回归测试                                                           |
 
 **签名兼容方案（精确逻辑）**：
@@ -201,7 +205,7 @@ type DiscoveryConfig = {
   verify(publicKey, hash, signature)
 ```
 
-**store.ts 变更（精确 diff 预览）**：
+**state/store-types.ts 变更（精确 diff 预览）**：
 
 ```typescript
 // ResourceIndexEntry — 仅增加可选字段
@@ -291,11 +295,11 @@ ingestDiscoveryRecords(records: DiscoveryRecord[], store: Web3StateStore):
 
 **目标**：实现基于 libp2p 的 DHT + Rendezvous 发现后端，以及后端工厂。
 
-| 序号 | 文件                          | 操作   | 具体产出                                                                                                                                                                                                                                             |
-| ---- | ----------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D-1  | `discovery/backend-libp2p.ts` | NEW    | `Libp2pDiscoveryBackend` — 创建 libp2p 节点（DHT + Noise + Yamux + CircuitRelayV2），实现 publish（DHT putProvider + Rendezvous register）、discover（DHT findProviders + Rendezvous discover）、stop（graceful shutdown）。包含 lazy init、错误容忍 |
-| D-2  | `discovery/factory.ts`        | NEW    | `createDiscoveryBackend(config, store)` — 根据 `config.discovery.backend` 值创建后端实例                                                                                                                                                             |
-| D-3  | `package.json`                | MODIFY | 新增依赖：`@libp2p/interface`、`libp2p`、`@libp2p/kad-dht`、`@libp2p/circuit-relay-v2`、`@chainsafe/libp2p-noise`、`@chainsafe/libp2p-yamux`                                                                                                         |
+| 序号 | 文件                          | 操作   | 具体产出                                                                                                                                                                                                                                                                                                                |
+| ---- | ----------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-1  | `discovery/backend-libp2p.ts` | NEW    | `Libp2pDiscoveryBackend` — 创建 libp2p 节点（DHT + Noise + Yamux + CircuitRelayV2），实现 publish（DHT provide + DHT put(record) + Rendezvous register）、discover（DHT findProviders 收集 peer hints、`dht.get()` 读取记录、Rendezvous discover 补充 peer hints）、stop（graceful shutdown）。包含 lazy init、错误容忍 |
+| D-2  | `discovery/factory.ts`        | NEW    | `createDiscoveryBackend(config, store)` — 根据 `config.discovery.backend` 值创建后端实例                                                                                                                                                                                                                                |
+| D-3  | `package.json`                | MODIFY | 新增依赖：`@libp2p/interface`、`libp2p`、`@libp2p/kad-dht`、`@libp2p/circuit-relay-v2`、`@chainsafe/libp2p-noise`、`@chainsafe/libp2p-yamux`                                                                                                                                                                            |
 
 **libp2p 节点配置（精确参数）**：
 
@@ -343,11 +347,11 @@ createLibp2p({
 
 **目标**：在 web3-core 插件中接入 DiscoveryBackend 的生命周期管理。
 
-| 序号 | 文件                  | 操作   | 具体产出                                                                                                                                                                                                       |
-| ---- | --------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E-1  | `config.ts`           | MODIFY | 新增 `DiscoveryConfig` 类型定义 + `Web3PluginConfig.discovery` 字段（默认 `{ enabled: false, backend: "static", bootstrapPeers: [], rendezvousIntervalMs: 30_000, dhtKeyPrefix: "/openclaw/resource" }`）      |
-| E-2  | `index.ts`            | MODIFY | 在 `register()` 中根据 `config.discovery.enabled` 创建 `DiscoveryBackend` → 在 background service start 时启动定期 discover → 在 `web3.index.report` 成功后触发 publish → 在 plugin stop 时调用 backend.stop() |
-| E-3  | `resources/leases.ts` | MODIFY | `ConsumerLeaseAccess` 增加可选字段 `connectionRef?: string`（peerId 引用，为 Slice B 阶段的连接闭环预留）                                                                                                      |
+| 序号 | 文件                    | 操作   | 具体产出                                                                                                                                                                                                  |
+| ---- | ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E-1  | `config.ts`             | MODIFY | 新增 `DiscoveryConfig` 类型定义 + `Web3PluginConfig.discovery` 字段（默认 `{ enabled: false, backend: "static", bootstrapPeers: [], rendezvousIntervalMs: 30_000, dhtKeyPrefix: "/openclaw/resource" }`） |
+| E-2  | `register-resources.ts` | MODIFY | 在资源注册层根据 `config.discovery.enabled` 创建 `DiscoveryBackend` → 在 background service start 时启动定期 discover → 在 `web3.index.report` 成功后触发 publish → 在 plugin stop 时调用 backend.stop()  |
+| E-3  | `resources/leases.ts`   | MODIFY | `ConsumerLeaseAccess` 增加可选字段 `connectionRef?: string`（peerId 引用，为 Slice B 阶段的连接闭环预留）                                                                                                 |
 
 **config.ts 变更预览**：
 
@@ -368,7 +372,7 @@ export type Web3PluginConfig = {
 };
 ```
 
-**index.ts 集成逻辑（伪代码）**：
+**register-resources.ts 集成逻辑（伪代码）**：
 
 ```typescript
 // register() 内
@@ -403,7 +407,7 @@ if (config.discovery.enabled) {
 - [ ] 现有 `web3.index.*` API 返回结构不变
 - [ ] `pnpm build` 通过（无类型错误）
 
-**回归点**：`config.ts` / `index.ts` / `leases.ts` 的改动均为追加（新增字段/新增 `if` 分支），回滚 = revert 这三个文件的 diff。
+**回归点**：`config.ts` / `register-resources.ts` / `leases.ts` 的改动均为追加（新增字段/新增 `if` 分支），回滚 = revert 这三个文件的 diff。
 
 ---
 
@@ -462,9 +466,9 @@ Slice F (architecture docs)
 | `discovery/ingest.test.ts`            | NEW    | C     | ingest 管线测试                | ~100         |
 | `discovery/backend-static.test.ts`    | NEW    | C     | 静态后端测试                   | ~30          |
 | `resources/signature-verification.ts` | MODIFY | B     | +v2 分支（~15 行追加）         | ~15          |
-| `state/store.ts`                      | MODIFY | B     | +可选字段（~5 行追加）         | ~5           |
+| `state/store-types.ts`                | MODIFY | B     | +可选字段（~5 行追加）         | ~5           |
 | `config.ts`                           | MODIFY | E     | +DiscoveryConfig 类型 + 默认值 | ~25          |
-| `index.ts`                            | MODIFY | E     | +discovery 生命周期注入        | ~40          |
+| `register-resources.ts`               | MODIFY | E     | +discovery 生命周期注入        | ~40          |
 | `resources/leases.ts`                 | MODIFY | E     | +connectionRef 可选字段        | ~3           |
 | `package.json`                        | MODIFY | D     | +libp2p 依赖                   | ~8           |
 | `ARCHITECTURE.md`                     | MODIFY | F     | +Discovery 模块章节            | ~60          |
@@ -553,8 +557,8 @@ Slice F (architecture docs)
 
 ### 8.3 与签名体系的关系
 
-- **密钥复用**：MDL 使用 `index-signing.json` 中的 Ed25519 密钥
-- **peerId 派生**：libp2p peerId 从同一 Ed25519 私钥派生
+- **密钥复用**：当前 `buildSignedDiscoveryRecord()` 复用 `index-signing.json` 中的 Ed25519 密钥为 DiscoveryRecord 生成 v2 签名
+- **peerId 派生**：目标是让 libp2p peerId 从同一 Ed25519 私钥派生；当前 `privateKeyDer` 尚未接入 libp2p identity，peerId 仍以运行时节点为准
 - **签名兼容**：v1 和 v2 签名共存，验签入口自动分发
 
 ---
