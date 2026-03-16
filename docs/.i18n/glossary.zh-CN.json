@@ -206,5 +206,109 @@
   {
     "source": "env var",
     "target": "环境变量"
+  },
+  {
+    "source": "FXQuote",
+    "target": "FXQuote"
+  },
+  {
+    "source": "TreasuryRoute",
+    "target": "TreasuryRoute"
+  },
+  {
+    "source": "PaymentIntent",
+    "target": "PaymentIntent"
+  },
+  {
+    "source": "PaymentReceipt",
+    "target": "PaymentReceipt"
+  },
+  {
+    "source": "ReconciliationSummary",
+    "target": "ReconciliationSummary"
+  },
+  {
+    "source": "PaymentOrchestrator",
+    "target": "PaymentOrchestrator"
+  },
+  {
+    "source": "payment orchestrator",
+    "target": "支付编排器"
+  },
+  {
+    "source": "treasury router",
+    "target": "金库选路"
+  },
+  {
+    "source": "Treasury Router",
+    "target": "金库选路"
+  },
+  {
+    "source": "direct rail",
+    "target": "直连路径"
+  },
+  {
+    "source": "Direct Rail",
+    "target": "直连路径"
+  },
+  {
+    "source": "bridge rail",
+    "target": "跨链路径"
+  },
+  {
+    "source": "Bridge Rail",
+    "target": "跨链路径"
+  },
+  {
+    "source": "circuit breaker",
+    "target": "熔断器"
+  },
+  {
+    "source": "Circuit Breaker",
+    "target": "熔断器"
+  },
+  {
+    "source": "idempotency key",
+    "target": "幂等键"
+  },
+  {
+    "source": "snapshot persistence",
+    "target": "快照持久化"
+  },
+  {
+    "source": "payment trace",
+    "target": "支付追踪"
+  },
+  {
+    "source": "reconciliation",
+    "target": "对账"
+  },
+  {
+    "source": "Reconciliation",
+    "target": "对账"
+  },
+  {
+    "source": "autopay",
+    "target": "自动支付"
+  },
+  {
+    "source": "Autopay",
+    "target": "自动支付"
+  },
+  {
+    "source": "escrow",
+    "target": "托管"
+  },
+  {
+    "source": "Escrow",
+    "target": "托管"
+  },
+  {
+    "source": "settlement",
+    "target": "结算"
+  },
+  {
+    "source": "Settlement",
+    "target": "结算"
   }
 ]

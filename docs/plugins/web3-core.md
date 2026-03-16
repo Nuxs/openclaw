@@ -94,6 +94,12 @@ Set config under `plugins.entries.web3-core.config`.
             // These fields are optional metadata for downstream settlement UI/integrations.
             paymentTokenAddress: "0xPAYMENT_TOKEN",
             paymentReceiverAddress: "0xRECEIVER_ADDRESS",
+
+            // FXQuote configuration (optional)
+            fxQuote: {
+              defaultTtlMs: 300000, // 5 minutes
+              cacheMaxSize: 100, // max cached quotes
+            },
           },
         },
       },
@@ -107,6 +113,57 @@ Notes:
 - Anchoring requires `chain.privateKey`. Without it, anchors are queued as pending.
 - For IPFS uploads, set `storage.pinataJwt`.
 - Defaults are defined in the plugin config and manifest.
+
+## Payment modules
+
+The Web3 Core plugin provides payment orchestration modules for dual-stack (TON + EVM) support:
+
+### FXQuote Module (`billing/fx-quote.ts`)
+
+Manages foreign exchange quotes for dual-stack payments:
+
+- **Cache management**: TTL-based cache with composite keys (`fromAsset:toAsset:rate:source`)
+- **Snapshot persistence**: Quotes are persisted with `PaymentRequiredRecord` for reconciliation
+- **Source tracing**: Tracks quote origin (`binance-spot`, `pyth-oracle`, `manual`, etc.)
+
+Key functions:
+
+- `resolveOrBuildFXQuote()`: Resolve from cache or build new quote
+- `materializeQuote()`: Apply invoice-specific context to base quote
+- `getCachedQuote()`: Retrieve with TTL validation
+
+### Payment Orchestrator (`billing/payment-orchestrator.ts`)
+
+Coordinates the complete payment flow:
+
+- **Invoice parsing**: Extract payment details from HTTP 402 responses
+- **Intent building**: Create `PaymentIntent` with idempotency keys
+- **Circuit breaker**: Track autopay failures and enforce cooldown periods
+- **Record persistence**: Store `PaymentRequiredRecord` for retry and reconciliation
+
+Key functions:
+
+- `buildPaymentIntent()`: Construct payment intent with order/quote association
+- `buildPaymentRequiredRecord()`: Create persistent payment record
+- `isAutopayCircuitOpen()`: Check if autopay is in cooldown
+
+### Treasury Router Runtime (`billing/treasury-router.runtime.ts`)
+
+Cross-extension boundary for treasury route resolution:
+
+- Delegates to `@openclaw/market-core` for authoritative routing logic
+- Returns `TreasuryRoute` with `direct` or `bridge` strategy
+- Supports stablecoin routing (TON payments → EVM settlement)
+
+### Reconciliation Module (`market/reconciliation.ts`)
+
+Generates shareable, redacted reconciliation summaries:
+
+- **Multi-source aggregation**: Combines payment, ledger, dispute, service proof data
+- **Payment trace**: Resolves `PaymentIntent` and `FXQuote` from stored records
+- **Safe output**: All fields redacted for safe sharing (no endpoints/tokens/paths)
+
+Gateway method: `web3.market.reconciliation.summary`
 
 ## Commands
 

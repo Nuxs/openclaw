@@ -38,6 +38,43 @@ graph TD
   MKT -->|audit/transparency| TRACE[transparency]
 ```
 
+### Billing 模块架构
+
+支付编排与结算控制面的核心模块：
+
+```mermaid
+flowchart LR
+  Invoice["402 Invoice"] --> PR["payment-required.ts<br/>支付入口"]
+  PR --> FX["fx-quote.ts<br/>报价缓存"]
+  PR --> PO["payment-orchestrator.ts<br/>编排器"]
+  PO --> TR["treasury-router.runtime.ts<br/>选路边界"]
+  TR --> MKT_TR["treasury-router.ts<br/>(market-core)"]
+  PO --> Policy["agent-wallet/policy.ts<br/>策略校验"]
+  Policy --> Autopay["autopay 执行"]
+  Autopay --> Settlement["market.settlement.*"]
+  Settlement --> Recon["reconciliation.ts<br/>对账摘要"]
+```
+
+**模块职责**：
+
+- **`payment-required.ts`**：402 支付入口，处理 HTTP 402 响应，协调报价、策略、编排
+- **`fx-quote.ts`**：FXQuote 缓存与快照，支持 TTL 过期，确保对账可追溯
+- **`payment-orchestrator.ts`**：支付编排器，构建 PaymentIntent，管理幂等性与熔断器
+- **`treasury-router.runtime.ts`**：TreasuryRoute 运行时边界，跨扩展复用选路逻辑
+- **`treasury-router.ts`** (market-core)：金库选路权威实现，决定 direct/bridge 策略
+- **`reconciliation.ts`**：对账摘要生成，聚合 payment/ledger/dispute/serviceProof 数据
+
+**关键数据流**：
+
+1. **Invoice 解析**：从 402 响应提取 `amount`、`asset`、`chain`、`payTo` 等字段
+2. **FXQuote 解析**：从 `invoice.quote` 或缓存获取报价，生成快照
+3. **策略校验**：通过 `agent-wallet/policy.ts` 检查预算、白名单、审批规则
+4. **TreasuryRoute 选路**：根据支付链、结算资产、报价决定结算路径
+5. **Autopay 执行**：通过 `agent-wallet` 执行 TON/EVM 支付
+6. **Settlement 意图**：创建 `market.settlement.lock` 意图
+7. **Resume 原请求**：使用 HMAC resume token 恢复原 HTTP 请求
+8. **Reconciliation 摘要**：聚合支付、账本、争议、服务证明数据
+
 ## P2P 协同算力落位（OpenClaw 视角）
 
 如果你正在把 `Web3 Market` 扩展到“算力池节点 + 个人电脑子节点”的 P2P 协同场景，请坚持以下边界：
