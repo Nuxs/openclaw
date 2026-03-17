@@ -9,14 +9,14 @@
 
 ## 0. 状态总览
 
-| 维度             | 完成度 | 说明                                         |
-| ---------------- | ------ | -------------------------------------------- |
-| **核心能力**     | 100%   | KYA/Streaming/x402/MDL 已完成                |
-| **产品化**       | 100%   | Provider/Buyer/Control 闭环已成品化          |
-| **文档完善**     | 100%   | 核心文档完整，Beta FAQ/风险披露已补充        |
-| **工业级**       | 100%   | 核心能力达标，产品化完成                     |
-| **最高智能架构** | 85%    | AI 自主权模型已明确，Reputation 待实现       |
-| **GA 门禁**      | 100%   | 回滚/熔断/发布说明全部就绪                   |
+| 维度             | 完成度 | 说明                                   |
+| ---------------- | ------ | -------------------------------------- |
+| **核心能力**     | 100%   | KYA/Streaming/x402/MDL 已完成          |
+| **产品化**       | 100%   | Provider/Buyer/Control 闭环已成品化    |
+| **文档完善**     | 100%   | 核心文档完整，Beta FAQ/风险披露已补充  |
+| **工业级**       | 100%   | 核心能力达标，产品化完成               |
+| **最高智能架构** | 85%    | AI 自主权模型已明确，Reputation 待实现 |
+| **GA 门禁**      | 100%   | 回滚/熔断/发布说明全部就绪             |
 
 ---
 
@@ -203,15 +203,15 @@
 
 ### 7.1 Provider 上架闭环 ✅
 
-| 能力                    | 状态 | 代码位置                              | 验证        |
-| ----------------------- | ---- | ------------------------------------- | ----------- |
-| Offer 创建 CLI          | ✅   | `src/commands/market-offer.ts`        | ✅ 已实现   |
-| Offer 编辑 CLI          | ✅   | `src/commands/market-offer.ts`        | ✅ 已实现   |
-| Offer 发布 CLI          | ✅   | `src/commands/market-offer.ts`        | ✅ 已实现   |
-| Offer 列表 CLI          | ✅   | `src/commands/market-offer.ts`        | ✅ 已实现   |
+| 能力                    | 状态 | 代码位置                                  | 验证      |
+| ----------------------- | ---- | ----------------------------------------- | --------- |
+| Offer 创建 CLI          | ✅   | `src/commands/market-offer.ts`            | ✅ 已实现 |
+| Offer 编辑 CLI          | ✅   | `src/commands/market-offer.ts`            | ✅ 已实现 |
+| Offer 发布 CLI          | ✅   | `src/commands/market-offer.ts`            | ✅ 已实现 |
+| Offer 列表 CLI          | ✅   | `src/commands/market-offer.ts`            | ✅ 已实现 |
 | Offer 创建 UI           | ✅   | `ui/src/ui/views/market-offer-create.tsx` | ✅ 已实现 |
-| Offer 校验              | ✅   | `market-core/validators.ts`           | ✅ 已实现   |
-| Publish/Unpublish/Close | ✅   | `src/commands/market-offer.ts`        | ✅ 已实现   |
+| Offer 校验              | ✅   | `market-core/validators.ts`               | ✅ 已实现 |
+| Publish/Unpublish/Close | ✅   | `src/commands/market-offer.ts`            | ✅ 已实现 |
 
 **验收标准**：
 
@@ -258,15 +258,15 @@
 
 ### 7.4 Control 面成品化 ✅
 
-| 能力               | 状态 | 代码位置                                     | 验证      |
-| ------------------ | ---- | -------------------------------------------- | --------- |
-| Provider 管理 CLI  | ✅   | `src/commands/market.ts`                     | ✅ 已实现 |
-| 订单检索 CLI       | ✅   | `src/commands/market-order.ts`               | ✅ 已实现 |
-| 争议管理 CLI       | ✅   | `src/commands/market.ts`                     | ✅ 已实现 |
-| 审计查询 CLI       | ✅   | `src/commands/market.ts`                     | ✅ 已实现 |
-| 健康检查 CLI       | ✅   | `src/commands/market.ts`                     | ✅ 已实现 |
-| 控制面板 UI        | ✅   | `ui/src/ui/views/market-control-panel.tsx`   | ✅ 已实现 |
-| 熔断/回滚脚本      | ✅   | `scripts/kill-switch-web3-market.sh`         | ✅ 已实现 |
+| 能力              | 状态 | 代码位置                                   | 验证      |
+| ----------------- | ---- | ------------------------------------------ | --------- |
+| Provider 管理 CLI | ✅   | `src/commands/market.ts`                   | ✅ 已实现 |
+| 订单检索 CLI      | ✅   | `src/commands/market-order.ts`             | ✅ 已实现 |
+| 争议管理 CLI      | ✅   | `src/commands/market.ts`                   | ✅ 已实现 |
+| 审计查询 CLI      | ✅   | `src/commands/market.ts`                   | ✅ 已实现 |
+| 健康检查 CLI      | ✅   | `src/commands/market.ts`                   | ✅ 已实现 |
+| 控制面板 UI       | ✅   | `ui/src/ui/views/market-control-panel.tsx` | ✅ 已实现 |
+| 熔断/回滚脚本     | ✅   | `scripts/kill-switch-web3-market.sh`       | ✅ 已实现 |
 
 **验收标准**：
 
@@ -276,14 +276,14 @@
 
 ### 7.5 契约统一与发布口径收敛 ✅
 
-| 能力                      | 状态 | 代码位置                                | 验证      |
-| ------------------------- | ---- | --------------------------------------- | --------- |
-| Capability stability 统一 | ✅   | `capabilities/catalog/`                 | ✅ 已完成 |
-| Docs 重写与删减过度承诺   | ✅   | `skills/web3-market/`                   | ✅ 已完成 |
-| UI/Command 文案统一       | ✅   | `src/commands/market*.ts`               | ✅ 已完成 |
-| Beta FAQ                  | ✅   | `docs/web3/BETA_FAQ.md`                 | ✅ 已完成 |
-| 发布说明模板              | ✅   | `docs/web3/RELEASE_NOTES_TEMPLATE.md`   | ✅ 已完成 |
-| 风险披露                  | ✅   | `docs/web3/RISK_DISCLOSURE.md`          | ✅ 已完成 |
+| 能力                      | 状态 | 代码位置                              | 验证      |
+| ------------------------- | ---- | ------------------------------------- | --------- |
+| Capability stability 统一 | ✅   | `capabilities/catalog/`               | ✅ 已完成 |
+| Docs 重写与删减过度承诺   | ✅   | `skills/web3-market/`                 | ✅ 已完成 |
+| UI/Command 文案统一       | ✅   | `src/commands/market*.ts`             | ✅ 已完成 |
+| Beta FAQ                  | ✅   | `docs/web3/BETA_FAQ.md`               | ✅ 已完成 |
+| 发布说明模板              | ✅   | `docs/web3/RELEASE_NOTES_TEMPLATE.md` | ✅ 已完成 |
+| 风险披露                  | ✅   | `docs/web3/RISK_DISCLOSURE.md`        | ✅ 已完成 |
 
 ---
 
@@ -291,16 +291,16 @@
 
 ### 8.1 发布门禁 ✅
 
-| 门禁                 | 状态 | 说明                                      |
-| -------------------- | ---- | ----------------------------------------- |
-| 回滚演练记录         | ✅   | `docs/web3/ROLLBACK_DRILL_TEMPLATE.md`    |
-| 回滚检查清单         | ✅   | `docs/web3/ROLLBACK_CHECKLIST.md`         |
-| 发布说明草案         | ✅   | `docs/web3/RELEASE_NOTES_TEMPLATE.md`     |
-| kill switch 脚本固化 | ✅   | `scripts/kill-switch-web3-market.sh`      |
-| 熔断指南             | ✅   | `docs/web3/KILL_SWITCH_GUIDE.md`          |
-| Beta FAQ             | ✅   | `docs/web3/BETA_FAQ.md`                   |
-| 风险披露             | ✅   | `docs/web3/RISK_DISCLOSURE.md`            |
-| 回滚脚本             | ✅   | `scripts/rollback-web3-market.sh`         |
+| 门禁                 | 状态 | 说明                                   |
+| -------------------- | ---- | -------------------------------------- |
+| 回滚演练记录         | ✅   | `docs/web3/ROLLBACK_DRILL_TEMPLATE.md` |
+| 回滚检查清单         | ✅   | `docs/web3/ROLLBACK_CHECKLIST.md`      |
+| 发布说明草案         | ✅   | `docs/web3/RELEASE_NOTES_TEMPLATE.md`  |
+| kill switch 脚本固化 | ✅   | `scripts/kill-switch-web3-market.sh`   |
+| 熔断指南             | ✅   | `docs/web3/KILL_SWITCH_GUIDE.md`       |
+| Beta FAQ             | ✅   | `docs/web3/BETA_FAQ.md`                |
+| 风险披露             | ✅   | `docs/web3/RISK_DISCLOSURE.md`         |
+| 回滚脚本             | ✅   | `scripts/rollback-web3-market.sh`      |
 
 ### 8.2 可观测收敛 ❌
 

@@ -26,7 +26,7 @@ Week 9: 集成测试与文档完善
 - **Overlay-first**：新增功能通过新文件实现，不修改上游热点文件
 - **叶子模块隔离**：新功能放在叶子节点，不修改被多方依赖的文件
 - **敏感信息零泄露**：token、endpoint、真实路径永不暴露
-- **web3.* 公开、market.* 内部**：公开契约稳定，内部实现可演进
+- **web3._ 公开、market._ 内部**：公开契约稳定，内部实现可演进
 
 ### 0.3 文件组织原则
 
@@ -71,11 +71,11 @@ ui/src/ui/
 
 **实施内容**：
 
-| 任务 | 说明 | 代码位置 |
-|------|------|----------|
-| 回滚脚本 | `scripts/rollback-web3-market.sh` | 新建 |
-| 演练记录模板 | `docs/web3/ROLLBACK_DRILL_TEMPLATE.md` | 新建 |
-| 回滚检查清单 | `docs/web3/ROLLBACK_CHECKLIST.md` | 新建 |
+| 任务         | 说明                                   | 代码位置 |
+| ------------ | -------------------------------------- | -------- |
+| 回滚脚本     | `scripts/rollback-web3-market.sh`      | 新建     |
+| 演练记录模板 | `docs/web3/ROLLBACK_DRILL_TEMPLATE.md` | 新建     |
+| 回滚检查清单 | `docs/web3/ROLLBACK_CHECKLIST.md`      | 新建     |
 
 **回滚脚本框架**：
 
@@ -135,32 +135,38 @@ echo "=== Rollback complete ==="
 # Web3 Market 回滚演练记录
 
 ## 演练信息
+
 - 日期：YYYY-MM-DD
 - 演练人：
 - 演练版本：vX.Y.Z → vA.B.C
 - 环境：[dev/staging/prod]
 
 ## 演练步骤
+
 1. [ ] 确认当前版本
 2. [ ] 执行回滚脚本
 3. [ ] 验证服务恢复
 4. [ ] 记录回滚时间
 
 ## 验证结果
+
 - [ ] Gateway 正常启动
 - [ ] web3.status 命令正常
 - [ ] 历史数据完整
 - [ ] 钱包余额正确
 
 ## 回滚耗时
+
 - 总耗时：X 分钟
 - 脚本执行：X 秒
 - 服务恢复：X 秒
 
 ## 问题记录
+
 - 无 / [描述问题]
 
 ## 改进建议
+
 - [改进建议]
 ```
 
@@ -178,21 +184,23 @@ echo "=== Rollback complete ==="
 
 **实施内容**：
 
-| 文档 | 说明 | 位置 |
-|------|------|------|
+| 文档         | 说明                                  | 位置 |
+| ------------ | ------------------------------------- | ---- |
 | 发布说明模板 | `docs/web3/RELEASE_NOTES_TEMPLATE.md` | 新建 |
-| Beta FAQ | `docs/web3/BETA_FAQ.md` | 新建 |
-| 风险披露 | `docs/web3/RISK_DISCLOSURE.md` | 新建 |
+| Beta FAQ     | `docs/web3/BETA_FAQ.md`               | 新建 |
+| 风险披露     | `docs/web3/RISK_DISCLOSURE.md`        | 新建 |
 
 **发布说明模板**：
 
-```markdown
+````markdown
 # OpenClaw Web3 Market vX.Y.Z Release Notes
 
 ## 发布日期
+
 YYYY-MM-DD
 
 ## 发布类型
+
 - [ ] Stable
 - [ ] Beta
 - [ ] Experimental
@@ -200,38 +208,49 @@ YYYY-MM-DD
 ## 新功能
 
 ### Feature 1: [名称]
+
 **描述**：[功能描述]
 **配置**：`web3.feature.enabled = true`
 **影响范围**：[范围]
 
 ### Feature 2: [名称]
+
 ...
 
 ## 改进
+
 - [改进项]
 
 ## 修复
+
 - [修复项]
 
 ## 已知问题
+
 - [已知问题]
 
 ## 破坏性变更
+
 - [破坏性变更说明]
 
 ## 升级指南
+
 1. [升级步骤]
 
 ## 回滚方案
+
 ```bash
 scripts/rollback-web3-market.sh <previous-version>
 ```
+````
 
 ## 风险提示
+
 - **熔断机制**：`web3.x402.autopay.enabled` 可全局禁用自动支付
 - **回滚时间**：预计 X 分钟
 - **数据兼容**：[兼容性说明]
-```
+
+````
 
 **Beta FAQ 框架**：
 
@@ -251,32 +270,38 @@ OpenClaw Web3 Market 是一个可问责的数字服务市场，让 AI 管家可�
 ```bash
 openclaw config set web3.market.enabled true
 openclaw config set web3.kya.enabled true
-```
+````
 
 ## 如何设置预算？
+
 ```bash
 openclaw wallet policy set --daily-cap 100
 ```
 
 ## 如何禁用自动支付？
+
 ```bash
 openclaw config set web3.x402.autopay.enabled false
 ```
 
 ## 遇到问题如何回滚？
+
 ```bash
 scripts/rollback-web3-market.sh <previous-version>
 ```
 
 ## 支持的支付链
+
 - **EVM**：Ethereum、Polygon、Arbitrum 等
 - **TON**：TON Mainnet
 
 ## 安全保障
+
 - **策略引擎**：所有支出受 KYA 策略约束
 - **敏感信息保护**：token、endpoint 永不泄露
 - **审计日志**：所有操作可追溯
-```
+
+````
 
 **验收标准**：
 
@@ -344,7 +369,7 @@ case "$ACTION" in
     exit 1
     ;;
 esac
-```
+````
 
 **验收标准**：
 
@@ -397,11 +422,7 @@ export type PricingModel =
   | { type: "metered"; unitPrice: string; currency: string; unit: string }
   | { type: "tiered"; tiers: PricingTier[] };
 
-export type ProofType =
-  | "tlsnotary"
-  | "signed_receipt"
-  | "api_response"
-  | "custom";
+export type ProofType = "tlsnotary" | "signed_receipt" | "api_response" | "custom";
 
 export type CreateOfferInput = {
   serviceSchema: ServiceSchema;
@@ -426,7 +447,7 @@ import { store } from "../store";
 
 export async function createOffer(
   providerId: string,
-  input: CreateOfferInput
+  input: CreateOfferInput,
 ): Promise<ServiceOffer> {
   // 1. 校验输入
   const validation = validateOffer(input);
@@ -523,9 +544,7 @@ import {
 } from "@openclaw/market-core";
 
 // web3.market.offer.create
-export async function handleOfferCreate(
-  input: CreateOfferInput
-): Promise<ServiceOffer> {
+export async function handleOfferCreate(input: CreateOfferInput): Promise<ServiceOffer> {
   const providerId = await getCurrentProviderId();
   return marketCreateOffer(providerId, input);
 }
@@ -538,7 +557,7 @@ export async function handleOfferPublish(offerId: string): Promise<ServiceOffer>
 // web3.market.offer.update
 export async function handleOfferUpdate(
   offerId: string,
-  updates: Partial<ServiceOffer>
+  updates: Partial<ServiceOffer>,
 ): Promise<ServiceOffer> {
   return marketUpdateOffer(offerId, updates);
 }
@@ -650,7 +669,7 @@ async function interactiveCreateOffer(options: any): Promise<CreateOfferInput> {
 // web3.market.offer.edit
 export async function handleOfferEdit(
   offerId: string,
-  updates: Partial<ServiceOffer>
+  updates: Partial<ServiceOffer>,
 ): Promise<ServiceOffer> {
   const offer = await store.offers.get(offerId);
   if (!offer) {
@@ -661,13 +680,11 @@ export async function handleOfferEdit(
   if (offer.status === "published") {
     // 已发布状态仅允许修改 supply 和 metadata
     const allowedKeys = ["supply", "metadata"];
-    const invalidKeys = Object.keys(updates).filter(
-      (k) => !allowedKeys.includes(k)
-    );
+    const invalidKeys = Object.keys(updates).filter((k) => !allowedKeys.includes(k));
     if (invalidKeys.length > 0) {
       throw new Error(
         `Cannot edit ${invalidKeys.join(", ")} in published status. ` +
-          `Unpublish first to edit price or service schema.`
+          `Unpublish first to edit price or service schema.`,
       );
     }
   }
@@ -679,9 +696,7 @@ export async function handleOfferEdit(
 }
 
 // web3.market.offer.unpublish
-export async function handleOfferUnpublish(
-  offerId: string
-): Promise<ServiceOffer> {
+export async function handleOfferUnpublish(offerId: string): Promise<ServiceOffer> {
   const offer = await store.offers.get(offerId);
   if (!offer || offer.status !== "published") {
     throw new Error(`Cannot unpublish offer in status: ${offer?.status}`);
@@ -694,9 +709,7 @@ export async function handleOfferUnpublish(
 }
 
 // web3.market.offer.close
-export async function handleOfferClose(
-  offerId: string
-): Promise<ServiceOffer> {
+export async function handleOfferClose(offerId: string): Promise<ServiceOffer> {
   const offer = await store.offers.get(offerId);
   if (!offer) {
     throw new Error(`Offer not found: ${offerId}`);
@@ -709,9 +722,7 @@ export async function handleOfferClose(
   });
 
   if (activeOrders.length > 0) {
-    console.warn(
-      `Warning: ${activeOrders.length} active orders exist for this offer.`
-    );
+    console.warn(`Warning: ${activeOrders.length} active orders exist for this offer.`);
     // 需要确认
   }
 
@@ -839,9 +850,7 @@ async function guideCreateFirstOffer(): Promise<ServiceOffer> {
 
 ```typescript
 // web3.market.browse
-export async function handleMarketBrowse(
-  filter?: BrowseFilter
-): Promise<ServiceListing[]> {
+export async function handleMarketBrowse(filter?: BrowseFilter): Promise<ServiceListing[]> {
   const offers = await store.offers.query({
     status: "published",
     ...filter,
@@ -894,10 +903,7 @@ openclaw market show <offer-id>
 
 ```typescript
 // web3.market.offer.quote
-export async function handleOfferQuote(
-  offerId: string,
-  quantity: number = 1
-): Promise<Quote> {
+export async function handleOfferQuote(offerId: string, quantity: number = 1): Promise<Quote> {
   const offer = await store.offers.get(offerId);
   if (!offer || offer.status !== "published") {
     throw new Error("Offer not available");
@@ -915,24 +921,16 @@ export async function handleOfferQuote(
   return {
     offerId,
     quantity,
-    unitPrice:
-      offer.pricing.type === "fixed"
-        ? offer.pricing.amount
-        : offer.pricing.unitPrice,
+    unitPrice: offer.pricing.type === "fixed" ? offer.pricing.amount : offer.pricing.unitPrice,
     totalAmount,
-    currency:
-      offer.pricing.type === "fixed"
-        ? offer.pricing.currency
-        : offer.pricing.currency,
+    currency: offer.pricing.type === "fixed" ? offer.pricing.currency : offer.pricing.currency,
     estimatedDelivery: estimateDeliveryTime(offer.deliveryMode),
     validUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min
   };
 }
 
 // web3.market.order.create
-export async function handleOrderCreate(
-  input: CreateOrderInput
-): Promise<Order> {
+export async function handleOrderCreate(input: CreateOrderInput): Promise<Order> {
   const offer = await store.offers.get(input.offerId);
   if (!offer || offer.status !== "published") {
     throw new Error("Offer not available");
@@ -947,15 +945,9 @@ export async function handleOrderCreate(
     buyerId: await getCurrentBuyerId(),
     providerId: offer.providerId,
     quantity: input.quantity ?? 1,
-    unitPrice:
-      offer.pricing.type === "fixed"
-        ? offer.pricing.amount
-        : offer.pricing.unitPrice,
+    unitPrice: offer.pricing.type === "fixed" ? offer.pricing.amount : offer.pricing.unitPrice,
     totalAmount: calculateTotal(offer, input.quantity),
-    currency:
-      offer.pricing.type === "fixed"
-        ? offer.pricing.currency
-        : offer.pricing.currency,
+    currency: offer.pricing.type === "fixed" ? offer.pricing.currency : offer.pricing.currency,
     status: "pending",
     createdAt: new Date().toISOString(),
   };
@@ -965,15 +957,12 @@ export async function handleOrderCreate(
   return order;
 }
 
-async function validateOrderReadiness(
-  input: CreateOrderInput,
-  offer: ServiceOffer
-): Promise<void> {
+async function validateOrderReadiness(input: CreateOrderInput, offer: ServiceOffer): Promise<void> {
   // 1. 检查预算
   const budget = await getBudgetStatus();
   if (parseFloat(budget.remaining) < parseFloat(offer.pricing.amount)) {
     throw new Error(
-      `Insufficient budget. Remaining: ${budget.remaining}, Required: ${offer.pricing.amount}`
+      `Insufficient budget. Remaining: ${budget.remaining}, Required: ${offer.pricing.amount}`,
     );
   }
 
@@ -988,9 +977,7 @@ async function validateOrderReadiness(
   // 3. 检查授权限额
   const policy = await getWalletPolicy();
   if (parseFloat(offer.pricing.amount) > policy.maxSingleTransaction) {
-    throw new Error(
-      `Transaction exceeds single transaction limit: ${policy.maxSingleTransaction}`
-    );
+    throw new Error(`Transaction exceeds single transaction limit: ${policy.maxSingleTransaction}`);
   }
 }
 ```
@@ -1012,9 +999,7 @@ export async function handleOrderGet(orderId: string): Promise<Order> {
 }
 
 // web3.market.order.list
-export async function handleOrderList(
-  filter?: OrderFilter
-): Promise<Order[]> {
+export async function handleOrderList(filter?: OrderFilter): Promise<Order[]> {
   return store.orders.query({
     buyerId: await getCurrentBuyerId(),
     ...filter,
@@ -1022,10 +1007,7 @@ export async function handleOrderList(
 }
 
 // web3.market.order.cancel
-export async function handleOrderCancel(
-  orderId: string,
-  reason?: string
-): Promise<Order> {
+export async function handleOrderCancel(orderId: string, reason?: string): Promise<Order> {
   const order = await store.orders.get(orderId);
   if (!order) {
     throw new Error(`Order not found: ${orderId}`);
@@ -1157,9 +1139,7 @@ function ServiceCard({ service }: { service: ServiceListing }) {
 
 ```typescript
 // web3.market.provider.list
-export async function handleProviderList(
-  filter?: ProviderFilter
-): Promise<ProviderProfile[]> {
+export async function handleProviderList(filter?: ProviderFilter): Promise<ProviderProfile[]> {
   const providers = await store.providers.query(filter);
 
   return providers.map((p) => ({
@@ -1175,7 +1155,7 @@ export async function handleProviderList(
 // web3.market.provider.suspend
 export async function handleProviderSuspend(
   providerId: string,
-  reason: string
+  reason: string,
 ): Promise<ProviderProfile> {
   const provider = await store.providers.get(providerId);
   if (!provider) {
@@ -1231,9 +1211,7 @@ export async function handlePolicyGet(): Promise<RiskPolicy> {
 }
 
 // web3.market.policy.update
-export async function handlePolicyUpdate(
-  updates: Partial<RiskPolicy>
-): Promise<RiskPolicy> {
+export async function handlePolicyUpdate(updates: Partial<RiskPolicy>): Promise<RiskPolicy> {
   const current = await handlePolicyGet();
   const updated = { ...current, ...updates };
 
@@ -1264,9 +1242,7 @@ export async function handlePolicyUpdate(
 
 ```typescript
 // web3.market.audit.query
-export async function handleAuditQuery(
-  filter?: AuditFilter
-): Promise<AuditLog[]> {
+export async function handleAuditQuery(filter?: AuditFilter): Promise<AuditLog[]> {
   return store.audit.query({
     ...filter,
     limit: filter?.limit ?? 100,
@@ -1301,7 +1277,12 @@ export async function handleHealthCheck(): Promise<HealthStatus> {
     await store.healthCheck();
     probes.push({ component: "database", status: "healthy", lastCheck: new Date().toISOString() });
   } catch (e) {
-    probes.push({ component: "database", status: "unhealthy", lastCheck: new Date().toISOString(), details: { error: e.message } });
+    probes.push({
+      component: "database",
+      status: "unhealthy",
+      lastCheck: new Date().toISOString(),
+      details: { error: e.message },
+    });
   }
 
   // 2. Gateway 健康
@@ -1315,16 +1296,24 @@ export async function handleHealthCheck(): Promise<HealthStatus> {
   // 3. 区块链连接
   try {
     await checkBlockchainConnection();
-    probes.push({ component: "blockchain", status: "healthy", lastCheck: new Date().toISOString() });
+    probes.push({
+      component: "blockchain",
+      status: "healthy",
+      lastCheck: new Date().toISOString(),
+    });
   } catch (e) {
-    probes.push({ component: "blockchain", status: "degraded", lastCheck: new Date().toISOString() });
+    probes.push({
+      component: "blockchain",
+      status: "degraded",
+      lastCheck: new Date().toISOString(),
+    });
   }
 
   const overall = probes.every((p) => p.status === "healthy")
     ? "healthy"
     : probes.some((p) => p.status === "unhealthy")
-    ? "unhealthy"
-    : "degraded";
+      ? "unhealthy"
+      : "degraded";
 
   return { overall, probes };
 }
@@ -1351,9 +1340,7 @@ export const marketCapabilities: CapabilityDescriptor[] = [
     description: "Create a new service offer as a provider",
     stability: "beta",
     prerequisites: ["web3.market.enabled", "provider.verified"],
-    parameters: [
-      { name: "input", type: "CreateOfferInput", required: true },
-    ],
+    parameters: [{ name: "input", type: "CreateOfferInput", required: true }],
     returns: { type: "ServiceOffer" },
     errors: [
       { code: "INVALID_INPUT", description: "Invalid offer input" },
@@ -1432,16 +1419,16 @@ fi
 
 **术语表**：
 
-| 英文 | 中文 | 说明 |
-|------|------|------|
-| Offer | 服务报价 | Provider 发布的服务 |
-| Order | 订单 | Buyer 的购买记录 |
-| Provider | 服务提供方 | 提供 Offer 的一方 |
-| Buyer | 服务购买方 | 购买 Offer 的一方 |
-| Settlement | 结算 | 资金划转 |
-| Proof | 交付证明 | 服务执行的证明 |
-| Lease | 租约 | 资源访问授权 |
-| Consent | 隐私授权 | 数据使用授权 |
+| 英文       | 中文       | 说明                |
+| ---------- | ---------- | ------------------- |
+| Offer      | 服务报价   | Provider 发布的服务 |
+| Order      | 订单       | Buyer 的购买记录    |
+| Provider   | 服务提供方 | 提供 Offer 的一方   |
+| Buyer      | 服务购买方 | 购买 Offer 的一方   |
+| Settlement | 结算       | 资金划转            |
+| Proof      | 交付证明   | 服务执行的证明      |
+| Lease      | 租约       | 资源访问授权        |
+| Consent    | 隐私授权   | 数据使用授权        |
 
 ---
 
@@ -1451,25 +1438,25 @@ fi
 
 **测试场景清单**：
 
-| 场景 | 步骤 | 验证点 |
-|------|------|--------|
-| Provider 完整上架流程 | 创建 → 编辑 → 发布 → 下架 | 状态转换正确 |
-| Buyer 完整购买流程 | 浏览 → 下单 → 支付 → 验收 | 订单状态正确 |
-| 争议流程 | 下单 → 拒绝 → 发起争议 → 裁决 | 资金正确分配 |
-| 预算约束 | 超预算下单 | 拒绝并提示 |
-| 熔断触发 | 连续失败 | 自动禁用 |
-| 回滚演练 | 执行回滚 | 服务恢复 |
+| 场景                  | 步骤                          | 验证点       |
+| --------------------- | ----------------------------- | ------------ |
+| Provider 完整上架流程 | 创建 → 编辑 → 发布 → 下架     | 状态转换正确 |
+| Buyer 完整购买流程    | 浏览 → 下单 → 支付 → 验收     | 订单状态正确 |
+| 争议流程              | 下单 → 拒绝 → 发起争议 → 裁决 | 资金正确分配 |
+| 预算约束              | 超预算下单                    | 拒绝并提示   |
+| 熔断触发              | 连续失败                      | 自动禁用     |
+| 回滚演练              | 执行回滚                      | 服务恢复     |
 
 ---
 
 ### 6.2 文档完善
 
-| 文档 | 说明 | 状态 |
-|------|------|------|
-| Provider 快速入门 | 5 分钟上架指南 | 待写 |
-| Buyer 快速入门 | 5 分钟购买指南 | 待写 |
-| API 参考 | 所有 web3.* 方法 | 待完善 |
-| 运维手册 | 部署、监控、排障 | 待完善 |
+| 文档              | 说明              | 状态   |
+| ----------------- | ----------------- | ------ |
+| Provider 快速入门 | 5 分钟上架指南    | 待写   |
+| Buyer 快速入门    | 5 分钟购买指南    | 待写   |
+| API 参考          | 所有 web3.\* 方法 | 待完善 |
+| 运维手册          | 部署、监控、排障  | 待完善 |
 
 ---
 
@@ -1532,26 +1519,26 @@ ui/src/ui/types-web3.ts                           # 补充 UI 类型
 
 ### 7.3 门禁清单
 
-| 门禁 | 验证方式 | 完成标准 |
-|------|----------|----------|
-| 敏感信息零泄露 | grep -r "accessToken\|endpoint" | 无泄露 |
-| 状态机合法 | 单元测试 | 覆盖率 > 80% |
-| API 契约一致 | catalog validate | 100% 覆盖 |
-| 回滚演练可执行 | 实际演练 | 记录完整 |
-| 发布说明完整 | 评审 | 无遗漏 |
+| 门禁           | 验证方式                        | 完成标准     |
+| -------------- | ------------------------------- | ------------ |
+| 敏感信息零泄露 | grep -r "accessToken\|endpoint" | 无泄露       |
+| 状态机合法     | 单元测试                        | 覆盖率 > 80% |
+| API 契约一致   | catalog validate                | 100% 覆盖    |
+| 回滚演练可执行 | 实际演练                        | 记录完整     |
+| 发布说明完整   | 评审                            | 无遗漏       |
 
 ---
 
 ## 8. 时间表
 
-| 周次 | 工作内容 | 产出 |
-|------|----------|------|
-| Week 1-2 | P0 阻断项 | 回滚脚本、发布说明、kill switch |
-| Week 3-4 | Provider 上架闭环 | CLI/UI 创建 Offer 流程 |
-| Week 5-6 | Buyer 购买闭环 | CLI/UI 购买流程 |
-| Week 7 | Control 面成品化 | 运营后台 UI |
-| Week 8 | 契约统一 | Catalog 100% 覆盖 |
-| Week 9 | 集成测试 | E2E 测试通过 |
+| 周次     | 工作内容          | 产出                            |
+| -------- | ----------------- | ------------------------------- |
+| Week 1-2 | P0 阻断项         | 回滚脚本、发布说明、kill switch |
+| Week 3-4 | Provider 上架闭环 | CLI/UI 创建 Offer 流程          |
+| Week 5-6 | Buyer 购买闭环    | CLI/UI 购买流程                 |
+| Week 7   | Control 面成品化  | 运营后台 UI                     |
+| Week 8   | 契约统一          | Catalog 100% 覆盖               |
+| Week 9   | 集成测试          | E2E 测试通过                    |
 
 ---
 
@@ -1579,6 +1566,7 @@ Order: pending -> confirmed -> delivering -> delivered -> accepted -> completed
 ### A.3 审计约束
 
 所有写操作必须记录审计日志：
+
 - 创建、更新、删除
 - 状态变更
 - 策略修改
