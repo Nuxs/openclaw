@@ -1261,7 +1261,7 @@
           },
           "type": "object"
         },
-        "returns": "Execution summary with executionState, acceptanceRecord, trace entries, and redacted linked object snapshots.",
+        "returns": "Execution summary with approval state, consent snapshot, executionState, acceptanceRecord, dispute penalties, trace entries, and redacted linked object snapshots.",
         "risk": {
           "level": "low"
         },
@@ -1387,6 +1387,14 @@
               "pattern": "^0x[a-fA-F0-9]{40}$",
               "type": "string"
             },
+            "approval": {
+              "description": "Optional prior approval decision payload.",
+              "type": "object"
+            },
+            "budgetPolicy": {
+              "description": "Optional steward budget policy.",
+              "type": "object"
+            },
             "consumerActorId": {
               "pattern": "^0x[a-fA-F0-9]{40}$",
               "type": "string"
@@ -1399,6 +1407,14 @@
             "resourceId": {
               "description": "Target resource ID",
               "type": "string"
+            },
+            "riskPolicy": {
+              "description": "Optional steward risk policy.",
+              "type": "object"
+            },
+            "selectionPolicy": {
+              "description": "Optional steward selection policy.",
+              "type": "object"
             },
             "ttlMs": {
               "description": "Lease duration in milliseconds",
@@ -1418,7 +1434,7 @@
         "pricing": {
           "requiresPreLock": true
         },
-        "returns": "Lease response with leaseId/orderId/consentId/deliveryId/expiresAt/stored (no token or endpoint).",
+        "returns": "Lease response with leaseId/orderId/consentId/deliveryId/expiresAt/stored, or approval_required policy details when human consent is needed (never returns token or endpoint).",
         "risk": {
           "level": "high",
           "notes": ["Access token stored internally; never returned"]
@@ -1460,6 +1476,35 @@
         },
         "returns": "Lease list response.",
         "summary": "Market entrypoint for lease listing (proxy to market-core)."
+      },
+      {
+        "availability": {
+          "enabled": false,
+          "reason": "resources consumer disabled"
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.lease.mount",
+        "paramsSchema": {
+          "properties": {
+            "leaseId": {
+              "description": "Existing lease ID to mount.",
+              "type": "string"
+            },
+            "providerEndpoint": {
+              "description": "Optional provider endpoint override used only for local runtime mounting.",
+              "type": "string"
+            }
+          },
+          "required": ["leaseId"],
+          "type": "object"
+        },
+        "returns": "Internal mount acknowledgement with leaseId/resourceId/expiresAt/stored; tokens remain runtime-only and are never returned.",
+        "risk": {
+          "level": "high",
+          "notes": ["Mounts a leased capability into runtime cache without revealing secrets."]
+        },
+        "summary": "Resolve an existing lease into an internally mounted consumer capability without exposing its token."
       },
       {
         "aliases": ["web3.resources.revokeLease"],
@@ -1950,6 +1995,14 @@
               "description": "Actor authorizing the order.",
               "type": "string"
             },
+            "approval": {
+              "description": "Optional prior approval decision payload.",
+              "type": "object"
+            },
+            "budgetPolicy": {
+              "description": "Optional steward budget policy.",
+              "type": "object"
+            },
             "buyerId": {
               "description": "Buyer wallet / actor address.",
               "type": "string"
@@ -1962,6 +2015,14 @@
               "description": "Optional quantity; defaults to 1.",
               "minimum": 1,
               "type": "number"
+            },
+            "riskPolicy": {
+              "description": "Optional steward risk policy.",
+              "type": "object"
+            },
+            "selectionPolicy": {
+              "description": "Optional steward selection policy.",
+              "type": "object"
             }
           },
           "required": ["actorId", "offerId", "buyerId"],
@@ -1971,7 +2032,7 @@
           "requiresIdentity": true
         },
         "prerequisites": ["resources consumer enabled", "published offer", "buyer actor identity"],
-        "returns": "Returns orderId, orderHash and the initial order status.",
+        "returns": "Returns orderId/orderHash/status for direct creation, or approval_required policy details when steward thresholds block automatic execution.",
         "risk": {
           "level": "high",
           "notes": ["Creates a commercial order that may later lock payment or grant access."]
@@ -2026,7 +2087,7 @@
           },
           "type": "object"
         },
-        "returns": "Order list and count.",
+        "returns": "Order list and count, including approvalStatus/consentId when a steward approval gate is pending.",
         "risk": {
           "level": "low"
         },
@@ -2196,6 +2257,10 @@
                 "issuedAt": {
                   "type": "string"
                 },
+                "metadata": {
+                  "description": "Family-specific proof metadata such as receiptId, attesterRole, confidence, oracle, or eventId.",
+                  "type": "object"
+                },
                 "redactedFields": {
                   "items": {
                     "type": "string"
@@ -2204,7 +2269,7 @@
                   "type": "array"
                 },
                 "type": {
-                  "enum": ["tlsnotary"],
+                  "enum": ["tlsnotary", "signed_receipt", "human_attestation", "oracle_event"],
                   "type": "string"
                 },
                 "verifier": {
@@ -2617,7 +2682,12 @@
                             "type": "boolean"
                           },
                           "type": {
-                            "enum": ["tlsnotary"],
+                            "enum": [
+                              "tlsnotary",
+                              "signed_receipt",
+                              "human_attestation",
+                              "oracle_event"
+                            ],
                             "type": "string"
                           }
                         },
@@ -2816,6 +2886,10 @@
                 "issuedAt": {
                   "type": "string"
                 },
+                "metadata": {
+                  "description": "Family-specific proof metadata such as receiptId, attesterRole, confidence, oracle, or eventId.",
+                  "type": "object"
+                },
                 "redactedFields": {
                   "items": {
                     "type": "string"
@@ -2824,7 +2898,7 @@
                   "type": "array"
                 },
                 "type": {
-                  "enum": ["tlsnotary"],
+                  "enum": ["tlsnotary", "signed_receipt", "human_attestation", "oracle_event"],
                   "type": "string"
                 },
                 "verifier": {
@@ -5574,7 +5648,7 @@
           },
           "type": "object"
         },
-        "returns": "Execution summary with executionState, acceptanceRecord, trace entries, and redacted linked object snapshots.",
+        "returns": "Execution summary with approval state, consent snapshot, executionState, acceptanceRecord, dispute penalties, trace entries, and redacted linked object snapshots.",
         "risk": {
           "level": "low"
         },
@@ -5695,6 +5769,14 @@
               "pattern": "^0x[a-fA-F0-9]{40}$",
               "type": "string"
             },
+            "approval": {
+              "description": "Optional prior approval decision payload.",
+              "type": "object"
+            },
+            "budgetPolicy": {
+              "description": "Optional steward budget policy.",
+              "type": "object"
+            },
             "consumerActorId": {
               "pattern": "^0x[a-fA-F0-9]{40}$",
               "type": "string"
@@ -5707,6 +5789,14 @@
             "resourceId": {
               "description": "Target resource ID",
               "type": "string"
+            },
+            "riskPolicy": {
+              "description": "Optional steward risk policy.",
+              "type": "object"
+            },
+            "selectionPolicy": {
+              "description": "Optional steward selection policy.",
+              "type": "object"
             },
             "ttlMs": {
               "description": "Lease duration in milliseconds",
@@ -5726,7 +5816,7 @@
         "pricing": {
           "requiresPreLock": true
         },
-        "returns": "Lease response with leaseId/orderId/consentId/deliveryId/expiresAt/stored (no token or endpoint).",
+        "returns": "Lease response with leaseId/orderId/consentId/deliveryId/expiresAt/stored, or approval_required policy details when human consent is needed (never returns token or endpoint).",
         "risk": {
           "level": "high",
           "notes": ["Access token stored internally; never returned"]
@@ -5767,6 +5857,34 @@
         },
         "returns": "Lease list response.",
         "summary": "Market entrypoint for lease listing (proxy to market-core)."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "market",
+        "kind": "gateway",
+        "name": "web3.market.lease.mount",
+        "paramsSchema": {
+          "properties": {
+            "leaseId": {
+              "description": "Existing lease ID to mount.",
+              "type": "string"
+            },
+            "providerEndpoint": {
+              "description": "Optional provider endpoint override used only for local runtime mounting.",
+              "type": "string"
+            }
+          },
+          "required": ["leaseId"],
+          "type": "object"
+        },
+        "returns": "Internal mount acknowledgement with leaseId/resourceId/expiresAt/stored; tokens remain runtime-only and are never returned.",
+        "risk": {
+          "level": "high",
+          "notes": ["Mounts a leased capability into runtime cache without revealing secrets."]
+        },
+        "summary": "Resolve an existing lease into an internally mounted consumer capability without exposing its token."
       },
       {
         "aliases": ["web3.resources.revokeLease"],
@@ -6243,6 +6361,14 @@
               "description": "Actor authorizing the order.",
               "type": "string"
             },
+            "approval": {
+              "description": "Optional prior approval decision payload.",
+              "type": "object"
+            },
+            "budgetPolicy": {
+              "description": "Optional steward budget policy.",
+              "type": "object"
+            },
             "buyerId": {
               "description": "Buyer wallet / actor address.",
               "type": "string"
@@ -6255,6 +6381,14 @@
               "description": "Optional quantity; defaults to 1.",
               "minimum": 1,
               "type": "number"
+            },
+            "riskPolicy": {
+              "description": "Optional steward risk policy.",
+              "type": "object"
+            },
+            "selectionPolicy": {
+              "description": "Optional steward selection policy.",
+              "type": "object"
             }
           },
           "required": ["actorId", "offerId", "buyerId"],
@@ -6264,7 +6398,7 @@
           "requiresIdentity": true
         },
         "prerequisites": ["resources consumer enabled", "published offer", "buyer actor identity"],
-        "returns": "Returns orderId, orderHash and the initial order status.",
+        "returns": "Returns orderId/orderHash/status for direct creation, or approval_required policy details when steward thresholds block automatic execution.",
         "risk": {
           "level": "high",
           "notes": ["Creates a commercial order that may later lock payment or grant access."]
@@ -6318,7 +6452,7 @@
           },
           "type": "object"
         },
-        "returns": "Order list and count.",
+        "returns": "Order list and count, including approvalStatus/consentId when a steward approval gate is pending.",
         "risk": {
           "level": "low"
         },
@@ -6483,6 +6617,10 @@
                 "issuedAt": {
                   "type": "string"
                 },
+                "metadata": {
+                  "description": "Family-specific proof metadata such as receiptId, attesterRole, confidence, oracle, or eventId.",
+                  "type": "object"
+                },
                 "redactedFields": {
                   "items": {
                     "type": "string"
@@ -6491,7 +6629,7 @@
                   "type": "array"
                 },
                 "type": {
-                  "enum": ["tlsnotary"],
+                  "enum": ["tlsnotary", "signed_receipt", "human_attestation", "oracle_event"],
                   "type": "string"
                 },
                 "verifier": {
@@ -6900,7 +7038,12 @@
                             "type": "boolean"
                           },
                           "type": {
-                            "enum": ["tlsnotary"],
+                            "enum": [
+                              "tlsnotary",
+                              "signed_receipt",
+                              "human_attestation",
+                              "oracle_event"
+                            ],
                             "type": "string"
                           }
                         },
@@ -7093,6 +7236,10 @@
                 "issuedAt": {
                   "type": "string"
                 },
+                "metadata": {
+                  "description": "Family-specific proof metadata such as receiptId, attesterRole, confidence, oracle, or eventId.",
+                  "type": "object"
+                },
                 "redactedFields": {
                   "items": {
                     "type": "string"
@@ -7101,7 +7248,7 @@
                   "type": "array"
                 },
                 "type": {
-                  "enum": ["tlsnotary"],
+                  "enum": ["tlsnotary", "signed_receipt", "human_attestation", "oracle_event"],
                   "type": "string"
                 },
                 "verifier": {
@@ -9870,6 +10017,7 @@
           "market.lease.get",
           "market.lease.issue",
           "market.lease.list",
+          "market.lease.mount",
           "market.lease.revoke",
           "market.ledger.append",
           "market.ledger.list",
@@ -10800,6 +10948,7 @@
           "web3.market.lease.get",
           "web3.market.lease.issue",
           "web3.market.lease.list",
+          "web3.market.lease.mount",
           "web3.market.lease.revoke",
           "web3.market.ledger.list",
           "web3.market.ledger.summary",
