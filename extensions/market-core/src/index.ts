@@ -49,6 +49,7 @@ import {
   createLeaseGetHandler,
   createLeaseIssueHandler,
   createLeaseListHandler,
+  createLeaseMountHandler,
   createLeaseRevokeHandler,
   createMarketAuditQueryHandler,
   createMarketMetricsSnapshotHandler,
@@ -185,6 +186,7 @@ const plugin: OpenClawPluginDefinition = {
     api.registerGatewayMethod("market.lease.revoke", createLeaseRevokeHandler(store, config));
     api.registerGatewayMethod("market.lease.get", createLeaseGetHandler(store, config));
     api.registerGatewayMethod("market.lease.list", createLeaseListHandler(store, config));
+    api.registerGatewayMethod("market.lease.mount", createLeaseMountHandler(store, config));
     api.registerGatewayMethod(
       "market.lease.expireSweep",
       createLeaseExpireSweepHandler(store, config),

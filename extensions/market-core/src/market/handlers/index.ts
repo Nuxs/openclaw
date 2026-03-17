@@ -44,6 +44,7 @@ export {
 export { createProofSubmitHandler, createProofVerifyHandler } from "./proof.js";
 export { createAcceptanceSignHandler, createAcceptanceRejectHandler } from "./acceptance.js";
 export { createExecutionGetHandler } from "./execution.js";
+export { createLeaseMountHandler } from "./lease-mount.js";
 export {
   createResourcePublishHandler,
   createResourceUnpublishHandler,

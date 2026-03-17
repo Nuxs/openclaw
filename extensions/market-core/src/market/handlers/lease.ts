@@ -4,16 +4,12 @@ import type {
 } from "openclaw/plugin-sdk/gateway-types";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
-import { createDeliveryCredentialsStore } from "../credentials.js";
-import { canonicalize, hashCanonical } from "../hash.js";
-import type { MarketLease, MarketLeaseStatus } from "../resources.js";
+import { summarizeProviderReputation } from "../provider-reputation.js";
+import type { MarketResource } from "../resources.js";
 import { executeRevocation } from "../revocation.js";
-import {
-  assertDeliveryTransition,
-  assertLeaseTransition,
-  assertOrderTransition,
-} from "../state-machine.js";
-import type { Consent, Delivery, Order } from "../types.js";
+import { assertDeliveryTransition, assertLeaseTransition } from "../state-machine.js";
+import { evaluateMarketStewardPolicy, parseMarketStewardPolicyInput } from "../steward-policy.js";
+import type { Consent, ConsentApprovalContext, Delivery, Offer } from "../types.js";
 import {
   normalizeBuyerId,
   requireAddress,
@@ -23,7 +19,6 @@ import {
   requireOptionalIsoTimestamp,
   requirePositiveInt,
   requireString,
-  requireUsageScope,
 } from "../validators.js";
 import {
   assertAccess,
@@ -32,13 +27,86 @@ import {
   formatGatewayErrorResponse,
   hashAccessToken,
   nowIso,
-  randomBytes,
-  randomUUID,
   recordAudit,
   recordAuditWithAnchor,
   requireOptionalAddress,
   resolveDeliveryPayloadForRevocation,
 } from "./_shared.js";
+import {
+  createDraftOrder,
+  createPendingLeaseApprovalConsent,
+  issueLeaseForApprovedOrder,
+} from "./lease-issue-flow.js";
+
+function buildApprovalContext(params: {
+  actorId: string;
+  resource: MarketResource;
+  offer: Offer;
+  consumerActorId: string;
+  ttlMs: number;
+  maxCost?: string;
+  policyDecision: ReturnType<typeof evaluateMarketStewardPolicy>;
+}): ConsentApprovalContext {
+  return {
+    kind: "lease_issue",
+    requesterActorId: params.actorId,
+    resourceId: params.resource.resourceId,
+    offerId: params.offer.offerId,
+    consumerActorId: params.consumerActorId,
+    quantity: 1,
+    ttlMs: params.ttlMs,
+    maxCost: params.maxCost,
+    candidate: {
+      resourceId: params.policyDecision.candidate.resourceId,
+      label: params.policyDecision.candidate.label,
+      providerActorId: params.policyDecision.candidate.providerActorId,
+      kind: params.policyDecision.candidate.kind,
+      proofRequired: params.policyDecision.candidate.proofRequired,
+      proofTypes: params.policyDecision.candidate.proofTypes,
+      estimatedTotal: params.policyDecision.candidate.estimatedTotal,
+      priceAmount: params.policyDecision.candidate.priceAmount,
+      currency: params.policyDecision.candidate.currency,
+    },
+    budgetDecision: params.policyDecision.plan.budget
+      ? {
+          status: params.policyDecision.plan.budget.status,
+          reason: params.policyDecision.plan.budget.reason,
+          requiresApproval: params.policyDecision.plan.budget.requiresApproval,
+          amount: params.policyDecision.plan.budget.amount,
+          currency: params.policyDecision.plan.budget.currency,
+          policyApplied: params.policyDecision.plan.budget.policyApplied,
+        }
+      : null,
+    riskDecision: params.policyDecision.plan.risk
+      ? {
+          status: params.policyDecision.plan.risk.status,
+          reason: params.policyDecision.plan.risk.reason,
+          requiresApproval: params.policyDecision.plan.risk.requiresApproval,
+          riskLevel: params.policyDecision.plan.risk.riskLevel,
+          policyApplied: params.policyDecision.plan.risk.policyApplied,
+        }
+      : null,
+    providerDecision: params.policyDecision.providerDecision,
+    requestedAt: nowIso(),
+    approval: params.policyDecision.plan.status === "approval_required" ? {} : undefined,
+  };
+}
+
+function buildPolicyResponse(params: {
+  decision: ReturnType<typeof evaluateMarketStewardPolicy>;
+  orderId?: string;
+  consentId?: string;
+}) {
+  return {
+    status: params.decision.status,
+    orderId: params.orderId ?? null,
+    consentId: params.consentId ?? null,
+    policy: {
+      plan: params.decision.plan,
+      provider: params.decision.providerDecision,
+    },
+  };
+}
 
 export function createLeaseIssueHandler(
   store: MarketStateStore,
@@ -85,140 +153,110 @@ export function createLeaseIssueHandler(
         "consumerActorId",
       );
 
-      const now = nowIso();
-      const expiresAt = new Date(Date.now() + ttlMs).toISOString();
-      const orderId = randomUUID();
-      const orderHash = hashCanonical({
-        orderId,
-        offerId: offer.offerId,
-        buyerId: consumerActorId,
-        quantity: 1,
-        price: offer.price,
-        currency: offer.currency,
-      });
-      const order: Order = {
-        orderId,
-        offerId: offer.offerId,
-        buyerId: consumerActorId,
-        quantity: 1,
-        status: "order_created",
-        orderHash,
-        createdAt: now,
-        updatedAt: now,
-      };
-      assertOrderTransition(order.status, "payment_locked");
-      order.status = "payment_locked";
-      assertOrderTransition(order.status, "consent_granted");
-      order.status = "consent_granted";
-      assertOrderTransition(order.status, "delivery_ready");
-      order.status = "delivery_ready";
-      order.updatedAt = now;
-
-      const consentId = randomUUID();
-      const consentMessage = canonicalize({
-        orderId,
-        offerId: offer.offerId,
-        buyerId: consumerActorId,
-        scope: offer.usageScope,
-      });
-      const consentHash = hashCanonical(consentMessage);
-      const consent: Consent = {
-        consentId,
-        orderId,
-        scope: {
-          purpose: offer.usageScope.purpose,
-          durationDays: offer.usageScope.durationDays,
-        },
-        signature: "lease_issue",
-        status: "consent_granted",
-        consentHash,
-        grantedAt: now,
-      };
-
-      const accessToken = `tok_${randomBytes(32).toString("base64url")}`;
-      const accessTokenHash = hashAccessToken(accessToken);
-      const deliveryId = randomUUID();
-      const credentialsStore = createDeliveryCredentialsStore(config.credentials);
-      const payloadRef = credentialsStore
-        ? await credentialsStore.putDeliveryPayload(deliveryId, {
-            type: "api",
-            accessToken,
+      const policy = parseMarketStewardPolicyInput(input);
+      const policyDecision = policy
+        ? evaluateMarketStewardPolicy({
+            resource,
+            quantity: 1,
+            policy,
+            reputation: (() => {
+              const snapshot = summarizeProviderReputation({
+                store,
+                providerActorId: resource.providerActorId,
+                resourceId,
+                limit: 200,
+              });
+              return { score: snapshot.score, signals: snapshot.signals };
+            })(),
           })
         : undefined;
 
-      const deliveryHash = hashCanonical({
-        deliveryId,
-        orderId,
-        deliveryType: "api",
-        issuedAt: now,
-        payloadRef: payloadRef?.ref ?? null,
-      });
-      const delivery: Delivery = {
-        deliveryId,
-        orderId,
-        deliveryType: "api",
-        status: "delivery_ready",
-        deliveryHash,
-        issuedAt: now,
-        payloadRef: payloadRef ?? undefined,
-      };
-
-      const leaseId = randomUUID();
-      const lease: MarketLease = {
-        leaseId,
-        resourceId,
-        kind: resource.kind,
-        providerActorId: resource.providerActorId,
-        consumerActorId,
-        orderId,
-        consentId,
-        deliveryId,
-        accessTokenHash,
-        accessRef: payloadRef ? { store: "credentials", ref: payloadRef.ref } : undefined,
-        status: "lease_active",
-        issuedAt: now,
-        expiresAt,
-        maxCost,
-      };
-
-      // Atomic: order + consent + delivery + lease must persist together
-      try {
-        await store.runInTransaction(() => {
-          store.saveOrder(order);
-          store.saveConsent(consent);
-          store.saveDelivery(delivery);
-          store.saveLease(lease);
-        });
-      } catch (err) {
-        if (payloadRef && credentialsStore) {
-          await credentialsStore.removeDeliveryPayload(payloadRef);
+      if (policyDecision && !policyDecision.canExecute) {
+        if (policyDecision.status === "approval_required") {
+          const order = createDraftOrder({ offer, buyerId: consumerActorId, quantity: 1 });
+          const approvalContext = buildApprovalContext({
+            actorId,
+            resource,
+            offer,
+            consumerActorId,
+            ttlMs,
+            maxCost,
+            policyDecision,
+          });
+          const consent = createPendingLeaseApprovalConsent({
+            order,
+            offer,
+            actorId,
+            resource,
+            consumerActorId,
+            ttlMs,
+            maxCost,
+            approvalContext,
+          });
+          await store.runInTransaction(() => {
+            store.saveOrder(order);
+            store.saveConsent(consent);
+          });
+          await recordAuditWithAnchor({
+            store,
+            config,
+            kind: "consent_requested",
+            refId: consent.consentId,
+            hash: consent.consentHash,
+            anchorId: `consent:${consent.consentId}`,
+            actor: actorId,
+            details: {
+              orderId: order.orderId,
+              resourceId,
+              providerActorId: resource.providerActorId,
+              consumerActorId,
+              budgetDecision: approvalContext.budgetDecision,
+              riskDecision: approvalContext.riskDecision,
+              providerDecision: approvalContext.providerDecision,
+            },
+          });
+          respond(
+            true,
+            buildPolicyResponse({
+              decision: policyDecision,
+              orderId: order.orderId,
+              consentId: consent.consentId,
+            }),
+          );
+          return;
         }
-        throw err;
+        respond(true, buildPolicyResponse({ decision: policyDecision }));
+        return;
       }
 
-      await recordAuditWithAnchor({
+      const order = createDraftOrder({ offer, buyerId: consumerActorId, quantity: 1 });
+      const issued = await issueLeaseForApprovedOrder({
         store,
         config,
-        kind: "lease_issued",
-        refId: leaseId,
-        hash: accessTokenHash,
-        anchorId: `lease:${leaseId}`,
-        actor: actorId,
-        details: {
-          resourceId,
-          orderId,
-          deliveryId,
-          accessTokenHash,
-        },
+        actorId,
+        resource,
+        offer,
+        order,
+        consumerActorId,
+        ttlMs,
+        maxCost,
+        approvalId: policy?.approval?.approvalId,
+        approverId: policy?.approval?.approverId,
       });
 
       respond(true, {
-        leaseId,
-        orderId,
-        consentId,
-        deliveryId,
-        expiresAt,
-        accessToken,
+        leaseId: issued.lease.leaseId,
+        orderId: order.orderId,
+        consentId: issued.consent.consentId,
+        deliveryId: issued.delivery.deliveryId,
+        expiresAt: issued.expiresAt,
+        status: issued.lease.status,
+        policy: policyDecision
+          ? {
+              plan: policyDecision.plan,
+              provider: policyDecision.providerDecision,
+            }
+          : undefined,
       });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
@@ -270,7 +308,6 @@ export function createLeaseRevokeHandler(
       const offer = order ? store.getOffer(order.offerId) : undefined;
       const consent = lease.consentId ? store.getConsent(lease.consentId) : undefined;
 
-      // Atomic: lease + delivery revocation must persist together
       await store.runInTransaction(() => {
         store.saveLease(lease);
         if (
@@ -282,12 +319,11 @@ export function createLeaseRevokeHandler(
           delivery.status = "delivery_revoked";
           delivery.revokedAt = revokedAt;
           delivery.revokeReason = reason ?? "lease_revoked";
-          delivery.revokeHash = hashCanonical({
-            deliveryId: delivery.deliveryId,
-            orderId: delivery.orderId,
-            revokedAt,
-            reason: delivery.revokeReason,
-          });
+          delivery.revokeHash = hashAccessToken(
+            hashAccessToken(
+              `${delivery.deliveryId}:${delivery.orderId}:${delivery.revokeReason}:${revokedAt}`,
+            ),
+          );
           store.saveDelivery(delivery);
         }
       });
@@ -379,7 +415,7 @@ export function createLeaseListHandler(
         "lease_active",
         "lease_revoked",
         "lease_expired",
-      ] as MarketLeaseStatus[]);
+      ] as const);
       const limit = requireLimit(input, "limit", 50, 200);
       const leases = store.listLeases({
         providerActorId,
