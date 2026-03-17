@@ -17,6 +17,7 @@ import {
   requireOptionalPositiveInt,
   requireOptionalStringArray,
   requireServiceSchema,
+  requireServiceWrapper,
   requireString,
   requireUsageScope,
 } from "../validators.js";
@@ -109,10 +110,30 @@ export function createResourcePublishHandler(
       }
 
       let serviceSchema: MarketResource["serviceSchema"] | undefined;
+      let serviceWrapper: MarketResource["serviceWrapper"] | undefined;
       if (kind === "service") {
-        serviceSchema = requireServiceSchema(resourceInput.serviceSchema);
-      } else if (resourceInput.serviceSchema !== undefined) {
-        throw new Error("E_INVALID_ARGUMENT: serviceSchema only applies to service resources");
+        // Keep legacy `serviceSchema` alive while allowing the additive wrapper path.
+        if (
+          resourceInput.serviceSchema === undefined &&
+          resourceInput.serviceWrapper === undefined
+        ) {
+          throw new Error(
+            "E_INVALID_ARGUMENT: service resources require serviceSchema or serviceWrapper",
+          );
+        }
+        serviceSchema =
+          resourceInput.serviceSchema !== undefined
+            ? requireServiceSchema(resourceInput.serviceSchema)
+            : undefined;
+        serviceWrapper = requireServiceWrapper(resourceInput.serviceWrapper, serviceSchema);
+        serviceSchema = serviceWrapper.serviceSchema ?? serviceSchema;
+      } else {
+        if (resourceInput.serviceSchema !== undefined) {
+          throw new Error("E_INVALID_ARGUMENT: serviceSchema only applies to service resources");
+        }
+        if (resourceInput.serviceWrapper !== undefined) {
+          throw new Error("E_INVALID_ARGUMENT: serviceWrapper only applies to service resources");
+        }
       }
 
       const offerInput = (resourceInput.offer ?? {}) as Record<string, unknown>;
@@ -193,6 +214,7 @@ export function createResourcePublishHandler(
         price: { unit, amount, currency, tokenAddress },
         policy,
         serviceSchema,
+        serviceWrapper,
         version,
         createdAt: existingResource?.createdAt ?? now,
         updatedAt: now,
@@ -217,6 +239,7 @@ export function createResourcePublishHandler(
         price: resource.price,
         policy,
         serviceSchema,
+        serviceWrapper,
         version,
       });
       await recordAuditWithAnchor({

@@ -4,8 +4,11 @@ import type {
 } from "openclaw/plugin-sdk/gateway-types";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
-import type { MarketLeaseStatus } from "../resources.js";
-import type { Dispute } from "../types.js";
+import {
+  summarizeProviderReputation,
+  type ProviderReputationSnapshot,
+} from "../provider-reputation.js";
+import { buildAgentReputation } from "../reputation-engine.js";
 import { requireOptionalIsoTimestamp, requireLimit } from "../validators.js";
 import { assertAccess, formatGatewayErrorResponse, requireOptionalAddress } from "./_shared.js";
 
@@ -24,63 +27,29 @@ type ReputationSummary = {
   signals: string[];
   leases: {
     total: number;
-    byStatus: Record<MarketLeaseStatus, number>;
+    byStatus: ProviderReputationSnapshot["leaseCounts"];
   };
   disputes: {
     total: number;
     byStatus: Record<string, number>;
+    resolvedAgainstProvider: number;
   };
   ledger: {
     totalCost: string;
     currency: string;
   };
+  policy: {
+    riskBand: "low" | "medium" | "high";
+    autoPurchaseEligible: boolean;
+    requiresManualReview: boolean;
+  };
+  agentReputation: ReturnType<typeof buildAgentReputation>;
 };
 
-function clampScore(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function countByStatus(disputes: Dispute[]): Record<string, number> {
-  return disputes.reduce<Record<string, number>>((acc, entry) => {
-    const status = entry.status ?? "unknown";
-    acc[status] = (acc[status] ?? 0) + 1;
-    return acc;
-  }, {});
-}
-
-function buildSignals(params: {
-  totalLeases: number;
-  revoked: number;
-  expired: number;
-  disputes: number;
-}): string[] {
-  const signals: string[] = [];
-  if (params.totalLeases === 0) {
-    signals.push("insufficient_data");
-    return signals;
-  }
-  const disputeRate = params.disputes / params.totalLeases;
-  const revokeRate = params.revoked / params.totalLeases;
-  const expireRate = params.expired / params.totalLeases;
-  if (disputeRate > 0.2) signals.push("high_dispute_rate");
-  if (revokeRate > 0.3) signals.push("high_revoke_rate");
-  if (expireRate > 0.3) signals.push("high_expire_rate");
-  return signals;
-}
-
-function computeScore(params: {
-  totalLeases: number;
-  revoked: number;
-  expired: number;
-  disputes: number;
-}): number {
-  if (params.totalLeases === 0) return 50;
-  const disputeRate = params.disputes / params.totalLeases;
-  const revokeRate = params.revoked / params.totalLeases;
-  const expireRate = params.expired / params.totalLeases;
-  const penalty = disputeRate * 40 + revokeRate * 20 + expireRate * 10;
-  return clampScore(100 - penalty);
+function deriveRiskBand(score: number): "low" | "medium" | "high" {
+  if (score >= 80) return "low";
+  if (score >= 60) return "medium";
+  return "high";
 }
 
 export function createReputationSummaryHandler(
@@ -98,83 +67,65 @@ export function createReputationSummaryHandler(
       const until = requireOptionalIsoTimestamp(input, "until");
       const limit = requireLimit(input, "limit", 200, 1000);
 
-      const leases = store.listLeases({ providerActorId, resourceId, limit });
-      const leaseCounts: Record<MarketLeaseStatus, number> = {
-        lease_active: 0,
-        lease_revoked: 0,
-        lease_expired: 0,
-      };
-      for (const lease of leases) {
-        // Filter by time range if provided (MarketLeaseFilter lacks since/until)
-        if (since) {
-          const issuedAt = Date.parse(lease.issuedAt);
-          if (Number.isNaN(issuedAt) || issuedAt < Date.parse(since)) continue;
-        }
-        if (until) {
-          const issuedAt = Date.parse(lease.issuedAt);
-          if (Number.isNaN(issuedAt) || issuedAt > Date.parse(until)) continue;
-        }
-        leaseCounts[lease.status] = (leaseCounts[lease.status] ?? 0) + 1;
-      }
-
-      // Resolve resources: direct lookup when resourceId is given, otherwise list by provider
-      const resourceMatches = resourceId
-        ? (() => {
-            const res = store.getResource(resourceId);
-            return res ? [res] : [];
-          })()
-        : store.listResources(providerActorId ? { providerActorId } : {});
-      const offerIds = new Set(resourceMatches.map((entry) => entry.offerId));
-      const orders = store.listOrders().filter((order) => offerIds.has(order.offerId));
-      const orderIds = new Set(orders.map((order) => order.orderId));
-
-      let disputes = store.listDisputes().filter((entry) => orderIds.has(entry.orderId));
-      if (since || until) {
-        disputes = disputes.filter((entry) => {
-          const openedAt = Date.parse(entry.openedAt);
-          if (Number.isNaN(openedAt)) return false;
-          if (since && openedAt < Date.parse(since)) return false;
-          if (until && openedAt > Date.parse(until)) return false;
-          return true;
-        });
-      }
-
-      const ledgerSummary = store.summarizeLedger({
+      const snapshot = summarizeProviderReputation({
+        store,
         providerActorId,
         resourceId,
         since,
         until,
+        limit,
       });
-
-      const totalLeases = Object.values(leaseCounts).reduce((sum, n) => sum + n, 0);
-      const revoked = leaseCounts.lease_revoked ?? 0;
-      const expired = leaseCounts.lease_expired ?? 0;
-      const disputeCount = disputes.length;
-      const signals = buildSignals({ totalLeases, revoked, expired, disputes: disputeCount });
-      const score = computeScore({ totalLeases, revoked, expired, disputes: disputeCount });
+      const totalLeases = Object.values(snapshot.leaseCounts).reduce(
+        (sum, count) => sum + count,
+        0,
+      );
+      const riskBand = deriveRiskBand(snapshot.score);
 
       const summary: ReputationSummary = {
         providerActorId,
         resourceId,
-        score,
-        signals,
+        score: snapshot.score,
+        signals: snapshot.signals,
         leases: {
           total: totalLeases,
-          byStatus: leaseCounts,
+          byStatus: snapshot.leaseCounts,
         },
         disputes: {
-          total: disputeCount,
-          byStatus: countByStatus(disputes),
+          total: snapshot.disputes.length,
+          byStatus: snapshot.disputeCounts,
+          resolvedAgainstProvider: snapshot.providerLosses,
         },
         ledger: {
-          totalCost: ledgerSummary.totalCost,
-          currency: ledgerSummary.currency,
+          totalCost: snapshot.ledgerSummary.totalCost,
+          currency: snapshot.ledgerSummary.currency,
         },
+        policy: {
+          riskBand,
+          autoPurchaseEligible:
+            snapshot.score >= 75 && !snapshot.signals.includes("provider_penalized"),
+          requiresManualReview:
+            riskBand !== "low" || snapshot.signals.includes("high_dispute_rate"),
+        },
+        agentReputation: buildAgentReputation({
+          providerActorId,
+          resources: snapshot.matchedResources,
+          proofs: snapshot.proofs,
+          totalJobs: totalLeases,
+          completedJobs: snapshot.completedJobs,
+          disputedJobs: snapshot.disputes.length,
+          score: snapshot.score,
+          lastUpdated: snapshot.lastUpdated,
+        }),
       };
 
       respond(true, summary);
     } catch (err) {
-      respond(false, formatGatewayErrorResponse(err));
+      respond(
+        false,
+        formatGatewayErrorResponse(err, undefined, {
+          cause: err instanceof Error ? err.message : String(err),
+        }),
+      );
     }
   };
 }

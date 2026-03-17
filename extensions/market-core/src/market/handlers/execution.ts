@@ -4,7 +4,12 @@ import type {
 } from "openclaw/plugin-sdk/gateway-types";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
-import { requireLimit, requireString } from "../validators.js";
+import { deriveAcceptanceRecord } from "../acceptance-record.js";
+import { buildExecutionState, deriveExecutionLifecycleStatus } from "../execution-state.js";
+import { buildGenericProofSummary } from "../proof-types.js";
+import { resolveServiceWrapper } from "../service-wrapper.js";
+import type { Consent } from "../types.js";
+import { requireLimit } from "../validators.js";
 import { assertAccess, formatGatewayErrorResponse, redactAuditDetails } from "./_shared.js";
 
 function resolveOrderId(store: MarketStateStore, input: Record<string, unknown>): string {
@@ -24,48 +29,40 @@ function resolveOrderId(store: MarketStateStore, input: Record<string, unknown>)
   throw new Error("E_INVALID_ARGUMENT: orderId, leaseId, or proofId is required");
 }
 
-function deriveAcceptanceStatus(params: {
-  orderStatus: string;
-  settlementStatus?: string;
-  disputeStatus?: string;
-  hasProof: boolean;
-}): string {
-  const { orderStatus, settlementStatus, disputeStatus, hasProof } = params;
-  if (settlementStatus === "settlement_released" || orderStatus === "settlement_completed") {
-    return "acceptance_signed";
-  }
-  if (disputeStatus === "dispute_opened" || disputeStatus === "dispute_evidence_submitted") {
-    return "acceptance_rejected";
-  }
-  if (hasProof || orderStatus === "delivery_completed") {
-    return "acceptance_pending";
-  }
-  return "acceptance_not_ready";
+function compareConsentTimestamp(left: Consent, right: Consent): number {
+  const leftTime = Date.parse(left.approvedAt ?? left.grantedAt ?? left.revokedAt ?? "");
+  const rightTime = Date.parse(right.approvedAt ?? right.grantedAt ?? right.revokedAt ?? "");
+  return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
 }
 
-function deriveExecutionStatus(params: {
-  orderStatus: string;
-  settlementStatus?: string;
-  disputeStatus?: string;
-  hasProof: boolean;
-}): string {
-  const { orderStatus, settlementStatus, disputeStatus, hasProof } = params;
-  if (orderStatus === "order_cancelled" || orderStatus === "settlement_cancelled") {
-    return "cancelled";
+function resolveOrderConsents(store: MarketStateStore, orderId: string, consentId?: string) {
+  const consents = store
+    .listConsents()
+    .filter((consent) => consent.orderId === orderId)
+    .sort(compareConsentTimestamp);
+  const linkedConsent = consentId ? (store.getConsent(consentId) ?? null) : null;
+  const pendingConsent = consents.find((consent) => consent.status === "consent_pending") ?? null;
+  const currentConsent = linkedConsent ?? pendingConsent ?? consents[0] ?? null;
+  return { currentConsent, pendingConsent };
+}
+
+function buildApprovalSummary(consent: Consent | null) {
+  if (!consent?.approvalContext) {
+    return null;
   }
-  if (disputeStatus === "dispute_opened" || disputeStatus === "dispute_evidence_submitted") {
-    return "disputed";
-  }
-  if (settlementStatus === "settlement_released" || orderStatus === "settlement_completed") {
-    return "settled";
-  }
-  if (hasProof || orderStatus === "delivery_completed") {
-    return "awaiting_acceptance";
-  }
-  if (orderStatus === "delivery_ready" || orderStatus === "consent_granted") {
-    return "awaiting_delivery";
-  }
-  return "awaiting_payment";
+  return {
+    status: consent.status === "consent_pending" ? "approval_required" : "approved",
+    consentId: consent.consentId,
+    requestedAt: consent.approvalContext.requestedAt ?? consent.grantedAt,
+    approvedAt: consent.approvedAt ?? null,
+    approvedBy: consent.approvedBy ?? null,
+    approvalId: consent.approvalId ?? consent.approvalContext.approval?.approvalId ?? null,
+    kind: consent.approvalContext.kind,
+    candidate: consent.approvalContext.candidate,
+    budgetDecision: consent.approvalContext.budgetDecision,
+    riskDecision: consent.approvalContext.riskDecision,
+    providerDecision: consent.approvalContext.providerDecision,
+  };
 }
 
 export function createExecutionGetHandler(
@@ -93,12 +90,26 @@ export function createExecutionGetHandler(
       const proof = store.getServiceProofByOrder(orderId) ?? null;
       const settlement = store.getSettlementByOrder(orderId) ?? null;
       const dispute = store.getDisputeByOrder(orderId) ?? null;
+      const { currentConsent, pendingConsent } = resolveOrderConsents(
+        store,
+        orderId,
+        lease?.consentId,
+      );
+      const approval = buildApprovalSummary(pendingConsent ?? currentConsent);
+      const serviceWrapper = resource
+        ? resolveServiceWrapper({
+            serviceSchema: resource.serviceSchema,
+            serviceWrapper: resource.serviceWrapper,
+          })
+        : undefined;
 
       const traceIds = new Set(
         [
           orderId,
           order.offerId,
           resource?.resourceId ?? null,
+          currentConsent?.consentId ?? null,
+          pendingConsent?.consentId ?? null,
           lease?.leaseId ?? null,
           delivery?.deliveryId ?? null,
           proof?.proofId ?? null,
@@ -126,17 +137,36 @@ export function createExecutionGetHandler(
           details: redactAuditDetails(event.details) ?? null,
         }));
 
-      const acceptanceStatus = deriveAcceptanceStatus({
+      const proofSummary = proof ? buildGenericProofSummary(proof) : null;
+      const executionStatus = deriveExecutionLifecycleStatus({
         orderStatus: order.status,
         settlementStatus: settlement?.status ?? undefined,
         disputeStatus: dispute?.status ?? undefined,
         hasProof: Boolean(proof),
+        hasPendingApproval: pendingConsent?.status === "consent_pending",
       });
-      const executionStatus = deriveExecutionStatus({
-        orderStatus: order.status,
-        settlementStatus: settlement?.status ?? undefined,
-        disputeStatus: dispute?.status ?? undefined,
-        hasProof: Boolean(proof),
+      const acceptanceRecord = deriveAcceptanceRecord({
+        order,
+        proof,
+        settlement,
+        dispute,
+        policy: serviceWrapper?.acceptance,
+      });
+      const acceptanceStatus = acceptanceRecord
+        ? acceptanceRecord.status === "accepted"
+          ? "acceptance_signed"
+          : acceptanceRecord.status === "rejected"
+            ? "acceptance_rejected"
+            : "acceptance_pending"
+        : "acceptance_not_ready";
+      const executionState = buildExecutionState({
+        order,
+        lease,
+        proof,
+        settlement,
+        dispute,
+        acceptance: acceptanceRecord,
+        consent: pendingConsent ?? currentConsent,
       });
 
       respond(true, {
@@ -150,6 +180,7 @@ export function createExecutionGetHandler(
           buyerId: order.buyerId,
           offerId: order.offerId,
           quantity: order.quantity,
+          approvalStatus: approval?.status ?? null,
         },
         offer: {
           offerId: offer.offerId,
@@ -170,6 +201,18 @@ export function createExecutionGetHandler(
               tags: resource.tags ?? [],
               price: resource.price,
               serviceSchema: resource.serviceSchema ?? null,
+              serviceWrapper: serviceWrapper ?? null,
+            }
+          : null,
+        approval,
+        consent: currentConsent
+          ? {
+              consentId: currentConsent.consentId,
+              status: currentConsent.status,
+              grantedAt: currentConsent.grantedAt,
+              approvedAt: currentConsent.approvedAt ?? null,
+              approvedBy: currentConsent.approvedBy ?? null,
+              revokedAt: currentConsent.revokedAt ?? null,
             }
           : null,
         lease: lease
@@ -196,6 +239,8 @@ export function createExecutionGetHandler(
               status: proof.status,
               submittedAt: proof.submittedAt,
               summary: {
+                family: proofSummary?.family ?? proof.proof.type,
+                artifactCount: proofSummary?.artifactCount ?? 1,
                 type: proof.proof.type,
                 verifier: proof.proof.verifier,
                 artifactHash: proof.proof.artifactHash,
@@ -205,13 +250,16 @@ export function createExecutionGetHandler(
           : null,
         acceptance: {
           status: acceptanceStatus,
+          acceptanceId: acceptanceRecord?.acceptanceId ?? null,
           decidedAt:
             acceptanceStatus === "acceptance_signed"
               ? (settlement?.releasedAt ?? order.updatedAt)
               : acceptanceStatus === "acceptance_rejected"
                 ? (dispute?.openedAt ?? order.updatedAt)
                 : null,
+          policy: acceptanceRecord?.policy ?? serviceWrapper?.acceptance ?? null,
         },
+        acceptanceRecord,
         settlement: settlement
           ? {
               settlementId: settlement.settlementId,
@@ -230,8 +278,13 @@ export function createExecutionGetHandler(
               reason: dispute.reason,
               openedAt: dispute.openedAt,
               resolvedAt: dispute.resolvedAt ?? null,
+              winnerActorId: dispute.winnerActorId ?? null,
+              loserActorId: dispute.loserActorId ?? null,
+              proofFamily: dispute.proofFamily ?? null,
+              penalties: dispute.penalties ?? null,
             }
           : null,
+        executionState,
         trace,
       });
     } catch (err) {

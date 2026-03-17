@@ -5,6 +5,7 @@ import type {
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { hashCanonical } from "../hash.js";
+import { buildGenericProofSummary } from "../proof-types.js";
 import type { Offer, Order, ServiceProof, Settlement } from "../types.js";
 import { normalizeBuyerId, requireExecutionProof, requireString } from "../validators.js";
 import {
@@ -20,7 +21,7 @@ import {
 function assertReadableByActor(actorId: string | undefined, order: Order, offer: Offer): void {
   if (!actorId) return;
   const buyerMatch = normalizeBuyerId(actorId) === normalizeBuyerId(order.buyerId);
-  const sellerMatch = actorId === offer.sellerId;
+  const sellerMatch = normalizeBuyerId(actorId) === normalizeBuyerId(offer.sellerId);
   if (!buyerMatch && !sellerMatch) {
     throw new Error("E_FORBIDDEN: actorId does not match buyerId or sellerId");
   }
@@ -125,6 +126,7 @@ export function createServiceProofSubmitHandler(
         submittedAt,
         status: "proof_submitted",
       };
+      const proofSummary = buildGenericProofSummary(serviceProof);
 
       store.saveServiceProof(serviceProof);
       await recordAuditWithAnchor({
@@ -142,7 +144,9 @@ export function createServiceProofSubmitHandler(
           orderStatus: order.status,
           settlementStatus: settlement!.status,
           proofType: proof.type,
+          proofFamily: proofSummary.family,
           artifactHash: proof.artifactHash,
+          metadata: proof.metadata ?? null,
         },
       });
 
@@ -151,6 +155,7 @@ export function createServiceProofSubmitHandler(
         orderId,
         status: serviceProof.status,
         proofHash,
+        proofFamily: proofSummary.family,
         orderStatus: order.status,
         settlementStatus: settlement!.status,
       });
@@ -216,7 +221,7 @@ export function createServiceProofListHandler(
           const offer = store.getOffer(order.offerId);
           if (!offer) return false;
           const buyerMatch = normalizeBuyerId(actorId) === normalizeBuyerId(order.buyerId);
-          const sellerMatch = actorId === offer.sellerId;
+          const sellerMatch = normalizeBuyerId(actorId) === normalizeBuyerId(offer.sellerId);
           return buyerMatch || sellerMatch;
         });
       }
