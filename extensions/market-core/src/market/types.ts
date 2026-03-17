@@ -25,7 +25,7 @@ export type OrderStatus =
   | "consent_revoked";
 
 export type DeliveryStatus = "delivery_ready" | "delivery_completed" | "delivery_revoked";
-export type ConsentStatus = "consent_granted" | "consent_revoked";
+export type ConsentStatus = "consent_pending" | "consent_granted" | "consent_revoked";
 export type SettlementStatus = "settlement_locked" | "settlement_released" | "settlement_refunded";
 
 export type UsageScope = {
@@ -92,6 +92,10 @@ export type Consent = {
   scope: ConsentScope;
   signature: string;
   status: ConsentStatus;
+  approvalContext?: ConsentApprovalContext;
+  approvedAt?: string;
+  approvedBy?: string;
+  approvalId?: string;
   consentHash: string;
   grantedAt: string;
   revokedAt?: string;
@@ -136,14 +140,21 @@ export type Delivery = {
  */
 export type Sha256ArtifactHash = `sha256:${string}`;
 
+export type ExecutionProofType =
+  | "tlsnotary"
+  | "human_attestation"
+  | "oracle_event"
+  | "signed_receipt";
+
 export type ExecutionProof = {
-  type: "tlsnotary";
+  type: ExecutionProofType;
   artifactHash: Sha256ArtifactHash;
   /** ISO timestamp. */
   issuedAt: string;
   redactedFields?: string[];
   /** The verifier identifier (e.g. "tlsnotary"). */
   verifier: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type ServiceProofStatus = "proof_submitted";
@@ -206,6 +217,7 @@ export type AuditEventKind =
   | "order_created"
   | "order_cancelled"
   | "payment_locked"
+  | "consent_requested"
   | "consent_granted"
   | "consent_revoked"
   | "delivery_issued"
@@ -346,10 +358,19 @@ export type Dispute = {
   orderId: string;
   initiatorActorId: string;
   respondentActorId: string;
-  arbitratorType: "platform" | "community" | "onchain";
+  arbitratorType: "platform" | "community" | "onchain" | "human" | "dao" | "partner";
   reason: string;
   status: DisputeStatus;
   resolution?: DisputeResolution;
+  winnerActorId?: string;
+  loserActorId?: string;
+  resolutionReason?: string;
+  proofFamily?: ExecutionProofType;
+  penalties?: {
+    reputationDelta?: number;
+    settlementSlashAmount?: string;
+    settlementCurrency?: string;
+  };
   evidence: DisputeEvidence[];
   disputeHash: string;
   openedAt: string;
@@ -637,4 +658,22 @@ export type PrivacyReplayFilter = {
   actorId?: string;
   status?: PrivacyReplayStatus;
   limit?: number;
+};
+
+export type ConsentApprovalContext = {
+  approval?: {
+    approvalId?: string;
+    approverId?: string;
+    decidedAt?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+};
+export type ConsentApprovalDecision = {
+  status: "approved" | "rejected" | "approval_required";
+  approvalId?: string;
+  approverId?: string;
+  approvedAt?: string;
+  reason?: string;
+  policyApplied?: boolean;
 };
