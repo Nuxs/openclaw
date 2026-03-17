@@ -4,9 +4,16 @@ import {
   resolveMarketStewardContext,
 } from "./market-steward-context.js";
 
-const { loadCoreConfigMock, loadSessionStoreHelpersMock } = vi.hoisted(() => ({
+const {
+  loadCoreConfigMock,
+  loadSessionStoreHelpersMock,
+  loadStewardGrowthRuntimeHelpersMock,
+  syncStewardGrowthLoopMock,
+} = vi.hoisted(() => ({
   loadCoreConfigMock: vi.fn(),
   loadSessionStoreHelpersMock: vi.fn(),
+  loadStewardGrowthRuntimeHelpersMock: vi.fn(),
+  syncStewardGrowthLoopMock: vi.fn(),
 }));
 
 let currentEntry: Record<string, unknown> | null = null;
@@ -28,6 +35,7 @@ const updateSessionStoreEntryMock = vi.fn(async ({ update }: UpdateParams) => {
 vi.mock("../core-imports.js", () => ({
   loadCoreConfig: loadCoreConfigMock,
   loadSessionStoreHelpers: loadSessionStoreHelpersMock,
+  loadStewardGrowthRuntimeHelpers: loadStewardGrowthRuntimeHelpersMock,
 }));
 
 describe("market steward context", () => {
@@ -36,12 +44,17 @@ describe("market steward context", () => {
     updateSessionStoreEntryMock.mockClear();
     loadCoreConfigMock.mockReset();
     loadSessionStoreHelpersMock.mockReset();
+    loadStewardGrowthRuntimeHelpersMock.mockReset();
+    syncStewardGrowthLoopMock.mockReset();
     loadCoreConfigMock.mockResolvedValue({ session: { store: "file" } });
     loadSessionStoreHelpersMock.mockResolvedValue({
       resolveSessionStoreKey: ({ sessionKey }: { sessionKey: string }) => `canonical:${sessionKey}`,
       resolveSessionAgentId: () => "agent-1",
       resolveStorePath: () => "/tmp/openclaw-session-store.json",
       updateSessionStoreEntry: updateSessionStoreEntryMock,
+    });
+    loadStewardGrowthRuntimeHelpersMock.mockResolvedValue({
+      syncStewardGrowthLoop: syncStewardGrowthLoopMock,
     });
   });
 
@@ -123,7 +136,7 @@ describe("market steward context", () => {
     expect(resolved.usedDefaultRiskPolicy).toBe(true);
   });
 
-  it("persists steward execution state back into the session store", async () => {
+  it("persists steward execution state back into the session store and syncs growth runtime", async () => {
     currentEntry = {
       steward: {
         actorId: "0xold-buyer",
@@ -152,6 +165,8 @@ describe("market steward context", () => {
       leaseId: "lease-1",
       settlementId: "settlement-1",
       growthSummary: "Prefer proof-backed providers when available.",
+      researchBacklog: ["Compare proof-backed fallback routes before the next quiet cycle."],
+      lastResearchedAt: "2026-03-18T01:00:00.000Z",
     });
 
     expect(updateSessionStoreEntryMock).toHaveBeenCalledTimes(1);
@@ -182,8 +197,13 @@ describe("market steward context", () => {
         lastLeaseId: "lease-1",
         lastSettlementId: "settlement-1",
         growthSummary: "Prefer proof-backed providers when available.",
+        researchBacklog: ["Compare proof-backed fallback routes before the next quiet cycle."],
+        lastResearchedAt: "2026-03-18T01:00:00.000Z",
         updatedAt: expect.any(Number),
       },
+    });
+    expect(syncStewardGrowthLoopMock).toHaveBeenCalledWith({
+      sessionKey: "canonical:sess-3",
     });
   });
 });

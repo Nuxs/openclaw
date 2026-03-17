@@ -3013,6 +3013,30 @@
       {
         "availability": {
           "enabled": false,
+          "reason": "resources consumer disabled"
+        },
+        "group": "tools",
+        "kind": "tool",
+        "name": "web3.market.steward.research",
+        "paramsSchema": {
+          "budgetPolicy": "object",
+          "query": "string",
+          "resourceId": "string",
+          "riskPolicy": "object",
+          "selectionPolicy": "object",
+          "sessionKey": "string",
+          "ttlMs": "number"
+        },
+        "returns": "A low-risk research package with selected candidate, alternatives, policy recommendations, and next research backlog.",
+        "risk": {
+          "level": "low",
+          "notes": ["No payment or lease is triggered; intended for quiet-cycle policy hardening"]
+        },
+        "summary": "Run a no-spend steward research pass to compare providers, inspect proof posture, and tighten future budget/risk policy."
+      },
+      {
+        "availability": {
+          "enabled": false,
           "reason": "resources disabled"
         },
         "group": "market",
@@ -7358,6 +7382,29 @@
           "notes": ["Can trigger policy-gated autopay and lease when execute=true"]
         },
         "summary": "Plan or execute a steward-first market purchase with session-backed identity recovery, approval-aware budget checks, and optional autopay + lease."
+      },
+      {
+        "availability": {
+          "enabled": true
+        },
+        "group": "tools",
+        "kind": "tool",
+        "name": "web3.market.steward.research",
+        "paramsSchema": {
+          "budgetPolicy": "object",
+          "query": "string",
+          "resourceId": "string",
+          "riskPolicy": "object",
+          "selectionPolicy": "object",
+          "sessionKey": "string",
+          "ttlMs": "number"
+        },
+        "returns": "A low-risk research package with selected candidate, alternatives, policy recommendations, and next research backlog.",
+        "risk": {
+          "level": "low",
+          "notes": ["No payment or lease is triggered; intended for quiet-cycle policy hardening"]
+        },
+        "summary": "Run a no-spend steward research pass to compare providers, inspect proof posture, and tighten future budget/risk policy."
       },
       {
         "availability": {

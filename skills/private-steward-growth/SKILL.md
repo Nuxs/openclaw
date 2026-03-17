@@ -19,6 +19,7 @@ Treat the growth loop as a disciplined policy layer on top of the current runtim
 - **Research** updates provider preference, proof expectations, and spending boundaries.
 - **Heartbeat** keeps the loop warm between explicit user messages.
 - **Owner governance** remains the hard boundary for approvals, kill switches, and exception handling.
+- **Cron traceability** keeps each active steward session on a bounded, auditable wake-up rhythm instead of relying on ad-hoc pings.
 
 ## Trigger
 

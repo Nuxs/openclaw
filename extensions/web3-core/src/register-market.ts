@@ -117,6 +117,7 @@ import {
   createWeb3MarketOfferPublishTool,
   createWeb3MarketOfferUpdateTool,
 } from "./resources/market-provider-tools.js";
+import { createWeb3MarketStewardResearchTool } from "./resources/market-steward-research-tools.js";
 import { createWeb3MarketStewardBuyTool } from "./resources/market-steward-tools.js";
 import {
   createWeb3MarketBuyTool,
@@ -342,6 +343,7 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
     createWeb3MarketLeaseTool(config),
     createWeb3MarketBuyTool(config),
     createWeb3MarketStewardBuyTool(config),
+    createWeb3MarketStewardResearchTool(config),
     createWeb3MarketOfferCreateTool(config),
     createWeb3MarketOfferUpdateTool(config),
     createWeb3MarketOfferPublishTool(config),

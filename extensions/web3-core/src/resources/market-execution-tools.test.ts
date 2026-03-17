@@ -48,6 +48,21 @@ describe("web3 market execution tools", () => {
     callGatewayMock.mockResolvedValue({ ok: true, result: { ok: true } });
   });
 
+  it("exposes sessionKey across lifecycle tool schemas that feed steward memory", () => {
+    const tools = [
+      createWeb3MarketExecutionStatusTool(makeConfig())!,
+      createWeb3MarketProofSubmitTool(makeConfig())!,
+      createWeb3MarketAcceptanceRejectTool(makeConfig())!,
+      createWeb3MarketDisputeResolveTool(makeConfig())!,
+    ];
+
+    for (const tool of tools) {
+      expect(
+        (tool.parameters as { properties?: Record<string, unknown> }).properties,
+      ).toHaveProperty("sessionKey");
+    }
+  });
+
   it("reads execution status by leaseId and persists the recovered lifecycle IDs", async () => {
     callGatewayMock.mockResolvedValueOnce({
       ok: true,
@@ -154,6 +169,7 @@ describe("web3 market execution tools", () => {
         orderId: "order-1",
         proofId: "proof-1",
         disputeId: "dispute-1",
+        lastReflectedAt: expect.any(String),
       }),
     );
   });

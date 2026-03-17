@@ -96,6 +96,7 @@ async function rememberLifecycleContext(params: {
     disputeId: memory.disputeId,
     settlementId: memory.settlementId,
     growthSummary: buildLifecycleGrowthSummary(params.stage, params.result),
+    lastReflectedAt: new Date().toISOString(),
   });
 }
 
@@ -141,6 +142,7 @@ type ExecutionStatusParams = {
   leaseId?: string;
   proofId?: string;
   limit?: number;
+  sessionKey?: string;
 };
 
 const SettlementQuerySchema = Type.Object(
@@ -153,6 +155,7 @@ const SettlementQuerySchema = Type.Object(
     since: Type.Optional(Type.String()),
     until: Type.Optional(Type.String()),
     limit: Type.Optional(Type.Number({ minimum: 1, maximum: 200 })),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -166,6 +169,7 @@ type SettlementQueryParams = {
   since?: string;
   until?: string;
   limit?: number;
+  sessionKey?: string;
 };
 
 const ProofSubmitSchema = Type.Object(
@@ -175,6 +179,7 @@ const ProofSubmitSchema = Type.Object(
     leaseId: Type.Optional(Type.String()),
     deliveryId: Type.Optional(Type.String()),
     proof: ProofObjectSchema,
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -185,6 +190,7 @@ type ProofSubmitParams = {
   leaseId?: string;
   deliveryId?: string;
   proof: Record<string, unknown>;
+  sessionKey?: string;
 };
 
 const ProofVerifySchema = Type.Object(
@@ -192,6 +198,7 @@ const ProofVerifySchema = Type.Object(
     actorId: Type.Optional(Type.String()),
     proofId: Type.Optional(Type.String()),
     orderId: Type.Optional(Type.String()),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -200,6 +207,7 @@ type ProofVerifyParams = {
   actorId?: string;
   proofId?: string;
   orderId?: string;
+  sessionKey?: string;
 };
 
 const AcceptanceSignSchema = Type.Object(
@@ -208,6 +216,7 @@ const AcceptanceSignSchema = Type.Object(
     orderId: Type.String({ description: "Order ID being accepted." }),
     proofId: Type.Optional(Type.String()),
     idempotencyKey: Type.Optional(Type.String()),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -217,6 +226,7 @@ type AcceptanceSignParams = {
   orderId: string;
   proofId?: string;
   idempotencyKey?: string;
+  sessionKey?: string;
 };
 
 const AcceptanceRejectSchema = Type.Object(
@@ -225,6 +235,7 @@ const AcceptanceRejectSchema = Type.Object(
     orderId: Type.String({ description: "Order ID being rejected." }),
     reason: Type.String({ description: "Rejection reason shown in dispute context." }),
     proofId: Type.Optional(Type.String()),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -234,6 +245,7 @@ type AcceptanceRejectParams = {
   orderId: string;
   reason: string;
   proofId?: string;
+  sessionKey?: string;
 };
 
 const DisputeOpenSchema = Type.Object(
@@ -250,6 +262,7 @@ type DisputeOpenParams = {
   actorId: string;
   orderId: string;
   reason: string;
+  sessionKey?: string;
 };
 
 const DisputeEvidenceSchema = Type.Object(
@@ -258,6 +271,7 @@ const DisputeEvidenceSchema = Type.Object(
     disputeId: Type.Optional(Type.String()),
     orderId: Type.Optional(Type.String()),
     evidence: EvidenceObjectSchema,
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -267,6 +281,7 @@ type DisputeEvidenceParams = {
   disputeId?: string;
   orderId?: string;
   evidence: { summary: string; cid?: string };
+  sessionKey?: string;
 };
 
 const DisputeResolveSchema = Type.Object(
@@ -277,6 +292,7 @@ const DisputeResolveSchema = Type.Object(
     resolution: Type.String({ description: "release | refund | partial" }),
     payer: Type.Optional(Type.String()),
     payees: Type.Optional(Type.Array(PayeeSchema, { minItems: 1 })),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -288,6 +304,7 @@ type DisputeResolveParams = {
   resolution: string;
   payer?: string;
   payees?: Payee[];
+  sessionKey?: string;
 };
 
 const DisputeRejectSchema = Type.Object(
@@ -295,6 +312,7 @@ const DisputeRejectSchema = Type.Object(
     actorId: Type.String({ description: "Authorized actor rejecting the dispute." }),
     disputeId: Type.Optional(Type.String()),
     orderId: Type.Optional(Type.String()),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -303,6 +321,7 @@ type DisputeRejectParams = {
   actorId: string;
   disputeId?: string;
   orderId?: string;
+  sessionKey?: string;
 };
 
 function createLifecycleTool<T extends Record<string, unknown>>(params: {

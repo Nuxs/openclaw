@@ -141,7 +141,7 @@ export function renderMarketControlWorkbenchSection(props: MarketControlWorkbenc
               </div>
             </article>
             <article class="list-item list-item--stacked">
-              <div class="list-item__title">Owner Gates & Growth</div>
+              <div class="list-item__title">Owner Gates & Autonomy</div>
               <div class="list-item__meta">
                 <span>${props.approvalQueueCount} owner gates</span>
                 <span>${props.growthActionsCount} growth actions</span>

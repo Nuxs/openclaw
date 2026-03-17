@@ -147,6 +147,29 @@ export function toolsCapabilities(config: Web3PluginConfig): CapabilityDescripto
       },
     },
     {
+      name: "web3.market.steward.research",
+      summary:
+        "Run a no-spend steward research pass to compare providers, inspect proof posture, and tighten future budget/risk policy.",
+      kind: "tool",
+      group: "tools",
+      availability: availability(consumerEnabled, "resources consumer disabled"),
+      paramsSchema: {
+        resourceId: "string",
+        query: "string",
+        ttlMs: "number",
+        sessionKey: "string",
+        selectionPolicy: "object",
+        budgetPolicy: "object",
+        riskPolicy: "object",
+      },
+      returns:
+        "A low-risk research package with selected candidate, alternatives, policy recommendations, and next research backlog.",
+      risk: {
+        level: "low",
+        notes: ["No payment or lease is triggered; intended for quiet-cycle policy hardening"],
+      },
+    },
+    {
       name: "web3.market.ledger.summary",
       summary: "Summarize market ledger totals.",
       kind: "tool",

@@ -103,6 +103,12 @@ export type ConfigWriteHelpers = {
   writeConfigFile: (config: OpenClawConfig) => Promise<void>;
 };
 
+export type StewardGrowthRuntimeHelpers = {
+  syncStewardGrowthLoop: (params: {
+    sessionKey: string;
+  }) => Promise<Record<string, unknown> | null>;
+};
+
 function hostSrcUrl(path: string): string {
   return new URL(path, HOST_SRC_ROOT).href;
 }
@@ -242,6 +248,29 @@ export async function loadConfigWriteHelpers(): Promise<ConfigWriteHelpers> {
       writeConfigFile: config.writeConfigFile,
     };
   }
+}
+
+export async function loadStewardGrowthRuntimeHelpers(): Promise<StewardGrowthRuntimeHelpers> {
+  try {
+    const mod = await import(hostSrcUrl("agents/steward/cron-jobs.ts"));
+    if (typeof mod.syncStewardGrowthLoop === "function") {
+      return {
+        syncStewardGrowthLoop:
+          mod.syncStewardGrowthLoop as StewardGrowthRuntimeHelpers["syncStewardGrowthLoop"],
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  const mod = await import(hostDistUrl("agents/steward/cron-jobs.js"));
+  if (typeof mod.syncStewardGrowthLoop !== "function") {
+    throw new Error("syncStewardGrowthLoop is not available");
+  }
+  return {
+    syncStewardGrowthLoop:
+      mod.syncStewardGrowthLoop as StewardGrowthRuntimeHelpers["syncStewardGrowthLoop"],
+  };
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────

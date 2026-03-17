@@ -24,7 +24,7 @@ export function renderMarketGrowthLoopSection(props: MarketGrowthLoopSectionProp
       <div>
         <div class="card-title">Growth Loop</div>
         <div class="card-sub">
-          Continuous steward learning lane across memory, reflection, research, and heartbeat follow-up.
+          Continuous steward learning across memory, reflection, research, and cron-traceable heartbeat follow-up.
         </div>
       </div>
 

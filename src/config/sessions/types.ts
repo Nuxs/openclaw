@@ -91,6 +91,21 @@ export type SessionStewardApproval = {
   expiresAt?: string;
 };
 
+export type SessionStewardAutonomyPosture = "active" | "conservative" | "guarded" | "tripped";
+
+export type SessionStewardCadence = {
+  everyMs?: number;
+  label?: string;
+  reason?: string;
+};
+
+export type SessionStewardGrowthJob = {
+  jobId?: string;
+  enabled?: boolean;
+  target?: string;
+  nextWakeAt?: string;
+};
+
 export type SessionStewardState = {
   actorId?: string;
   consumerActorId?: string;
@@ -106,6 +121,15 @@ export type SessionStewardState = {
   lastDisputeId?: string;
   lastSettlementId?: string;
   growthSummary?: string;
+  reflectionBacklog?: string[];
+  researchBacklog?: string[];
+  heartbeatBacklog?: string[];
+  autonomyPosture?: SessionStewardAutonomyPosture;
+  cadence?: SessionStewardCadence;
+  growthJob?: SessionStewardGrowthJob;
+  lastHeartbeatedAt?: string;
+  lastReflectedAt?: string;
+  lastResearchedAt?: string;
   updatedAt?: number;
 };
 

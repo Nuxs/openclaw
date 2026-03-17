@@ -8,6 +8,7 @@ import {
   isEmbeddedPiRunStreaming,
   resolveEmbeddedSessionLane,
 } from "../../agents/pi-embedded.js";
+import { buildStewardHeartbeatContext } from "../../agents/steward/heartbeat-context.js";
 import { buildStewardSystemPrompt } from "../../agents/steward/session-context.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
@@ -16,6 +17,7 @@ import {
   resolveSessionFilePathOptions,
   type SessionEntry,
   updateSessionStore,
+  updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
 import { clearCommandLane, getQueueSize } from "../../process/command-queue.js";
@@ -380,14 +382,47 @@ export async function runPreparedReply(
   sessionEntry = skillResult.sessionEntry ?? sessionEntry;
   currentSystemSent = skillResult.systemSent;
   const skillsSnapshot = skillResult.skillsSnapshot;
+  if (isHeartbeat && sessionEntry?.steward && sessionKey) {
+    const heartbeatAt = new Date().toISOString();
+    sessionEntry = {
+      ...sessionEntry,
+      steward: {
+        ...sessionEntry.steward,
+        lastHeartbeatedAt: heartbeatAt,
+      },
+    };
+    if (sessionStore) {
+      sessionStore[sessionKey] = sessionEntry;
+    }
+    if (storePath) {
+      await updateSessionStoreEntry({
+        storePath,
+        sessionKey,
+        update: async (entry) =>
+          entry.steward
+            ? {
+                steward: {
+                  ...entry.steward,
+                  lastHeartbeatedAt: heartbeatAt,
+                },
+              }
+            : null,
+      });
+    }
+  }
   const stewardSystemPrompt = buildStewardSystemPrompt({
     config: cfg,
     sessionEntry,
     sessionKey,
   });
-  const extraSystemPromptParts = [...baseExtraSystemPromptParts, stewardSystemPrompt].filter(
-    Boolean,
-  );
+  const stewardHeartbeatContext = isHeartbeat
+    ? buildStewardHeartbeatContext(sessionEntry)
+    : undefined;
+  const extraSystemPromptParts = [
+    ...baseExtraSystemPromptParts,
+    stewardSystemPrompt,
+    stewardHeartbeatContext,
+  ].filter(Boolean);
   const prefixedBody = [threadContextNote, prefixedBodyBase].filter(Boolean).join("\n\n");
   const mediaNote = buildInboundMediaNote(ctx);
   const mediaReplyHint = mediaNote

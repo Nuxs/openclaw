@@ -417,7 +417,7 @@ async function rememberStewardState(
     proofId: params.proofId,
     disputeId: params.disputeId,
     settlementId: params.settlementId,
-    growthSummary: params.growthSummary,
+    growthSummary: params.growthSummary ?? buildStewardGrowthSummary(context, params),
   });
 }
 

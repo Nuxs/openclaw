@@ -120,6 +120,7 @@ describe("market steward controller", () => {
     expect(snapshot.killSwitchState).toBe("tripped");
     expect(snapshot.killSwitchReason).toContain("failing checks");
     expect(snapshot.auditBacklog).toBe(5);
+    expect(snapshot.summary[2]).toContain("cron-traceable");
   });
 
   it("creates growth loop items for memory, reflection, research, and heartbeat", () => {
@@ -173,6 +174,7 @@ describe("market steward controller", () => {
       "heartbeat",
     ]);
     expect(items[0]?.priority).toBe("high");
-    expect(items[3]?.detail).toContain("audit backlog");
+    expect(items[2]?.detail).toContain("web3.market.steward.research");
+    expect(items[3]?.detail).toContain("cron-traceable");
   });
 });

@@ -25,7 +25,7 @@ export function renderMarketOwnerGovernanceSection(props: MarketOwnerGovernanceS
         <div>
           <div class="card-title">Owner Governance Cockpit</div>
           <div class="card-sub">
-            God-view posture for owner approvals, exception pressure, audit backlog, and kill switch readiness.
+            God-view posture for owner approvals, exception pressure, audit backlog, kill switch readiness, and cron-traceable steward loops.
           </div>
         </div>
         <span class="pill" style="border-color:${color}; color:${color};">

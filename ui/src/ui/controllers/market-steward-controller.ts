@@ -154,7 +154,7 @@ export function buildOwnerGovernanceSnapshot(params: {
   );
   appendUnique(
     summary,
-    `${auditBacklog} audit backlog item${auditBacklog === 1 ? "" : "s"} across anchors and repair candidates.`,
+    `${auditBacklog} audit backlog item${auditBacklog === 1 ? "" : "s"} remain visible for cron-traceable follow-up.`,
   );
   if (params.auditSnapshot?.lastEventAt) {
     appendUnique(summary, `Last audit event at ${params.auditSnapshot.lastEventAt}.`);
@@ -164,15 +164,16 @@ export function buildOwnerGovernanceSnapshot(params: {
     appendUnique(summary, `Latest preset action: ${recommendedActions[0]}.`);
   }
 
-  let killSwitchReason = "No exception currently warrants a kill switch posture.";
+  let killSwitchReason =
+    "No exception currently warrants a kill switch posture; autonomous loops can stay visible and auditable without pausing spend.";
   if (killSwitchState === "tripped") {
     killSwitchReason =
       presetFailCount > 0
-        ? "Preset verification reports failing checks; owner intervention should precede further autonomous execution."
+        ? "Preset verification reports failing checks; owner intervention should precede further autonomous execution and the steward should keep every cron wake traceable."
         : "Exception pressure is high enough that autonomous spending should stay paused until the system is re-stabilized.";
   } else if (killSwitchState === "guarded") {
     killSwitchReason =
-      "The system is still operable, but approvals, audit backlog, or live alerts mean the steward should behave conservatively.";
+      "The system is still operable, but approvals, audit backlog, or live alerts mean the steward should behave conservatively and keep each wake-up bounded.";
   }
 
   return {
@@ -199,18 +200,18 @@ export function buildMarketGrowthLoop(params: {
 
   items.push({
     phase: "memory",
-    title: "Carry forward live execution anchors",
+    title: "Carry forward live anchors into the next wake",
     detail:
       params.approvalQueue.length > 0
-        ? `Keep ${params.approvalQueue.length} open owner decisions visible so the steward resumes with exact order, consent, and dispute references.`
-        : "No owner gates are open; this is a good window to persist provider lessons and policy posture.",
+        ? `Keep ${params.approvalQueue.length} open owner decision${params.approvalQueue.length === 1 ? "" : "s"} visible so the next cron-traceable wake resumes with exact order, consent, and dispute references.`
+        : "No owner gates are open; this is a good window to persist provider lessons, cadence, and policy posture.",
     refs: params.approvalQueue.flatMap((item) => item.refs).slice(0, 4),
     priority: params.approvalQueue.length > 0 ? "high" : "medium",
   });
 
   items.push({
     phase: "reflection",
-    title: "Re-score exception pressure before the next spend",
+    title: "Re-score exception pressure before the next autonomous spend",
     detail:
       openDisputes > 0 || activeAlerts > 0
         ? `${openDisputes} open dispute(s) and ${activeAlerts} active alert(s) mean provider trust should not be judged by price alone.`
@@ -221,21 +222,21 @@ export function buildMarketGrowthLoop(params: {
 
   items.push({
     phase: "research",
-    title: "Update provider and policy playbooks",
+    title: "Advance the research lane without spending",
     detail:
       (params.opsSummary?.preset?.recommendedActions ?? [])[0] ??
-      "Research proof-backed alternatives, approval thresholds, and dispute cost so the steward can grow autonomy without losing auditability.",
+      "Use `web3.market.steward.research` during quiet cycles to compare proof-backed alternatives, approval thresholds, and dispute cost before the next spend.",
     refs: [],
     priority: params.opsSummary?.preset?.readiness.warnCount ? "high" : "medium",
   });
 
   items.push({
     phase: "heartbeat",
-    title: "Heartbeat on approvals, disputes, and audit backlog",
+    title: "Heartbeat only the bounded operational queues",
     detail:
       auditBacklog > 0
-        ? `Next heartbeat should inspect ${auditBacklog} audit backlog item(s) alongside approvals and disputes before declaring the loop quiet.`
-        : "Next heartbeat should still poll approvals, lease expiries, and new alerts to keep the loop warm.",
+        ? `Next heartbeat should inspect ${auditBacklog} audit backlog item(s) alongside approvals and disputes before declaring the loop quiet; every wake should remain cron-traceable.`
+        : "Next heartbeat should still poll approvals, lease expiries, and new alerts to keep the loop warm without inventing extra work.",
     refs: params.auditSnapshot?.lastEventAt
       ? [`lastAuditAt=${params.auditSnapshot.lastEventAt}`]
       : [],

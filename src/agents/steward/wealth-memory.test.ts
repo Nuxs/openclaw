@@ -18,6 +18,8 @@ describe("steward wealth memory", () => {
     });
 
     expect(checkpoint?.summary).toContain("owner-governance boundary");
+    expect(checkpoint?.autonomyPosture).toBe("guarded");
+    expect(checkpoint?.cadenceLabel).toBe("30m");
     expect(checkpoint?.memoryAnchors).toContain("Current order anchor: order-1");
     expect(checkpoint?.researchTopics[0]).toContain("approval thresholds");
     expect(checkpoint?.heartbeatActions[0]).toContain("web3.market.consent.grant");
@@ -40,13 +42,16 @@ describe("steward wealth memory", () => {
     expect(summary).toContain("acceptance");
   });
 
-  it("formats growth loop sections for prompt injection", () => {
+  it("formats autonomy posture, cadence, and queues for prompt injection", () => {
     const formatted = formatStewardGrowthCheckpoint({
       sessionId: "sess-3",
       updatedAt: Date.now(),
       steward: {
         lastStatus: "acceptance_rejected",
         lastDisputeId: "dispute-3",
+        growthJob: {
+          nextWakeAt: "2026-03-18T03:00:00.000Z",
+        },
       },
       settlement: {
         orderId: "order-3",
@@ -54,7 +59,9 @@ describe("steward wealth memory", () => {
     });
 
     expect(formatted).toContain("## Steward Growth Loop");
-    expect(formatted).toContain("Memory anchors:");
+    expect(formatted).toContain("Autonomy posture: guarded");
+    expect(formatted).toContain("Heartbeat cadence: 30m");
+    expect(formatted).toContain("Next wake: 2026-03-18T03:00:00.000Z");
     expect(formatted).toContain("Research queue:");
     expect(formatted).toContain("dispute-3");
   });

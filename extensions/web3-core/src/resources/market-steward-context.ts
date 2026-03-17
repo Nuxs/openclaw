@@ -3,7 +3,25 @@ import type {
   StewardBudgetPolicy,
   StewardRiskPolicy,
 } from "openclaw/plugin-sdk/steward-policy";
-import { loadCoreConfig, loadSessionStoreHelpers, type SessionEntry } from "../core-imports.js";
+import {
+  loadCoreConfig,
+  loadSessionStoreHelpers,
+  loadStewardGrowthRuntimeHelpers,
+  type SessionEntry,
+} from "../core-imports.js";
+
+type SessionStewardCadence = {
+  everyMs?: number;
+  label?: string;
+  reason?: string;
+};
+
+type SessionStewardGrowthJob = {
+  jobId?: string;
+  enabled?: boolean;
+  target?: string;
+  nextWakeAt?: string;
+};
 
 type SessionStewardState = {
   actorId?: string;
@@ -20,6 +38,15 @@ type SessionStewardState = {
   lastDisputeId?: string;
   lastSettlementId?: string;
   growthSummary?: string;
+  reflectionBacklog?: string[];
+  researchBacklog?: string[];
+  heartbeatBacklog?: string[];
+  autonomyPosture?: "active" | "conservative" | "guarded" | "tripped";
+  cadence?: SessionStewardCadence;
+  growthJob?: SessionStewardGrowthJob;
+  lastHeartbeatedAt?: string;
+  lastReflectedAt?: string;
+  lastResearchedAt?: string;
   updatedAt?: number;
 };
 
@@ -50,6 +77,53 @@ export type ResolvedMarketStewardContext = {
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function trimStringArray(values?: string[]): string[] | undefined {
+  if (!Array.isArray(values)) {
+    return undefined;
+  }
+  const next: string[] = [];
+  for (const entry of values) {
+    const trimmed = asString(entry);
+    if (trimmed && !next.includes(trimmed)) {
+      next.push(trimmed);
+    }
+  }
+  return next.length > 0 ? next : [];
+}
+
+function trimCadence(cadence?: SessionStewardCadence): SessionStewardCadence | undefined {
+  if (!cadence) {
+    return undefined;
+  }
+  const everyMs =
+    typeof cadence.everyMs === "number" && Number.isFinite(cadence.everyMs) && cadence.everyMs > 0
+      ? Math.floor(cadence.everyMs)
+      : undefined;
+  const label = asString(cadence.label);
+  const reason = asString(cadence.reason);
+  if (everyMs === undefined && !label && !reason) {
+    return undefined;
+  }
+  return {
+    ...(everyMs !== undefined ? { everyMs } : {}),
+    ...(label ? { label } : {}),
+    ...(reason ? { reason } : {}),
+  };
+}
+
+function trimGrowthJob(job?: SessionStewardGrowthJob): SessionStewardGrowthJob | undefined {
+  if (!job) {
+    return undefined;
+  }
+  const next: SessionStewardGrowthJob = {
+    ...(asString(job.jobId) ? { jobId: asString(job.jobId) } : {}),
+    ...(typeof job.enabled === "boolean" ? { enabled: job.enabled } : {}),
+    ...(asString(job.target) ? { target: asString(job.target) } : {}),
+    ...(asString(job.nextWakeAt) ? { nextWakeAt: asString(job.nextWakeAt) } : {}),
+  };
+  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 function trimApproval(approval?: StewardApproval): StewardApproval | undefined {
@@ -189,6 +263,15 @@ export async function rememberMarketStewardContext(params: {
   disputeId?: string;
   settlementId?: string;
   growthSummary?: string;
+  reflectionBacklog?: string[];
+  researchBacklog?: string[];
+  heartbeatBacklog?: string[];
+  autonomyPosture?: "active" | "conservative" | "guarded" | "tripped";
+  cadence?: SessionStewardCadence;
+  growthJob?: SessionStewardGrowthJob;
+  lastHeartbeatedAt?: string;
+  lastReflectedAt?: string;
+  lastResearchedAt?: string;
 }): Promise<void> {
   const trimmedKey = asString(params.sessionKey);
   if (!trimmedKey) {
@@ -229,6 +312,35 @@ export async function rememberMarketStewardContext(params: {
           ...(asString(params.growthSummary)
             ? { growthSummary: asString(params.growthSummary) }
             : {}),
+          ...(trimStringArray(params.reflectionBacklog)
+            ? { reflectionBacklog: trimStringArray(params.reflectionBacklog) }
+            : {}),
+          ...(trimStringArray(params.researchBacklog)
+            ? { researchBacklog: trimStringArray(params.researchBacklog) }
+            : {}),
+          ...(trimStringArray(params.heartbeatBacklog)
+            ? { heartbeatBacklog: trimStringArray(params.heartbeatBacklog) }
+            : {}),
+          ...(asString(params.autonomyPosture)
+            ? {
+                autonomyPosture: asString(
+                  params.autonomyPosture,
+                ) as SessionStewardState["autonomyPosture"],
+              }
+            : {}),
+          ...(trimCadence(params.cadence) ? { cadence: trimCadence(params.cadence) } : {}),
+          ...(trimGrowthJob(params.growthJob)
+            ? { growthJob: trimGrowthJob(params.growthJob) }
+            : {}),
+          ...(asString(params.lastHeartbeatedAt)
+            ? { lastHeartbeatedAt: asString(params.lastHeartbeatedAt) }
+            : {}),
+          ...(asString(params.lastReflectedAt)
+            ? { lastReflectedAt: asString(params.lastReflectedAt) }
+            : {}),
+          ...(asString(params.lastResearchedAt)
+            ? { lastResearchedAt: asString(params.lastResearchedAt) }
+            : {}),
           updatedAt: Date.now(),
         };
         return {
@@ -246,6 +358,13 @@ export async function rememberMarketStewardContext(params: {
         } as Partial<SessionEntry>;
       },
     });
+
+    try {
+      const runtimeHelpers = await loadStewardGrowthRuntimeHelpers();
+      await runtimeHelpers.syncStewardGrowthLoop({ sessionKey: canonicalKey });
+    } catch {
+      // Best-effort only; runtime synchronization should not break market execution.
+    }
   } catch {
     // Best-effort only; steward memory should not break execution.
   }

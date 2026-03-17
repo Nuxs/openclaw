@@ -1,7 +1,12 @@
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions/types.js";
 import { normalizePluginsConfig, resolveEnableState } from "../../plugins/config-state.js";
-import { formatStewardGrowthHints } from "./growth-loop.js";
+import {
+  deriveStewardResearchBacklog,
+  formatStewardGrowthHints,
+  resolveStewardAutonomyPosture,
+  resolveStewardCadence,
+} from "./growth-loop.js";
 import {
   formatStewardGrowthCheckpoint,
   summarizeStewardGrowthCheckpoint,
@@ -85,6 +90,13 @@ function formatStewardReferences(sessionEntry?: SessionEntry): string | undefine
   return references.length > 0 ? references.join(", ") : undefined;
 }
 
+function formatBacklogPreview(values: string[]): string | undefined {
+  if (values.length === 0) {
+    return undefined;
+  }
+  return values.slice(0, 3).join(" | ");
+}
+
 export function buildStewardSystemPrompt(params: {
   config?: OpenClawConfig;
   sessionEntry?: SessionEntry;
@@ -105,11 +117,16 @@ export function buildStewardSystemPrompt(params: {
     summarizeStewardGrowthCheckpoint(params.sessionEntry);
   const growthHints = formatStewardGrowthHints(params.sessionEntry);
   const growthCheckpoint = formatStewardGrowthCheckpoint(params.sessionEntry);
+  const autonomyPosture = resolveStewardAutonomyPosture(params.sessionEntry);
+  const cadence = resolveStewardCadence(params.sessionEntry);
+  const researchPreview = formatBacklogPreview(deriveStewardResearchBacklog(params.sessionEntry));
+  const nextWakeAt = params.sessionEntry?.steward?.growthJob?.nextWakeAt;
 
   const lines = [
     "## Steward Wealth Context",
     "This conversation may operate as a private wealth steward for external digital services and accountable market execution.",
     "For market-backed purchasing, prefer `web3.market.steward.buy` as the default buyer entrypoint.",
+    "Use `web3.market.steward.research` during quiet cycles to compare proof-backed alternatives, tighten policy, and reduce future approval burden without spending.",
     "Use lower-level tools such as `web3.market.buy`, `web3.market.order.create`, or `web3.market.lease` only when the user explicitly asks for raw control or when debugging a broken steward flow.",
     "Always include `sessionKey` on market purchase or execution tools when available so settlement tracking, lease recovery, approvals, and follow-up state stay attached to this conversation.",
     "If a tool returns `approval_required`, stop, explain the gate, and wait for owner approval instead of trying to bypass the governance boundary.",
@@ -120,6 +137,10 @@ export function buildStewardSystemPrompt(params: {
     budgetSummary ? `Remembered budget policy: ${budgetSummary}` : undefined,
     riskSummary ? `Remembered risk policy: ${riskSummary}` : undefined,
     referenceSummary ? `Active market references: ${referenceSummary}` : undefined,
+    `Autonomy posture: ${autonomyPosture}`,
+    `Heartbeat cadence: ${cadence.label} (${cadence.reason.toLowerCase()})`,
+    nextWakeAt ? `Next scheduled wake: ${nextWakeAt}` : undefined,
+    researchPreview ? `Research backlog preview: ${researchPreview}` : undefined,
     growthSummary ? `Recent steward growth summary: ${growthSummary}` : undefined,
     growthHints,
     growthCheckpoint,

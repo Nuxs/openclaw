@@ -68,10 +68,12 @@ Use the following loop repeatedly:
 
 4. **Heartbeat**
    - Re-check only bounded operational queues.
+   - Keep the wake-up on a session-scoped cron job so the loop is resumable and auditable.
    - Quiet cycles should harden policy, not produce noise.
 
 5. **Govern**
    - Owner approval, kill switch, and exception handling remain outside the steward's autonomous boundary.
+   - Research may stay autonomous; spending, approvals, and disputed resolution still remain policy-gated.
 
 ## What to store
 
