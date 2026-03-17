@@ -4,37 +4,17 @@ import {
 } from "../../channels/plugins/index.js";
 import { normalizeChannelId as normalizeChatChannelId } from "../../channels/registry.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import {
+  formatMarketReferenceContext,
+  formatMountedMarketLeaseContext,
+  type MarketLeaseMountSummary,
+  type MarketReferenceContext,
+} from "./market-reference-context.js";
 
 const ANNOUNCE_SKIP_TOKEN = "ANNOUNCE_SKIP";
 const REPLY_SKIP_TOKEN = "REPLY_SKIP";
 const DEFAULT_PING_PONG_TURNS = 5;
 const MAX_PING_PONG_TURNS = 5;
-
-export type MarketReferenceContext = {
-  taskId?: string;
-  orderId?: string;
-  proofId?: string;
-  settlementId?: string;
-};
-
-function formatMarketReferenceContext(refs?: MarketReferenceContext): string | undefined {
-  if (!refs) {
-    return undefined;
-  }
-  const entries = [
-    ["taskId", refs.taskId],
-    ["orderId", refs.orderId],
-    ["proofId", refs.proofId],
-    ["settlementId", refs.settlementId],
-  ].filter(
-    (entry): entry is [string, string] =>
-      typeof entry[1] === "string" && entry[1].trim().length > 0,
-  );
-  if (entries.length === 0) {
-    return undefined;
-  }
-  return `Market references: ${entries.map(([k, v]) => `${k}=${v}`).join(", ")}.`;
-}
 
 export type AnnounceTarget = {
   channel: string;
@@ -119,11 +99,13 @@ export function buildAgentToAgentMessageContext(params: {
   requesterChannel?: string;
   targetSessionKey: string;
   marketRefs?: MarketReferenceContext;
+  mountedLease?: MarketLeaseMountSummary | null;
 }) {
   const lines = [
     "Agent-to-agent message context:",
     ...buildAgentSessionLines(params),
     formatMarketReferenceContext(params.marketRefs),
+    formatMountedMarketLeaseContext(params.mountedLease),
   ].filter((line): line is string => Boolean(line));
   return lines.join("\n");
 }
@@ -137,6 +119,7 @@ export function buildAgentToAgentReplyContext(params: {
   turn: number;
   maxTurns: number;
   marketRefs?: MarketReferenceContext;
+  mountedLease?: MarketLeaseMountSummary | null;
 }) {
   const currentLabel =
     params.currentRole === "requester" ? "Agent 1 (requester)" : "Agent 2 (target)";
@@ -146,6 +129,7 @@ export function buildAgentToAgentReplyContext(params: {
     `Turn ${params.turn} of ${params.maxTurns}.`,
     ...buildAgentSessionLines(params),
     formatMarketReferenceContext(params.marketRefs),
+    formatMountedMarketLeaseContext(params.mountedLease),
     `If you want to stop the ping-pong, reply exactly "${REPLY_SKIP_TOKEN}".`,
   ].filter((line): line is string => Boolean(line));
   return lines.join("\n");
@@ -160,6 +144,7 @@ export function buildAgentToAgentAnnounceContext(params: {
   roundOneReply?: string;
   latestReply?: string;
   marketRefs?: MarketReferenceContext;
+  mountedLease?: MarketLeaseMountSummary | null;
 }) {
   const lines = [
     "Agent-to-agent announce step:",
@@ -170,6 +155,7 @@ export function buildAgentToAgentAnnounceContext(params: {
       : "Round 1 reply: (not available).",
     params.latestReply ? `Latest reply: ${params.latestReply}` : "Latest reply: (not available).",
     formatMarketReferenceContext(params.marketRefs),
+    formatMountedMarketLeaseContext(params.mountedLease),
     `If you want to remain silent, reply exactly "${ANNOUNCE_SKIP_TOKEN}".`,
     "Any other reply will be posted to the target channel.",
     "After this reply, the agent-to-agent conversation is over.",

@@ -11,6 +11,7 @@ import {
 import { AGENT_LANE_NESTED } from "../lanes.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult, readStringParam } from "./common.js";
+import { resolveAndMountLease, type MarketReferenceContext } from "./market-reference-context.js";
 import {
   createSessionVisibilityGuard,
   createAgentToAgentPolicy,
@@ -21,11 +22,7 @@ import {
   resolveVisibleSessionReference,
   stripToolMessages,
 } from "./sessions-helpers.js";
-import {
-  buildAgentToAgentMessageContext,
-  resolvePingPongTurns,
-  type MarketReferenceContext,
-} from "./sessions-send-helpers.js";
+import { buildAgentToAgentMessageContext, resolvePingPongTurns } from "./sessions-send-helpers.js";
 import { runSessionsSendA2AFlow } from "./sessions-send-tool.a2a.js";
 
 const SessionsSendToolSchema = Type.Object({
@@ -36,8 +33,12 @@ const SessionsSendToolSchema = Type.Object({
   timeoutSeconds: Type.Optional(Type.Number({ minimum: 0 })),
   taskId: Type.Optional(Type.String({ minLength: 1 })),
   orderId: Type.Optional(Type.String({ minLength: 1 })),
+  leaseId: Type.Optional(Type.String({ minLength: 1 })),
   proofId: Type.Optional(Type.String({ minLength: 1 })),
+  acceptanceId: Type.Optional(Type.String({ minLength: 1 })),
   settlementId: Type.Optional(Type.String({ minLength: 1 })),
+  disputeId: Type.Optional(Type.String({ minLength: 1 })),
+  executionRef: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 async function startAgentRun(params: {
@@ -249,14 +250,20 @@ export function createSessionsSendTool(opts?: {
       const marketRefs: MarketReferenceContext = {
         taskId: readStringParam(params, "taskId")?.trim() || undefined,
         orderId: readStringParam(params, "orderId")?.trim() || undefined,
+        leaseId: readStringParam(params, "leaseId")?.trim() || undefined,
         proofId: readStringParam(params, "proofId")?.trim() || undefined,
+        acceptanceId: readStringParam(params, "acceptanceId")?.trim() || undefined,
         settlementId: readStringParam(params, "settlementId")?.trim() || undefined,
+        disputeId: readStringParam(params, "disputeId")?.trim() || undefined,
+        executionRef: readStringParam(params, "executionRef")?.trim() || undefined,
       };
+      const mountedLease = await resolveAndMountLease(marketRefs).catch(() => null);
       const agentMessageContext = buildAgentToAgentMessageContext({
         requesterSessionKey: opts?.agentSessionKey,
         requesterChannel: opts?.agentChannel,
         targetSessionKey: displayKey,
         marketRefs,
+        mountedLease,
       });
       const sendParams = {
         message,
@@ -289,6 +296,7 @@ export function createSessionsSendTool(opts?: {
           roundOneReply,
           waitRunId,
           marketRefs,
+          mountedLease,
         });
       };
 

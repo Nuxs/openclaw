@@ -5,13 +5,17 @@ import { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { GatewayMessageChannel } from "../../utils/message-channel.js";
 import { AGENT_LANE_NESTED } from "../lanes.js";
 import { readLatestAssistantReply, runAgentStep } from "./agent-step.js";
+import {
+  resolveAndMountLease,
+  type MarketLeaseMountSummary,
+  type MarketReferenceContext,
+} from "./market-reference-context.js";
 import { resolveAnnounceTarget } from "./sessions-announce-target.js";
 import {
   buildAgentToAgentAnnounceContext,
   buildAgentToAgentReplyContext,
   isAnnounceSkip,
   isReplySkip,
-  type MarketReferenceContext,
 } from "./sessions-send-helpers.js";
 
 const log = createSubsystemLogger("agents/sessions-send");
@@ -27,9 +31,22 @@ export async function runSessionsSendA2AFlow(params: {
   roundOneReply?: string;
   waitRunId?: string;
   marketRefs?: MarketReferenceContext;
+  mountedLease?: MarketLeaseMountSummary | null;
 }) {
   const runContextId = params.waitRunId ?? "unknown";
   try {
+    const mountedLease = params.mountedLease
+      ? params.mountedLease
+      : params.marketRefs
+        ? await resolveAndMountLease(params.marketRefs).catch((err) => {
+            log.warn("sessions_send market lease mount failed", {
+              runId: runContextId,
+              error: formatErrorMessage(err),
+            });
+            return null;
+          })
+        : null;
+
     let primaryReply = params.roundOneReply;
     let latestReply = params.roundOneReply;
     if (!primaryReply && params.waitRunId) {
@@ -79,6 +96,7 @@ export async function runSessionsSendA2AFlow(params: {
           turn,
           maxTurns: params.maxPingPongTurns,
           marketRefs: params.marketRefs,
+          mountedLease,
         });
         const replyText = await runAgentStep({
           sessionKey: currentSessionKey,
@@ -111,6 +129,7 @@ export async function runSessionsSendA2AFlow(params: {
       roundOneReply: primaryReply,
       latestReply,
       marketRefs: params.marketRefs,
+      mountedLease,
     });
     const announceReply = await runAgentStep({
       sessionKey: params.targetSessionKey,
