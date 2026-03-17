@@ -5,7 +5,9 @@ import type {
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { hashCanonical } from "../hash.js";
+import { summarizeProviderReputation } from "../provider-reputation.js";
 import { assertOrderTransition } from "../state-machine.js";
+import { evaluateMarketStewardPolicy, parseMarketStewardPolicyInput } from "../steward-policy.js";
 import type { Order, OrderStatus } from "../types.js";
 import {
   normalizeBuyerId,
@@ -27,6 +29,16 @@ import {
   requireOptionalAddress,
 } from "./_shared.js";
 
+function buildPolicyResponse(decision: ReturnType<typeof evaluateMarketStewardPolicy>) {
+  return {
+    status: decision.status,
+    policy: {
+      plan: decision.plan,
+      provider: decision.providerDecision,
+    },
+  };
+}
+
 export function createOrderCreateHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
@@ -47,6 +59,27 @@ export function createOrderCreateHandler(
       }
       const quantity = input.quantity === undefined ? 1 : requireNumber(input.quantity, "quantity");
       if (quantity <= 0) throw new Error("quantity must be greater than 0");
+
+      const resource = store.listResources().find((entry) => entry.offerId === offerId) ?? null;
+      const policy = parseMarketStewardPolicyInput(input);
+      if (resource && policy) {
+        const snapshot = summarizeProviderReputation({
+          store,
+          providerActorId: resource.providerActorId,
+          resourceId: resource.resourceId,
+          limit: 200,
+        });
+        const decision = evaluateMarketStewardPolicy({
+          resource,
+          quantity,
+          policy,
+          reputation: { score: snapshot.score, signals: snapshot.signals },
+        });
+        if (!decision.canExecute) {
+          respond(true, buildPolicyResponse(decision));
+          return;
+        }
+      }
 
       const orderId = randomUUID();
       const createdAt = nowIso();
@@ -166,6 +199,12 @@ export function createOrderListHandler(
       const offerMap = new Map(offers.map((offer) => [offer.offerId, offer]));
       const resources = store.listResources();
       const resourceByOfferId = new Map(resources.map((resource) => [resource.offerId, resource]));
+      const pendingConsentByOrderId = new Map(
+        store
+          .listConsents()
+          .filter((consent) => consent.status === "consent_pending")
+          .map((consent) => [consent.orderId, consent]),
+      );
 
       const orders = store
         .listOrders()
@@ -198,6 +237,7 @@ export function createOrderListHandler(
         .map((order) => {
           const offer = offerMap.get(order.offerId);
           const resource = resourceByOfferId.get(order.offerId);
+          const pendingConsent = pendingConsentByOrderId.get(order.orderId);
           return {
             orderId: order.orderId,
             offerId: order.offerId,
@@ -207,6 +247,8 @@ export function createOrderListHandler(
             sellerId: offer?.sellerId ?? null,
             quantity: order.quantity,
             status: order.status,
+            approvalStatus: pendingConsent ? "approval_required" : null,
+            consentId: pendingConsent?.consentId ?? null,
             price: offer?.price ?? null,
             currency: offer?.currency ?? null,
             unit: resource?.price.unit ?? null,

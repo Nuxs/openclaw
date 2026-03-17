@@ -4,7 +4,9 @@ import type {
 } from "openclaw/plugin-sdk/gateway-types";
 import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
+import { deriveAcceptanceRecord } from "../acceptance-record.js";
 import { hashCanonical } from "../hash.js";
+import { resolveServiceWrapper } from "../service-wrapper.js";
 import type { Dispute, Offer, Order } from "../types.js";
 import { normalizeBuyerId, requireString } from "../validators.js";
 import {
@@ -61,6 +63,15 @@ function resolveProofId(
   return store.getServiceProofByOrder(orderId)?.proofId;
 }
 
+function resolveAcceptancePolicy(store: MarketStateStore, offerId: string) {
+  const resource = store.listResources().find((entry) => entry.offerId === offerId) ?? null;
+  const wrapper = resolveServiceWrapper({
+    serviceSchema: resource?.serviceSchema,
+    serviceWrapper: resource?.serviceWrapper,
+  });
+  return wrapper?.acceptance;
+}
+
 export function createAcceptanceSignHandler(
   store: MarketStateStore,
   config: MarketPluginConfig,
@@ -76,6 +87,7 @@ export function createAcceptanceSignHandler(
 
       const { order, offer } = resolveAcceptanceContext(store, orderId);
       assertBuyerActor(config, actorId, order);
+      const acceptancePolicy = resolveAcceptancePolicy(store, order.offerId);
       const settlement = store.getSettlementByOrder(orderId);
       if (!settlement) {
         throw new Error("E_CONFLICT: settlement not found");
@@ -91,11 +103,20 @@ export function createAcceptanceSignHandler(
       const totalAmount = parseAmount(settlement.amount, "settlement.amount");
       const releasedAmount = getReleasedAmount(settlement);
       if (releasedAmount >= totalAmount && order.status === "settlement_completed") {
+        const acceptanceRecord = deriveAcceptanceRecord({
+          order,
+          proof: resolvedProofId ? (store.getServiceProof(resolvedProofId) ?? null) : null,
+          settlement,
+          policy: acceptancePolicy,
+          acceptedBy: actorId,
+        });
         respond(true, {
           orderId,
           proofId: resolvedProofId ?? null,
           settlementId: settlement.settlementId,
+          acceptanceId: acceptanceRecord?.acceptanceId ?? null,
           acceptanceStatus: "acceptance_signed",
+          acceptanceRecord,
           orderStatus: order.status,
           settlementStatus: settlement.status,
           releasedAmount: releasedAmount.toString(),
@@ -139,11 +160,23 @@ export function createAcceptanceSignHandler(
         },
       });
 
+      const acceptedOrder = store.getOrder(orderId) ?? order;
+      const acceptedSettlement = store.getSettlementByOrder(orderId) ?? settlement;
+      const acceptanceRecord = deriveAcceptanceRecord({
+        order: acceptedOrder,
+        proof: resolvedProofId ? (store.getServiceProof(resolvedProofId) ?? null) : null,
+        settlement: acceptedSettlement,
+        policy: acceptancePolicy,
+        acceptedBy: actorId,
+      });
+
       respond(true, {
         orderId,
         proofId: resolvedProofId ?? null,
         settlementId: releaseResult.settlementId,
+        acceptanceId: acceptanceRecord?.acceptanceId ?? null,
         acceptanceStatus: "acceptance_signed",
+        acceptanceRecord,
         orderStatus: releaseResult.orderStatus,
         settlementStatus: releaseResult.status,
         releasedAmount: releaseResult.releasedAmount,
@@ -171,6 +204,7 @@ export function createAcceptanceRejectHandler(
 
       const { order, offer } = resolveAcceptanceContext(store, orderId);
       assertBuyerActor(config, actorId, order);
+      const acceptancePolicy = resolveAcceptancePolicy(store, order.offerId);
       const resolvedProofId = resolveProofId(store, orderId, proofId);
       const existing = store.getDisputeByOrder(orderId);
       if (
@@ -178,10 +212,18 @@ export function createAcceptanceRejectHandler(
         existing.status !== "dispute_resolved" &&
         existing.status !== "dispute_rejected"
       ) {
+        const acceptanceRecord = deriveAcceptanceRecord({
+          order,
+          proof: resolvedProofId ? (store.getServiceProof(resolvedProofId) ?? null) : null,
+          dispute: existing,
+          policy: acceptancePolicy,
+        });
         respond(true, {
           orderId,
           proofId: resolvedProofId ?? null,
+          acceptanceId: acceptanceRecord?.acceptanceId ?? null,
           acceptanceStatus: "acceptance_rejected",
+          acceptanceRecord,
           disputeId: existing.disputeId,
           disputeStatus: existing.status,
         });
@@ -243,10 +285,19 @@ export function createAcceptanceRejectHandler(
         },
       });
 
+      const acceptanceRecord = deriveAcceptanceRecord({
+        order,
+        proof: resolvedProofId ? (store.getServiceProof(resolvedProofId) ?? null) : null,
+        dispute,
+        policy: acceptancePolicy,
+      });
+
       respond(true, {
         orderId,
         proofId: resolvedProofId ?? null,
+        acceptanceId: acceptanceRecord?.acceptanceId ?? null,
         acceptanceStatus: "acceptance_rejected",
+        acceptanceRecord,
         disputeId: dispute.disputeId,
         disputeStatus: dispute.status,
       });

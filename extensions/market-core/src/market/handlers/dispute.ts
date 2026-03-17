@@ -6,6 +6,7 @@ import type { MarketPluginConfig } from "../../config.js";
 import type { MarketStateStore } from "../../state/store.js";
 import { createEscrowAdapter } from "../escrow-factory.js";
 import { hashCanonical } from "../hash.js";
+import { resolveServiceWrapper } from "../service-wrapper.js";
 import { assertDisputeTransition, assertOrderTransition } from "../state-machine.js";
 import type {
   Dispute,
@@ -71,9 +72,47 @@ function createDisputeHash(dispute: Dispute) {
     reason: dispute.reason,
     status: dispute.status,
     resolution: dispute.resolution,
+    winnerActorId: dispute.winnerActorId,
+    loserActorId: dispute.loserActorId,
+    penalties: dispute.penalties,
     openedAt: dispute.openedAt,
     resolvedAt: dispute.resolvedAt,
   });
+}
+
+function resolveDisputeArbitratorType(
+  store: MarketStateStore,
+  orderId: string,
+): Dispute["arbitratorType"] {
+  const order = store.getOrder(orderId);
+  const resource = order
+    ? (store.listResources().find((entry) => entry.offerId === order.offerId) ?? null)
+    : null;
+  const wrapper = resolveServiceWrapper({
+    serviceSchema: resource?.serviceSchema,
+    serviceWrapper: resource?.serviceWrapper,
+  });
+  switch (wrapper?.acceptance.arbitratorType) {
+    case "manual":
+      return "human";
+    case "dao":
+      return "dao";
+    case "partner":
+      return "partner";
+    default:
+      return "platform";
+  }
+}
+
+function resolveProofFamily(store: MarketStateStore, orderId: string) {
+  return store.getServiceProofByOrder(orderId)?.proof.type;
+}
+
+function subtractAmounts(total?: string, released?: string): string | undefined {
+  if (!total || !released) return undefined;
+  if (!/^\d+$/.test(total) || !/^\d+$/.test(released)) return undefined;
+  const diff = BigInt(total) - BigInt(released);
+  return diff > 0n ? diff.toString() : undefined;
 }
 
 export function createDisputeOpenHandler(
@@ -118,13 +157,14 @@ export function createDisputeOpenHandler(
         orderId,
         initiatorActorId: actorId,
         respondentActorId: isBuyer ? offer.sellerId : order.buyerId,
-        arbitratorType: "platform",
+        arbitratorType: resolveDisputeArbitratorType(store, orderId),
         reason,
         status: "dispute_opened",
         evidence: [],
         disputeHash: "",
         openedAt: now,
         updatedAt: now,
+        proofFamily: resolveProofFamily(store, orderId),
       };
       dispute.disputeHash = createDisputeHash(dispute);
 
@@ -137,13 +177,21 @@ export function createDisputeOpenHandler(
         hash: dispute.disputeHash,
         anchorId: `dispute:${dispute.disputeId}`,
         actor: actorId,
-        details: { orderId, reason, respondentActorId: dispute.respondentActorId },
+        details: {
+          orderId,
+          reason,
+          respondentActorId: dispute.respondentActorId,
+          arbitratorType: dispute.arbitratorType,
+          proofFamily: dispute.proofFamily ?? null,
+        },
       });
 
       respond(true, {
         disputeId: dispute.disputeId,
         status: dispute.status,
         disputeHash: dispute.disputeHash,
+        arbitratorType: dispute.arbitratorType,
+        proofFamily: dispute.proofFamily ?? null,
       });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
@@ -252,7 +300,7 @@ export function createDisputeResolveHandler(
     try {
       assertAccess(opts, config, "write");
       const input = (params ?? {}) as Record<string, unknown>;
-      requireActorId(opts, config, input);
+      const actorId = requireActorId(opts, config, input);
 
       const disputeId = typeof input.disputeId === "string" ? input.disputeId : undefined;
       const orderId = typeof input.orderId === "string" ? input.orderId : undefined;
@@ -272,12 +320,25 @@ export function createDisputeResolveHandler(
       }
 
       const resolution = requireResolution(input.resolution);
+      const resolutionReason =
+        typeof input.reason === "string" && input.reason.trim().length > 0
+          ? input.reason.trim()
+          : undefined;
       const order = store.getOrder(dispute.orderId);
       if (!order) throw new Error("order not found");
       const offer = store.getOffer(order.offerId);
       if (!offer) throw new Error("offer not found");
+      const existingSettlement = store.getSettlementByOrder(order.orderId);
 
       let txHash: string | undefined;
+      let settlementId = existingSettlement?.settlementId ?? randomUUID();
+      let settlement: Settlement | undefined;
+      let releasedAmount: string | undefined;
+      let winnerActorId: string | undefined;
+      let loserActorId: string | undefined;
+      let reputationDelta: number | undefined;
+      let settlementSlashAmount: string | undefined;
+
       if (resolution === "refund") {
         const payer = requireChainAddress(config.chain.network, input.payer, "payer");
         assertOrderTransition(order.status, "settlement_cancelled");
@@ -287,11 +348,8 @@ export function createDisputeResolveHandler(
         }
         order.status = "settlement_cancelled";
         order.updatedAt = nowIso();
-
-        const existingSettlement = store.getSettlementByOrder(order.orderId);
-        const settlementId = existingSettlement?.settlementId ?? randomUUID();
         const settlementHash = hashCanonical({ orderId: order.orderId, payer, txHash });
-        const settlement: Settlement = {
+        settlement = {
           settlementId,
           orderId: order.orderId,
           status: "settlement_refunded",
@@ -305,77 +363,65 @@ export function createDisputeResolveHandler(
           refundTxHash: txHash,
           settlementHash,
         };
-
-        assertDisputeTransition(dispute.status, "dispute_resolved");
-        dispute.status = "dispute_resolved";
-        dispute.resolution = resolution;
-        dispute.resolvedAt = nowIso();
-        dispute.updatedAt = dispute.resolvedAt;
-        dispute.disputeHash = createDisputeHash(dispute);
-
-        await store.runInTransaction(() => {
-          store.saveOrder(order);
-          store.saveSettlement(settlement);
-          store.saveDispute(dispute);
-        });
-
-        await recordAuditWithAnchor({
-          store,
-          config,
-          kind: "dispute_resolved",
-          refId: dispute.disputeId,
-          hash: dispute.disputeHash,
-          anchorId: `dispute:${dispute.disputeId}`,
-          details: { resolution, settlementId, txHash },
-        });
-
-        respond(true, {
-          disputeId: dispute.disputeId,
-          status: dispute.status,
-          resolution,
+        winnerActorId = order.buyerId;
+        loserActorId = offer.sellerId;
+        reputationDelta = -20;
+        settlementSlashAmount = existingSettlement?.amount;
+      } else {
+        const payees = requirePayees(config.chain.network, input);
+        assertOrderTransition(order.status, "settlement_completed");
+        if (config.settlement.mode === "contract") {
+          const escrow = createEscrowAdapter(config.chain, config.settlement);
+          txHash = await escrow.release(order.orderHash, payees);
+        }
+        order.status = "settlement_completed";
+        order.updatedAt = nowIso();
+        const settlementHash = hashCanonical({ orderId: order.orderId, payees, txHash });
+        releasedAmount = payees.reduce((sum, p) => sum + BigInt(p.amount), 0n).toString();
+        settlement = {
           settlementId,
-        });
-        return;
+          orderId: order.orderId,
+          status: "settlement_released",
+          amount: existingSettlement?.amount ?? releasedAmount,
+          releasedAmount,
+          strategy: existingSettlement?.strategy ?? "one-shot",
+          tokenAddress: config.settlement.tokenAddress,
+          lockedAt: existingSettlement?.lockedAt,
+          lockTxHash: existingSettlement?.lockTxHash,
+          releasedAt: nowIso(),
+          releaseTxHash: txHash,
+          settlementHash,
+        };
+        if (resolution === "release") {
+          winnerActorId = offer.sellerId;
+          loserActorId = order.buyerId;
+        } else {
+          winnerActorId = undefined;
+          loserActorId = offer.sellerId;
+          reputationDelta = -10;
+          settlementSlashAmount = subtractAmounts(existingSettlement?.amount, releasedAmount);
+        }
       }
-
-      const payees = requirePayees(config.chain.network, input);
-      assertOrderTransition(order.status, "settlement_completed");
-      if (config.settlement.mode === "contract") {
-        const escrow = createEscrowAdapter(config.chain, config.settlement);
-        txHash = await escrow.release(order.orderHash, payees);
-      }
-      order.status = "settlement_completed";
-      order.updatedAt = nowIso();
-
-      const existingSettlement = store.getSettlementByOrder(order.orderId);
-      const settlementId = existingSettlement?.settlementId ?? randomUUID();
-      const settlementHash = hashCanonical({ orderId: order.orderId, payees, txHash });
-      const releasedAmount = payees.reduce((sum, p) => sum + BigInt(p.amount), 0n).toString();
-      const settlement: Settlement = {
-        settlementId,
-        orderId: order.orderId,
-        status: "settlement_released",
-        amount: existingSettlement?.amount ?? releasedAmount,
-        releasedAmount,
-        strategy: existingSettlement?.strategy ?? "one-shot",
-        tokenAddress: config.settlement.tokenAddress,
-        lockedAt: existingSettlement?.lockedAt,
-        lockTxHash: existingSettlement?.lockTxHash,
-        releasedAt: nowIso(),
-        releaseTxHash: txHash,
-        settlementHash,
-      };
 
       assertDisputeTransition(dispute.status, "dispute_resolved");
       dispute.status = "dispute_resolved";
       dispute.resolution = resolution;
+      dispute.resolutionReason = resolutionReason;
+      dispute.winnerActorId = winnerActorId;
+      dispute.loserActorId = loserActorId;
+      dispute.penalties = {
+        reputationDelta,
+        settlementSlashAmount,
+        settlementCurrency: offer.currency,
+      };
+      dispute.proofFamily = resolveProofFamily(store, order.orderId);
       dispute.resolvedAt = nowIso();
       dispute.updatedAt = dispute.resolvedAt;
       dispute.disputeHash = createDisputeHash(dispute);
 
       await store.runInTransaction(() => {
         store.saveOrder(order);
-        store.saveSettlement(settlement);
+        store.saveSettlement(settlement!);
         store.saveDispute(dispute);
       });
 
@@ -386,7 +432,17 @@ export function createDisputeResolveHandler(
         refId: dispute.disputeId,
         hash: dispute.disputeHash,
         anchorId: `dispute:${dispute.disputeId}`,
-        details: { resolution, settlementId, txHash },
+        actor: actorId,
+        details: {
+          resolution,
+          resolutionReason: resolutionReason ?? null,
+          settlementId,
+          txHash,
+          winnerActorId: winnerActorId ?? null,
+          loserActorId: loserActorId ?? null,
+          penalties: dispute.penalties,
+          proofFamily: dispute.proofFamily ?? null,
+        },
       });
 
       respond(true, {
@@ -394,6 +450,9 @@ export function createDisputeResolveHandler(
         status: dispute.status,
         resolution,
         settlementId,
+        winnerActorId: winnerActorId ?? null,
+        loserActorId: loserActorId ?? null,
+        penalties: dispute.penalties,
       });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
@@ -410,7 +469,7 @@ export function createDisputeRejectHandler(
     try {
       assertAccess(opts, config, "write");
       const input = (params ?? {}) as Record<string, unknown>;
-      requireActorId(opts, config, input);
+      const actorId = requireActorId(opts, config, input);
 
       const disputeId = typeof input.disputeId === "string" ? input.disputeId : undefined;
       const orderId = typeof input.orderId === "string" ? input.orderId : undefined;
@@ -431,6 +490,10 @@ export function createDisputeRejectHandler(
 
       assertDisputeTransition(dispute.status, "dispute_rejected");
       dispute.status = "dispute_rejected";
+      dispute.resolutionReason =
+        typeof input.reason === "string" && input.reason.trim().length > 0
+          ? input.reason.trim()
+          : dispute.resolutionReason;
       dispute.resolvedAt = nowIso();
       dispute.updatedAt = dispute.resolvedAt;
       dispute.disputeHash = createDisputeHash(dispute);
@@ -443,11 +506,13 @@ export function createDisputeRejectHandler(
         refId: dispute.disputeId,
         hash: dispute.disputeHash,
         anchorId: `dispute:${dispute.disputeId}`,
+        actor: actorId,
         details: {
           disputeId: dispute.disputeId,
           orderId: dispute.orderId,
           status: dispute.status,
           resolvedAt: dispute.resolvedAt,
+          resolutionReason: dispute.resolutionReason ?? null,
         },
       });
 

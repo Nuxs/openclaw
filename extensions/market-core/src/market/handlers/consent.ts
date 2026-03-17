@@ -22,6 +22,21 @@ import {
   requireActorId,
   resolveDeliveryPayloadForRevocation,
 } from "./_shared.js";
+import { issueLeaseForApprovedOrder } from "./lease-issue-flow.js";
+
+function resolvePendingApprovalConsent(
+  store: MarketStateStore,
+  consentId: string | undefined,
+): Consent | undefined {
+  if (!consentId) {
+    return undefined;
+  }
+  const consent = store.getConsent(consentId);
+  if (!consent || consent.status !== "consent_pending" || !consent.approvalContext) {
+    return undefined;
+  }
+  return consent;
+}
 
 export function createConsentGrantHandler(
   store: MarketStateStore,
@@ -33,6 +48,90 @@ export function createConsentGrantHandler(
       assertAccess(opts, config, "write");
       const input = (params ?? {}) as Record<string, unknown>;
       const actorId = requireActorId(opts, config, input);
+      const pendingConsent = resolvePendingApprovalConsent(
+        store,
+        typeof input.consentId === "string" ? input.consentId.trim() : undefined,
+      );
+
+      if (pendingConsent?.approvalContext?.kind === "lease_issue") {
+        const order = store.getOrder(pendingConsent.orderId);
+        if (!order) {
+          throw new Error("E_NOT_FOUND: order not found");
+        }
+        const resourceId = pendingConsent.approvalContext.resourceId;
+        if (typeof resourceId !== "string" || resourceId.trim().length === 0) {
+          throw new Error("E_CONFLICT: pending consent missing resourceId");
+        }
+        const resource = store.getResource(resourceId);
+        if (!resource) {
+          throw new Error("E_NOT_FOUND: resource not found");
+        }
+        const offer = store.getOffer(order.offerId);
+        if (!offer) {
+          throw new Error("E_NOT_FOUND: offer not found");
+        }
+        assertActorMatch(
+          config,
+          normalizeBuyerId(actorId),
+          normalizeBuyerId(order.buyerId),
+          "order.buyerId",
+        );
+        const ttlMs = pendingConsent.approvalContext.ttlMs;
+        if (typeof ttlMs !== "number" || !Number.isFinite(ttlMs) || ttlMs <= 0) {
+          throw new Error("E_CONFLICT: pending consent missing ttlMs");
+        }
+        const issued = await issueLeaseForApprovedOrder({
+          store,
+          config,
+          actorId,
+          resource,
+          offer,
+          order,
+          consumerActorId: order.buyerId,
+          ttlMs,
+          maxCost:
+            typeof pendingConsent.approvalContext.maxCost === "string"
+              ? pendingConsent.approvalContext.maxCost
+              : undefined,
+          existingConsent: pendingConsent,
+          signature:
+            typeof input.signature === "string" && input.signature.trim().length > 0
+              ? input.signature.trim()
+              : "policy_approved",
+          approvalId:
+            typeof input.approvalId === "string" && input.approvalId.trim().length > 0
+              ? input.approvalId.trim()
+              : pendingConsent.approvalContext.approval?.approvalId,
+          approverId: actorId,
+        });
+        await recordAuditWithAnchor({
+          store,
+          config,
+          kind: "consent_granted",
+          refId: pendingConsent.consentId,
+          hash: issued.consent.consentHash,
+          anchorId: `consent:${pendingConsent.consentId}`,
+          actor: actorId,
+          details: {
+            orderId: order.orderId,
+            resourceId,
+            leaseId: issued.lease.leaseId,
+            deliveryId: issued.delivery.deliveryId,
+            approvalKind: pendingConsent.approvalContext.kind,
+          },
+        });
+        respond(true, {
+          consentId: pendingConsent.consentId,
+          status: issued.consent.status,
+          orderId: order.orderId,
+          leaseId: issued.lease.leaseId,
+          deliveryId: issued.delivery.deliveryId,
+          expiresAt: issued.expiresAt,
+          approvalStatus: "approved",
+        });
+        return;
+      }
+
       const orderId = requireString(input.orderId, "orderId");
       const signature = requireString(input.signature, "signature");
       if (!signature.startsWith("0x")) {
@@ -136,7 +235,7 @@ export function createConsentRevokeHandler(
           : undefined;
       const consent = store.getConsent(consentId);
       if (!consent) throw new Error("consent not found");
-      if (consent.status !== "consent_granted") throw new Error("consent already revoked");
+      if (consent.status === "consent_revoked") throw new Error("consent already revoked");
 
       const revokedAt = nowIso();
       const revokePayload: Record<string, unknown> = {
@@ -162,73 +261,79 @@ export function createConsentRevokeHandler(
           "buyerId",
         );
       }
-      if (order) {
-        assertOrderTransition(order.status, "consent_revoked");
-        order.status = "consent_revoked";
+      if (
+        order &&
+        consent.approvalContext?.kind === "lease_issue" &&
+        order.status === "order_created"
+      ) {
+        assertOrderTransition(order.status, "order_cancelled");
+        order.status = "order_cancelled";
         order.updatedAt = revokedAt;
         store.saveOrder(order);
       }
 
-      for (const delivery of store.listDeliveries()) {
-        if (delivery.orderId !== consent.orderId) continue;
-        if (delivery.status === "delivery_completed" || delivery.status === "delivery_revoked") {
-          continue;
-        }
-        assertDeliveryTransition(delivery.status, "delivery_revoked");
-        const revokeReason = reason ?? "consent_revoked";
-        delivery.status = "delivery_revoked";
-        delivery.revokedAt = revokedAt;
-        delivery.revokeReason = revokeReason;
-        delivery.revokeHash = hashCanonical({
-          deliveryId: delivery.deliveryId,
-          orderId: delivery.orderId,
-          revokedAt,
-          reason: revokeReason,
-        });
-        store.saveDelivery(delivery);
+      if (consent.approvalContext?.kind !== "lease_issue") {
+        for (const delivery of store.listDeliveries()) {
+          if (delivery.orderId !== consent.orderId) continue;
+          if (delivery.status === "delivery_completed" || delivery.status === "delivery_revoked") {
+            continue;
+          }
+          assertDeliveryTransition(delivery.status, "delivery_revoked");
+          const revokeReason = reason ?? "consent_revoked";
+          delivery.status = "delivery_revoked";
+          delivery.revokedAt = revokedAt;
+          delivery.revokeReason = revokeReason;
+          delivery.revokeHash = hashCanonical({
+            deliveryId: delivery.deliveryId,
+            orderId: delivery.orderId,
+            revokedAt,
+            reason: revokeReason,
+          });
+          store.saveDelivery(delivery);
 
-        const offer = order ? store.getOffer(order.offerId) : undefined;
-        const deliveryPayload = await resolveDeliveryPayloadForRevocation(config, delivery);
-        const revokeResult = await executeRevocation(config, {
-          delivery: deliveryPayload ? { ...delivery, payload: deliveryPayload } : delivery,
-          order: order ?? undefined,
-          offer,
-          consent,
-          reason: revokeReason,
-        });
-
-        if (!revokeResult.ok) {
-          const job = createRevocationJob({
-            config,
-            delivery,
+          const offer = order ? store.getOffer(order.offerId) : undefined;
+          const deliveryPayload = await resolveDeliveryPayloadForRevocation(config, delivery);
+          const revokeResult = await executeRevocation(config, {
+            delivery: deliveryPayload ? { ...delivery, payload: deliveryPayload } : delivery,
             order: order ?? undefined,
             offer,
             consent,
             reason: revokeReason,
-            error: revokeResult.error,
           });
-          store.saveRevocation(job);
-          recordAudit(store, "revocation_retry", job.jobId, job.payloadHash, undefined, {
-            deliveryId: delivery.deliveryId,
-            attempts: job.attempts,
-            nextAttemptAt: job.nextAttemptAt,
-          });
-        }
 
-        recordAudit(
-          store,
-          "delivery_revoked",
-          delivery.deliveryId,
-          delivery.revokeHash,
-          actorId || order?.buyerId,
-          {
-            deliveryHash: delivery.deliveryHash,
-            revokeReason,
-            revokeOk: revokeResult.ok,
-            revokeStatus: revokeResult.status,
-            revokeError: revokeResult.error,
-          },
-        );
+          if (!revokeResult.ok) {
+            const job = createRevocationJob({
+              config,
+              delivery,
+              order: order ?? undefined,
+              offer,
+              consent,
+              reason: revokeReason,
+              error: revokeResult.error,
+            });
+            store.saveRevocation(job);
+            recordAudit(store, "revocation_retry", job.jobId, job.payloadHash, undefined, {
+              deliveryId: delivery.deliveryId,
+              attempts: job.attempts,
+              nextAttemptAt: job.nextAttemptAt,
+            });
+          }
+
+          recordAudit(
+            store,
+            "delivery_revoked",
+            delivery.deliveryId,
+            delivery.revokeHash,
+            actorId || order?.buyerId,
+            {
+              deliveryHash: delivery.deliveryHash,
+              revokeReason,
+              revokeOk: revokeResult.ok,
+              revokeStatus: revokeResult.status,
+              revokeError: revokeResult.error,
+            },
+          );
+        }
       }
 
       await recordAuditWithAnchor({
@@ -239,9 +344,17 @@ export function createConsentRevokeHandler(
         hash: revokeHash,
         anchorId: `revoke:${consentId}`,
         actor: actorId || order?.buyerId,
-        details: reason ? { reason } : undefined,
+        details: {
+          reason: reason ?? null,
+          approvalKind: consent.approvalContext?.kind ?? null,
+        },
       });
-      respond(true, { consentId, revokedAt, revokeHash });
+      respond(true, {
+        consentId,
+        revokedAt,
+        revokeHash,
+        approvalStatus: consent.approvalContext ? "rejected" : undefined,
+      });
     } catch (err) {
       respond(false, formatGatewayErrorResponse(err));
     }
