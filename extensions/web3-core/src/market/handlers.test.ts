@@ -188,6 +188,11 @@ describe("market.offer quote/compare", () => {
                 tags: ["security", "review"],
                 price: { unit: "call", amount: "2", currency: "USDC" },
                 serviceSchema: { proofRequirements: [{ type: "tlsnotary" }] },
+                serviceWrapper: {
+                  category: "digital",
+                  acceptance: { mode: "human" },
+                  proof: { families: ["tlsnotary", "signed_receipt"], required: true },
+                },
               },
               {
                 resourceId: "resource-2",
@@ -455,6 +460,21 @@ describe("market.reputation.summary", () => {
         providerActorId: "0x00000000000000000000000000000000000000a1",
         score: 88,
         signals: ["stable"],
+        agentReputation: {
+          agentDid: "0x00000000000000000000000000000000000000a1",
+          profile: {
+            totalJobs: 4,
+            completedJobs: 3,
+            disputedJobs: 0,
+            averageRating: null,
+            specializations: ["digital", "security"],
+          },
+          proofs: [{ type: "tlsnotary", count: 2, verifiedRate: 1 }],
+          attestations: [],
+          lastUpdated: "2026-03-03T00:00:00.000Z",
+          derivedScore: 88,
+          source: "market_derived",
+        },
       },
     });
     resolveEnsAddressMock.mockResolvedValue({
@@ -473,6 +493,8 @@ describe("market.reputation.summary", () => {
     expect(payload.identity.ensName).toBe("provider.eth");
     expect(payload.identity.ensSource).toBe("reverse");
     expect(payload.identity.ensStatus).toBe("ok");
+    expect(payload.agentReputation.derivedScore).toBe(88);
+    expect(payload.agentReputation.profile.specializations).toEqual(["digital", "security"]);
   });
 
   it("uses binding ENS before reverse lookup and degrades when unavailable", async () => {

@@ -22,6 +22,15 @@ export type ConsumerLeaseAccess = {
   connectionRef?: string;
 };
 
+export type MountedConsumerLeaseAccess = {
+  stored: true;
+  leaseId: string;
+  resourceId: string;
+  expiresAt: string;
+  kind?: string;
+  serviceCategory?: string | null;
+};
+
 const consumerLeaseCache = new Map<string, ConsumerLeaseAccess>();
 
 function hashAccessToken(token: string): string {
@@ -40,6 +49,10 @@ function isTokenValid(expectedHash: string | undefined, token: string): boolean 
     return false;
   }
   return timingSafeEqual(expectedBuffer, providedBuffer);
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
 export async function validateLeaseAccess(params: {
@@ -112,6 +125,51 @@ function isLeaseExpired(expiresAt: string): boolean {
 export function saveConsumerLeaseAccess(entry: ConsumerLeaseAccess): void {
   if (!entry.accessToken) return;
   consumerLeaseCache.set(entry.resourceId, entry);
+}
+
+export async function mountConsumerLeaseAccess(params: {
+  config: Web3PluginConfig;
+  leaseId: string;
+  resourceId?: string;
+  providerEndpoint?: string;
+}): Promise<MountedConsumerLeaseAccess> {
+  const callGateway = await loadCallGateway();
+  const response = await callGateway({
+    method: "market.lease.mount",
+    params: { leaseId: params.leaseId },
+    timeoutMs: params.config.brain.timeoutMs,
+  });
+  const normalized = normalizeGatewayResult(response);
+  if (!normalized.ok) {
+    throw new Error(normalized.error ?? "lease mount failed");
+  }
+
+  const payload = (normalized.result ?? {}) as Record<string, unknown>;
+  const resourceId = asString(payload.resourceId) ?? params.resourceId;
+  const accessToken = asString(payload.accessToken);
+  const expiresAt = asString(payload.expiresAt);
+  if (!resourceId || !accessToken || !expiresAt) {
+    throw new Error("lease mount response missing resourceId/accessToken/expiresAt");
+  }
+
+  saveConsumerLeaseAccess({
+    leaseId: asString(payload.leaseId) ?? params.leaseId,
+    resourceId,
+    accessToken,
+    expiresAt,
+    providerEndpoint: params.providerEndpoint?.trim() || undefined,
+    connectionRef: asString(payload.connectionRef),
+  });
+
+  return {
+    stored: true,
+    leaseId: asString(payload.leaseId) ?? params.leaseId,
+    resourceId,
+    expiresAt,
+    kind: asString(payload.kind),
+    serviceCategory:
+      payload.serviceCategory === null ? null : (asString(payload.serviceCategory) ?? undefined),
+  };
 }
 
 export function getConsumerLeaseAccess(resourceId: string): ConsumerLeaseAccess | null {

@@ -13,7 +13,11 @@ import {
   type GatewayCallResult,
 } from "../core-imports.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
-import { clearConsumerLeaseById, saveConsumerLeaseAccess } from "./leases.js";
+import {
+  clearConsumerLeaseById,
+  mountConsumerLeaseAccess,
+  saveConsumerLeaseAccess,
+} from "./leases.js";
 
 type SessionSettlement = {
   orderId: string;
@@ -149,10 +153,11 @@ export function createResourceLeaseHandler(config: Web3PluginConfig): GatewayReq
       const leaseId = typeof result.leaseId === "string" ? result.leaseId : undefined;
       const accessToken = typeof result.accessToken === "string" ? result.accessToken : undefined;
       const expiresAt = typeof result.expiresAt === "string" ? result.expiresAt : undefined;
+      const providerEndpointRaw =
+        typeof input.providerEndpoint === "string" ? input.providerEndpoint.trim() : "";
+      const providerEndpoint = providerEndpointRaw || config.brain.endpoint?.trim() || undefined;
+      let stored = false;
       if (leaseId && accessToken && expiresAt) {
-        const providerEndpointRaw =
-          typeof input.providerEndpoint === "string" ? input.providerEndpoint.trim() : "";
-        const providerEndpoint = providerEndpointRaw || config.brain.endpoint?.trim() || undefined;
         saveConsumerLeaseAccess({
           leaseId,
           resourceId,
@@ -160,6 +165,19 @@ export function createResourceLeaseHandler(config: Web3PluginConfig): GatewayReq
           expiresAt,
           providerEndpoint,
         });
+        stored = true;
+      } else if (leaseId) {
+        try {
+          const mounted = await mountConsumerLeaseAccess({
+            config,
+            leaseId,
+            resourceId,
+            providerEndpoint,
+          });
+          stored = mounted.stored;
+        } catch {
+          stored = false;
+        }
       }
 
       const orderId = typeof result.orderId === "string" ? result.orderId : undefined;
@@ -184,7 +202,7 @@ export function createResourceLeaseHandler(config: Web3PluginConfig): GatewayReq
         consentId: typeof result.consentId === "string" ? result.consentId : null,
         deliveryId: typeof result.deliveryId === "string" ? result.deliveryId : null,
         expiresAt: expiresAt ?? null,
-        stored: Boolean(leaseId && accessToken && expiresAt),
+        stored,
       });
     } catch (err) {
       respond(false, formatWeb3GatewayErrorResponse(err));

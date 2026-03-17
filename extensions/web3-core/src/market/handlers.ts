@@ -5,6 +5,7 @@ import type {
 import type { Web3PluginConfig } from "../config.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { resolveEnsAddress } from "../identity/ens.js";
+import { mountConsumerLeaseAccess } from "../resources/leases.js";
 import type { Web3StateStore } from "../state/store.js";
 import { redactUnknown } from "../utils/redact.js";
 import { loadCallGateway, normalizeGatewayResult } from "./proxy-utils.js";
@@ -87,6 +88,12 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
 function toFiniteNumber(value: unknown, fallback = 0): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim().length > 0) {
@@ -96,17 +103,47 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function readStringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+    : [];
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function buildServiceQuoteMetadata(resource: Record<string, unknown>) {
+  const serviceWrapper = asRecord(resource.serviceWrapper);
+  const wrapperServiceSchema = asRecord(serviceWrapper?.serviceSchema);
+  const serviceSchema = asRecord(resource.serviceSchema) ?? wrapperServiceSchema;
+  const schemaProofTypes = Array.isArray(serviceSchema?.proofRequirements)
+    ? serviceSchema.proofRequirements
+        .map((entry) => {
+          const proofRequirement = asRecord(entry);
+          return typeof proofRequirement?.type === "string" ? proofRequirement.type : null;
+        })
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
+  const proofPolicy = asRecord(serviceWrapper?.proof);
+  const acceptancePolicy = asRecord(serviceWrapper?.acceptance);
+  const proofTypes = uniqueStrings([...schemaProofTypes, ...readStringList(proofPolicy?.families)]);
+  return {
+    serviceSchema,
+    serviceWrapper,
+    proofTypes,
+    proofRequired:
+      typeof proofPolicy?.required === "boolean" ? proofPolicy.required : proofTypes.length > 0,
+    serviceCategory: typeof serviceWrapper?.category === "string" ? serviceWrapper.category : null,
+    acceptanceMode: typeof acceptancePolicy?.mode === "string" ? acceptancePolicy.mode : null,
+  };
+}
+
 function buildQuotePayload(resource: Record<string, unknown>, quantity: number, ttlMs?: number) {
   const price = requireRecord(resource.price, "resource.price");
   const amount = toFiniteNumber(price.amount, 0);
   const estimatedTotal = amount * quantity;
-  const serviceSchema =
-    resource.serviceSchema && typeof resource.serviceSchema === "object"
-      ? (resource.serviceSchema as Record<string, unknown>)
-      : undefined;
-  const proofRequirements = Array.isArray(serviceSchema?.proofRequirements)
-    ? serviceSchema.proofRequirements
-    : [];
+  const serviceMetadata = buildServiceQuoteMetadata(resource);
   return {
     resourceId: String(resource.resourceId ?? ""),
     offerId: String(resource.offerId ?? ""),
@@ -123,17 +160,12 @@ function buildQuotePayload(resource: Record<string, unknown>, quantity: number, 
     estimatedTotal: Number.isFinite(estimatedTotal)
       ? estimatedTotal.toFixed(6).replace(/\.0+$|(?<=\.\d*?)0+$/g, "")
       : null,
-    proofRequired: proofRequirements.length > 0,
-    proofTypes: proofRequirements
-      .map((entry) =>
-        entry &&
-        typeof entry === "object" &&
-        typeof (entry as Record<string, unknown>).type === "string"
-          ? (entry as Record<string, unknown>).type
-          : null,
-      )
-      .filter((entry): entry is string => Boolean(entry)),
-    serviceSchema: serviceSchema ?? null,
+    proofRequired: serviceMetadata.proofRequired,
+    proofTypes: serviceMetadata.proofTypes,
+    serviceCategory: serviceMetadata.serviceCategory,
+    acceptanceMode: serviceMetadata.acceptanceMode,
+    serviceSchema: serviceMetadata.serviceSchema ?? null,
+    serviceWrapper: serviceMetadata.serviceWrapper ?? null,
   };
 }
 
@@ -152,11 +184,7 @@ function scoreComparableResource(
         .map((entry) => entry.toLowerCase())
     : [];
   const amount = toFiniteNumber((resource.price as Record<string, unknown> | undefined)?.amount, 0);
-  const proofRequirements = Array.isArray(
-    (resource.serviceSchema as Record<string, unknown> | undefined)?.proofRequirements,
-  )
-    ? ((resource.serviceSchema as Record<string, unknown>).proofRequirements as unknown[])
-    : [];
+  const serviceMetadata = buildServiceQuoteMetadata(resource);
 
   if (preferredKind && resource.kind === preferredKind) score += 4;
   if (query) {
@@ -165,7 +193,7 @@ function scoreComparableResource(
     if (description.includes(normalized)) score += 2;
     if (tags.some((entry) => entry.includes(normalized))) score += 3;
   }
-  if (proofRequirements.length > 0) score += 2;
+  if (serviceMetadata.proofTypes.length > 0) score += 2;
   score += Math.max(0, 3 - Math.min(amount, 3));
   return Number(score.toFixed(2));
 }
@@ -281,7 +309,87 @@ export function createMarketSettlementQueryHandler(
 }
 
 export function createMarketLeaseIssueHandler(config: Web3PluginConfig): GatewayRequestHandler {
-  return createMarketProxyHandler(config, "market.lease.issue", { requireConsumer: true });
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      requireResourcesEnabled(config);
+      requireConsumerEnabled(config);
+      const input = (params ?? {}) as Record<string, unknown>;
+      const callGateway = await loadCallGateway();
+      const response = await callGateway({
+        method: "market.lease.issue",
+        params,
+        timeoutMs: config.brain.timeoutMs,
+      });
+      const normalized = normalizeGatewayResult(response);
+      if (!normalized.ok) {
+        respond(false, formatWeb3GatewayErrorResponse(normalized.error));
+        return;
+      }
+
+      const result = (normalized.result ?? {}) as Record<string, unknown>;
+      const leaseId = typeof result.leaseId === "string" ? result.leaseId : undefined;
+      const resourceId = typeof input.resourceId === "string" ? input.resourceId.trim() : undefined;
+      const providerEndpoint =
+        typeof input.providerEndpoint === "string" && input.providerEndpoint.trim().length > 0
+          ? input.providerEndpoint.trim()
+          : undefined;
+      let stored = false;
+      if (leaseId) {
+        try {
+          const mounted = await mountConsumerLeaseAccess({
+            config,
+            leaseId,
+            resourceId,
+            providerEndpoint,
+          });
+          stored = mounted.stored;
+        } catch {
+          stored = false;
+        }
+      }
+
+      const {
+        accessToken: _accessToken,
+        providerEndpoint: _ignoredProviderEndpoint,
+        ...safeResult
+      } = result as Record<string, unknown>;
+      respond(true, {
+        ...safeResult,
+        stored,
+      });
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
+}
+
+export function createMarketLeaseMountHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return async ({ params, respond }: GatewayRequestHandlerOptions) => {
+    try {
+      requireResourcesEnabled(config);
+      requireConsumerEnabled(config);
+      const input = (params ?? {}) as Record<string, unknown>;
+      const leaseId =
+        typeof input.leaseId === "string" && input.leaseId.trim().length > 0
+          ? input.leaseId.trim()
+          : "";
+      if (!leaseId) {
+        throw new Error("E_INVALID_ARGUMENT: leaseId is required");
+      }
+      const providerEndpoint =
+        typeof input.providerEndpoint === "string" && input.providerEndpoint.trim().length > 0
+          ? input.providerEndpoint.trim()
+          : undefined;
+      const mounted = await mountConsumerLeaseAccess({
+        config,
+        leaseId,
+        providerEndpoint,
+      });
+      respond(true, mounted);
+    } catch (err) {
+      respond(false, formatWeb3GatewayErrorResponse(err));
+    }
+  };
 }
 
 export function createMarketLeaseRevokeHandler(config: Web3PluginConfig): GatewayRequestHandler {

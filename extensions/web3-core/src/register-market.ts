@@ -36,6 +36,7 @@ import {
   createMarketLeaseGetHandler,
   createMarketLeaseIssueHandler,
   createMarketLeaseListHandler,
+  createMarketLeaseMountHandler,
   createMarketLeaseRevokeHandler,
   createMarketAuditQueryHandler,
   createMarketMetricsSnapshotHandler,
@@ -180,6 +181,7 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
 
   // ── Gateway: Market leases ──
   api.registerGatewayMethod("web3.market.lease.issue", createMarketLeaseIssueHandler(config));
+  api.registerGatewayMethod("web3.market.lease.mount", createMarketLeaseMountHandler(config));
   api.registerGatewayMethod("web3.market.lease.revoke", createMarketLeaseRevokeHandler(config));
   api.registerGatewayMethod("web3.market.lease.get", createMarketLeaseGetHandler(config));
   api.registerGatewayMethod("web3.market.lease.list", createMarketLeaseListHandler(config));
