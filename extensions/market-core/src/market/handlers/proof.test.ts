@@ -120,8 +120,17 @@ describe("generic proof handlers", () => {
 
     expect(verify.result()?.ok).toBe(true);
     expect(verify.result()?.payload.verified).toBe(true);
+    expect(
+      (verify.result()?.payload.summary as ServiceProof["proof"] & { family: string }).family,
+    ).toBe("tlsnotary");
     expect((verify.result()?.payload.summary as ServiceProof["proof"]).artifactHash).toBe(
       "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     );
+    expect(
+      (
+        (verify.result()?.payload.genericProof as { family?: string; artifacts?: unknown[] })
+          ?.artifacts ?? []
+      ).length,
+    ).toBe(1);
   });
 });

@@ -162,6 +162,10 @@ describe("acceptance handlers", () => {
 
       expect(r.result()?.ok).toBe(true);
       expect(r.result()?.payload.acceptanceStatus).toBe("acceptance_rejected");
+      expect(r.result()?.payload.acceptanceId).toBeTruthy();
+      expect((r.result()?.payload.acceptanceRecord as { status?: string })?.status).toBe(
+        "rejected",
+      );
       expect(store.getDisputeByOrder(seeded.order.orderId)?.status).toBe("dispute_opened");
     });
   });

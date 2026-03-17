@@ -115,6 +115,16 @@ describe("execution handler", () => {
     expect((r.result()?.payload.acceptance as { status: string }).status).toBe(
       "acceptance_pending",
     );
+    expect(
+      (r.result()?.payload.acceptanceRecord as { status?: string; proofId?: string })?.status,
+    ).toBe("pending");
+    expect(
+      (r.result()?.payload.executionState as { phase?: string; marketStatus?: string })?.phase,
+    ).toBe("completed");
+    expect(
+      (r.result()?.payload.executionState as { phase?: string; marketStatus?: string })
+        ?.marketStatus,
+    ).toBe("awaiting_acceptance");
     expect((r.result()?.payload.trace as unknown[]).length).toBeGreaterThan(0);
   });
 });
