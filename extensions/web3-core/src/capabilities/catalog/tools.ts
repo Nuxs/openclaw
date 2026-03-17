@@ -120,16 +120,18 @@ export function toolsCapabilities(config: Web3PluginConfig): CapabilityDescripto
     {
       name: "web3.market.steward.buy",
       summary:
-        "Plan or execute a policy-gated market purchase with candidate selection, approval-aware budget checks, and optional autopay + lease.",
+        "Plan or execute a steward-first market purchase with session-backed identity recovery, approval-aware budget checks, and optional autopay + lease.",
       kind: "tool",
       group: "tools",
       availability: availability(consumerEnabled, "resources consumer disabled"),
       paramsSchema: {
-        actorId: "string",
-        consumerActorId: "string",
+        actorId: "string (optional when sessionKey already carries remembered steward identity)",
+        consumerActorId:
+          "string (optional when sessionKey already carries remembered steward identity)",
         resourceId: "string",
         query: "string",
         ttlMs: "number",
+        sessionKey: "string",
         execute: "boolean",
         autoPay: "boolean",
         selectionPolicy: "object",

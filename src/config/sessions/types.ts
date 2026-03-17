@@ -65,6 +65,50 @@ export type AcpSessionRuntimeOptions = {
   backendExtras?: Record<string, string>;
 };
 
+export type SessionStewardBudgetPolicy = {
+  currency?: string;
+  maxAmount?: string;
+  remainingDailyAmount?: string;
+  requireApprovalAbove?: string;
+  failClosed?: boolean;
+};
+
+export type SessionStewardRiskPolicy = {
+  maxRiskLevel?: "low" | "medium" | "high";
+  requireProof?: boolean;
+  requireProviderActor?: boolean;
+  requireApprovalForMediumRisk?: boolean;
+  requireApprovalForHighRisk?: boolean;
+  allowUnpriced?: boolean;
+  failClosed?: boolean;
+};
+
+export type SessionStewardApproval = {
+  approved: boolean;
+  approvalId?: string;
+  approverId?: string;
+  decidedAt?: string;
+  expiresAt?: string;
+};
+
+export type SessionStewardState = {
+  actorId?: string;
+  consumerActorId?: string;
+  budgetPolicy?: SessionStewardBudgetPolicy;
+  riskPolicy?: SessionStewardRiskPolicy;
+  approval?: SessionStewardApproval;
+  lastStatus?: string;
+  lastOrderId?: string;
+  lastResourceId?: string;
+  lastLeaseId?: string;
+  lastConsentId?: string;
+  lastProofId?: string;
+  lastDisputeId?: string;
+  lastSettlementId?: string;
+  growthSummary?: string;
+  updatedAt?: number;
+};
+
 export type SessionEntry = {
   /**
    * Last delivered heartbeat payload (used to suppress duplicate heartbeat notifications).
@@ -186,6 +230,7 @@ export type SessionEntry = {
     amount?: string;
     actorId?: string;
   };
+  steward?: SessionStewardState;
   acp?: SessionAcpMeta;
 };
 

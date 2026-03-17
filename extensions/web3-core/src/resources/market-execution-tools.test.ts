@@ -7,7 +7,10 @@ import {
   createWeb3MarketProofSubmitTool,
 } from "./market-execution-tools.js";
 
-const callGatewayMock = vi.fn();
+const { callGatewayMock, rememberMarketStewardContextMock } = vi.hoisted(() => ({
+  callGatewayMock: vi.fn(),
+  rememberMarketStewardContextMock: vi.fn(),
+}));
 
 vi.mock("../core-imports.js", () => ({
   loadCallGateway: async () => callGatewayMock,
@@ -21,6 +24,10 @@ vi.mock("../core-imports.js", () => ({
     }
     return { ok: true, result: payload };
   },
+}));
+
+vi.mock("./market-steward-context.js", () => ({
+  rememberMarketStewardContext: rememberMarketStewardContextMock,
 }));
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
@@ -37,18 +44,41 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
 describe("web3 market execution tools", () => {
   beforeEach(() => {
     callGatewayMock.mockReset();
+    rememberMarketStewardContextMock.mockReset();
     callGatewayMock.mockResolvedValue({ ok: true, result: { ok: true } });
   });
 
-  it("reads execution status by leaseId without requiring a full order payload", async () => {
+  it("reads execution status by leaseId and persists the recovered lifecycle IDs", async () => {
+    callGatewayMock.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        orderId: "order-1",
+        executionStatus: "awaiting_acceptance",
+        lease: { leaseId: "lease-1" },
+        consent: { consentId: "consent-1" },
+        proof: { proofId: "proof-1" },
+        settlement: { settlementId: "settlement-1" },
+      },
+    });
     const tool = createWeb3MarketExecutionStatusTool(makeConfig())!;
 
-    await tool.execute("tc-1", { leaseId: "lease-1", limit: 10 });
+    await tool.execute("tc-1", { leaseId: "lease-1", limit: 10, sessionKey: "sess-1" });
 
     expect(callGatewayMock).toHaveBeenCalledWith(
       expect.objectContaining({
         method: "web3.market.execution.status",
-        params: { leaseId: "lease-1", limit: 10 },
+        params: { leaseId: "lease-1", limit: 10, sessionKey: "sess-1" },
+      }),
+    );
+    expect(rememberMarketStewardContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: "sess-1",
+        status: "awaiting_acceptance",
+        orderId: "order-1",
+        leaseId: "lease-1",
+        consentId: "consent-1",
+        proofId: "proof-1",
+        settlementId: "settlement-1",
       }),
     );
   });
@@ -85,7 +115,16 @@ describe("web3 market execution tools", () => {
     );
   });
 
-  it("rejects acceptance with a buyer reason and optional proof reference", async () => {
+  it("rejects acceptance with a buyer reason and remembers the resulting dispute anchor", async () => {
+    callGatewayMock.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        orderId: "order-1",
+        proofId: "proof-1",
+        acceptanceStatus: "acceptance_rejected",
+        disputeId: "dispute-1",
+      },
+    });
     const tool = createWeb3MarketAcceptanceRejectTool(makeConfig())!;
 
     await tool.execute("tc-3", {
@@ -93,6 +132,7 @@ describe("web3 market execution tools", () => {
       orderId: "order-1",
       proofId: "proof-1",
       reason: "artifact summary does not match request",
+      sessionKey: "sess-3",
     });
 
     expect(callGatewayMock).toHaveBeenCalledWith(
@@ -103,7 +143,17 @@ describe("web3 market execution tools", () => {
           orderId: "order-1",
           reason: "artifact summary does not match request",
           proofId: "proof-1",
+          sessionKey: "sess-3",
         },
+      }),
+    );
+    expect(rememberMarketStewardContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: "sess-3",
+        status: "acceptance_rejected",
+        orderId: "order-1",
+        proofId: "proof-1",
+        disputeId: "dispute-1",
       }),
     );
   });

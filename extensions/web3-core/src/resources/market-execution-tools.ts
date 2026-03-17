@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import type { AnyAgentTool } from "openclaw/plugin-sdk/core";
 import type { Web3PluginConfig } from "../config.js";
+import { rememberMarketStewardContext } from "./market-steward-context.js";
 import {
   callGatewayMethod,
   errorResult,
@@ -10,6 +11,93 @@ import {
 } from "./market-tools-shared.js";
 
 type Payee = { address: string; amount: string };
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function extractLifecycleMemory(payload: unknown) {
+  const result = asRecord(payload);
+  const approval = asRecord(result?.approval);
+  const consent = asRecord(result?.consent);
+  const lease = asRecord(result?.lease);
+  const proof = asRecord(result?.proof);
+  const dispute = asRecord(result?.dispute);
+  const settlement = asRecord(result?.settlement);
+  return {
+    orderId: asString(result?.orderId) ?? asString(asRecord(result?.order)?.orderId),
+    leaseId: asString(result?.leaseId) ?? asString(lease?.leaseId),
+    consentId:
+      asString(result?.consentId) ?? asString(consent?.consentId) ?? asString(approval?.consentId),
+    proofId: asString(result?.proofId) ?? asString(proof?.proofId),
+    disputeId: asString(result?.disputeId) ?? asString(dispute?.disputeId),
+    settlementId: asString(result?.settlementId) ?? asString(settlement?.settlementId),
+    status:
+      asString(result?.executionStatus) ??
+      asString(result?.acceptanceStatus) ??
+      asString(result?.status),
+  };
+}
+
+function buildLifecycleGrowthSummary(stage: string, result?: unknown): string | undefined {
+  const memory = extractLifecycleMemory(result);
+  const orderRef = memory.orderId ? ` for ${memory.orderId}` : "";
+  switch (stage) {
+    case "execution_status":
+      return memory.proofId && !memory.settlementId
+        ? `Proof is available${orderRef}; buyer acceptance or dispute handling is the next closure gate.`
+        : `Execution posture was refreshed${orderRef}; keep proof, acceptance, and settlement aligned before considering the loop closed.`;
+    case "proof_verified":
+      return `Proof verification succeeded${orderRef}; convert this into an acceptance decision while the evidence is fresh.`;
+    case "acceptance_signed":
+      return `Buyer acceptance is signed${orderRef}; reconcile settlement release and provider quality before reusing this route.`;
+    case "acceptance_rejected":
+      return `Buyer acceptance was rejected${orderRef}; preserve the reason as dispute evidence and tighten future acceptance criteria.`;
+    case "dispute_opened":
+      return `A dispute is now open${orderRef}; gather paste-safe evidence and avoid blind retries until resolution is explicit.`;
+    case "dispute_evidence_submitted":
+      return memory.disputeId
+        ? `Evidence was attached to dispute ${memory.disputeId}; resolve or reject it explicitly so the execution loop can converge.`
+        : `Evidence was attached${orderRef}; finish the dispute path explicitly before trusting the provider again.`;
+    case "dispute_resolved":
+      return `The dispute path resolved${orderRef}; verify settlement propagation and fold the outcome into provider preference memory.`;
+    case "dispute_rejected":
+      return `The dispute path was rejected${orderRef}; confirm the order is no longer blocked and reconcile the remaining settlement posture.`;
+    case "settlement_review":
+      return `Settlement posture was reviewed${orderRef}; compare realized spend, dispute overhead, and provider quality before closing the learning loop.`;
+    default:
+      return undefined;
+  }
+}
+
+async function rememberLifecycleContext(params: {
+  sessionKey?: string;
+  stage: string;
+  result?: unknown;
+}): Promise<void> {
+  const sessionKey = asString(params.sessionKey);
+  if (!sessionKey) {
+    return;
+  }
+  const memory = extractLifecycleMemory(params.result);
+  await rememberMarketStewardContext({
+    sessionKey,
+    status: memory.status ?? params.stage,
+    orderId: memory.orderId,
+    leaseId: memory.leaseId,
+    consentId: memory.consentId,
+    proofId: memory.proofId,
+    disputeId: memory.disputeId,
+    settlementId: memory.settlementId,
+    growthSummary: buildLifecycleGrowthSummary(params.stage, params.result),
+  });
+}
 
 const ProofObjectSchema = Type.Object(
   {},
@@ -42,6 +130,7 @@ const ExecutionStatusSchema = Type.Object(
     leaseId: Type.Optional(Type.String()),
     proofId: Type.Optional(Type.String()),
     limit: Type.Optional(Type.Number({ minimum: 1, maximum: 50 })),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -152,6 +241,7 @@ const DisputeOpenSchema = Type.Object(
     actorId: Type.String({ description: "Buyer or seller actor ID opening the dispute." }),
     orderId: Type.String({ description: "Order ID under dispute." }),
     reason: Type.String({ description: "Dispute reason." }),
+    sessionKey: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -236,7 +326,15 @@ function createLifecycleTool<T extends Record<string, unknown>>(params: {
     parameters: params.schema,
     execute: async (_toolCallId, raw: T) => {
       try {
-        const result = await callGatewayMethod(params.config, params.method, params.prepare(raw));
+        const prepared = params.prepare(raw);
+        const result = await callGatewayMethod(params.config, params.method, prepared);
+        if (result.ok) {
+          await rememberLifecycleContext({
+            sessionKey: asString(raw.sessionKey),
+            stage: params.stage,
+            result: result.result,
+          });
+        }
         return safeResult({
           buyerLifecycleStage: params.stage,
           nextAction: params.nextAction,

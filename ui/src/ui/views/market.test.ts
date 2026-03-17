@@ -289,6 +289,8 @@ describe("market view", () => {
       alerts: [],
       auditSnapshot: null,
       auditError: null,
+      approvalQueueCount: 0,
+      growthActionsCount: 0,
     }) as unknown as { strings: ReadonlyArray<string> };
 
     expect(provider.strings.join(" ")).toContain("Provider Workbench");

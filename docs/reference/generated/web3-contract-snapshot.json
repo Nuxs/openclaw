@@ -2990,16 +2990,17 @@
         "kind": "tool",
         "name": "web3.market.steward.buy",
         "paramsSchema": {
-          "actorId": "string",
+          "actorId": "string (optional when sessionKey already carries remembered steward identity)",
           "approval": "object",
           "autoPay": "boolean",
           "budgetPolicy": "object",
-          "consumerActorId": "string",
+          "consumerActorId": "string (optional when sessionKey already carries remembered steward identity)",
           "execute": "boolean",
           "query": "string",
           "resourceId": "string",
           "riskPolicy": "object",
           "selectionPolicy": "object",
+          "sessionKey": "string",
           "ttlMs": "number"
         },
         "returns": "A steward purchase plan with selected candidate, budget/risk decisions, and optional payment + lease execution results.",
@@ -3007,7 +3008,7 @@
           "level": "high",
           "notes": ["Can trigger policy-gated autopay and lease when execute=true"]
         },
-        "summary": "Plan or execute a policy-gated market purchase with candidate selection, approval-aware budget checks, and optional autopay + lease."
+        "summary": "Plan or execute a steward-first market purchase with session-backed identity recovery, approval-aware budget checks, and optional autopay + lease."
       },
       {
         "availability": {
@@ -7338,16 +7339,17 @@
         "kind": "tool",
         "name": "web3.market.steward.buy",
         "paramsSchema": {
-          "actorId": "string",
+          "actorId": "string (optional when sessionKey already carries remembered steward identity)",
           "approval": "object",
           "autoPay": "boolean",
           "budgetPolicy": "object",
-          "consumerActorId": "string",
+          "consumerActorId": "string (optional when sessionKey already carries remembered steward identity)",
           "execute": "boolean",
           "query": "string",
           "resourceId": "string",
           "riskPolicy": "object",
           "selectionPolicy": "object",
+          "sessionKey": "string",
           "ttlMs": "number"
         },
         "returns": "A steward purchase plan with selected candidate, budget/risk decisions, and optional payment + lease execution results.",
@@ -7355,7 +7357,7 @@
           "level": "high",
           "notes": ["Can trigger policy-gated autopay and lease when execute=true"]
         },
-        "summary": "Plan or execute a policy-gated market purchase with candidate selection, approval-aware budget checks, and optional autopay + lease."
+        "summary": "Plan or execute a steward-first market purchase with session-backed identity recovery, approval-aware budget checks, and optional autopay + lease."
       },
       {
         "availability": {

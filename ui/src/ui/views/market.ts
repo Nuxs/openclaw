@@ -1,4 +1,9 @@
 import { html, nothing } from "lit";
+import {
+  buildMarketApprovalQueue,
+  buildMarketGrowthLoop,
+  buildOwnerGovernanceSnapshot,
+} from "../controllers/market-steward-controller.ts";
 import { clampText, formatRelativeTimestamp } from "../format.ts";
 import type {
   BridgeRoutesSnapshot,
@@ -21,6 +26,10 @@ import type {
   Web3MonitorSnapshot,
 } from "../types.ts";
 import {
+  renderMarketApprovalQueueSection,
+  type MarketApprovalQueueSectionProps,
+} from "./market-approval-queue-section.ts";
+import {
   renderMarketBuyerWorkbenchSection,
   type MarketBuyerWorkbenchSectionProps,
 } from "./market-buyer-workbench-section.ts";
@@ -39,7 +48,15 @@ import {
   type MarketExecutionSectionProps,
 } from "./market-execution-section.ts";
 import { filterMarketResources } from "./market-filters.ts";
+import {
+  renderMarketGrowthLoopSection,
+  type MarketGrowthLoopSectionProps,
+} from "./market-growth-loop-section.ts";
 import { renderOpsSection, type OpsSectionProps } from "./market-ops-section.ts";
+import {
+  renderMarketOwnerGovernanceSection,
+  type MarketOwnerGovernanceSectionProps,
+} from "./market-owner-governance-section.ts";
 import { renderPrivacySection, type PrivacySectionProps } from "./market-privacy-section.ts";
 import {
   renderMarketProviderOnboardingSection,
@@ -196,6 +213,24 @@ export function renderMarket(props: MarketProps) {
     filters.ledgerSort,
   );
 
+  const approvalQueue = buildMarketApprovalQueue({
+    consents: props.privacySection?.consents ?? [],
+    executions: props.executionSection?.executions ?? [],
+    disputes: props.disputes,
+  });
+  const growthLoop = buildMarketGrowthLoop({
+    status,
+    opsSummary: props.opsSection?.summary ?? null,
+    auditSnapshot: props.auditSnapshot,
+    approvalQueue,
+  });
+  const ownerGovernance = buildOwnerGovernanceSnapshot({
+    status,
+    opsSummary: props.opsSection?.summary ?? null,
+    auditSnapshot: props.auditSnapshot,
+    approvalQueue,
+  });
+
   return html`
     <section class="grid grid-cols-2">
       <div class="card">
@@ -301,7 +336,26 @@ export function renderMarket(props: MarketProps) {
       alerts: props.opsSection?.alerts ?? [],
       auditSnapshot: props.auditSnapshot,
       auditError: props.auditError,
+      approvalQueueCount: approvalQueue.length,
+      growthActionsCount: growthLoop.length,
     } satisfies MarketControlWorkbenchSectionProps)}
+
+    ${renderMarketOwnerGovernanceSection({
+      snapshot: ownerGovernance,
+    } satisfies MarketOwnerGovernanceSectionProps)}
+
+    <section class="grid grid-cols-2" style="margin-top: 16px;">
+      ${renderMarketApprovalQueueSection({
+        loading:
+          props.loading ||
+          props.executionSection?.loading === true ||
+          props.privacySection?.loading === true,
+        items: approvalQueue,
+      } satisfies MarketApprovalQueueSectionProps)}
+      ${renderMarketGrowthLoopSection({
+        items: growthLoop,
+      } satisfies MarketGrowthLoopSectionProps)}
+    </section>
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
       ${renderIndexOverview({

@@ -8,6 +8,7 @@ import {
   isEmbeddedPiRunStreaming,
   resolveEmbeddedSessionLane,
 } from "../../agents/pi-embedded.js";
+import { buildStewardSystemPrompt } from "../../agents/steward/session-context.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
   resolveGroupSessionKey,
@@ -268,7 +269,7 @@ export async function runPreparedReply(
   const inboundMetaPrompt = buildInboundMetaSystemPrompt(
     isNewSession ? sessionCtx : { ...sessionCtx, ThreadStarterBody: undefined },
   );
-  const extraSystemPromptParts = [
+  const baseExtraSystemPromptParts = [
     inboundMetaPrompt,
     groupChatContext,
     groupIntro,
@@ -379,6 +380,14 @@ export async function runPreparedReply(
   sessionEntry = skillResult.sessionEntry ?? sessionEntry;
   currentSystemSent = skillResult.systemSent;
   const skillsSnapshot = skillResult.skillsSnapshot;
+  const stewardSystemPrompt = buildStewardSystemPrompt({
+    config: cfg,
+    sessionEntry,
+    sessionKey,
+  });
+  const extraSystemPromptParts = [...baseExtraSystemPromptParts, stewardSystemPrompt].filter(
+    Boolean,
+  );
   const prefixedBody = [threadContextNote, prefixedBodyBase].filter(Boolean).join("\n\n");
   const mediaNote = buildInboundMediaNote(ctx);
   const mediaReplyHint = mediaNote

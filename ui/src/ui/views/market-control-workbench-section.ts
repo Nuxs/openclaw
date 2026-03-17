@@ -14,6 +14,8 @@ export type MarketControlWorkbenchSectionProps = {
   alerts: OpsAlertView[];
   auditSnapshot: MarketAuditSnapshot | null;
   auditError: string | null;
+  approvalQueueCount: number;
+  growthActionsCount: number;
 };
 
 export function renderMarketControlWorkbenchSection(props: MarketControlWorkbenchSectionProps) {
@@ -136,6 +138,13 @@ export function renderMarketControlWorkbenchSection(props: MarketControlWorkbenc
               <div class="list-item__meta">
                 <span>${props.status?.revocations.pending ?? 0} pending</span>
                 <span>${props.status?.revocations.failed ?? 0} failed</span>
+              </div>
+            </article>
+            <article class="list-item list-item--stacked">
+              <div class="list-item__title">Owner Gates & Growth</div>
+              <div class="list-item__meta">
+                <span>${props.approvalQueueCount} owner gates</span>
+                <span>${props.growthActionsCount} growth actions</span>
               </div>
             </article>
           </div>

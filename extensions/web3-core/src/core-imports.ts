@@ -44,6 +44,23 @@ export type SessionEntry = {
     amount?: string;
     actorId?: string;
   };
+  steward?: {
+    actorId?: string;
+    consumerActorId?: string;
+    budgetPolicy?: Record<string, unknown>;
+    riskPolicy?: Record<string, unknown>;
+    approval?: Record<string, unknown>;
+    lastStatus?: string;
+    lastOrderId?: string;
+    lastResourceId?: string;
+    lastLeaseId?: string;
+    lastConsentId?: string;
+    lastProofId?: string;
+    lastDisputeId?: string;
+    lastSettlementId?: string;
+    growthSummary?: string;
+    updatedAt?: number;
+  };
   [key: string]: unknown;
 };
 

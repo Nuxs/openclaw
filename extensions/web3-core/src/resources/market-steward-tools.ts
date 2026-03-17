@@ -14,6 +14,11 @@ import { loadCallGateway, normalizeGatewayResult } from "../core-imports.js";
 import { formatWeb3GatewayErrorResponse } from "../errors.js";
 import { ErrorCode } from "../errors/codes.js";
 import { redactUnknown } from "../utils/redact.js";
+import {
+  rememberMarketStewardContext,
+  resolveMarketStewardContext,
+  type ResolvedMarketStewardContext,
+} from "./market-steward-context.js";
 
 type AgentToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -21,8 +26,8 @@ type AgentToolResult = {
 };
 
 type StewardBuyParams = {
-  actorId: string;
-  consumerActorId: string;
+  actorId?: string;
+  consumerActorId?: string;
   resourceId?: string;
   kind?: string;
   tag?: string;
@@ -269,6 +274,153 @@ function buildBaseResponse(params: {
   };
 }
 
+function resolvePlanningStatus(plan: ReturnType<typeof planMarketStewardPurchase>): string {
+  return plan.status === "approval_required"
+    ? "approval_required"
+    : plan.status === "approved"
+      ? "planned"
+      : "blocked";
+}
+
+function summarizeStewardContext(context: ResolvedMarketStewardContext) {
+  return {
+    sessionKey: context.sessionKey,
+    usedStoredIdentity: context.usedStoredIdentity,
+    usedStoredBudgetPolicy: context.usedStoredBudgetPolicy,
+    usedStoredRiskPolicy: context.usedStoredRiskPolicy,
+    usedStoredApproval: context.usedStoredApproval,
+    usedDefaultBudgetPolicy: context.usedDefaultBudgetPolicy,
+    usedDefaultRiskPolicy: context.usedDefaultRiskPolicy,
+  };
+}
+
+function formatGrowthRefs(params: {
+  resourceId?: string;
+  orderId?: string;
+  leaseId?: string;
+  consentId?: string;
+  proofId?: string;
+  disputeId?: string;
+  settlementId?: string;
+}): string {
+  const refs = [
+    params.resourceId,
+    params.orderId,
+    params.leaseId,
+    params.consentId,
+    params.proofId,
+    params.disputeId,
+    params.settlementId,
+  ].filter((value): value is string => Boolean(value));
+  return refs.length > 0 ? ` (${refs.join(", ")})` : "";
+}
+
+function buildStewardGrowthSummary(
+  context: ResolvedMarketStewardContext,
+  params: {
+    status: string;
+    resourceId?: string;
+    orderId?: string;
+    leaseId?: string;
+    consentId?: string;
+    proofId?: string;
+    disputeId?: string;
+    settlementId?: string;
+  },
+): string {
+  const refs = formatGrowthRefs(params);
+  const policyNote =
+    context.usedDefaultBudgetPolicy || context.usedDefaultRiskPolicy
+      ? " Conservative default policy remained in effect."
+      : "";
+  switch (params.status) {
+    case "compare_failed":
+      return `Market compare failed${refs}; re-check discovery and provider availability before retrying.${policyNote}`;
+    case "quote_failed":
+      return `Direct quote failed${refs}; verify the pinned resource and pricing posture before retrying.${policyNote}`;
+    case "approval_required":
+      return `Owner approval is still required${refs}; keep the candidate and policy context warm until the gate is decided.${policyNote}`;
+    case "planned":
+      return `A safe purchase plan is prepared${refs}; keep this candidate warm for the next execution window.${policyNote}`;
+    case "blocked":
+      return `No candidate cleared the current policy gate${refs}; research alternatives or change policy explicitly before spending.${policyNote}`;
+    case "payment_unresolved":
+      return `Autopay parameters could not be resolved${refs}; capture explicit payment metadata before retrying.${policyNote}`;
+    case "payment_failed":
+      return `Autopay failed${refs}; investigate wallet and payment rails before attempting the lease again.${policyNote}`;
+    case "lease_failed":
+      return `Lease issuance failed${refs}; inspect market health, approvals, and provider readiness before retrying.${policyNote}`;
+    case "executed":
+      return `The steward executed the purchase${refs}; follow proof, acceptance, and settlement before trusting this provider for future routing.${policyNote}`;
+    default:
+      return `Steward state updated to ${params.status}${refs}; keep memory, follow-up, and owner governance aligned.${policyNote}`;
+  }
+}
+
+function extractLeaseIdentifiers(payload: GatewayCallResult | null) {
+  const result = payload?.ok ? asRecord(payload.result) : undefined;
+  return {
+    orderId: result ? asString(result.orderId) : undefined,
+    leaseId: result ? asString(result.leaseId) : undefined,
+    consentId: result ? asString(result.consentId) : undefined,
+  };
+}
+
+function extractExecutionIdentifiers(payload: GatewayCallResult | null) {
+  const result = payload?.ok ? asRecord(payload.result) : undefined;
+  const approval = result ? asRecord(result.approval) : undefined;
+  const consent = result ? asRecord(result.consent) : undefined;
+  const proof = result ? asRecord(result.proof) : undefined;
+  const dispute = result ? asRecord(result.dispute) : undefined;
+  const settlement = result ? asRecord(result.settlement) : undefined;
+  const lease = result ? asRecord(result.lease) : undefined;
+  return {
+    orderId: result ? asString(result.orderId) : undefined,
+    leaseId: lease ? asString(lease.leaseId) : undefined,
+    consentId:
+      (consent ? asString(consent.consentId) : undefined) ??
+      (approval ? asString(approval.consentId) : undefined),
+    proofId: proof ? asString(proof.proofId) : undefined,
+    disputeId: dispute ? asString(dispute.disputeId) : undefined,
+    settlementId: settlement ? asString(settlement.settlementId) : undefined,
+  };
+}
+
+async function rememberStewardState(
+  context: ResolvedMarketStewardContext,
+  params: {
+    actorId: string;
+    consumerActorId: string;
+    status: string;
+    orderId?: string;
+    resourceId?: string;
+    leaseId?: string;
+    consentId?: string;
+    proofId?: string;
+    disputeId?: string;
+    settlementId?: string;
+    growthSummary?: string;
+  },
+): Promise<void> {
+  await rememberMarketStewardContext({
+    sessionKey: context.sessionKey,
+    actorId: params.actorId,
+    consumerActorId: params.consumerActorId,
+    budgetPolicy: context.budgetPolicy,
+    riskPolicy: context.riskPolicy,
+    approval: context.approval,
+    status: params.status,
+    orderId: params.orderId,
+    resourceId: params.resourceId,
+    leaseId: params.leaseId,
+    consentId: params.consentId,
+    proofId: params.proofId,
+    disputeId: params.disputeId,
+    settlementId: params.settlementId,
+    growthSummary: params.growthSummary,
+  });
+}
+
 const ApprovalSchema = Type.Object(
   {
     approved: Type.Boolean(),
@@ -317,10 +469,18 @@ const RiskPolicySchema = Type.Object(
 
 const StewardBuySchema = Type.Object(
   {
-    actorId: Type.String({ description: "Actor ID authorizing the steward purchase." }),
-    consumerActorId: Type.String({
-      description: "Consumer actor ID receiving the leased capability.",
-    }),
+    actorId: Type.Optional(
+      Type.String({
+        description:
+          "Optional actor ID authorizing the steward purchase. If omitted, the tool reuses remembered steward identity from the session when available.",
+      }),
+    ),
+    consumerActorId: Type.Optional(
+      Type.String({
+        description:
+          "Optional consumer actor ID receiving the leased capability. If omitted, the tool reuses remembered steward identity from the session when available.",
+      }),
+    ),
     resourceId: Type.Optional(
       Type.String({
         description: "Optional pinned resource ID. If omitted, compare flow is used.",
@@ -359,12 +519,26 @@ export function createWeb3MarketStewardBuyTool(config: Web3PluginConfig): AnyAge
     parameters: StewardBuySchema,
     execute: async (_toolCallId: string, params: StewardBuyParams) => {
       try {
-        const actorId = asString(params.actorId);
-        const consumerActorId = asString(params.consumerActorId);
+        const execute = params.execute === true;
+        const resolvedContext = await resolveMarketStewardContext({
+          sessionKey: asString(params.sessionKey),
+          actorId: asString(params.actorId),
+          consumerActorId: asString(params.consumerActorId),
+          budgetPolicy: toBudgetPolicy(params.budgetPolicy),
+          riskPolicy: toRiskPolicy(params.riskPolicy),
+          approval: toApproval(params.approval),
+          maxCost: asString(params.maxCost),
+          execute,
+        });
+        const actorId = asString(resolvedContext.actorId);
+        const consumerActorId = asString(resolvedContext.consumerActorId);
         if (!actorId || !consumerActorId) {
-          return errorResult("actorId and consumerActorId are required", {
-            fields: ["actorId", "consumerActorId"],
-          });
+          return errorResult(
+            "actorId and consumerActorId are required unless remembered steward identity is available for this session",
+            {
+              fields: ["actorId", "consumerActorId", "sessionKey"],
+            },
+          );
         }
 
         const quantity =
@@ -375,17 +549,25 @@ export function createWeb3MarketStewardBuyTool(config: Web3PluginConfig): AnyAge
           typeof params.limit === "number" && Number.isFinite(params.limit)
             ? Math.max(1, Math.min(20, Math.floor(params.limit)))
             : 5;
-        const execute = params.execute === true;
+        const resourceId = asString(params.resourceId);
 
         let candidates: MarketStewardCandidate[] = [];
-        const resourceId = asString(params.resourceId);
         if (resourceId) {
           const quoteResult = await callGatewayMethod(config, "web3.market.offer.quote", {
             resourceId,
             quantity,
             ttlMs: params.ttlMs,
           });
-          const quotePayload = quoteResult.ok ? asRecord(quoteResult.result) : undefined;
+          if (!quoteResult.ok) {
+            await rememberStewardState(resolvedContext, {
+              actorId,
+              consumerActorId,
+              status: "quote_failed",
+              resourceId,
+            });
+            return errorResult(quoteResult.error, { method: "web3.market.offer.quote" });
+          }
+          const quotePayload = asRecord(quoteResult.result);
           const quote = quotePayload ? asRecord(quotePayload.quote) : undefined;
           const candidate = quote ? candidateFromQuote(quote) : null;
           if (candidate) {
@@ -399,31 +581,43 @@ export function createWeb3MarketStewardBuyTool(config: Web3PluginConfig): AnyAge
             quantity,
             limit,
           });
-          candidates = compareResult.ok ? extractCandidates(compareResult.result) : [];
+          if (!compareResult.ok) {
+            await rememberStewardState(resolvedContext, {
+              actorId,
+              consumerActorId,
+              status: "compare_failed",
+            });
+            return errorResult(compareResult.error, { method: "web3.market.offer.compare" });
+          }
+          candidates = extractCandidates(compareResult.result);
         }
 
         const plan = planMarketStewardPurchase({
           candidates,
           requestedResourceId: resourceId,
           selectionPolicy: toSelectionPolicy(params.selectionPolicy),
-          budgetPolicy: toBudgetPolicy(params.budgetPolicy),
-          riskPolicy: toRiskPolicy(params.riskPolicy),
-          approval: toApproval(params.approval),
+          budgetPolicy: resolvedContext.budgetPolicy,
+          riskPolicy: resolvedContext.riskPolicy,
+          approval: resolvedContext.approval,
           requireBudgetPolicy: execute,
           requireRiskPolicy: execute,
         });
 
         if (!execute || !plan.canExecute || !plan.selectedCandidate) {
-          const status =
-            plan.status === "approval_required"
-              ? "approval_required"
-              : plan.status === "approved"
-                ? "planned"
-                : "blocked";
-          return safeResult(buildBaseResponse({ status, plan, executed: false }));
+          const status = resolvePlanningStatus(plan);
+          await rememberStewardState(resolvedContext, {
+            actorId,
+            consumerActorId,
+            status,
+            resourceId: plan.selectedCandidate?.resourceId ?? resourceId,
+          });
+          return safeResult({
+            ...buildBaseResponse({ status, plan, executed: false }),
+            stewardContext: summarizeStewardContext(resolvedContext),
+          });
         }
 
-        let payment: unknown = null;
+        let payment: GatewayCallResult | null = null;
         if (params.autoPay) {
           const paymentChain = asString(params.paymentChain) ?? "evm";
           const paymentTo =
@@ -436,6 +630,12 @@ export function createWeb3MarketStewardBuyTool(config: Web3PluginConfig): AnyAge
                 ? plan.selectedCandidate.priceAmount
                 : undefined);
           if (!paymentTo || !paymentAmount) {
+            await rememberStewardState(resolvedContext, {
+              actorId,
+              consumerActorId,
+              status: "payment_unresolved",
+              resourceId: plan.selectedCandidate.resourceId,
+            });
             return errorResult(
               "paymentTo/paymentAmount could not be resolved for steward autopay",
               {
@@ -450,6 +650,15 @@ export function createWeb3MarketStewardBuyTool(config: Web3PluginConfig): AnyAge
             amount: paymentAmount,
             tool: "web3.market.steward.buy",
           });
+          if (!payment.ok) {
+            await rememberStewardState(resolvedContext, {
+              actorId,
+              consumerActorId,
+              status: "payment_failed",
+              resourceId: plan.selectedCandidate.resourceId,
+            });
+            return errorResult(payment.error, { method: "web3.wallet.autopay" });
+          }
         }
 
         const lease = await callGatewayMethod(config, "web3.market.lease.issue", {
@@ -458,18 +667,43 @@ export function createWeb3MarketStewardBuyTool(config: Web3PluginConfig): AnyAge
           consumerActorId,
           ttlMs: params.ttlMs,
           maxCost: asString(params.maxCost),
-          sessionKey: asString(params.sessionKey),
+          sessionKey: asString(resolvedContext.sessionKey) ?? asString(params.sessionKey),
         });
-
-        const leasePayload = lease.ok ? asRecord(lease.result) : undefined;
-        const leaseId = leasePayload ? asString(leasePayload.leaseId) : undefined;
-        let execution: unknown = null;
-        if (leaseId) {
-          execution = await callGatewayMethod(config, "web3.market.execution.status", { leaseId });
+        if (!lease.ok) {
+          await rememberStewardState(resolvedContext, {
+            actorId,
+            consumerActorId,
+            status: "lease_failed",
+            resourceId: plan.selectedCandidate.resourceId,
+          });
+          return errorResult(lease.error, { method: "web3.market.lease.issue" });
         }
+
+        const leaseIdentifiers = extractLeaseIdentifiers(lease);
+        let execution: GatewayCallResult | null = null;
+        if (leaseIdentifiers.leaseId) {
+          execution = await callGatewayMethod(config, "web3.market.execution.status", {
+            leaseId: leaseIdentifiers.leaseId,
+          });
+        }
+        const executionIdentifiers = extractExecutionIdentifiers(execution);
+
+        await rememberStewardState(resolvedContext, {
+          actorId,
+          consumerActorId,
+          status: "executed",
+          orderId: executionIdentifiers.orderId ?? leaseIdentifiers.orderId,
+          resourceId: plan.selectedCandidate.resourceId,
+          leaseId: executionIdentifiers.leaseId ?? leaseIdentifiers.leaseId,
+          consentId: executionIdentifiers.consentId ?? leaseIdentifiers.consentId,
+          proofId: executionIdentifiers.proofId,
+          disputeId: executionIdentifiers.disputeId,
+          settlementId: executionIdentifiers.settlementId,
+        });
 
         return safeResult({
           ...buildBaseResponse({ status: "executed", plan, executed: true }),
+          stewardContext: summarizeStewardContext(resolvedContext),
           payment,
           lease,
           execution,

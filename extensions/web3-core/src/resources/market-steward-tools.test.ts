@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveConfig } from "../config.js";
 import { createWeb3MarketStewardBuyTool } from "./market-steward-tools.js";
 
-const callGatewayMock = vi.fn();
+const { callGatewayMock, resolveMarketStewardContextMock, rememberMarketStewardContextMock } =
+  vi.hoisted(() => ({
+    callGatewayMock: vi.fn(),
+    resolveMarketStewardContextMock: vi.fn(),
+    rememberMarketStewardContextMock: vi.fn(),
+  }));
 
 vi.mock("../core-imports.js", () => ({
   loadCallGateway: async () => callGatewayMock,
@@ -14,6 +19,11 @@ vi.mock("../core-imports.js", () => ({
     }
     return { ok: true, result: payload };
   },
+}));
+
+vi.mock("./market-steward-context.js", () => ({
+  resolveMarketStewardContext: resolveMarketStewardContextMock,
+  rememberMarketStewardContext: rememberMarketStewardContextMock,
 }));
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
@@ -30,6 +40,31 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
 describe("web3 market steward buy tool", () => {
   beforeEach(() => {
     callGatewayMock.mockReset();
+    resolveMarketStewardContextMock.mockReset();
+    rememberMarketStewardContextMock.mockReset();
+    resolveMarketStewardContextMock.mockImplementation(
+      async (params: {
+        sessionKey?: string;
+        actorId?: string;
+        consumerActorId?: string;
+        budgetPolicy?: Record<string, unknown>;
+        riskPolicy?: Record<string, unknown>;
+        approval?: Record<string, unknown>;
+      }) => ({
+        sessionKey: params.sessionKey,
+        actorId: params.actorId,
+        consumerActorId: params.consumerActorId,
+        budgetPolicy: params.budgetPolicy,
+        riskPolicy: params.riskPolicy,
+        approval: params.approval,
+        usedStoredIdentity: false,
+        usedStoredBudgetPolicy: false,
+        usedStoredRiskPolicy: false,
+        usedStoredApproval: false,
+        usedDefaultBudgetPolicy: false,
+        usedDefaultRiskPolicy: false,
+      }),
+    );
   });
 
   it("returns an approval-required plan without executing payment or lease", async () => {
@@ -82,6 +117,14 @@ describe("web3 market steward buy tool", () => {
     expect(payload.executed).toBe(false);
     expect(payload.selectedCandidate?.resourceId).toBe("res-1");
     expect(callGatewayMock).toHaveBeenCalledTimes(1);
+    expect(rememberMarketStewardContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: "0xbuyer",
+        consumerActorId: "0xbuyer",
+        status: "approval_required",
+        resourceId: "res-1",
+      }),
+    );
   });
 
   it("executes autopay and lease after policy approval", async () => {
@@ -103,8 +146,21 @@ describe("web3 market steward buy tool", () => {
         },
       })
       .mockResolvedValueOnce({ ok: true, result: { txHash: "0xtx" } })
-      .mockResolvedValueOnce({ ok: true, result: { leaseId: "lease-1" } })
-      .mockResolvedValueOnce({ ok: true, result: { executionStatus: "lease_issued" } });
+      .mockResolvedValueOnce({
+        ok: true,
+        result: { leaseId: "lease-1", orderId: "order-1", consentId: "consent-1" },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        result: {
+          orderId: "order-1",
+          executionStatus: "lease_issued",
+          consent: { consentId: "consent-1" },
+          proof: { proofId: "proof-1" },
+          settlement: { settlementId: "settlement-1" },
+          dispute: { disputeId: "dispute-1" },
+        },
+      });
 
     const tool = createWeb3MarketStewardBuyTool(makeConfig())!;
     const result = (await tool.execute("tc-2", {
@@ -165,6 +221,99 @@ describe("web3 market steward buy tool", () => {
       expect.objectContaining({
         method: "web3.market.execution.status",
         params: { leaseId: "lease-1" },
+      }),
+    );
+    expect(rememberMarketStewardContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: "sess-1",
+        actorId: "0xbuyer",
+        consumerActorId: "0xbuyer",
+        status: "executed",
+        orderId: "order-1",
+        resourceId: "res-1",
+        leaseId: "lease-1",
+        consentId: "consent-1",
+        proofId: "proof-1",
+        disputeId: "dispute-1",
+        settlementId: "settlement-1",
+      }),
+    );
+  });
+
+  it("reuses remembered steward identity and policy context when explicit fields are omitted", async () => {
+    resolveMarketStewardContextMock.mockResolvedValueOnce({
+      sessionKey: "sess-remembered",
+      actorId: "0xremembered-buyer",
+      consumerActorId: "0xremembered-buyer",
+      budgetPolicy: {
+        currency: "USDC",
+        maxAmount: "20",
+        requireApprovalAbove: "50",
+      },
+      riskPolicy: {
+        maxRiskLevel: "high",
+        requireProof: true,
+        requireProviderActor: true,
+      },
+      approval: undefined,
+      usedStoredIdentity: true,
+      usedStoredBudgetPolicy: true,
+      usedStoredRiskPolicy: true,
+      usedStoredApproval: false,
+      usedDefaultBudgetPolicy: false,
+      usedDefaultRiskPolicy: false,
+    });
+    callGatewayMock.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        candidates: [
+          {
+            score: 9,
+            quote: {
+              resourceId: "res-remembered",
+              offerId: "offer-remembered",
+              providerActorId: "0xprovider",
+              label: "Remembered provider",
+              kind: "service",
+              price: { amount: "4", currency: "USDC" },
+              estimatedTotal: "4",
+              proofRequired: true,
+              proofTypes: ["tlsnotary"],
+            },
+          },
+        ],
+      },
+    });
+
+    const tool = createWeb3MarketStewardBuyTool(makeConfig())!;
+    const result = (await tool.execute("tc-remembered", {
+      query: "find the best remembered provider",
+      ttlMs: 60_000,
+      sessionKey: "sess-remembered",
+    })) as { content: Array<{ text: string }> };
+
+    const payload = JSON.parse(result.content[0].text) as {
+      status: string;
+      stewardContext?: { usedStoredIdentity?: boolean };
+      selectedCandidate?: { resourceId?: string };
+    };
+    expect(payload.status).toBe("planned");
+    expect(payload.selectedCandidate?.resourceId).toBe("res-remembered");
+    expect(payload.stewardContext?.usedStoredIdentity).toBe(true);
+    expect(resolveMarketStewardContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: "sess-remembered",
+        actorId: undefined,
+        consumerActorId: undefined,
+      }),
+    );
+    expect(rememberMarketStewardContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: "sess-remembered",
+        actorId: "0xremembered-buyer",
+        consumerActorId: "0xremembered-buyer",
+        status: "planned",
+        resourceId: "res-remembered",
       }),
     );
   });
