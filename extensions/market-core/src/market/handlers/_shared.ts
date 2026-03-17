@@ -458,7 +458,7 @@ export function assertActorMatch(
 
 // ---- Delivery payload resolution ----
 
-export async function resolveDeliveryPayloadForRevocation(
+export async function resolveDeliveryPayload(
   config: MarketPluginConfig,
   delivery: Delivery,
 ): Promise<DeliveryPayload | undefined> {
@@ -468,4 +468,11 @@ export async function resolveDeliveryPayloadForRevocation(
   const store = createDeliveryCredentialsStore(config.credentials);
   if (!store) return undefined;
   return await store.getDeliveryPayload(delivery.payloadRef);
+}
+
+export async function resolveDeliveryPayloadForRevocation(
+  config: MarketPluginConfig,
+  delivery: Delivery,
+): Promise<DeliveryPayload | undefined> {
+  return await resolveDeliveryPayload(config, delivery);
 }

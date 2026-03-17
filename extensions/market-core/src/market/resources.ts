@@ -1,3 +1,15 @@
+import type { ServiceSchema, ServiceWrapper } from "./service-wrapper.js";
+
+export type {
+  AcceptanceMode,
+  AcceptancePolicy,
+  ProofFamily,
+  ProofPolicy,
+  ServiceCategory,
+  ServiceSchema,
+  ServiceWrapper,
+} from "./service-wrapper.js";
+
 export type MarketResourceKind = "model" | "search" | "storage" | "service";
 
 export type MarketResourceStatus = "resource_draft" | "resource_published" | "resource_unpublished";
@@ -17,16 +29,6 @@ export type MarketResourcePolicy = {
   allowMime?: string[];
 };
 
-export type ServiceSchema = {
-  inputs: string[];
-  outputs: string[];
-  sla?: {
-    maxLatencySec?: number;
-    deliveryWindowSec?: number;
-  };
-  proofRequirements?: Array<{ type: "tlsnotary"; required?: boolean }>;
-};
-
 export type MarketResource = {
   resourceId: string;
   kind: MarketResourceKind;
@@ -40,6 +42,7 @@ export type MarketResource = {
   price: MarketPrice;
   policy?: MarketResourcePolicy;
   serviceSchema?: ServiceSchema;
+  serviceWrapper?: ServiceWrapper;
   version: number;
   createdAt: string;
   updatedAt: string;

@@ -1,11 +1,19 @@
 import { normalizeTonAddress } from "@openclaw/blockchain-adapter";
 import { getAddress } from "viem";
-import type { ServiceSchema } from "./resources.js";
 import {
   requireOptionalPositiveInt,
   requireOptionalStringArray,
   requireStringArray,
 } from "./resources/validators.js";
+import type {
+  AcceptancePolicy,
+  ProofFamily,
+  ProofPolicy,
+  ServiceCategory,
+  ServiceSchema,
+  ServiceWrapper,
+} from "./service-wrapper.js";
+import { createDefaultAcceptancePolicy, createDefaultProofPolicy } from "./service-wrapper.js";
 import type {
   AssetType,
   DeliveryPayload,
@@ -114,8 +122,15 @@ export function requireExecutionProof(input: unknown): ExecutionProof {
   }
   const proof = input as Record<string, unknown>;
   const type = requireString(proof.type, "proof.type");
-  if (type !== "tlsnotary") {
-    throw new Error("proof.type must be tlsnotary");
+  if (
+    type !== "tlsnotary" &&
+    type !== "signed_receipt" &&
+    type !== "human_attestation" &&
+    type !== "oracle_event"
+  ) {
+    throw new Error(
+      "proof.type must be tlsnotary | signed_receipt | human_attestation | oracle_event",
+    );
   }
   const artifactHash = requireString(proof.artifactHash, "proof.artifactHash");
   if (!/^sha256:[a-f0-9]{64}$/i.test(artifactHash)) {
@@ -129,12 +144,176 @@ export function requireExecutionProof(input: unknown): ExecutionProof {
     unique: true,
   });
   const verifier = requireString(proof.verifier, "proof.verifier");
+  const metadataInput = proof.metadata;
+  const metadata =
+    metadataInput && typeof metadataInput === "object" && !Array.isArray(metadataInput)
+      ? ({ ...(metadataInput as Record<string, unknown>) } satisfies Record<string, unknown>)
+      : metadataInput === undefined
+        ? undefined
+        : (() => {
+            throw new Error("proof.metadata must be an object");
+          })();
+
+  if (type === "signed_receipt") {
+    if (typeof metadata?.receiptId !== "string" || metadata.receiptId.trim().length === 0) {
+      throw new Error("proof.metadata.receiptId is required for signed_receipt");
+    }
+  }
+  if (type === "human_attestation") {
+    if (typeof metadata?.attesterRole !== "string" || metadata.attesterRole.trim().length === 0) {
+      throw new Error("proof.metadata.attesterRole is required for human_attestation");
+    }
+    if (
+      metadata?.confidence !== undefined &&
+      (typeof metadata.confidence !== "number" ||
+        Number.isNaN(metadata.confidence) ||
+        metadata.confidence < 0 ||
+        metadata.confidence > 1)
+    ) {
+      throw new Error("proof.metadata.confidence must be a number between 0 and 1");
+    }
+  }
+  if (type === "oracle_event") {
+    if (typeof metadata?.oracle !== "string" || metadata.oracle.trim().length === 0) {
+      throw new Error("proof.metadata.oracle is required for oracle_event");
+    }
+    if (typeof metadata?.eventId !== "string" || metadata.eventId.trim().length === 0) {
+      throw new Error("proof.metadata.eventId is required for oracle_event");
+    }
+  }
+
   return {
-    type: "tlsnotary",
+    type,
     artifactHash: artifactHashTyped,
     issuedAt,
     redactedFields,
     verifier,
+    metadata,
+  };
+}
+
+function requireServiceCategory(value: unknown, field: string): ServiceCategory {
+  if (value === "digital" || value === "human" || value === "rwa") {
+    return value;
+  }
+  throw new Error(`${field} must be digital | human | rwa`);
+}
+
+function requireProofFamily(value: unknown, field: string): ProofFamily {
+  if (
+    value === "tlsnotary" ||
+    value === "signed_receipt" ||
+    value === "human_attestation" ||
+    value === "oracle_event"
+  ) {
+    return value;
+  }
+  throw new Error(`${field} must be tlsnotary | signed_receipt | human_attestation | oracle_event`);
+}
+
+export function requireAcceptancePolicy(
+  input: unknown,
+  category: ServiceCategory = "digital",
+): AcceptancePolicy {
+  if (input === undefined) {
+    return createDefaultAcceptancePolicy(category);
+  }
+  if (!input || typeof input !== "object") {
+    throw new Error("serviceWrapper.acceptance must be an object");
+  }
+  const policy = input as Record<string, unknown>;
+  const mode = requireString(policy.mode, "serviceWrapper.acceptance.mode");
+  if (mode !== "auto" && mode !== "human" && mode !== "milestone" && mode !== "oracle") {
+    throw new Error("serviceWrapper.acceptance.mode must be auto | human | milestone | oracle");
+  }
+  return {
+    mode,
+    reviewWindowHours: requireOptionalPositiveInt(policy, "reviewWindowHours", {
+      min: 1,
+      max: 24 * 30,
+    }),
+    milestoneCount: requireOptionalPositiveInt(policy, "milestoneCount", {
+      min: 1,
+      max: 100,
+    }),
+    arbitratorType:
+      policy.arbitratorType === "manual" ||
+      policy.arbitratorType === "dao" ||
+      policy.arbitratorType === "partner"
+        ? policy.arbitratorType
+        : undefined,
+  };
+}
+
+export function requireProofPolicy(
+  input: unknown,
+  params?: { category?: ServiceCategory; serviceSchema?: ServiceSchema },
+): ProofPolicy {
+  const category = params?.category ?? "digital";
+  const defaultPolicy = createDefaultProofPolicy({
+    category,
+    serviceSchema: params?.serviceSchema,
+  });
+  if (input === undefined) {
+    return defaultPolicy;
+  }
+  if (!input || typeof input !== "object") {
+    throw new Error("serviceWrapper.proof must be an object");
+  }
+  const policy = input as Record<string, unknown>;
+  const familiesInput = policy.families;
+  if (!Array.isArray(familiesInput) || familiesInput.length === 0) {
+    throw new Error("serviceWrapper.proof.families must be a non-empty array");
+  }
+  const families = familiesInput.map((family, index) =>
+    requireProofFamily(family, `serviceWrapper.proof.families[${index}]`),
+  );
+  return {
+    families: [...new Set(families)],
+    required: typeof policy.required === "boolean" ? policy.required : defaultPolicy.required,
+    minArtifacts: requireOptionalPositiveInt(policy, "minArtifacts", {
+      min: 1,
+      max: 100,
+    }),
+  };
+}
+
+export function requireServiceWrapper(
+  input: unknown,
+  serviceSchema?: ServiceSchema,
+): ServiceWrapper {
+  if (input === undefined) {
+    return {
+      version: "v1",
+      category: "digital",
+      serviceSchema,
+      acceptance: createDefaultAcceptancePolicy("digital"),
+      proof: createDefaultProofPolicy({ category: "digital", serviceSchema }),
+    };
+  }
+  if (!input || typeof input !== "object") {
+    throw new Error("serviceWrapper must be an object");
+  }
+  const wrapper = input as Record<string, unknown>;
+  const category = requireServiceCategory(wrapper.category, "serviceWrapper.category");
+  const embeddedServiceSchema =
+    wrapper.serviceSchema !== undefined
+      ? requireServiceSchema(wrapper.serviceSchema)
+      : serviceSchema;
+  return {
+    version: "v1",
+    category,
+    serviceSchema: embeddedServiceSchema,
+    acceptance: requireAcceptancePolicy(wrapper.acceptance, category),
+    proof: requireProofPolicy(wrapper.proof, {
+      category,
+      serviceSchema: embeddedServiceSchema,
+    }),
+    tags: requireOptionalStringArray(wrapper, "tags", {
+      maxItems: 16,
+      maxLen: 40,
+      unique: true,
+    }),
   };
 }
 
