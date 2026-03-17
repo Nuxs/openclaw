@@ -618,7 +618,7 @@
           "required": ["actorId", "orderId", "reason"],
           "type": "object"
         },
-        "returns": "Acceptance rejection result with dispute linkage.",
+        "returns": "Acceptance rejection result with acceptanceId, acceptanceRecord, and dispute linkage.",
         "risk": {
           "level": "medium"
         },
@@ -651,7 +651,7 @@
           "required": ["actorId", "orderId"],
           "type": "object"
         },
-        "returns": "Acceptance result with settlement release snapshot.",
+        "returns": "Acceptance result with acceptanceId, acceptanceRecord, and settlement release snapshot.",
         "risk": {
           "level": "medium"
         },
@@ -1261,7 +1261,7 @@
           },
           "type": "object"
         },
-        "returns": "Execution summary with trace entries and redacted linked object snapshots.",
+        "returns": "Execution summary with executionState, acceptanceRecord, trace entries, and redacted linked object snapshots.",
         "risk": {
           "level": "low"
         },
@@ -2663,7 +2663,7 @@
           "required": ["actorId", "resource"],
           "type": "object"
         },
-        "returns": "Published resource record with generated resourceId.",
+        "returns": "Published resource result with generated resourceId/offerId and persisted serviceSchema/serviceWrapper metadata.",
         "summary": "Market entrypoint for resource publish (proxy to market-core)."
       },
       {
@@ -4946,7 +4946,7 @@
           "required": ["actorId", "orderId", "reason"],
           "type": "object"
         },
-        "returns": "Acceptance rejection result with dispute linkage.",
+        "returns": "Acceptance rejection result with acceptanceId, acceptanceRecord, and dispute linkage.",
         "risk": {
           "level": "medium"
         },
@@ -4978,7 +4978,7 @@
           "required": ["actorId", "orderId"],
           "type": "object"
         },
-        "returns": "Acceptance result with settlement release snapshot.",
+        "returns": "Acceptance result with acceptanceId, acceptanceRecord, and settlement release snapshot.",
         "risk": {
           "level": "medium"
         },
@@ -5574,7 +5574,7 @@
           },
           "type": "object"
         },
-        "returns": "Execution summary with trace entries and redacted linked object snapshots.",
+        "returns": "Execution summary with executionState, acceptanceRecord, trace entries, and redacted linked object snapshots.",
         "risk": {
           "level": "low"
         },
@@ -6946,7 +6946,7 @@
           "required": ["actorId", "resource"],
           "type": "object"
         },
-        "returns": "Published resource record with generated resourceId.",
+        "returns": "Published resource result with generated resourceId/offerId and persisted serviceSchema/serviceWrapper metadata.",
         "summary": "Market entrypoint for resource publish (proxy to market-core)."
       },
       {
@@ -9217,6 +9217,20 @@
       "title": "AI Steward Golden Path for Web3 Market"
     },
     {
+      "declaredContracts": ["web3.market.resource.list"],
+      "docLayer": "guide",
+      "normative": false,
+      "path": "docs/web3/BETA_FAQ.md",
+      "title": "OpenClaw Web3 Market Beta FAQ"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/web3/KILL_SWITCH_GUIDE.md",
+      "title": "Web3 Market Kill Switch Guide"
+    },
+    {
       "declaredContracts": ["web3.*", "web3.market.*"],
       "docLayer": "guide",
       "normative": false,
@@ -9229,6 +9243,34 @@
       "normative": false,
       "path": "docs/web3/p2p-openclaw-thesis.md",
       "title": "OpenClaw P2P 协同算力战略判断"
+    },
+    {
+      "declaredContracts": ["web3.market.offer.quote"],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/web3/RELEASE_NOTES_TEMPLATE.md",
+      "title": "OpenClaw Web3 Market Release Notes Template"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/web3/RISK_DISCLOSURE.md",
+      "title": "OpenClaw Web3 Market Risk Disclosure"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/web3/ROLLBACK_CHECKLIST.md",
+      "title": "Web3 Market Rollback Checklist"
+    },
+    {
+      "declaredContracts": [],
+      "docLayer": "reference",
+      "normative": true,
+      "path": "docs/web3/ROLLBACK_DRILL_TEMPLATE.md",
+      "title": "Web3 Market Rollback Drill Template"
     },
     {
       "declaredContracts": ["agent-wallet.balance", "agent-wallet.create", "agent-wallet.send"],
@@ -10734,6 +10776,7 @@
           "web3.index.stats",
           "web3.market.acceptance.reject",
           "web3.market.acceptance.sign",
+          "web3.market.audit.query",
           "web3.market.bridge.list",
           "web3.market.bridge.request",
           "web3.market.bridge.routes",

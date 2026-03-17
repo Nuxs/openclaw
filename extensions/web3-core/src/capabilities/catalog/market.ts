@@ -523,7 +523,8 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           },
         },
       },
-      returns: "Published resource record with generated resourceId.",
+      returns:
+        "Published resource result with generated resourceId/offerId and persisted serviceSchema/serviceWrapper metadata.",
       aliases: ["web3.resources.publish"],
       examples: [
         {
@@ -960,7 +961,8 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           idempotencyKey: { type: "string" },
         },
       },
-      returns: "Acceptance result with settlement release snapshot.",
+      returns:
+        "Acceptance result with acceptanceId, acceptanceRecord, and settlement release snapshot.",
       risk: { level: "medium" },
     },
     {
@@ -979,7 +981,8 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           reason: { type: "string" },
         },
       },
-      returns: "Acceptance rejection result with dispute linkage.",
+      returns:
+        "Acceptance rejection result with acceptanceId, acceptanceRecord, and dispute linkage.",
       risk: { level: "medium" },
     },
     {
@@ -998,7 +1001,8 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           limit: { type: "number", minimum: 1, maximum: 50 },
         },
       },
-      returns: "Execution summary with trace entries and redacted linked object snapshots.",
+      returns:
+        "Execution summary with executionState, acceptanceRecord, trace entries, and redacted linked object snapshots.",
       risk: { level: "low" },
     },
     // ── Ledger ──────────────────────────────────────────

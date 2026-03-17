@@ -1,3 +1,11 @@
+---
+summary: "Web3 Market 风险披露：技术、财务、操作、服务与法律风险边界。"
+title: "OpenClaw Web3 Market Risk Disclosure"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
+---
+
 # OpenClaw Web3 Market 风险披露
 
 > **版本**：v1.0

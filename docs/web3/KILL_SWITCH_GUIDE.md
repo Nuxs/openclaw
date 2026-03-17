@@ -1,3 +1,11 @@
+---
+summary: "Web3 Market 熔断与恢复指南：kill switch、恢复流程、监控与回滚前后检查。"
+title: "Web3 Market Kill Switch Guide"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
+---
+
 # Web3 Market 熔断指南
 
 > **版本**：v1.0
@@ -62,11 +70,11 @@ openclaw config set web3.market.enabled false
 
 自动熔断在以下情况触发：
 
-| 条件         | 默认阈值 | 可配置                                         |
-| ------------ | -------- | ---------------------------------------------- |
-| 连续支付失败 | 5 次     | `web3.x402.maxRetries`                         |
-| 失败率过高   | 50%      | `web3.circuitBreaker.failureRateThreshold`     |
-| 请求量过低   | 10 次    | `web3.circuitBreaker.minRequestsForEvaluation` |
+| 条件         | 默认阈值 | 可配置项说明                 |
+| ------------ | -------- | ---------------------------- |
+| 连续支付失败 | 5 次     | x402 自动支付重试与失败保护  |
+| 失败率过高   | 50%      | circuit-breaker 失败率阈值   |
+| 请求量过低   | 10 次    | circuit-breaker 最小评估样本 |
 
 ### 熔断状态
 

@@ -1,3 +1,11 @@
+---
+summary: "Web3 Market 回滚演练模板：记录回滚演练背景、步骤、验证结果与后续行动。"
+title: "Web3 Market Rollback Drill Template"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
+---
+
 # Web3 Market 回滚演练记录模板
 
 > **说明**：每次回滚演练后填写此模板并归档到 `docs/web3/drills/`

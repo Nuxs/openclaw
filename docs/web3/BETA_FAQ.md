@@ -1,3 +1,11 @@
+---
+summary: "Web3 Market Beta 常见问题：边界、能力、预算、安全与回滚入口。"
+title: "OpenClaw Web3 Market Beta FAQ"
+doc_family: "web3"
+doc_layer: "guide"
+normative: false
+---
+
 # OpenClaw Web3 Market Beta FAQ
 
 > **最后更新**：2026-03-17
@@ -99,7 +107,7 @@ openclaw wallet balance --chain ton
 
 在策略边界内，AI 管家会：
 
-1. **发现服务**：通过 `web3.market.browse` 发现可用服务
+1. **发现服务**：通过 `web3.market.resource.list` 发现可用服务
 2. **评估选择**：根据价格、声誉、可用性选择服务
 3. **自动下单**：在预算内自动完成支付
 4. **验证交付**：检查服务执行证明

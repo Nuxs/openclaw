@@ -1,3 +1,11 @@
+---
+summary: "Web3 Market 发布说明模板：统一摘要、风险提示、回滚入口与 operator sign-off。"
+title: "OpenClaw Web3 Market Release Notes Template"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
+---
+
 # OpenClaw Web3 Market vX.Y.Z Release Notes
 
 > **发布日期**：YYYY-MM-DD
@@ -28,7 +36,7 @@ openclaw config set web3.feature.enabled true
 
 **相关方法**：
 
-- `web3.market.feature.action`
+- 按本次发布实际填写，例如 `web3.market.offer.quote`
 
 ---
 
@@ -133,7 +141,7 @@ scripts/rollback-web3-market.sh <previous-version>
 
 ### 熔断机制
 
-所有自动支付受 `web3.x402.autopay.enabled` 配置控制：
+所有自动支付受 x402 自动支付开关控制：
 
 ```bash
 # 紧急禁用自动支付
@@ -145,9 +153,9 @@ scripts/kill-switch-web3-market.sh disable-all
 
 ### 预算控制
 
-- **每日限额**：`web3.maxDailySpend`（默认 100 USDC）
-- **单笔限额**：`web3.maxOrderAmount`（默认 50 USDC）
-- **自动支付重试**：`web3.x402.maxRetries`（默认 3 次）
+- **每日限额**：每日预算上限（默认 100 USDC）
+- **单笔限额**：单笔交易预算上限（默认 50 USDC）
+- **自动支付重试**：x402 自动支付失败重试策略（默认 3 次）
 
 ### 数据安全
 

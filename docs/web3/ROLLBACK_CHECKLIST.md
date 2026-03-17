@@ -1,3 +1,11 @@
+---
+summary: "Web3 Market 回滚检查清单：执行前记录、执行中检查与回滚后核验。"
+title: "Web3 Market Rollback Checklist"
+doc_family: "web3"
+doc_layer: "reference"
+normative: true
+---
+
 # Web3 Market 回滚检查清单
 
 > **用途**：回滚操作前后验证清单，确保回滚成功且数据完整
