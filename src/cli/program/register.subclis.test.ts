@@ -18,6 +18,15 @@ const { nodesAction, registerNodesCli } = vi.hoisted(() => {
   return { nodesAction: action, registerNodesCli: register };
 });
 
+const { marketAction, registerMarketCli } = vi.hoisted(() => {
+  const action = vi.fn();
+  const register = vi.fn((program: Command) => {
+    const market = program.command("market");
+    market.command("status").action(action);
+  });
+  return { marketAction: action, registerMarketCli: register };
+});
+
 const configModule = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   readConfigFileSnapshot: vi.fn(),
@@ -25,10 +34,15 @@ const configModule = vi.hoisted(() => ({
 
 vi.mock("../acp-cli.js", () => ({ registerAcpCli }));
 vi.mock("../nodes-cli.js", () => ({ registerNodesCli }));
+vi.mock("../../commands/market.js", () => ({ registerMarketCli }));
 vi.mock("../../config/config.js", () => configModule);
 
-const { loadValidatedConfigForPluginRegistration, registerSubCliByName, registerSubCliCommands } =
-  await import("./register.subclis.js");
+const {
+  getSubCliEntries,
+  loadValidatedConfigForPluginRegistration,
+  registerSubCliByName,
+  registerSubCliCommands,
+} = await import("./register.subclis.js");
 
 describe("registerSubCliCommands", () => {
   const originalArgv = process.argv;
@@ -54,6 +68,8 @@ describe("registerSubCliCommands", () => {
     acpAction.mockClear();
     registerNodesCli.mockClear();
     nodesAction.mockClear();
+    registerMarketCli.mockClear();
+    marketAction.mockClear();
     configModule.loadConfig.mockReset();
     configModule.readConfigFileSnapshot.mockReset();
   });
@@ -84,8 +100,27 @@ describe("registerSubCliCommands", () => {
     const names = program.commands.map((cmd) => cmd.name());
     expect(names).toContain("acp");
     expect(names).toContain("gateway");
+    expect(names).toContain("market");
     expect(names).toContain("clawbot");
     expect(registerAcpCli).not.toHaveBeenCalled();
+  });
+
+  it("exposes market as a descriptor-backed lazy subcli", async () => {
+    const descriptors = getSubCliEntries();
+    const marketDescriptor = descriptors.find((entry) => entry.name === "market");
+    expect(marketDescriptor).toEqual({
+      name: "market",
+      description: "Operate the Web3 Market from the CLI",
+      hasSubcommands: true,
+    });
+
+    const program = createRegisteredProgram(["node", "openclaw", "market", "status"], "openclaw");
+    expect(program.commands.map((cmd) => cmd.name())).toEqual(["market"]);
+
+    await program.parseAsync(["market", "status"], { from: "user" });
+
+    expect(registerMarketCli).toHaveBeenCalledTimes(1);
+    expect(marketAction).toHaveBeenCalledTimes(1);
   });
 
   it("returns null for plugin registration when the config snapshot is invalid", async () => {

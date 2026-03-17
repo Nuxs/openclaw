@@ -473,6 +473,10 @@ export function createMarketStatusSummaryHandler(config: Web3PluginConfig): Gate
   return createMarketProxyHandler(config, "market.status.summary", { requireResources: false });
 }
 
+export function createMarketAuditQueryHandler(config: Web3PluginConfig): GatewayRequestHandler {
+  return createMarketProxyHandler(config, "market.audit.query", { requireResources: false });
+}
+
 export function createMarketMetricsSnapshotHandler(
   config: Web3PluginConfig,
 ): GatewayRequestHandler {

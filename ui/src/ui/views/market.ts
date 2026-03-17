@@ -4,6 +4,7 @@ import type {
   BridgeRoutesSnapshot,
   BridgeTransfer,
   MarketAlert,
+  MarketAuditSnapshot,
   MarketDispute,
   MarketFilters,
   MarketLedgerEntry,
@@ -20,21 +21,34 @@ import type {
   Web3MonitorSnapshot,
 } from "../types.ts";
 import {
+  renderMarketBuyerWorkbenchSection,
+  type MarketBuyerWorkbenchSectionProps,
+} from "./market-buyer-workbench-section.ts";
+import {
   renderBridgeRoutesCard,
   renderBridgeTransfersCard,
   renderReputationCard,
   renderTokenEconomyCard,
 } from "./market-cards.ts";
 import {
+  renderMarketControlWorkbenchSection,
+  type MarketControlWorkbenchSectionProps,
+} from "./market-control-workbench-section.ts";
+import {
   renderMarketExecutionSection,
   type MarketExecutionSectionProps,
 } from "./market-execution-section.ts";
+import { filterMarketResources } from "./market-filters.ts";
 import { renderOpsSection, type OpsSectionProps } from "./market-ops-section.ts";
 import { renderPrivacySection, type PrivacySectionProps } from "./market-privacy-section.ts";
 import {
   renderMarketProviderOnboardingSection,
   type MarketProviderOnboardingSectionProps,
 } from "./market-provider-onboarding-section.ts";
+import {
+  renderMarketProviderWorkbenchSection,
+  type MarketProviderWorkbenchSectionProps,
+} from "./market-provider-workbench-section.ts";
 import { renderIndexOverview, renderMonitorOverview } from "./market-sections.ts";
 import { renderTaskSection, type TaskSectionProps } from "./market-task-section.ts";
 
@@ -51,6 +65,8 @@ type MarketProps = {
   leases: MarketLease[];
   ledger: MarketLedgerSummary | null;
   ledgerEntries: MarketLedgerEntry[];
+  auditSnapshot: MarketAuditSnapshot | null;
+  auditError: string | null;
   disputes: MarketDispute[];
   reputation: MarketReputationSummary | null;
   tokenEconomy: TokenEconomyState | null;
@@ -73,6 +89,7 @@ const RESOURCE_KINDS: Array<{ key: MarketProps["resourceKind"]; label: string }>
   { key: "model", label: "Model" },
   { key: "search", label: "Search" },
   { key: "storage", label: "Storage" },
+  { key: "service", label: "Service" },
 ];
 
 const RESOURCE_STATUS_OPTIONS: Array<{
@@ -117,25 +134,15 @@ export function renderMarket(props: MarketProps) {
     : "n/a";
   const activeAlerts = metrics?.alerts.filter((alert) => alert.triggered) ?? [];
 
-  const filteredResources = sortResources(
-    props.resources
-      .filter((resource) => props.resourceKind === "all" || resource.kind === props.resourceKind)
-      .filter(
-        (resource) =>
-          filters.resourceStatus === "all" || resource.status === filters.resourceStatus,
-      )
-      .filter((resource) =>
-        matchesText(filters.resourceSearch, [
-          resource.resourceId,
-          resource.label,
-          resource.providerActorId,
-          resource.offerId,
-          resource.kind,
-          ...(resource.tags ?? []),
-        ]),
-      ),
-    filters.resourceSort,
-  );
+  const filteredResources = filterMarketResources({
+    resources: props.resources,
+    resourceKind: props.resourceKind,
+    filters: {
+      resourceSearch: filters.resourceSearch,
+      resourceStatus: filters.resourceStatus,
+      resourceSort: filters.resourceSort,
+    },
+  });
 
   const filteredLeases = sortLeases(
     props.leases
@@ -270,6 +277,31 @@ export function renderMarket(props: MarketProps) {
     }
 
     ${props.executionSection ? renderMarketExecutionSection(props.executionSection) : nothing}
+
+    ${renderMarketProviderWorkbenchSection({
+      loading: props.loading,
+      resources: props.resources,
+      leases: props.leases,
+      reputation: props.reputation,
+      tokenEconomy: props.tokenEconomy,
+    } satisfies MarketProviderWorkbenchSectionProps)}
+
+    ${renderMarketBuyerWorkbenchSection({
+      loading: props.loading,
+      resources: props.resources,
+      leases: props.leases,
+      disputes: props.disputes,
+      executions: props.executionSection?.executions ?? [],
+    } satisfies MarketBuyerWorkbenchSectionProps)}
+
+    ${renderMarketControlWorkbenchSection({
+      loading: props.loading,
+      status,
+      opsSummary: props.opsSection?.summary ?? null,
+      alerts: props.opsSection?.alerts ?? [],
+      auditSnapshot: props.auditSnapshot,
+      auditError: props.auditError,
+    } satisfies MarketControlWorkbenchSectionProps)}
 
     <section class="grid grid-cols-2" style="margin-top: 16px;">
       ${renderIndexOverview({
@@ -709,15 +741,6 @@ function renderLedgerCard(props: MarketProps, entries: MarketLedgerEntry[]) {
       </div>
     </div>
   `;
-}
-
-function sortResources(resources: MarketResource[], mode: MarketFilters["resourceSort"]) {
-  const copy = [...resources];
-  return copy.toSorted((a, b) =>
-    mode === "updated_asc"
-      ? compareValues(a.updatedAt, b.updatedAt)
-      : compareValues(b.updatedAt, a.updatedAt),
-  );
 }
 
 function sortLeases(leases: MarketLease[], mode: MarketFilters["leaseSort"]) {

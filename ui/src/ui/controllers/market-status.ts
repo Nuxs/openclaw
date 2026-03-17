@@ -4,6 +4,8 @@ import type {
   BridgeTransfer,
   ConsentView,
   GaReadinessCheck,
+  MarketAuditEventView,
+  MarketAuditSnapshot,
   MarketDispute,
   MarketLedgerEntry,
   MarketLedgerSummary,
@@ -47,6 +49,8 @@ type MarketStatusState = {
   marketLeases: MarketLease[];
   marketLedgerSummary: MarketLedgerSummary | null;
   marketLedgerEntries: MarketLedgerEntry[];
+  marketAuditSnapshot: MarketAuditSnapshot | null;
+  marketAuditError: string | null;
   marketDisputes: MarketDispute[];
   marketReputation: MarketReputationSummary | null;
   marketTokenEconomy: TokenEconomyState | null;
@@ -61,9 +65,9 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
   }
   state.marketLoading = true;
   state.marketError = null;
+  state.marketAuditError = null;
 
-  const hello = state.hello as { features?: { methods?: unknown } } | undefined;
-  const methods = Array.isArray(hello?.features?.methods) ? hello.features.methods : null;
+  const availableMethods = extractAvailableMethods(state.hello);
   const requiredMethods = [
     "web3.market.status.summary",
     "web3.market.metrics.snapshot",
@@ -71,9 +75,8 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
     "web3.index.stats",
     "web3.monitor.snapshot",
   ];
-  if (methods) {
-    const available = new Set<string>(methods.filter((m): m is string => typeof m === "string"));
-    const missing = requiredMethods.filter((m) => !available.has(m));
+  if (availableMethods) {
+    const missing = requiredMethods.filter((method) => !availableMethods.has(method));
     if (missing.length > 0) {
       state.marketError = `市场 API 未就绪：缺少 ${missing.join(", ")}。请启用/升级 web3-core 后重试。`;
       state.marketLoading = false;
@@ -82,6 +85,20 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
   }
 
   try {
+    const auditRequest =
+      availableMethods && !availableMethods.has("web3.market.audit.query")
+        ? Promise.resolve({
+            payload: null,
+            error:
+              "市场审计 API 未就绪：缺少 web3.market.audit.query。请启用/升级 web3-core 后重试。",
+          })
+        : state.client
+            .request<{ events?: unknown[]; count?: number }>("web3.market.audit.query", {
+              limit: 50,
+            })
+            .then((payload) => ({ payload, error: null }))
+            .catch((error: unknown) => ({ payload: null, error: String(error) }));
+
     const [
       status,
       metrics,
@@ -97,6 +114,7 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       tokenEconomy,
       bridgeRoutes,
       bridgeTransfers,
+      auditResult,
     ] = await Promise.all([
       state.client.request<MarketStatusSummary>("web3.market.status.summary", {}),
       state.client.request<MarketMetricsSnapshot>("web3.market.metrics.snapshot", {}),
@@ -114,6 +132,7 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       state.client.request("web3.market.bridge.list", {
         limit: 100,
       }),
+      auditRequest,
     ]);
 
     state.marketStatus = normalizePayload<MarketStatusSummary>(status);
@@ -133,6 +152,10 @@ export async function loadMarketStatus(state: MarketStatusState & { hello?: unkn
       bridgeTransfers,
       "transfers",
     );
+    state.marketAuditSnapshot = auditResult.payload
+      ? normalizeMarketAuditSnapshot(auditResult.payload)
+      : null;
+    state.marketAuditError = auditResult.error;
     state.marketLastSuccess = Date.now();
   } catch (error) {
     state.marketError = String(error);
@@ -411,6 +434,85 @@ function normalizeArrayOrListPayload<T>(payload: unknown, key: string): T[] {
 
 function normalizeSettledListPayload<T>(result: PromiseSettledResult<unknown>, key: string): T[] {
   return result.status === "fulfilled" ? normalizeListPayload<T>(result.value, key) : [];
+}
+
+function normalizeMarketAuditSnapshot(payload: unknown): MarketAuditSnapshot | null {
+  const value = unwrapResult(payload);
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const events = Array.isArray(record.events)
+    ? record.events
+        .map((entry) => normalizeMarketAuditEvent(entry))
+        .filter((entry): entry is MarketAuditEventView => Boolean(entry))
+        .toSorted((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
+    : [];
+  const byKind = events.reduce<Record<string, number>>((acc, event) => {
+    acc[event.kind] = (acc[event.kind] ?? 0) + 1;
+    return acc;
+  }, {});
+  const count = typeof record.count === "number" ? record.count : events.length;
+  return {
+    count,
+    byKind,
+    lastEventAt: events[0]?.timestamp ?? null,
+    events,
+  };
+}
+
+function normalizeMarketAuditEvent(value: unknown): MarketAuditEventView | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id =
+    typeof record.id === "string"
+      ? record.id
+      : typeof record.auditId === "string"
+        ? record.auditId
+        : null;
+  const kind = typeof record.kind === "string" ? record.kind : null;
+  const refId = typeof record.refId === "string" ? record.refId : null;
+  const timestamp = typeof record.timestamp === "string" ? record.timestamp : null;
+  if (!id || !kind || !refId || !timestamp) {
+    return null;
+  }
+  return {
+    id,
+    kind,
+    refId,
+    actor: typeof record.actor === "string" ? record.actor : null,
+    timestamp,
+    detailSummary: summarizeAuditDetails(record.details),
+  };
+}
+
+function summarizeAuditDetails(details: unknown): string | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return null;
+  }
+  const entries = Object.entries(details)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .slice(0, 3)
+    .map(([key, value]) => `${key}: ${summarizeAuditValue(value)}`);
+  return entries.length > 0 ? entries.join(" · ") : null;
+}
+
+function summarizeAuditValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  }
+  if (value && typeof value === "object") {
+    return "object";
+  }
+  return "n/a";
 }
 
 function unwrapResult(payload: unknown): unknown {

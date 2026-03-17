@@ -37,6 +37,7 @@ import {
   createMarketLeaseIssueHandler,
   createMarketLeaseListHandler,
   createMarketLeaseRevokeHandler,
+  createMarketAuditQueryHandler,
   createMarketMetricsSnapshotHandler,
   createMarketReconciliationSummaryHandler,
   createMarketReputationSummaryHandler,
@@ -255,6 +256,7 @@ export function registerMarket({ api, store, config }: RegistrationContext): voi
   api.registerGatewayMethod("web3.market.bridge.list", createMarketBridgeListHandler(config));
 
   // ── Gateway: Market metrics & reconciliation ──
+  api.registerGatewayMethod("web3.market.audit.query", createMarketAuditQueryHandler(config));
   api.registerGatewayMethod(
     "web3.market.metrics.snapshot",
     createMarketMetricsSnapshotHandler(config),

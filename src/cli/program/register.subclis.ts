@@ -182,6 +182,15 @@ const entries: SubCliEntry[] = [
     },
   },
   {
+    name: "market",
+    description: "Operate the Web3 Market from the CLI",
+    hasSubcommands: true,
+    register: async (program) => {
+      const mod = await import("../../commands/market.js");
+      mod.registerMarketCli(program);
+    },
+  },
+  {
     name: "hooks",
     description: "Manage internal agent hooks",
     hasSubcommands: true,

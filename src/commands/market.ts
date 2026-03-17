@@ -1,72 +1,94 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
-/* eslint-disable @typescript-eslint/no-base-to-string */
-// src/commands/market.ts
-/**
- * Market CLI 命令入口
- *
- * 提供市场相关的所有子命令
- */
-
 import { Command } from "commander";
-import { marketBrowseCommand, marketShowCommand, marketQuoteCommand } from "./market-browse.js";
+import {
+  marketBrowseCommand,
+  marketCompareCommand,
+  marketQuoteCommand,
+  marketShowCommand,
+} from "./market-browse.js";
 import { marketOfferCommand } from "./market-offer.js";
 import { marketOrderCommand } from "./market-order.js";
+import {
+  asArray,
+  asDisplayString,
+  asRecord,
+  asString,
+  callCliGateway,
+  formatTimestamp,
+  formatUnitPrice,
+  printJson,
+  printTable,
+  readJsonObjectFile,
+  requireStringOption,
+  shortId,
+} from "./market-shared.js";
 
 export const marketCommand = new Command("market")
-  .description("Manage Web3 Market services and orders")
+  .description("Operate the real Web3 Market public contract from the CLI")
   .addCommand(marketBrowseCommand)
   .addCommand(marketShowCommand)
   .addCommand(marketQuoteCommand)
+  .addCommand(marketCompareCommand)
   .addCommand(marketOfferCommand)
   .addCommand(marketOrderCommand)
-  .addCommand(marketProviderCommand())
-  .addCommand(marketAuditCommand())
-  .addCommand(marketDisputeCommand())
-  .addCommand(marketStatusCommand());
+  .addCommand(createProviderCommand())
+  .addCommand(createAuditCommand())
+  .addCommand(createDisputeCommand())
+  .addCommand(createStatusCommand());
 
-/**
- * openclaw market provider
- */
-function marketProviderCommand(): Command {
+export function registerMarketCli(program: Command): void {
+  program.addCommand(marketCommand);
+}
+
+function createProviderCommand(): Command {
   return new Command("provider")
-    .description("Manage providers")
+    .description("Inspect provider-facing resources and reputation")
     .addCommand(
       new Command("list")
-        .description("List all providers")
-        .option("--status <status>", "Filter by status")
+        .description("List published market resources, optionally scoped to one provider")
+        .option("--provider-actor-id <actorId>", "Filter by provider actor ID")
+        .option("--kind <kind>", "Filter by resource kind")
+        .option("--status <status>", "Filter by resource status", "resource_published")
         .option("--limit <n>", "Limit results", "20")
+        .option("--json", "Output as JSON")
         .action(async (options) => {
-          const { callGateway } = await import("../gateway/call.js");
-          const { table } = await import("../terminal/table.js");
-
           try {
-            const result = await callGateway("web3.market.provider.list", [
-              {
-                status: options.status,
-                limit: parseInt(options.limit),
-              },
-            ]);
+            const response = await callCliGateway("web3.market.resource.list", {
+              providerActorId: options.providerActorId,
+              kind: options.kind,
+              status: options.status,
+              limit: Number.parseInt(options.limit, 10),
+            });
+            const resources = asArray(asRecord(response)?.resources)
+              .map((entry) => asRecord(entry))
+              .filter((entry): entry is Record<string, unknown> => Boolean(entry));
 
-            console.log(
-              table([
-                ["ID", "Name", "Status", "Rating", "Offers"],
-                ...result.map(
-                  (p: {
-                    id: string;
-                    name?: string;
-                    status: string;
-                    rating?: number;
-                    totalOffers?: number;
-                  }) => [
-                    p.id.slice(0, 12),
-                    p.name || "N/A",
-                    p.status,
-                    p.rating?.toFixed(1) || "N/A",
-                    String(p.totalOffers || 0),
-                  ],
-                ),
-              ]),
+            if (options.json) {
+              printJson({ count: resources.length, resources });
+              return;
+            }
+
+            if (resources.length === 0) {
+              console.log("No provider resources matched the current filters.");
+              return;
+            }
+
+            printTable(
+              [
+                { key: "resourceId", header: "Resource" },
+                { key: "label", header: "Label", flex: true, minWidth: 20 },
+                { key: "kind", header: "Kind" },
+                { key: "provider", header: "Provider" },
+                { key: "price", header: "Price" },
+                { key: "status", header: "Status" },
+              ],
+              resources.map((resource) => ({
+                resourceId: shortId(resource.resourceId),
+                label: asString(resource.label) ?? "n/a",
+                kind: asString(resource.kind) ?? "n/a",
+                provider: shortId(resource.providerActorId),
+                price: formatUnitPrice(asRecord(resource.price)),
+                status: (asString(resource.status) ?? "n/a").replace("resource_", ""),
+              })),
             );
           } catch (error) {
             console.error(error instanceof Error ? error.message : String(error));
@@ -76,24 +98,105 @@ function marketProviderCommand(): Command {
     )
     .addCommand(
       new Command("show")
-        .description("Show provider details")
-        .argument("<provider-id>", "Provider ID")
-        .action(async (providerId) => {
-          const { callGateway } = await import("../gateway/call.js");
-
+        .description("Show one provider's reputation plus published resources")
+        .argument("<provider-actor-id>", "Provider actor ID")
+        .option("--limit <n>", "Max resources to display", "20")
+        .option("--json", "Output as JSON")
+        .action(async (providerActorId, options) => {
           try {
-            const result = await callGateway("web3.market.provider.get", [providerId]);
+            const [resourcesResponse, reputationResponse] = await Promise.all([
+              callCliGateway("web3.market.resource.list", {
+                providerActorId,
+                status: "resource_published",
+                limit: Number.parseInt(options.limit, 10),
+              }),
+              callCliGateway("web3.market.reputation.summary", {
+                providerActorId,
+                limit: Number.parseInt(options.limit, 10),
+              }),
+            ]);
+            const resources = asArray(asRecord(resourcesResponse)?.resources)
+              .map((entry) => asRecord(entry))
+              .filter((entry): entry is Record<string, unknown> => Boolean(entry));
 
-            console.log(`\n  Provider: ${result.id}`);
-            console.log(`  Name: ${result.name || "N/A"}`);
-            console.log(`  Status: ${result.status}`);
-            console.log(`  Rating: ${result.rating?.toFixed(1) || "N/A"}`);
-            console.log(`  Total Offers: ${result.totalOffers || 0}`);
-            console.log(`  Total Orders: ${result.totalOrders || 0}`);
-            if (result.verifiedAt) {
-              console.log(`  Verified: ${result.verifiedAt}`);
+            if (options.json) {
+              printJson({ reputation: reputationResponse, resources });
+              return;
             }
-            console.log();
+
+            const reputationIdentity = asRecord(reputationResponse.identity);
+            const reputationLeases = asRecord(reputationResponse.leases);
+            const reputationDisputes = asRecord(reputationResponse.disputes);
+
+            console.log(`\nProvider: ${providerActorId}`);
+            console.log(`ENS: ${asString(reputationIdentity?.ensName) ?? "n/a"}`);
+            console.log(`Score: ${asDisplayString(reputationResponse.score) ?? "n/a"}`);
+            console.log(`Leases: ${asDisplayString(reputationLeases?.total) ?? "n/a"}`);
+            console.log(`Disputes: ${asDisplayString(reputationDisputes?.total) ?? "n/a"}`);
+            console.log(`Published resources: ${resources.length}`);
+            if (resources.length > 0) {
+              printTable(
+                [
+                  { key: "resourceId", header: "Resource" },
+                  { key: "label", header: "Label", flex: true, minWidth: 20 },
+                  { key: "kind", header: "Kind" },
+                  { key: "price", header: "Price" },
+                ],
+                resources.map((resource) => ({
+                  resourceId: shortId(resource.resourceId),
+                  label: asString(resource.label) ?? "n/a",
+                  kind: asString(resource.kind) ?? "n/a",
+                  price: formatUnitPrice(asRecord(resource.price)),
+                })),
+              );
+            }
+          } catch (error) {
+            console.error(error instanceof Error ? error.message : String(error));
+            process.exit(1);
+          }
+        }),
+    )
+    .addCommand(
+      new Command("publish")
+        .description("Publish or refresh a provider resource from a JSON payload")
+        .option("-f, --file <path>", "JSON payload matching web3.market.resource.publish")
+        .option("--json", "Output as JSON")
+        .action(async (options) => {
+          try {
+            const filePath = requireStringOption(options.file, "file");
+            const params = readJsonObjectFile(filePath);
+            const result = await callCliGateway("web3.market.resource.publish", params);
+            if (options.json) {
+              printJson(result);
+              return;
+            }
+            console.log(`Resource published: ${asString(result.resourceId) ?? "n/a"}`);
+            console.log(`Offer: ${asString(result.offerId) ?? "n/a"}`);
+            console.log(`Status: ${asString(result.status) ?? "n/a"}`);
+          } catch (error) {
+            console.error(error instanceof Error ? error.message : String(error));
+            process.exit(1);
+          }
+        }),
+    )
+    .addCommand(
+      new Command("unpublish")
+        .description("Unpublish a provider resource")
+        .argument("<resource-id>", "Resource ID")
+        .option("--actor-id <actorId>", "Provider actor ID")
+        .option("--json", "Output as JSON")
+        .action(async (resourceId, options) => {
+          try {
+            const result = await callCliGateway("web3.market.resource.unpublish", {
+              actorId: requireStringOption(options.actorId, "actor-id"),
+              resourceId,
+            });
+            if (options.json) {
+              printJson(result);
+              return;
+            }
+            console.log(`Resource unpublished: ${asString(result.resourceId) ?? resourceId}`);
+            console.log(`Status: ${asString(result.status) ?? "n/a"}`);
           } catch (error) {
             console.error(error instanceof Error ? error.message : String(error));
             process.exit(1);
@@ -102,53 +205,40 @@ function marketProviderCommand(): Command {
     );
 }
 
-/**
- * openclaw market audit
- */
-function marketAuditCommand(): Command {
+function createAuditCommand(): Command {
   return new Command("audit")
-    .description("Query audit logs")
-    .option("--kind <kind>", "Filter by event kind")
-    .option("--entity <id>", "Filter by entity ID")
-    .option("--from <date>", "From date (ISO)")
-    .option("--to <date>", "To date (ISO)")
-    .option("--limit <n>", "Limit results", "100")
+    .description("Query the market audit trail through the public contract")
+    .option("--limit <n>", "Limit results", "50")
     .option("--json", "Output as JSON")
     .action(async (options) => {
-      const { callGateway } = await import("../gateway/call.js");
-      const { table } = await import("../terminal/table.js");
-
       try {
-        const result = await callGateway("web3.market.audit.query", [
-          {
-            kind: options.kind,
-            entityId: options.entity,
-            from: options.from,
-            to: options.to,
-            limit: parseInt(options.limit),
-          },
-        ]);
-
+        const response = await callCliGateway("web3.market.audit.query", {
+          limit: Number.parseInt(options.limit, 10),
+        });
+        const events = asArray(asRecord(response)?.events)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry));
         if (options.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printJson({ count: events.length, events });
           return;
         }
-
-        if (result.length === 0) {
-          console.log("No audit logs found");
+        if (events.length === 0) {
+          console.log("No audit events were returned.");
           return;
         }
-
-        console.log(
-          table([
-            ["Time", "Kind", "Entity", "Actor"],
-            ...result.map((log: any) => [
-              new Date(log.timestamp).toLocaleString(),
-              log.kind,
-              log.refId?.slice(0, 15) || "N/A",
-              log.actor?.slice(0, 15) || "system",
-            ]),
-          ]),
+        printTable(
+          [
+            { key: "timestamp", header: "Time" },
+            { key: "kind", header: "Kind" },
+            { key: "refId", header: "Ref" },
+            { key: "actor", header: "Actor" },
+          ],
+          events.map((event) => ({
+            timestamp: formatTimestamp(event.timestamp),
+            kind: asString(event.kind) ?? "n/a",
+            refId: shortId(event.refId),
+            actor: shortId(event.actor),
+          })),
         );
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
@@ -157,53 +247,45 @@ function marketAuditCommand(): Command {
     });
 }
 
-/**
- * openclaw market dispute
- */
-function marketDisputeCommand(): Command {
+function createDisputeCommand(): Command {
   return new Command("dispute")
-    .description("Manage disputes")
+    .description("Inspect market disputes")
     .addCommand(
       new Command("list")
         .description("List disputes")
-        .option("--status <status>", "Filter by status")
+        .option("--status <status>", "Filter by dispute status")
         .option("--limit <n>", "Limit results", "20")
+        .option("--json", "Output as JSON")
         .action(async (options) => {
-          const { callGateway } = await import("../gateway/call.js");
-          const { table } = await import("../terminal/table.js");
-
           try {
-            const result = await callGateway("web3.market.dispute.list", [
-              {
-                status: options.status,
-                limit: parseInt(options.limit),
-              },
-            ]);
-
-            if (result.length === 0) {
-              console.log("No disputes found");
+            const response = await callCliGateway("web3.market.dispute.list", {
+              status: options.status,
+              limit: Number.parseInt(options.limit, 10),
+            });
+            const disputes = asArray(asRecord(response)?.disputes)
+              .map((entry) => asRecord(entry))
+              .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+            if (options.json) {
+              printJson({ count: disputes.length, disputes });
               return;
             }
-
-            console.log(
-              table([
-                ["ID", "Order", "Status", "Resolution", "Opened"],
-                ...result.map(
-                  (d: {
-                    disputeId: string;
-                    orderId: string;
-                    status: string;
-                    resolution?: string;
-                    openedAt: string;
-                  }) => [
-                    d.disputeId.slice(0, 12),
-                    d.orderId.slice(0, 12),
-                    d.status.replace("dispute_", ""),
-                    d.resolution || "pending",
-                    new Date(d.openedAt).toLocaleDateString(),
-                  ],
-                ),
-              ]),
+            if (disputes.length === 0) {
+              console.log("No disputes matched the current filters.");
+              return;
+            }
+            printTable(
+              [
+                { key: "disputeId", header: "Dispute" },
+                { key: "orderId", header: "Order" },
+                { key: "status", header: "Status" },
+                { key: "openedAt", header: "Opened" },
+              ],
+              disputes.map((dispute) => ({
+                disputeId: shortId(dispute.disputeId),
+                orderId: shortId(dispute.orderId),
+                status: (asString(dispute.status) ?? "n/a").replaceAll("_", " "),
+                openedAt: formatTimestamp(dispute.openedAt),
+              })),
             );
           } catch (error) {
             console.error(error instanceof Error ? error.message : String(error));
@@ -213,30 +295,24 @@ function marketDisputeCommand(): Command {
     )
     .addCommand(
       new Command("status")
-        .description("Show dispute status")
+        .alias("show")
+        .description("Show one dispute")
         .argument("<dispute-id>", "Dispute ID")
-        .action(async (disputeId) => {
-          const { callGateway } = await import("../gateway/call.js");
-
+        .option("--json", "Output as JSON")
+        .action(async (disputeId, options) => {
           try {
-            const result = await callGateway("web3.market.dispute.get", [disputeId]);
-
-            console.log(`\n  Dispute: ${result.disputeId}`);
-            console.log(`  Order: ${result.orderId}`);
-            console.log(`  Status: ${result.status}`);
-            console.log(`  Reason: ${result.reason}`);
-            console.log(`\n  Initiator: ${result.initiatorActorId}`);
-            console.log(`  Respondent: ${result.respondentActorId}`);
-            console.log(`  Arbitrator: ${result.arbitratorType}`);
-            console.log(`\n  Evidence: ${result.evidence?.length || 0} items`);
-            if (result.resolution) {
-              console.log(`  Resolution: ${result.resolution}`);
+            const dispute = await callCliGateway("web3.market.dispute.get", { disputeId });
+            if (options.json) {
+              printJson(dispute);
+              return;
             }
-            console.log(`  Opened: ${result.openedAt}`);
-            if (result.resolvedAt) {
-              console.log(`  Resolved: ${result.resolvedAt}`);
-            }
-            console.log();
+            console.log(`\nDispute: ${asString(dispute.disputeId) ?? disputeId}`);
+            console.log(`Order: ${asString(dispute.orderId) ?? "n/a"}`);
+            console.log(`Status: ${asString(dispute.status) ?? "n/a"}`);
+            console.log(`Reason: ${asString(dispute.reason) ?? "n/a"}`);
+            console.log(`Initiator: ${asString(dispute.initiatorActorId) ?? "n/a"}`);
+            console.log(`Respondent: ${asString(dispute.respondentActorId) ?? "n/a"}`);
+            console.log(`Opened: ${formatTimestamp(dispute.openedAt)}`);
           } catch (error) {
             console.error(error instanceof Error ? error.message : String(error));
             process.exit(1);
@@ -245,49 +321,58 @@ function marketDisputeCommand(): Command {
     );
 }
 
-/**
- * openclaw market status
- */
-function marketStatusCommand(): Command {
+function createStatusCommand(): Command {
   return new Command("status")
-    .description("Show market status summary")
+    .description("Summarize market status, monitor health, and active alerts")
     .option("--json", "Output as JSON")
     .action(async (options) => {
-      const { callGateway } = await import("../gateway/call.js");
-
       try {
-        const [health, stats] = await Promise.all([
-          callGateway("web3.market.health.check", []),
-          callGateway("web3.market.stats", []),
+        const [marketStatus, monitorHealth, alertsResponse] = await Promise.all([
+          callCliGateway("web3.market.status.summary", {}),
+          callCliGateway("web3.monitor.health", {}),
+          callCliGateway("web3.monitor.alerts.list", {
+            activeOnly: false,
+            limit: 20,
+          }),
         ]);
+        const alerts = asArray(asRecord(alertsResponse)?.alerts)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry));
 
         if (options.json) {
-          console.log(JSON.stringify({ health, stats }, null, 2));
+          printJson({ marketStatus, monitorHealth, alerts });
           return;
         }
 
-        console.log("\n  Market Status");
-        console.log("  ─────────────");
+        const totals = asRecord(marketStatus.totals);
 
-        console.log(`  Overall: ${health.overall as string}`);
-
-        console.log("\n  Statistics");
-        console.log("  ─────────────");
-        console.log(`  Total Offers: ${stats.totalOffers || 0}`);
-        console.log(`  Active Offers: ${stats.activeOffers || 0}`);
-        console.log(`  Total Orders: ${stats.totalOrders || 0}`);
-        console.log(`  Pending Orders: ${stats.pendingOrders || 0}`);
-        console.log(`  Total Providers: ${stats.totalProviders || 0}`);
-
-        console.log("\n  Health Probes");
-        console.log("  ─────────────");
-        for (const probe of health.probes || []) {
-          const probeStatus =
-            probe.status === "healthy" ? "✓" : probe.status === "degraded" ? "⚠" : "✗";
-          console.log(`  ${probeStatus} ${probe.component}: ${probe.status}`);
+        console.log("\nMarket status");
+        console.log(`Offers: ${asDisplayString(totals?.offers) ?? "0"}`);
+        console.log(`Orders: ${asDisplayString(totals?.orders) ?? "0"}`);
+        console.log(`Deliveries: ${asDisplayString(totals?.deliveries) ?? "0"}`);
+        console.log(`Settlements: ${asDisplayString(totals?.settlements) ?? "0"}`);
+        console.log(
+          `Monitor: ${asString(monitorHealth.status) ?? (monitorHealth.healthy === true ? "healthy" : "unknown")}`,
+        );
+        console.log(
+          `Active alerts: ${alerts.filter((alert) => asString(alert.status) !== "resolved").length}`,
+        );
+        if (alerts.length > 0) {
+          printTable(
+            [
+              { key: "level", header: "Level" },
+              { key: "category", header: "Category" },
+              { key: "status", header: "Status" },
+              { key: "timestamp", header: "Time" },
+            ],
+            alerts.slice(0, 5).map((alert) => ({
+              level: asString(alert.level) ?? "n/a",
+              category: asString(alert.category) ?? "n/a",
+              status: asString(alert.status) ?? "n/a",
+              timestamp: formatTimestamp(alert.timestamp),
+            })),
+          );
         }
-
-        console.log();
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);

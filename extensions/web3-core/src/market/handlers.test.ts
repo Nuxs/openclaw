@@ -41,6 +41,7 @@ vi.mock("../identity/ens.js", async () => {
 
 // Dynamically import after mocks are established
 const {
+  createMarketAuditQueryHandler,
   createMarketOfferCompareHandler,
   createMarketOfferQuoteHandler,
   createMarketReconciliationSummaryHandler,
@@ -76,6 +77,60 @@ beforeEach(() => {
 
 afterEach(() => {
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe("market.audit.query", () => {
+  it("proxies the redacted audit query through the public market contract", async () => {
+    mockCallGateway.mockResolvedValue({
+      ok: true,
+      result: {
+        events: [
+          {
+            auditId: "audit-1",
+            kind: "delivery_issued",
+            refId: "order-1",
+            details: {
+              payload: undefined,
+              payloadRef: undefined,
+              accessToken: "[redacted]",
+            },
+          },
+        ],
+        count: 1,
+      },
+    });
+
+    const handler = createMarketAuditQueryHandler(config);
+    const r = createResponder();
+    await handler({
+      params: { limit: 25 },
+      respond: r.respond,
+    } as never);
+
+    expect(mockCallGateway).toHaveBeenCalledWith({
+      method: "market.audit.query",
+      params: { limit: 25 },
+      timeoutMs: config.brain.timeoutMs,
+    });
+    expect(r.result()).toEqual({
+      ok: true,
+      payload: {
+        events: [
+          {
+            auditId: "audit-1",
+            kind: "delivery_issued",
+            refId: "order-1",
+            details: {
+              payload: undefined,
+              payloadRef: undefined,
+              accessToken: "[redacted]",
+            },
+          },
+        ],
+        count: 1,
+      },
+    });
+  });
 });
 
 describe("market.offer quote/compare", () => {

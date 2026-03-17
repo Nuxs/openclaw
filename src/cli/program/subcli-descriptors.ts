@@ -69,6 +69,11 @@ export const SUB_CLI_DESCRIPTORS = [
     hasSubcommands: false,
   },
   {
+    name: "market",
+    description: "Operate the Web3 Market from the CLI",
+    hasSubcommands: true,
+  },
+  {
     name: "hooks",
     description: "Manage internal agent hooks",
     hasSubcommands: true,

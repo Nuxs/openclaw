@@ -1,15 +1,29 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/commands/market-order.ts
-/**
- * Market Order CLI 命令
- *
- * 提供订单创建、查询、取消等操作
- */
-
 import { Command } from "commander";
+import {
+  asArray,
+  asDisplayString,
+  asRecord,
+  asString,
+  callCliGateway,
+  formatTimestamp,
+  printJson,
+  printTable,
+  promptConfirm,
+  requireStringOption,
+  shortId,
+} from "./market-shared.js";
+
+type QuotePayload = {
+  offerId: string;
+  resourceId: string;
+  providerActorId: string;
+  quantity: number;
+  estimatedTotal?: string | null;
+  price?: Record<string, unknown> | null;
+};
 
 export const marketOrderCommand = new Command("order")
-  .description("Manage market orders as a buyer")
+  .description("Manage buyer-side market orders")
   .addCommand(createOrderCommand())
   .addCommand(listOrderCommand())
   .addCommand(showOrderCommand())
@@ -17,132 +31,57 @@ export const marketOrderCommand = new Command("order")
   .addCommand(acceptOrderCommand())
   .addCommand(rejectOrderCommand());
 
-/**
- * openclaw market order create
- */
 function createOrderCommand(): Command {
   return new Command("create")
-    .description("Create a new order for an offer")
-    .argument("<offer-id>", "Offer ID to purchase")
+    .description("Create a buyer order from a published resource")
+    .argument("<resource-id>", "Published resource ID")
+    .option("--buyer-id <actorId>", "Buyer actor ID")
+    .option("--actor-id <actorId>", "Authorizing actor ID; defaults to buyer-id")
     .option("--quantity <n>", "Quantity", "1")
-    .option("--budget-impact", "Show budget impact before ordering", true)
     .option("-y, --yes", "Skip confirmation", false)
-    .action(async (offerId, options) => {
-      const { callGateway } = await import("../gateway/call.js");
-      const { progress } = await import("../cli/progress.js");
-
-      // 获取报价
-      const spinner = progress.spinner("Getting quote...");
-
+    .option("--json", "Output as JSON")
+    .action(async (resourceId, options) => {
       try {
-        const quote = await callGateway("web3.market.offer.quote", [
-          offerId,
-          parseInt(options.quantity),
-        ]);
-        spinner.success("Quote received");
-
-        console.log("\n  Quote Details:");
-        console.log(`    Offer ID: ${quote.offerId}`);
-        console.log(`    Quantity: ${quote.quantity}`);
-        console.log(`    Unit Price: ${quote.unitPrice} ${quote.currency}`);
-        console.log(`    Total: ${quote.totalAmount} ${quote.currency}`);
-        console.log(`    Valid Until: ${new Date(quote.validUntil).toLocaleString()}`);
-        console.log();
-
-        if (options.budgetImpact) {
-          const budget = await callGateway("web3.budget.status", []);
-          console.log("  Budget Impact:");
-          console.log(`    Daily Remaining: ${budget.remaining} ${budget.currency}`);
-          console.log(
-            `    After Order: ${parseFloat(budget.remaining) - parseFloat(quote.totalAmount)} ${budget.currency}`,
-          );
-          console.log();
+        const buyerId = requireStringOption(options.buyerId, "buyer-id");
+        const actorId = asString(options.actorId) ?? buyerId;
+        const quantity = Number.parseInt(options.quantity, 10);
+        const quoteResponse = await callCliGateway("web3.market.offer.quote", {
+          resourceId,
+          quantity,
+        });
+        const quote = normalizeQuote(asRecord(quoteResponse)?.quote);
+        if (!quote) {
+          throw new Error("quote unavailable");
         }
 
         if (!options.yes) {
-          const confirm = await promptConfirm("Proceed with order?");
-          if (!confirm) {
-            console.log("Cancelled");
+          console.log(`Resource: ${quote.resourceId}`);
+          console.log(`Offer: ${quote.offerId}`);
+          console.log(`Provider: ${quote.providerActorId}`);
+          console.log(`Quantity: ${quote.quantity}`);
+          console.log(`Estimated total: ${quote.estimatedTotal ?? "n/a"}`);
+          const confirmed = await promptConfirm("Create the order with the quoted offer?");
+          if (!confirmed) {
+            console.log("Cancelled.");
             return;
           }
         }
 
-        const orderSpinner = progress.spinner("Creating order...");
-        const result = await callGateway("web3.market.order.create", [
-          {
-            offerId,
-            quantity: parseInt(options.quantity),
-          },
-        ]);
-        orderSpinner.success("Order created");
-
-        console.log("\n  Order Details:");
-        console.log(`    Order ID: ${result.orderId}`);
-        console.log(`    Status: ${result.status}`);
-        console.log(`    Total: ${result.totalAmount} ${result.currency}`);
-        console.log();
-        console.log("Track your order:");
-        console.log(`  openclaw market order status ${result.orderId}`);
-      } catch (error) {
-        spinner.error("Failed to create order");
-        console.error(error instanceof Error ? error.message : String(error));
-        process.exit(1);
-      }
-    });
-}
-
-/**
- * openclaw market order list
- */
-function listOrderCommand(): Command {
-  return new Command("list")
-    .description("List your orders")
-    .option("--status <status>", "Filter by status")
-    .option("--limit <n>", "Limit results", "20")
-    .option("--json", "Output as JSON")
-    .action(async (options) => {
-      const { callGateway } = await import("../gateway/call.js");
-      const { table } = await import("../terminal/table.js");
-
-      try {
-        const result = await callGateway("web3.market.order.list", [
-          {
-            status: options.status,
-            limit: parseInt(options.limit),
-          },
-        ]);
-
+        const result = await callCliGateway("web3.market.order.create", {
+          actorId,
+          buyerId,
+          offerId: quote.offerId,
+          quantity,
+        });
         if (options.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printJson({ quote, result });
           return;
         }
-
-        if (result.length === 0) {
-          console.log("No orders found");
-          return;
-        }
-
+        console.log(`Order created: ${asString(result.orderId) ?? "n/a"}`);
+        console.log(`Status: ${asString(result.status) ?? "n/a"}`);
+        console.log(`Order hash: ${asString(result.orderHash) ?? "n/a"}`);
         console.log(
-          table([
-            ["Order ID", "Offer", "Amount", "Status", "Created"],
-            ...result.map(
-              (o: {
-                orderId: string;
-                offerId: string;
-                totalAmount?: string;
-                price?: number;
-                currency: string;
-                status: string;
-                createdAt: string;
-              }) => [
-                o.orderId.slice(0, 12),
-                o.offerId.slice(0, 12),
-                `${o.totalAmount || o.price} ${o.currency}`,
-                o.status.replace("order_", "").replace("_", " "),
-                new Date(o.createdAt).toLocaleDateString(),
-              ],
-            ),
-          ]),
+          `Track it: openclaw market order status ${asString(result.orderId) ?? "<order-id>"}`,
         );
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
@@ -151,49 +90,115 @@ function listOrderCommand(): Command {
     });
 }
 
-/**
- * openclaw market order status / show
- */
+function listOrderCommand(): Command {
+  return new Command("list")
+    .description("List buyer/provider orders")
+    .option("--order-id <orderId>", "Filter by order ID")
+    .option("--offer-id <offerId>", "Filter by offer ID")
+    .option("--buyer-id <actorId>", "Filter by buyer actor ID")
+    .option("--seller-id <actorId>", "Filter by seller actor ID")
+    .option("--status <status>", "Filter by status")
+    .option("--limit <n>", "Limit results", "20")
+    .option("--json", "Output as JSON")
+    .action(async (options) => {
+      try {
+        const response = await callCliGateway("web3.market.order.list", {
+          orderId: options.orderId,
+          offerId: options.offerId,
+          buyerId: options.buyerId,
+          sellerId: options.sellerId,
+          status: options.status,
+          limit: Number.parseInt(options.limit, 10),
+        });
+        const orders = asArray(asRecord(response)?.orders)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+
+        if (options.json) {
+          printJson({ count: orders.length, orders });
+          return;
+        }
+
+        if (orders.length === 0) {
+          console.log("No orders matched the current filters.");
+          return;
+        }
+
+        printTable(
+          [
+            { key: "orderId", header: "Order" },
+            { key: "resource", header: "Resource", flex: true, minWidth: 18 },
+            { key: "buyer", header: "Buyer" },
+            { key: "seller", header: "Seller" },
+            { key: "status", header: "Status" },
+            { key: "createdAt", header: "Created" },
+          ],
+          orders.map((order) => ({
+            orderId: shortId(order.orderId),
+            resource: asString(order.resourceName) ?? asString(order.offerId) ?? "n/a",
+            buyer: shortId(order.buyerId),
+            seller: shortId(order.sellerId),
+            status: (asString(order.status) ?? "n/a").replaceAll("_", " "),
+            createdAt: formatTimestamp(order.createdAt),
+          })),
+        );
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+    });
+}
+
 function showOrderCommand(): Command {
   return new Command("status")
     .alias("show")
-    .description("Show order details")
+    .description("Show one order plus the execution summary")
     .argument("<order-id>", "Order ID")
+    .option("--buyer-id <actorId>", "Optional buyer actor filter")
+    .option("--seller-id <actorId>", "Optional seller actor filter")
     .option("--json", "Output as JSON")
     .action(async (orderId, options) => {
-      const { callGateway } = await import("../gateway/call.js");
-
       try {
-        const result = await callGateway("web3.market.order.get", [orderId]);
+        const [listResponse, executionResponse] = await Promise.all([
+          callCliGateway("web3.market.order.list", {
+            orderId,
+            buyerId: options.buyerId,
+            sellerId: options.sellerId,
+            limit: 1,
+          }),
+          callCliGateway("web3.market.execution.status", { orderId }),
+        ]);
+        const order = asRecord(asArray(asRecord(listResponse)?.orders)[0]);
+        if (!order) {
+          throw new Error(`order not found: ${orderId}`);
+        }
 
         if (options.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printJson({ order, execution: executionResponse });
           return;
         }
 
-        console.log(`\n  Order: ${result.orderId}`);
-        console.log(`  Status: ${result.status}`);
-        console.log(`\n  Details:`);
-        console.log(`    Offer ID: ${result.offerId}`);
-        console.log(`    Quantity: ${result.quantity || 1}`);
-        console.log(`    Unit Price: ${result.unitPrice || result.price}`);
-        console.log(`    Total: ${result.totalAmount || result.price} ${result.currency}`);
-        console.log(`\n  Timeline:`);
-        console.log(`    Created: ${result.createdAt}`);
+        console.log(`\nOrder: ${asString(order.orderId) ?? orderId}`);
+        console.log(`Status: ${asString(order.status) ?? "n/a"}`);
+        console.log(
+          `Resource: ${asString(order.resourceName) ?? asString(order.offerId) ?? "n/a"}`,
+        );
+        console.log(`Buyer: ${asString(order.buyerId) ?? "n/a"}`);
+        console.log(`Seller: ${asString(order.sellerId) ?? "n/a"}`);
+        console.log(`Quantity: ${asDisplayString(order.quantity) ?? "1"}`);
+        console.log(`Created: ${formatTimestamp(order.createdAt)}`);
+        console.log(`Updated: ${formatTimestamp(order.updatedAt)}`);
 
-        if (result.paymentTxHash) {
-          console.log(`    Payment: ${result.paymentTxHash.slice(0, 20)}...`);
+        const execution = asRecord(executionResponse);
+        if (execution) {
+          console.log("\nExecution summary:");
+          console.log(`Execution: ${asString(execution.executionStatus) ?? "n/a"}`);
+          console.log(`Acceptance: ${asString(asRecord(execution.acceptance)?.status) ?? "n/a"}`);
+          console.log(`Delivery: ${asString(asRecord(execution.delivery)?.status) ?? "n/a"}`);
+          console.log(`Proof: ${asString(asRecord(execution.proof)?.status) ?? "n/a"}`);
+          console.log(`Settlement: ${asString(asRecord(execution.settlement)?.status) ?? "n/a"}`);
+          console.log(`Dispute: ${asString(asRecord(execution.dispute)?.status) ?? "n/a"}`);
         }
-
-        if (result.deliveryId) {
-          console.log(`    Delivery: ${result.deliveryId}`);
-        }
-
-        if (result.settlementId) {
-          console.log(`    Settlement: ${result.settlementId}`);
-        }
-
-        console.log();
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -201,37 +206,35 @@ function showOrderCommand(): Command {
     });
 }
 
-/**
- * openclaw market order cancel
- */
 function cancelOrderCommand(): Command {
   return new Command("cancel")
-    .description("Cancel a pending order")
+    .description("Cancel an order you own")
     .argument("<order-id>", "Order ID")
-    .option("--reason <reason>", "Cancellation reason")
+    .option("--actor-id <actorId>", "Buyer actor ID")
+    .option("--reason <reason>", "Optional cancellation reason")
     .option("-y, --yes", "Skip confirmation", false)
+    .option("--json", "Output as JSON")
     .action(async (orderId, options) => {
-      const { callGateway } = await import("../gateway/call.js");
-
-      if (!options.yes) {
-        const confirm = await promptConfirm(`Cancel order ${orderId}?`);
-        if (!confirm) {
-          console.log("Cancelled");
+      try {
+        const actorId = requireStringOption(options.actorId, "actor-id");
+        if (!options.yes) {
+          const confirmed = await promptConfirm(`Cancel order ${orderId}?`);
+          if (!confirmed) {
+            console.log("Cancelled.");
+            return;
+          }
+        }
+        const result = await callCliGateway("web3.market.order.cancel", {
+          actorId,
+          orderId,
+          reason: asString(options.reason) ?? undefined,
+        });
+        if (options.json) {
+          printJson(result);
           return;
         }
-      }
-
-      try {
-        const result = await callGateway("web3.market.order.cancel", [
-          orderId,
-          { reason: options.reason },
-        ]);
-        console.log(`Order ${orderId} cancelled`);
-        console.log(`Status: ${result.status}`);
-
-        if (result.refundAmount) {
-          console.log(`Refund: ${result.refundAmount} ${result.currency}`);
-        }
+        console.log(`Order cancelled: ${asString(result.orderId) ?? orderId}`);
+        console.log(`Status: ${asString(result.status) ?? "n/a"}`);
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -239,71 +242,61 @@ function cancelOrderCommand(): Command {
     });
 }
 
-/**
- * openclaw market order accept
- */
 function acceptOrderCommand(): Command {
   return new Command("accept")
-    .description("Accept a delivered order")
+    .description("Accept a completed delivery")
     .argument("<order-id>", "Order ID")
-    .option("--note <note>", "Acceptance note")
+    .option("--actor-id <actorId>", "Buyer actor ID")
+    .option("--proof-id <proofId>", "Optional proof ID")
+    .option("--json", "Output as JSON")
     .action(async (orderId, options) => {
-      const { callGateway } = await import("../gateway/call.js");
-      const { progress } = await import("../cli/progress.js");
-
-      const spinner = progress.spinner(`Accepting order ${orderId}...`);
-
       try {
-        const result = await callGateway("web3.market.acceptance.sign", [
+        const actorId = requireStringOption(options.actorId, "actor-id");
+        const result = await callCliGateway("web3.market.acceptance.sign", {
+          actorId,
           orderId,
-          { note: options.note },
-        ]);
-        spinner.success("Order accepted");
-
-        console.log("\n  Acceptance recorded");
-        console.log(`  Settlement: ${result.settlementId}`);
-        console.log(`  Status: ${result.status}`);
+          proofId: asString(options.proofId) ?? undefined,
+        });
+        if (options.json) {
+          printJson(result);
+          return;
+        }
+        console.log(`Acceptance recorded for ${orderId}.`);
+        console.log(
+          `Settlement status: ${asString(asRecord(result.settlement)?.status) ?? asString(result.status) ?? "n/a"}`,
+        );
       } catch (error) {
-        spinner.error("Failed to accept order");
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
 }
 
-/**
- * openclaw market order reject
- */
 function rejectOrderCommand(): Command {
   return new Command("reject")
-    .description("Reject a delivered order and optionally dispute")
+    .description("Reject a delivery and trigger the dispute-ready path")
     .argument("<order-id>", "Order ID")
-    .option("--reason <reason>", "Rejection reason (required)")
-    .option("--dispute", "Also open a dispute", false)
+    .option("--actor-id <actorId>", "Buyer actor ID")
+    .option("--proof-id <proofId>", "Optional proof ID")
+    .option("--reason <reason>", "Rejection reason")
+    .option("--json", "Output as JSON")
     .action(async (orderId, options) => {
-      const { callGateway } = await import("../gateway/call.js");
-
-      if (!options.reason) {
-        console.error("Error: --reason is required for rejection");
-        process.exit(1);
-      }
-
       try {
-        const result = await callGateway("web3.market.acceptance.reject", [
+        const actorId = requireStringOption(options.actorId, "actor-id");
+        const reason = requireStringOption(options.reason, "reason");
+        const result = await callCliGateway("web3.market.acceptance.reject", {
+          actorId,
           orderId,
-          {
-            reason: options.reason,
-            openDispute: options.dispute,
-          },
-        ]);
-
-        console.log(`Order ${orderId} rejected`);
-        console.log(`Status: ${result.status}`);
-
-        if (result.disputeId) {
-          console.log(`\nDispute opened: ${result.disputeId}`);
-          console.log("Track dispute: openclaw market dispute status ${result.disputeId}");
+          proofId: asString(options.proofId) ?? undefined,
+          reason,
+        });
+        if (options.json) {
+          printJson(result);
+          return;
         }
+        console.log(`Acceptance rejected for ${orderId}.`);
+        console.log(`Status: ${asString(result.status) ?? "n/a"}`);
+        console.log(`Dispute: ${asString(result.disputeId) ?? "n/a"}`);
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -311,20 +304,22 @@ function rejectOrderCommand(): Command {
     });
 }
 
-// ── Helper Functions ───────────────────────────────────────────────────────────
-
-import * as readline from "readline";
-
-async function promptConfirm(message: string): Promise<boolean> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(`${message} (y/N) `, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase() === "y");
-    });
-  });
+function normalizeQuote(value: unknown): QuotePayload | null {
+  const record = asRecord(value) ?? {};
+  const offerId = asString(record.offerId);
+  const resourceId = asString(record.resourceId);
+  const providerActorId = asString(record.providerActorId);
+  const quantityRaw = record.quantity;
+  const quantity = typeof quantityRaw === "number" ? quantityRaw : Number.NaN;
+  if (!offerId || !resourceId || !providerActorId || !Number.isFinite(quantity)) {
+    return null;
+  }
+  return {
+    offerId,
+    resourceId,
+    providerActorId,
+    quantity,
+    estimatedTotal: asString(record.estimatedTotal),
+    price: asRecord(record.price),
+  };
 }

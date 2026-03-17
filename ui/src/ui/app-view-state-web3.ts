@@ -9,6 +9,7 @@ import type {
   BridgeRoutesSnapshot,
   BridgeTransfer,
   ConsentView,
+  MarketAuditSnapshot,
   MarketDispute,
   MarketExecutionSummaryView,
   MarketFilters,
@@ -63,6 +64,8 @@ export type Web3ViewState = {
   marketLeases: MarketLease[];
   marketLedgerSummary: MarketLedgerSummary | null;
   marketLedgerEntries: MarketLedgerEntry[];
+  marketAuditSnapshot: MarketAuditSnapshot | null;
+  marketAuditError: string | null;
   marketDisputes: MarketDispute[];
   marketReputation: MarketReputationSummary | null;
   marketTokenEconomy: TokenEconomyState | null;

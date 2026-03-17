@@ -1,151 +1,160 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/commands/market-browse.ts
-/**
- * Market Browse CLI 命令
- *
- * 提供服务发现和浏览功能
- */
-
 import { Command } from "commander";
+import {
+  asArray,
+  asRecord,
+  asString,
+  callCliGateway,
+  formatTimestamp,
+  formatUnitPrice,
+  parseCsv,
+  printJson,
+  printTable,
+  shortId,
+} from "./market-shared.js";
+
+type MarketResource = {
+  resourceId: string;
+  label: string;
+  kind: string;
+  status: string;
+  providerActorId: string;
+  description?: string;
+  offerId?: string;
+  tags?: string[];
+  price?: Record<string, unknown> | null;
+  serviceSchema?: Record<string, unknown> | null;
+  updatedAt?: string;
+};
+
+type QuotePayload = {
+  resourceId: string;
+  offerId: string;
+  providerActorId: string;
+  kind: string;
+  label?: string | null;
+  quantity: number;
+  estimatedTotal?: string | null;
+  requestedLeaseTtlMs?: number | null;
+  proofRequired?: boolean;
+  proofTypes?: string[];
+  price?: Record<string, unknown> | null;
+};
+
+type CompareCandidate = {
+  score: number;
+  quote: QuotePayload;
+};
 
 export const marketBrowseCommand = new Command("browse")
-  .description("Browse available services in the market")
-  .option(
-    "--category <category>",
-    "Filter by category: search|data|inference|automation|code-review",
-  )
-  .option("--max-price <price>", "Maximum price filter")
-  .option("--delivery <mode>", "Delivery mode filter: sync|async|scheduled")
-  .option("--sort <field>", "Sort by: price|rating|popularity", "rating")
+  .description("Browse published market resources")
+  .option("--kind <kind>", "Filter by kind: model|search|storage|service")
+  .option("--tag <tag>", "Filter by tag")
+  .option("--provider-actor-id <actorId>", "Filter by provider actor ID")
+  .option("--query <text>", "Local text filter for label/description/tags")
+  .option("--status <status>", "Filter by resource status", "resource_published")
   .option("--limit <n>", "Limit results", "20")
   .option("--json", "Output as JSON")
   .action(async (options) => {
-    const { callGateway } = await import("../gateway/call.js");
-    const { table } = await import("../terminal/table.js");
-    const { progress } = await import("../cli/progress.js");
-
-    const spinner = progress.spinner("Searching services...");
-
     try {
-      const result = await callGateway("web3.market.browse", [
-        {
-          category: options.category,
-          maxPrice: options.maxPrice,
-          deliveryMode: options.delivery,
-          sortBy: options.sort,
-          limit: parseInt(options.limit),
-        },
-      ]);
-
-      spinner.success(`Found ${result.length} services`);
+      const response = await callCliGateway("web3.market.resource.list", {
+        kind: options.kind,
+        tag: options.tag,
+        providerActorId: options.providerActorId,
+        status: options.status,
+        limit: Number.parseInt(options.limit, 10),
+      });
+      const resources = asArray(asRecord(response)?.resources)
+        .map(normalizeResource)
+        .filter((resource): resource is MarketResource => Boolean(resource))
+        .filter((resource) => matchesQuery(resource, options.query));
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printJson({ count: resources.length, resources });
         return;
       }
 
-      if (result.length === 0) {
-        console.log("\nNo services found matching your criteria.");
-        console.log("Try broadening your search or check back later.\n");
+      if (resources.length === 0) {
+        console.log("No published market resources matched the current filters.");
         return;
       }
 
-      console.log(
-        "\n" +
-          table([
-            ["#", "ID", "Name", "Price", "Rating", "Delivery"],
-            ...result.map(
-              (
-                s: {
-                  id: string;
-                  name?: string;
-                  pricing?: {
-                    type: string;
-                    amount?: string;
-                    currency?: string;
-                    unitPrice?: string;
-                    unit?: string;
-                  };
-                  rating?: number;
-                  deliveryMode?: string;
-                },
-                i: number,
-              ) => [
-                String(i + 1),
-                s.id.slice(0, 10),
-                s.name?.slice(0, 25) || "N/A",
-                formatPrice(s.pricing),
-                `★ ${s.rating?.toFixed(1) || "N/A"}`,
-                s.deliveryMode || "sync",
-              ],
-            ),
-          ]),
+      printTable(
+        [
+          { key: "resourceId", header: "Resource" },
+          { key: "label", header: "Label", flex: true, minWidth: 20 },
+          { key: "kind", header: "Kind" },
+          { key: "price", header: "Price" },
+          { key: "provider", header: "Provider" },
+          { key: "status", header: "Status" },
+        ],
+        resources.map((resource) => ({
+          resourceId: shortId(resource.resourceId),
+          label: resource.label,
+          kind: resource.kind,
+          price: formatUnitPrice(resource.price ?? null),
+          provider: shortId(resource.providerActorId),
+          status: resource.status.replace("resource_", ""),
+        })),
       );
 
-      console.log("\nTo view details:");
-      console.log("  openclaw market show <service-id>");
-      console.log("\nTo purchase:");
-      console.log("  openclaw market order create <service-id>");
-      console.log();
+      console.log("\nUse `openclaw market show <resource-id>` for full details.");
+      console.log("Use `openclaw market quote <resource-id>` to preview buyer cost.");
     } catch (error) {
-      spinner.error("Failed to browse services");
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   });
 
 export const marketShowCommand = new Command("show")
-  .description("Show service details")
-  .argument("<service-id>", "Service ID")
+  .description("Show a published market resource")
+  .argument("<resource-id>", "Published resource ID")
   .option("--json", "Output as JSON")
-  .action(async (serviceId, options) => {
-    const { callGateway } = await import("../gateway/call.js");
-
+  .action(async (resourceId, options) => {
     try {
-      const result = await callGateway("web3.market.offer.get", [serviceId]);
+      const response = await callCliGateway("web3.market.resource.get", {
+        resourceId,
+      });
+      const resource = normalizeResource(asRecord(response)?.resource);
+      if (!resource) {
+        throw new Error(`resource not found: ${resourceId}`);
+      }
 
       if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printJson({ resource });
         return;
       }
 
-      console.log("\n┌─────────────────────────────────────────────┐");
-      console.log(`│ Service: ${result.offerId.slice(0, 35).padEnd(35)}│`);
-      console.log("└─────────────────────────────────────────────┘");
-
-      console.log("\n  Overview");
-      console.log("  ─────────");
-      console.log(`  Title: ${result.assetMeta?.title || "N/A"}`);
-      console.log(`  Description: ${result.assetMeta?.description || "N/A"}`);
-      console.log(`  Type: ${result.assetType}`);
-      console.log(`  Status: ${result.status}`);
-
-      console.log("\n  Pricing");
-      console.log("  ─────────");
-      console.log(`  Price: ${result.price} ${result.currency}`);
-      console.log(`  Supply: ${result.supply || "Unlimited"}`);
-
-      console.log("\n  Delivery");
-      console.log("  ─────────");
-      console.log(`  Mode: ${result.deliveryType}`);
-      console.log(`  Proof Type: ${result.proofType || "tlsnotary"}`);
-
-      console.log("\n  Provider");
-      console.log("  ─────────");
-      console.log(`  ID: ${result.sellerId?.slice(0, 20) || "N/A"}...`);
-
-      console.log("\n  Timeline");
-      console.log("  ─────────");
-      console.log(`  Created: ${new Date(result.createdAt).toLocaleString()}`);
-      if (result.publishedAt) {
-        console.log(`  Published: ${new Date(result.publishedAt).toLocaleString()}`);
+      console.log(`\nResource: ${resource.label}`);
+      console.log(`ID: ${resource.resourceId}`);
+      console.log(`Kind: ${resource.kind}`);
+      console.log(`Status: ${resource.status}`);
+      console.log(`Provider: ${resource.providerActorId}`);
+      console.log(`Offer: ${resource.offerId ?? "n/a"}`);
+      console.log(`Price: ${formatUnitPrice(resource.price ?? null)}`);
+      console.log(`Updated: ${formatTimestamp(resource.updatedAt)}`);
+      if (resource.description) {
+        console.log(`Description: ${resource.description}`);
       }
-
-      console.log("\n  Actions");
-      console.log("  ─────────");
-      console.log("  Get quote:   openclaw market quote " + serviceId);
-      console.log("  Purchase:    openclaw market order create " + serviceId);
-      console.log();
+      if (resource.tags && resource.tags.length > 0) {
+        console.log(`Tags: ${resource.tags.join(", ")}`);
+      }
+      if (resource.serviceSchema) {
+        const inputs = parseCsvArray(resource.serviceSchema.inputs);
+        const outputs = parseCsvArray(resource.serviceSchema.outputs);
+        const proofTypes = asArray(resource.serviceSchema.proofRequirements)
+          .map((entry) => asString(asRecord(entry)?.type))
+          .filter((entry): entry is string => Boolean(entry));
+        console.log(`Inputs: ${inputs.length > 0 ? inputs.join(", ") : "n/a"}`);
+        console.log(`Outputs: ${outputs.length > 0 ? outputs.join(", ") : "n/a"}`);
+        if (proofTypes.length > 0) {
+          console.log(`Proofs: ${proofTypes.join(", ")}`);
+        }
+      }
+      console.log("\nNext steps:");
+      console.log(`- Quote: openclaw market quote ${resource.resourceId}`);
+      console.log(
+        `- Buy:   openclaw market order create ${resource.resourceId} --buyer-id <0x...>`,
+      );
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
@@ -153,60 +162,195 @@ export const marketShowCommand = new Command("show")
   });
 
 export const marketQuoteCommand = new Command("quote")
-  .description("Get a price quote for a service")
-  .argument("<service-id>", "Service ID")
+  .description("Build a redacted quote for a published market resource")
+  .argument("<resource-id>", "Published resource ID")
   .option("--quantity <n>", "Quantity", "1")
-  .action(async (serviceId, options) => {
-    const { callGateway } = await import("../gateway/call.js");
-
+  .option("--ttl-ms <ms>", "Optional requested lease TTL in milliseconds")
+  .option("--json", "Output as JSON")
+  .action(async (resourceId, options) => {
     try {
-      const result = await callGateway("web3.market.offer.quote", [
-        serviceId,
-        parseInt(options.quantity),
-      ]);
-
-      console.log("\n  Quote Details");
-      console.log("  ─────────────");
-      console.log(`  Service: ${result.offerId}`);
-      console.log(`  Quantity: ${result.quantity}`);
-      console.log(`  Unit Price: ${result.unitPrice} ${result.currency}`);
-      console.log(`  Total: ${result.totalAmount} ${result.currency}`);
-      console.log(`  Valid Until: ${new Date(result.validUntil).toLocaleString()}`);
-      console.log();
-
-      if (result.estimatedDelivery) {
-        console.log(`  Estimated Delivery: ${result.estimatedDelivery}`);
+      const response = await callCliGateway("web3.market.offer.quote", {
+        resourceId,
+        quantity: Number.parseInt(options.quantity, 10),
+        ttlMs: options.ttlMs ? Number.parseInt(options.ttlMs, 10) : undefined,
+      });
+      const quote = normalizeQuote(asRecord(response)?.quote);
+      if (!quote) {
+        throw new Error("quote unavailable");
       }
 
-      console.log("\n  To purchase:");
-      console.log(`  openclaw market order create ${serviceId} --quantity ${options.quantity}`);
-      console.log();
+      if (options.json) {
+        printJson({ quote });
+        return;
+      }
+
+      console.log(`\nQuote for ${quote.label ?? quote.resourceId}`);
+      console.log(`Resource: ${quote.resourceId}`);
+      console.log(`Offer: ${quote.offerId}`);
+      console.log(`Provider: ${quote.providerActorId}`);
+      console.log(`Kind: ${quote.kind}`);
+      console.log(`Quantity: ${quote.quantity}`);
+      console.log(`Price: ${formatUnitPrice(quote.price ?? null)}`);
+      console.log(`Estimated total: ${quote.estimatedTotal ?? "n/a"}`);
+      console.log(`Proof required: ${quote.proofRequired ? "yes" : "no"}`);
+      if (quote.proofTypes && quote.proofTypes.length > 0) {
+        console.log(`Proof types: ${quote.proofTypes.join(", ")}`);
+      }
+      if (quote.requestedLeaseTtlMs) {
+        console.log(`Requested lease TTL: ${quote.requestedLeaseTtlMs}ms`);
+      }
+      console.log("\nCreate order:");
+      console.log(
+        `openclaw market order create ${quote.resourceId} --buyer-id <0x...> --quantity ${quote.quantity}`,
+      );
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   });
 
-// ── Helper Functions ───────────────────────────────────────────────────────────
+export const marketCompareCommand = new Command("compare")
+  .description("Compare published resources for the same buyer intent")
+  .option("--kind <kind>", "Preferred kind: model|search|storage|service")
+  .option("--tag <tag>", "Optional tag filter")
+  .option("--query <text>", "Intent text used for ranking")
+  .option("--quantity <n>", "Quantity", "1")
+  .option("--limit <n>", "Limit candidates", "5")
+  .option("--json", "Output as JSON")
+  .action(async (options) => {
+    try {
+      const response = await callCliGateway("web3.market.offer.compare", {
+        kind: options.kind,
+        tag: options.tag,
+        query: options.query,
+        quantity: Number.parseInt(options.quantity, 10),
+        limit: Number.parseInt(options.limit, 10),
+      });
+      const candidates = asArray(asRecord(response)?.candidates)
+        .map((candidate) => normalizeCandidate(candidate))
+        .filter((candidate): candidate is CompareCandidate => Boolean(candidate));
 
-function formatPrice(
-  pricing: {
-    type?: string;
-    amount?: string;
-    currency?: string;
-    unitPrice?: string;
-    unit?: string;
-  } | null,
-): string {
-  if (!pricing) {
-    return "N/A";
+      if (options.json) {
+        printJson({ count: candidates.length, candidates });
+        return;
+      }
+
+      if (candidates.length === 0) {
+        console.log("No comparable resources matched the current intent.");
+        return;
+      }
+
+      printTable(
+        [
+          { key: "score", header: "Score", align: "right" },
+          { key: "resourceId", header: "Resource" },
+          { key: "label", header: "Label", flex: true, minWidth: 20 },
+          { key: "price", header: "Price" },
+          { key: "provider", header: "Provider" },
+          { key: "proof", header: "Proof" },
+        ],
+        candidates.map((candidate) => ({
+          score: candidate.score.toFixed(2),
+          resourceId: shortId(candidate.quote.resourceId),
+          label: candidate.quote.label ?? candidate.quote.resourceId,
+          price: formatUnitPrice(candidate.quote.price ?? null),
+          provider: shortId(candidate.quote.providerActorId),
+          proof:
+            candidate.quote.proofRequired && candidate.quote.proofTypes?.length
+              ? candidate.quote.proofTypes.join(",")
+              : candidate.quote.proofRequired
+                ? "required"
+                : "none",
+        })),
+      );
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+function normalizeResource(value: unknown): MarketResource | null {
+  const record = asRecord(value);
+  const resourceId = asString(record?.resourceId);
+  const label = asString(record?.label);
+  const kind = asString(record?.kind);
+  const status = asString(record?.status);
+  const providerActorId = asString(record?.providerActorId);
+  if (!resourceId || !label || !kind || !status || !providerActorId) {
+    return null;
   }
+  return {
+    resourceId,
+    label,
+    kind,
+    status,
+    providerActorId,
+    description: asString(record?.description) ?? undefined,
+    offerId: asString(record?.offerId) ?? undefined,
+    tags: asArray(record?.tags)
+      .map((entry) => asString(entry))
+      .filter((entry): entry is string => Boolean(entry)),
+    price: asRecord(record?.price),
+    serviceSchema: asRecord(record?.serviceSchema),
+    updatedAt: asString(record?.updatedAt) ?? undefined,
+  };
+}
 
-  if (pricing.type === "fixed") {
-    return `${pricing.amount} ${pricing.currency}`;
-  } else if (pricing.type === "metered") {
-    return `${pricing.unitPrice}/${pricing.unit || "unit"}`;
+function normalizeQuote(value: unknown): QuotePayload | null {
+  const record = asRecord(value);
+  const resourceId = asString(record?.resourceId);
+  const offerId = asString(record?.offerId);
+  const providerActorId = asString(record?.providerActorId);
+  const kind = asString(record?.kind);
+  const quantity = Number(asRecord({ quantity: record?.quantity })?.quantity ?? 1);
+  if (!resourceId || !offerId || !providerActorId || !kind || !Number.isFinite(quantity)) {
+    return null;
   }
+  const proofTypes = asArray(record?.proofTypes)
+    .map((entry) => asString(entry))
+    .filter((entry): entry is string => Boolean(entry));
+  return {
+    resourceId,
+    offerId,
+    providerActorId,
+    kind,
+    label: asString(record?.label),
+    quantity,
+    estimatedTotal: asString(record?.estimatedTotal),
+    requestedLeaseTtlMs:
+      typeof record?.requestedLeaseTtlMs === "number" ? record.requestedLeaseTtlMs : null,
+    proofRequired: record?.proofRequired === true,
+    proofTypes,
+    price: asRecord(record?.price),
+  };
+}
 
-  return `${pricing.amount || pricing.unitPrice || "N/A"} ${pricing.currency || ""}`;
+function normalizeCandidate(value: unknown): CompareCandidate | null {
+  const record = asRecord(value);
+  const scoreRaw = record?.score;
+  const score = typeof scoreRaw === "number" ? scoreRaw : Number.NaN;
+  const quote = normalizeQuote(record?.quote);
+  if (!Number.isFinite(score) || !quote) {
+    return null;
+  }
+  return { score, quote };
+}
+
+function matchesQuery(resource: MarketResource, queryRaw: string | undefined): boolean {
+  const query = queryRaw?.trim().toLowerCase();
+  if (!query) {
+    return true;
+  }
+  const haystack = [resource.label, resource.description ?? "", ...(resource.tags ?? [])]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+function parseCsvArray(value: unknown): string[] {
+  return parseCsv(
+    asArray(value)
+      .map((entry) => asString(entry) ?? "")
+      .join(","),
+  );
 }

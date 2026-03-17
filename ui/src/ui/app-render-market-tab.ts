@@ -20,6 +20,8 @@ export function renderMarketTab(state: AppViewState) {
     leases: state.marketLeases,
     ledger: state.marketLedgerSummary,
     ledgerEntries: state.marketLedgerEntries,
+    auditSnapshot: state.marketAuditSnapshot,
+    auditError: state.marketAuditError,
     disputes: state.marketDisputes,
     reputation: state.marketReputation,
     tokenEconomy: state.marketTokenEconomy,

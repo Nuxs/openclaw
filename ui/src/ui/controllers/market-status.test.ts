@@ -21,13 +21,22 @@ function createClient(
 }
 
 describe("market-status controller", () => {
-  it("loadMarketStatus reads bridge transfers from the registered bridge.list method", async () => {
+  it("loadMarketStatus reads bridge transfers and optional audit events from registered market methods", async () => {
     const methods: string[] = [];
     const client = createClient(async (method) => {
       methods.push(method);
       switch (method) {
         case "web3.market.status.summary":
-          return { result: { totals: { offers: 1, orders: 1, resources: 1, leases: 1 } } };
+          return {
+            result: {
+              totals: { offers: 1, orders: 1, deliveries: 0, settlements: 0 },
+              audit: { events: 2, anchorPending: 1 },
+              repair: { candidates: 0, orphaned: 0, expiredActive: 0 },
+              disputes: { total: 0, byStatus: {}, open: 0, resolved: 0, rejected: 0 },
+              revocations: { total: 0, pending: 0, failed: 0 },
+              leases: { total: 0, byStatus: {}, active: 0, expired: 0, revoked: 0 },
+            },
+          };
         case "web3.market.metrics.snapshot":
           return { result: { alerts: [] } };
         case "web3.index.list":
@@ -44,6 +53,30 @@ describe("market-status controller", () => {
           return { result: { totalEntries: 0 } };
         case "web3.market.ledger.list":
           return { result: { entries: [] } };
+        case "web3.market.audit.query":
+          return {
+            result: {
+              count: 2,
+              events: [
+                {
+                  id: "audit-2",
+                  kind: "settlement_released",
+                  refId: "order-2",
+                  actor: "system",
+                  timestamp: "2026-03-16T01:00:00.000Z",
+                  details: { releasedAmount: "4" },
+                },
+                {
+                  id: "audit-1",
+                  kind: "delivery_issued",
+                  refId: "order-1",
+                  actor: "provider-1",
+                  timestamp: "2026-03-16T00:00:00.000Z",
+                  details: { accessToken: "[redacted]" },
+                },
+              ],
+            },
+          };
         case "web3.market.dispute.list":
           return { result: { disputes: [] } };
         case "web3.market.reputation.summary":
@@ -84,6 +117,7 @@ describe("market-status controller", () => {
             "web3.index.list",
             "web3.index.stats",
             "web3.monitor.snapshot",
+            "web3.market.audit.query",
           ],
         },
       },
@@ -98,6 +132,8 @@ describe("market-status controller", () => {
       marketLeases: [],
       marketLedgerSummary: null,
       marketLedgerEntries: [],
+      marketAuditSnapshot: null,
+      marketAuditError: null,
       marketDisputes: [],
       marketReputation: null,
       marketTokenEconomy: null,
@@ -110,8 +146,103 @@ describe("market-status controller", () => {
 
     expect(methods).toContain("web3.market.bridge.list");
     expect(methods).not.toContain("web3.market.bridge.transfers");
+    expect(methods).toContain("web3.market.audit.query");
     expect(state.marketBridgeTransfers).toHaveLength(1);
     expect(state.marketBridgeTransfers[0]?.bridgeId).toBe("bridge-1");
+    expect(state.marketAuditError).toBeNull();
+    expect(state.marketAuditSnapshot?.count).toBe(2);
+    expect(state.marketAuditSnapshot?.events[0]?.kind).toBe("settlement_released");
+  });
+
+  it("loadMarketStatus keeps the main dashboard alive when audit query fails", async () => {
+    const client = createClient(async (method) => {
+      switch (method) {
+        case "web3.market.status.summary":
+          return {
+            result: {
+              totals: { offers: 1, orders: 1, deliveries: 0, settlements: 0 },
+              audit: { events: 0, anchorPending: 0 },
+              repair: { candidates: 0, orphaned: 0, expiredActive: 0 },
+              disputes: { total: 0, byStatus: {}, open: 0, resolved: 0, rejected: 0 },
+              revocations: { total: 0, pending: 0, failed: 0 },
+              leases: { total: 0, byStatus: {}, active: 0, expired: 0, revoked: 0 },
+            },
+          };
+        case "web3.market.metrics.snapshot":
+          return { result: { alerts: [] } };
+        case "web3.index.list":
+          return { result: { entries: [] } };
+        case "web3.index.stats":
+          return { result: { providers: 1 } };
+        case "web3.monitor.snapshot":
+          return { result: { healthy: true } };
+        case "web3.market.resource.list":
+          return { result: { resources: [] } };
+        case "web3.market.lease.list":
+          return { result: { leases: [] } };
+        case "web3.market.ledger.summary":
+          return { result: { totalEntries: 0 } };
+        case "web3.market.ledger.list":
+          return { result: { entries: [] } };
+        case "web3.market.audit.query":
+          throw new Error("audit unavailable");
+        case "web3.market.dispute.list":
+          return { result: { disputes: [] } };
+        case "web3.market.reputation.summary":
+          return { result: { topProviders: [] } };
+        case "web3.market.tokenEconomy.summary":
+          return { result: { totalSupply: "0" } };
+        case "web3.market.bridge.routes":
+          return { result: { assets: [], routes: [] } };
+        case "web3.market.bridge.list":
+          return { result: [] };
+        default:
+          throw new Error(`Unexpected method: ${method}`);
+      }
+    });
+
+    const state: Parameters<typeof loadMarketStatus>[0] = {
+      client,
+      connected: true,
+      hello: {
+        features: {
+          methods: [
+            "web3.market.status.summary",
+            "web3.market.metrics.snapshot",
+            "web3.index.list",
+            "web3.index.stats",
+            "web3.monitor.snapshot",
+            "web3.market.audit.query",
+          ],
+        },
+      },
+      marketLoading: false,
+      marketError: null,
+      marketStatus: null,
+      marketMetrics: null,
+      marketIndexEntries: [],
+      marketIndexStats: null,
+      marketMonitor: null,
+      marketResources: [],
+      marketLeases: [],
+      marketLedgerSummary: null,
+      marketLedgerEntries: [],
+      marketAuditSnapshot: null,
+      marketAuditError: null,
+      marketDisputes: [],
+      marketReputation: null,
+      marketTokenEconomy: null,
+      marketBridgeRoutes: null,
+      marketBridgeTransfers: [],
+      marketLastSuccess: null,
+    };
+
+    await loadMarketStatus(state);
+
+    expect(state.marketError).toBeNull();
+    expect(state.marketStatus?.totals.offers).toBe(1);
+    expect(state.marketAuditSnapshot).toBeNull();
+    expect(state.marketAuditError).toContain("audit unavailable");
   });
 
   it("loadMarketTasks uses the formal result list method and derives summary fields", async () => {

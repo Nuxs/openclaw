@@ -1,42 +1,75 @@
 import { describe, expect, it } from "vitest";
+import { renderMarketBuyerWorkbenchSection } from "./market-buyer-workbench-section.ts";
+import { renderMarketControlWorkbenchSection } from "./market-control-workbench-section.ts";
+import { filterMarketResources } from "./market-filters.ts";
+import { renderMarketProviderWorkbenchSection } from "./market-provider-workbench-section.ts";
+import { renderMarket } from "./market.ts";
+
+function createMarketProps(
+  overrides: Partial<Parameters<typeof renderMarket>[0]> = {},
+): Parameters<typeof renderMarket>[0] {
+  return {
+    loading: false,
+    error: null,
+    lastSuccessAt: Date.now(),
+    status: null,
+    metrics: null,
+    indexEntries: [],
+    indexStats: null,
+    monitor: null,
+    resources: [],
+    leases: [],
+    ledger: null,
+    ledgerEntries: [],
+    auditSnapshot: null,
+    auditError: null,
+    disputes: [],
+    reputation: null,
+    tokenEconomy: null,
+    bridgeRoutes: null,
+    bridgeTransfers: [],
+    resourceKind: "all",
+    filters: {
+      resourceSearch: "",
+      resourceStatus: "all",
+      resourceSort: "updated_desc",
+      leaseSearch: "",
+      leaseStatus: "all",
+      leaseSort: "issued_desc",
+      disputeSearch: "",
+      disputeStatus: "all",
+      disputeSort: "opened_desc",
+      ledgerSearch: "",
+      ledgerUnit: "all",
+      ledgerSort: "time_desc",
+    },
+    onResourceKindChange: () => {},
+    onFiltersChange: () => {},
+    onRefresh: () => {},
+    ...overrides,
+  };
+}
+
+function collectTemplateScalars(value: unknown, acc: string[] = []): string[] {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    acc.push(String(value));
+    return acc;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectTemplateScalars(entry, acc);
+    }
+    return acc;
+  }
+  if (value && typeof value === "object" && "values" in value) {
+    collectTemplateScalars((value as { values?: unknown }).values, acc);
+  }
+  return acc;
+}
 
 describe("market view", () => {
   it("renderMarket composes all section cards including task/privacy/ops", () => {
-    // Validates the rendering function accepts task/privacy/ops section props
-    // and composes them into the market view layout.
-    const props = {
-      loading: false,
-      error: null,
-      lastSuccessAt: Date.now(),
-      status: null,
-      metrics: null,
-      indexEntries: [],
-      indexStats: null,
-      monitor: null,
-      resources: [],
-      leases: [],
-      ledger: null,
-      ledgerEntries: [],
-      disputes: [],
-      reputation: null,
-      tokenEconomy: null,
-      bridgeRoutes: null,
-      bridgeTransfers: [],
-      resourceKind: "all" as const,
-      filters: {
-        resourceSearch: "",
-        resourceStatus: "all" as const,
-        resourceSort: "updated_desc" as const,
-        leaseSearch: "",
-        leaseStatus: "all" as const,
-        leaseSort: "issued_desc" as const,
-        disputeSearch: "",
-        disputeStatus: "all" as const,
-        disputeSort: "opened_desc" as const,
-        ledgerSearch: "",
-        ledgerUnit: "all" as const,
-        ledgerSort: "time_desc" as const,
-      },
+    const props = createMarketProps({
       executionSection: {
         loading: false,
         executions: [
@@ -109,8 +142,8 @@ describe("market view", () => {
       providerOnboardingSection: {
         loading: false,
         error: null,
-        mode: "trusted-circle" as const,
-        intent: "provider" as const,
+        mode: "trusted-circle",
+        intent: "provider",
         preview: {
           mode: "trusted-circle",
           intent: "provider",
@@ -140,12 +173,8 @@ describe("market view", () => {
         onIntentChange: () => {},
         onRefresh: () => {},
       },
-      onResourceKindChange: () => {},
-      onFiltersChange: () => {},
-      onRefresh: () => {},
-    };
+    });
 
-    // Verify the props structure includes task/privacy/ops section data
     expect(props.executionSection).toBeTruthy();
     expect(props.executionSection?.executions[0]?.executionStatus).toBe("awaiting_acceptance");
     expect(props.taskSection).toBeTruthy();
@@ -159,6 +188,58 @@ describe("market view", () => {
     expect(props.providerOnboardingSection?.preview?.detectedProviders[0]?.label).toBe(
       "Local Ollama",
     );
+  });
+
+  it("supports service resources in the kind picker and filtering contract", () => {
+    const resources = [
+      {
+        resourceId: "res-service",
+        kind: "service",
+        status: "resource_published",
+        providerActorId: "provider-1",
+        offerId: "offer-1",
+        label: "Advanced code review",
+        description: "Deep secure review",
+        price: { amount: "2.5", currency: "USDC", unit: "call" },
+        updatedAt: "2026-03-16T00:00:00.000Z",
+      },
+      {
+        resourceId: "res-model",
+        kind: "model",
+        status: "resource_published",
+        providerActorId: "provider-2",
+        offerId: "offer-2",
+        label: "Local summarizer",
+        description: "Model resource",
+        price: { amount: "1", currency: "USDC", unit: "token" },
+        updatedAt: "2026-03-15T00:00:00.000Z",
+      },
+    ] as const;
+
+    const filtered = filterMarketResources({
+      resources: [...resources],
+      resourceKind: "service",
+      filters: {
+        resourceSearch: "",
+        resourceStatus: "all",
+        resourceSort: "updated_desc",
+      },
+    });
+
+    const scalars = collectTemplateScalars(
+      renderMarket(
+        createMarketProps({
+          resourceKind: "service",
+          resources: [...resources],
+        }),
+      ),
+    );
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.kind).toBe("service");
+    expect(filtered[0]?.label).toBe("Advanced code review");
+    expect(scalars).toContain("service");
+    expect(scalars).toContain("Service");
   });
 
   it("task section renders status badges for all task states", () => {
@@ -180,11 +261,39 @@ describe("market view", () => {
       "receipt_disputed",
     ];
 
-    // All states should be recognized
     for (const state of states) {
       expect(typeof state).toBe("string");
       expect(state.length).toBeGreaterThan(0);
     }
+  });
+
+  it("new provider/buyer/control workbench sections expose stable templates", () => {
+    const provider = renderMarketProviderWorkbenchSection({
+      loading: false,
+      resources: [],
+      leases: [],
+      reputation: null,
+      tokenEconomy: null,
+    }) as unknown as { strings: ReadonlyArray<string> };
+    const buyer = renderMarketBuyerWorkbenchSection({
+      loading: false,
+      resources: [],
+      leases: [],
+      disputes: [],
+      executions: [],
+    }) as unknown as { strings: ReadonlyArray<string> };
+    const control = renderMarketControlWorkbenchSection({
+      loading: false,
+      status: null,
+      opsSummary: null,
+      alerts: [],
+      auditSnapshot: null,
+      auditError: null,
+    }) as unknown as { strings: ReadonlyArray<string> };
+
+    expect(provider.strings.join(" ")).toContain("Provider Workbench");
+    expect(buyer.strings.join(" ")).toContain("Buyer Workbench");
+    expect(control.strings.join(" ")).toContain("Control Workbench");
   });
 
   it("privacy section handles empty state gracefully", () => {

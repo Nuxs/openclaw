@@ -80,7 +80,7 @@ export type Web3StatusSummary = {
   };
 };
 
-export type Web3IndexResourceKind = "model" | "search" | "storage";
+export type Web3IndexResourceKind = "model" | "search" | "storage" | "service";
 
 export type Web3IndexResource = {
   resourceId: string;
@@ -400,7 +400,7 @@ export type ReconciliationSummary = {
   anchorReceipt?: { tx?: string; network?: string; block?: number; updatedAt?: string };
 };
 
-export type MarketResourceKind = "model" | "search" | "storage";
+export type MarketResourceKind = "model" | "search" | "storage" | "service";
 export type MarketResourceStatus = "resource_draft" | "resource_published" | "resource_unpublished";
 export type MarketLeaseStatus = "lease_active" | "lease_revoked" | "lease_expired";
 export type MarketDisputeStatus =
@@ -717,3 +717,4 @@ export type {
   MarketExecutionSummaryView,
   MarketExecutionTraceView,
 } from "./types-web3-market-execution.ts";
+export type { MarketAuditEventView, MarketAuditSnapshot } from "./types-web3-market-audit.ts";
