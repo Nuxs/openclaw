@@ -155,9 +155,14 @@ export function marketCommerceCapabilities(config: Web3PluginConfig): Capability
             minimum: 1,
             description: "Optional quantity; defaults to 1.",
           },
+          selectionPolicy: { type: "object", description: "Optional steward selection policy." },
+          budgetPolicy: { type: "object", description: "Optional steward budget policy." },
+          riskPolicy: { type: "object", description: "Optional steward risk policy." },
+          approval: { type: "object", description: "Optional prior approval decision payload." },
         },
       },
-      returns: "Returns orderId, orderHash and the initial order status.",
+      returns:
+        "Returns orderId/orderHash/status for direct creation, or approval_required policy details when steward thresholds block automatic execution.",
     },
     {
       name: "web3.market.order.cancel",

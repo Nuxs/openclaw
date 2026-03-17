@@ -486,7 +486,15 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
                       type: "object",
                       required: ["type"],
                       properties: {
-                        type: { type: "string", enum: ["tlsnotary"] },
+                        type: {
+                          type: "string",
+                          enum: [
+                            "tlsnotary",
+                            "signed_receipt",
+                            "human_attestation",
+                            "oracle_event",
+                          ],
+                        },
                         required: { type: "boolean" },
                       },
                     },
@@ -645,7 +653,8 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           limit: { type: "number", minimum: 1, maximum: 200 },
         },
       },
-      returns: "Order list and count.",
+      returns:
+        "Order list and count, including approvalStatus/consentId when a steward approval gate is pending.",
       risk: { level: "low" },
     },
     {
@@ -740,10 +749,14 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
             description: "Optional max cost (decimal string)",
             pattern: "^[0-9]+(\\.[0-9]+)?$",
           },
+          selectionPolicy: { type: "object", description: "Optional steward selection policy." },
+          budgetPolicy: { type: "object", description: "Optional steward budget policy." },
+          riskPolicy: { type: "object", description: "Optional steward risk policy." },
+          approval: { type: "object", description: "Optional prior approval decision payload." },
         },
       },
       returns:
-        "Lease response with leaseId/orderId/consentId/deliveryId/expiresAt/stored (no token or endpoint).",
+        "Lease response with leaseId/orderId/consentId/deliveryId/expiresAt/stored, or approval_required policy details when human consent is needed (never returns token or endpoint).",
       aliases: ["web3.resources.lease"],
       risk: { level: "high", notes: ["Access token stored internally; never returned"] },
       pricing: { requiresPreLock: true },
@@ -758,6 +771,32 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
           },
         },
       ],
+    },
+    {
+      name: "web3.market.lease.mount",
+      summary:
+        "Resolve an existing lease into an internally mounted consumer capability without exposing its token.",
+      kind: "gateway",
+      group: "market",
+      availability: availability(consumerEnabled, "resources consumer disabled"),
+      paramsSchema: {
+        type: "object",
+        required: ["leaseId"],
+        properties: {
+          leaseId: { type: "string", description: "Existing lease ID to mount." },
+          providerEndpoint: {
+            type: "string",
+            description:
+              "Optional provider endpoint override used only for local runtime mounting.",
+          },
+        },
+      },
+      returns:
+        "Internal mount acknowledgement with leaseId/resourceId/expiresAt/stored; tokens remain runtime-only and are never returned.",
+      risk: {
+        level: "high",
+        notes: ["Mounts a leased capability into runtime cache without revealing secrets."],
+      },
     },
     {
       name: "web3.market.lease.revoke",
@@ -850,11 +889,19 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
             type: "object",
             required: ["type", "artifactHash", "issuedAt", "verifier"],
             properties: {
-              type: { type: "string", enum: ["tlsnotary"] },
+              type: {
+                type: "string",
+                enum: ["tlsnotary", "signed_receipt", "human_attestation", "oracle_event"],
+              },
               artifactHash: { type: "string", pattern: "^sha256:[a-fA-F0-9]{64}$" },
               issuedAt: { type: "string" },
               redactedFields: { type: "array", items: { type: "string" }, maxItems: 64 },
               verifier: { type: "string" },
+              metadata: {
+                type: "object",
+                description:
+                  "Family-specific proof metadata such as receiptId, attesterRole, confidence, oracle, or eventId.",
+              },
             },
           },
         },
@@ -916,11 +963,19 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
             type: "object",
             required: ["type", "artifactHash", "issuedAt", "verifier"],
             properties: {
-              type: { type: "string", enum: ["tlsnotary"] },
+              type: {
+                type: "string",
+                enum: ["tlsnotary", "signed_receipt", "human_attestation", "oracle_event"],
+              },
               artifactHash: { type: "string", pattern: "^sha256:[a-fA-F0-9]{64}$" },
               issuedAt: { type: "string" },
               redactedFields: { type: "array", items: { type: "string" }, maxItems: 64 },
               verifier: { type: "string" },
+              metadata: {
+                type: "object",
+                description:
+                  "Family-specific proof metadata such as receiptId, attesterRole, confidence, oracle, or eventId.",
+              },
             },
           },
         },
@@ -1002,7 +1057,7 @@ export function marketCapabilities(config: Web3PluginConfig): CapabilityDescript
         },
       },
       returns:
-        "Execution summary with executionState, acceptanceRecord, trace entries, and redacted linked object snapshots.",
+        "Execution summary with approval state, consent snapshot, executionState, acceptanceRecord, dispute penalties, trace entries, and redacted linked object snapshots.",
       risk: { level: "low" },
     },
     // ── Ledger ──────────────────────────────────────────
