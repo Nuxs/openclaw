@@ -141,6 +141,24 @@ describe("market-status", () => {
     expect(formatWeb3MarketStatusMessage(summary)).toContain("⚠️ Some probes failed:");
   });
 
+  it("returns structured runtime errors when the host gateway bridge cannot be loaded", async () => {
+    vi.mocked(loadCallGateway).mockRejectedValue(new Error("Cannot find module host bridge"));
+
+    const summary = await buildWeb3MarketStatusSummary({
+      config: createConfig(),
+      profile: "fast",
+    });
+
+    expect(summary.meta).toEqual({ profile: "fast" });
+    expect(summary.runtime.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("web3.status.summary: Cannot find module host bridge"),
+        expect.stringContaining("web3.market.status.summary: Cannot find module host bridge"),
+        expect.stringContaining("market.task.list: Cannot find module host bridge"),
+      ]),
+    );
+  });
+
   it("redacts endpoints, tokens, and local paths from share-safe market status", async () => {
     installGatewayResponses({
       "web3.status.summary": {

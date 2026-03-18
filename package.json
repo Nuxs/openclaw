@@ -270,6 +270,10 @@
       "types": "./dist/plugin-sdk/steward-policy.d.ts",
       "default": "./dist/plugin-sdk/steward-policy.js"
     },
+    "./plugin-sdk/web3-host": {
+      "types": "./dist/plugin-sdk/web3-host.d.ts",
+      "default": "./dist/plugin-sdk/web3-host.js"
+    },
     "./extension-api": "./dist/extensionAPI.js",
     "./cli-entry": "./openclaw.mjs"
   },

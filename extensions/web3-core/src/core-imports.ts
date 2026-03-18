@@ -1,25 +1,9 @@
-/**
- * Centralized core-import adapter for web3-core.
- *
- * ALL cross-boundary imports that reach into `../../../src/` or `../../../dist/`
- * are consolidated here. Consumer modules import from this file instead of using
- * physical paths that couple the extension to the host repo layout.
- *
- * When `openclaw/plugin-sdk` eventually exposes these APIs, only this file needs
- * to be updated — the rest of the extension stays untouched.
- */
-
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-types";
 
-const HOST_SRC_ROOT = new URL("../../../src/", import.meta.url);
-const HOST_DIST_ROOT = new URL("../../../dist/", import.meta.url);
-
-type ConfigValidationIssue = {
+export type ConfigValidationIssue = {
   path: string;
   message: string;
 };
-
-// ── Types ────────────────────────────────────────────────────────────────────
 
 export type CallGatewayFn = (opts: {
   method: string;
@@ -59,6 +43,24 @@ export type SessionEntry = {
     lastDisputeId?: string;
     lastSettlementId?: string;
     growthSummary?: string;
+    reflectionBacklog?: string[];
+    researchBacklog?: string[];
+    heartbeatBacklog?: string[];
+    autonomyPosture?: "active" | "conservative" | "guarded" | "tripped";
+    cadence?: {
+      everyMs?: number;
+      label?: string;
+      reason?: string;
+    };
+    growthJob?: {
+      jobId?: string;
+      enabled?: boolean;
+      target?: string;
+      nextWakeAt?: string;
+    };
+    lastHeartbeatedAt?: string;
+    lastReflectedAt?: string;
+    lastResearchedAt?: string;
     updatedAt?: number;
   };
   [key: string]: unknown;
@@ -109,161 +111,93 @@ export type StewardGrowthRuntimeHelpers = {
   }) => Promise<Record<string, unknown> | null>;
 };
 
-function hostSrcUrl(path: string): string {
-  return new URL(path, HOST_SRC_ROOT).href;
+type HostBridgeModule = {
+  callGateway?: unknown;
+  loadConfig?: unknown;
+  resolveSessionStoreKey?: unknown;
+  resolveStorePath?: unknown;
+  updateSessionStoreEntry?: unknown;
+  resolveSessionAgentId?: unknown;
+  resolveChannelConfigWrites?: unknown;
+  normalizeChannelId?: unknown;
+  getConfigValueAtPath?: unknown;
+  setConfigValueAtPath?: unknown;
+  readConfigFileSnapshot?: unknown;
+  validateConfigObjectWithPlugins?: unknown;
+  writeConfigFile?: unknown;
+  syncStewardGrowthLoop?: unknown;
+};
+
+async function loadHostBridge(): Promise<HostBridgeModule> {
+  return (await import("openclaw/plugin-sdk/web3-host")) as HostBridgeModule;
 }
 
-function hostDistUrl(path: string): string {
-  return new URL(path, HOST_DIST_ROOT).href;
-}
-
-// ── Loaders ──────────────────────────────────────────────────────────────────
-
-/**
- * Lazily loads the `callGateway` function from the host's gateway module.
- * Uses dynamic import with a `src/` → `dist/` fallback chain so it works
- * in both development (ts source) and production (built output) modes.
- */
 export async function loadCallGateway(): Promise<CallGatewayFn> {
-  try {
-    const mod = await import(hostSrcUrl("gateway/call.ts"));
-    if (typeof mod.callGateway === "function") {
-      return mod.callGateway as CallGatewayFn;
-    }
-  } catch {
-    // ignore — expected when running from dist
-  }
-
-  const mod = await import(hostDistUrl("gateway/call.js"));
+  const mod = await loadHostBridge();
   if (typeof mod.callGateway !== "function") {
     throw new Error("callGateway is not available");
   }
   return mod.callGateway as CallGatewayFn;
 }
 
-/**
- * Lazily loads `loadConfig` from the host's config module.
- */
 export async function loadCoreConfig(): Promise<OpenClawConfig> {
-  try {
-    const mod = await import(hostSrcUrl("config/config.ts"));
-    if (typeof mod.loadConfig === "function") {
-      return await mod.loadConfig();
-    }
-  } catch {
-    // ignore
-  }
-
-  const mod = await import(hostDistUrl("config/config.js"));
+  const mod = await loadHostBridge();
   if (typeof mod.loadConfig !== "function") {
     throw new Error("loadConfig is not available");
   }
-  return await mod.loadConfig();
+  return await (mod.loadConfig as () => OpenClawConfig | Promise<OpenClawConfig>)();
 }
 
-/**
- * Lazily loads session-store helpers from various host modules.
- */
 export async function loadSessionStoreHelpers(): Promise<SessionStoreHelpers> {
-  try {
-    const [sessionUtils, sessionPaths, sessionStore, agentScope] = await Promise.all([
-      import(hostSrcUrl("gateway/session-utils.ts")),
-      import(hostSrcUrl("config/sessions/paths.ts")),
-      import(hostSrcUrl("config/sessions/store.ts")),
-      import(hostSrcUrl("agents/agent-scope.ts")),
-    ]);
-    if (
-      typeof sessionUtils.resolveSessionStoreKey !== "function" ||
-      typeof sessionPaths.resolveStorePath !== "function" ||
-      typeof sessionStore.updateSessionStoreEntry !== "function" ||
-      typeof agentScope.resolveSessionAgentId !== "function"
-    ) {
-      throw new Error("session store helpers are unavailable");
-    }
-    return {
-      resolveSessionStoreKey: sessionUtils.resolveSessionStoreKey,
-      resolveStorePath: sessionPaths.resolveStorePath,
-      updateSessionStoreEntry: sessionStore.updateSessionStoreEntry,
-      resolveSessionAgentId: agentScope.resolveSessionAgentId,
-    };
-  } catch {
-    const [sessionUtils, sessionPaths, sessionStore, agentScope] = await Promise.all([
-      import(hostDistUrl("gateway/session-utils.js")),
-      import(hostDistUrl("config/sessions/paths.js")),
-      import(hostDistUrl("config/sessions/store.js")),
-      import(hostDistUrl("agents/agent-scope.js")),
-    ]);
-    if (
-      typeof sessionUtils.resolveSessionStoreKey !== "function" ||
-      typeof sessionPaths.resolveStorePath !== "function" ||
-      typeof sessionStore.updateSessionStoreEntry !== "function" ||
-      typeof agentScope.resolveSessionAgentId !== "function"
-    ) {
-      throw new Error("session store helpers are unavailable");
-    }
-    return {
-      resolveSessionStoreKey: sessionUtils.resolveSessionStoreKey,
-      resolveStorePath: sessionPaths.resolveStorePath,
-      updateSessionStoreEntry: sessionStore.updateSessionStoreEntry,
-      resolveSessionAgentId: agentScope.resolveSessionAgentId,
-    };
+  const mod = await loadHostBridge();
+  if (
+    typeof mod.resolveSessionStoreKey !== "function" ||
+    typeof mod.resolveStorePath !== "function" ||
+    typeof mod.updateSessionStoreEntry !== "function" ||
+    typeof mod.resolveSessionAgentId !== "function"
+  ) {
+    throw new Error("session store helpers are unavailable");
   }
+  return {
+    resolveSessionStoreKey:
+      mod.resolveSessionStoreKey as SessionStoreHelpers["resolveSessionStoreKey"],
+    resolveStorePath: mod.resolveStorePath as SessionStoreHelpers["resolveStorePath"],
+    updateSessionStoreEntry:
+      mod.updateSessionStoreEntry as SessionStoreHelpers["updateSessionStoreEntry"],
+    resolveSessionAgentId:
+      mod.resolveSessionAgentId as SessionStoreHelpers["resolveSessionAgentId"],
+  };
 }
 
-/**
- * Lazily loads config-write helpers used by `web3-market-command.ts` for
- * one-click market enablement.
- */
 export async function loadConfigWriteHelpers(): Promise<ConfigWriteHelpers> {
-  try {
-    const [configWrites, channelRegistry, configPaths, config] = await Promise.all([
-      import(hostSrcUrl("channels/plugins/config-writes.ts")),
-      import(hostSrcUrl("channels/registry.ts")),
-      import(hostSrcUrl("config/config-paths.ts")),
-      import(hostSrcUrl("config/config.ts")),
-    ]);
-    return {
-      resolveChannelConfigWrites: configWrites.resolveChannelConfigWrites,
-      normalizeChannelId: channelRegistry.normalizeChannelId,
-      getConfigValueAtPath: configPaths.getConfigValueAtPath,
-      setConfigValueAtPath: configPaths.setConfigValueAtPath,
-      readConfigFileSnapshot: config.readConfigFileSnapshot,
-      validateConfigObjectWithPlugins: config.validateConfigObjectWithPlugins,
-      writeConfigFile: config.writeConfigFile,
-    };
-  } catch {
-    const [configWrites, channelRegistry, configPaths, config] = await Promise.all([
-      import(hostDistUrl("channels/plugins/config-writes.js")),
-      import(hostDistUrl("channels/registry.js")),
-      import(hostDistUrl("config/config-paths.js")),
-      import(hostDistUrl("config/config.js")),
-    ]);
-    return {
-      resolveChannelConfigWrites: configWrites.resolveChannelConfigWrites,
-      normalizeChannelId: channelRegistry.normalizeChannelId,
-      getConfigValueAtPath: configPaths.getConfigValueAtPath,
-      setConfigValueAtPath: configPaths.setConfigValueAtPath,
-      readConfigFileSnapshot: config.readConfigFileSnapshot,
-      validateConfigObjectWithPlugins: config.validateConfigObjectWithPlugins,
-      writeConfigFile: config.writeConfigFile,
-    };
+  const mod = await loadHostBridge();
+  if (
+    typeof mod.resolveChannelConfigWrites !== "function" ||
+    typeof mod.normalizeChannelId !== "function" ||
+    typeof mod.getConfigValueAtPath !== "function" ||
+    typeof mod.setConfigValueAtPath !== "function" ||
+    typeof mod.readConfigFileSnapshot !== "function" ||
+    typeof mod.validateConfigObjectWithPlugins !== "function" ||
+    typeof mod.writeConfigFile !== "function"
+  ) {
+    throw new Error("config write helpers are unavailable");
   }
+  return {
+    resolveChannelConfigWrites:
+      mod.resolveChannelConfigWrites as ConfigWriteHelpers["resolveChannelConfigWrites"],
+    normalizeChannelId: mod.normalizeChannelId as ConfigWriteHelpers["normalizeChannelId"],
+    getConfigValueAtPath: mod.getConfigValueAtPath as ConfigWriteHelpers["getConfigValueAtPath"],
+    setConfigValueAtPath: mod.setConfigValueAtPath as ConfigWriteHelpers["setConfigValueAtPath"],
+    readConfigFileSnapshot:
+      mod.readConfigFileSnapshot as ConfigWriteHelpers["readConfigFileSnapshot"],
+    validateConfigObjectWithPlugins:
+      mod.validateConfigObjectWithPlugins as ConfigWriteHelpers["validateConfigObjectWithPlugins"],
+    writeConfigFile: mod.writeConfigFile as ConfigWriteHelpers["writeConfigFile"],
+  };
 }
 
 export async function loadStewardGrowthRuntimeHelpers(): Promise<StewardGrowthRuntimeHelpers> {
-  try {
-    const mod = await import(hostSrcUrl("agents/steward/cron-jobs.ts"));
-    if (typeof mod.syncStewardGrowthLoop === "function") {
-      return {
-        syncStewardGrowthLoop:
-          mod.syncStewardGrowthLoop as StewardGrowthRuntimeHelpers["syncStewardGrowthLoop"],
-      };
-    }
-  } catch {
-    // ignore
-  }
-
-  const mod = await import(hostDistUrl("agents/steward/cron-jobs.js"));
+  const mod = await loadHostBridge();
   if (typeof mod.syncStewardGrowthLoop !== "function") {
     throw new Error("syncStewardGrowthLoop is not available");
   }
@@ -273,12 +207,6 @@ export async function loadStewardGrowthRuntimeHelpers(): Promise<StewardGrowthRu
   };
 }
 
-// ── Utilities ────────────────────────────────────────────────────────────────
-
-/**
- * Normalizes a raw gateway response into a predictable `{ ok, result?, error? }` shape.
- * Extracted here to eliminate duplication across proxy handler files.
- */
 export function normalizeGatewayResult(payload: unknown): {
   ok: boolean;
   result?: unknown;

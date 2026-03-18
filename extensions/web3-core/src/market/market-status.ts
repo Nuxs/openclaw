@@ -199,8 +199,8 @@ async function callGatewayMethod(
   method: string,
   params?: unknown,
 ): Promise<{ ok: true; result: unknown } | { ok: false; error: string }> {
-  const callGateway = await loadCallGateway();
   try {
+    const callGateway = await loadCallGateway();
     const response = await retryProbe(async () => {
       const raw = await callGateway({
         method,

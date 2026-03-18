@@ -56,5 +56,6 @@
   "http-body",
   "http-route",
   "config-types",
-  "steward-policy"
+  "steward-policy",
+  "web3-host"
 ]
