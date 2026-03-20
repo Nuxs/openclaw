@@ -1334,6 +1334,7 @@
                     "pages": [
                       "plugins/web3-core-dev",
                       "reference/web3-market-dev",
+                      "reference/web3-nemo-stack-openclaw-report",
                       "reference/web3-p2p-research-landscape",
                       "reference/web3-p2p-openclaw-architecture",
                       "reference/web3-p2p-validation-playbook",
