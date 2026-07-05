@@ -1,0 +1,32 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260519233730
+Username: neo\NEO
+RunAs User: neo\NEO
+Configuration Name: 
+Machine: NEO (Microsoft Windows NT 10.0.26200.0)
+Host Application: powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\25292\openclaw\svm.ps1 -Repair
+Process ID: 4580
+PSVersion: 5.1.26100.8457
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.8457
+BuildVersion: 10.0.26100.8457
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+
+==============================================
+ WSL1 安装/修复（不开启 Hypervisor）
+==============================================
+PS>TerminatingError(): "管道已被停止。"
+>> TerminatingError(): "管道已被停止。"
+>> TerminatingError(): "管道已被停止。"
+>> TerminatingError(): "管道已被停止。"
+>> $global:?
+True
+**********************
+Windows PowerShell transcript end
+End time: 20260519234213
+**********************

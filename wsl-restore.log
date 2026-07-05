@@ -1,0 +1,94 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260520002457
+Username: neo\NEO
+RunAs User: neo\NEO
+Configuration Name: 
+Machine: NEO (Microsoft Windows NT 10.0.26200.0)
+Host Application: powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\25292\openclaw\svm.ps1 -Repair
+Process ID: 23172
+PSVersion: 5.1.26100.8457
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.8457
+BuildVersion: 10.0.26100.8457
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+
+==============================================
+ WSL1 完整恢复脚本（针对你的系统定制）
+ 安装后：WSL1正常用 + 游戏正常玩，同时运行！
+==============================================
+
+=== 检查内存完整性状态（避免VBS强制开启Hypervisor） ===
+内存完整性已关闭，没问题。
+
+=== 检查Hypervisor状态 ===
+Hypervisor已关闭，游戏可以正常运行！
+
+✅ 系统状态检查通过，开始安装WSL1...
+
+=== 修复WSL环境 ===
+WSL核心组件正常，跳过修复。
+
+>>> 关闭所有WSL实例
+wsl.exe --shutdown
+
+>>> 关闭所有WSL实例
+cmd.exe /c echo.| wsl.exe --shutdown
+Virtual Machine Platform 未启用，跳过。
+Hypervisor Platform 未启用，跳过。
+
+=== 1/4 启用WSL核心功能 ===
+Windows Subsystem for Linux 未启用，正在启用...
+
+>>> 启用 Windows Subsystem for Linux
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /norestart /quiet
+
+=== 2/4 安装WSL核心组件 ===
+
+>>> 安装WSL核心
+wsl.exe --install --web-download --no-distribution --quiet
+
+>>> 安装WSL核心
+cmd.exe /c echo.| wsl.exe --install --web-download --no-distribution --quiet
+
+=== 3/4 设置默认WSL版本为1（不依赖Hypervisor） ===
+
+>>> 设置默认WSL版本
+wsl.exe --set-default-version 1
+
+>>> 设置默认WSL版本
+cmd.exe /c echo.| wsl.exe --set-default-version 1
+提示：若仍失败，重启后执行 wsl --set-default-version 1
+
+=== 4/4 安装Ubuntu 22.04 ===
+
+>>> 安装 Ubuntu-22.04
+wsl.exe --install -d Ubuntu-22.04 --quiet
+
+>>> 安装 Ubuntu-22.04
+cmd.exe /c echo.| wsl.exe --install -d Ubuntu-22.04 --quiet
+
+=== 初始化Ubuntu ===
+接下来会弹出Ubuntu窗口，请设置你的Linux用户名和密码。
+输入密码时不会显示字符，这是正常的。
+设置完成后关闭Ubuntu窗口即可。
+
+
+=== 安装OpenClaw所需的开发依赖 ===
+
+✅ 全部完成！
+
+🎉 现在你可以：
+  1. 直接玩《三角洲行动》，Hypervisor已关闭，反作弊不会报错！
+  2. 打开WSL运行OpenClaw，输入: wsl -d Ubuntu-22.04
+  3. 两个可以同时运行，不用重启切换！
+
+Windows的磁盘在WSL里的路径是: /mnt/c、/mnt/d，你的代码直接就能访问！
+**********************
+Windows PowerShell transcript end
+End time: 20260520063919
+**********************
